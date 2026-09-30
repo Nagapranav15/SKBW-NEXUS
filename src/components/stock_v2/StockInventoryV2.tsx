@@ -1732,11 +1732,9 @@ export const StockInventoryV2: React.FC = () => {
         {/* ── TAB CONTENT RENDERING ── */}
         
         {/* 1. Warehouse Hierarchy Tab */}
-        {activeTab === 'warehouse' && (
-          <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-2xs">
-            <WarehouseStructureV2 />
-          </div>
-        )}
+        <div className={`bg-white rounded-2xl border border-gray-200/80 p-4 shadow-2xs ${activeTab === 'warehouse' ? 'block' : 'hidden'}`}>
+          <WarehouseStructureV2 />
+        </div>
 
         {/* 2. Stock Transfers Tab */}
         {activeTab === 'transfers' && (
@@ -2346,8 +2344,8 @@ export const StockInventoryV2: React.FC = () => {
           onSaveSuccess={(updated) => {
             const targetId = updated._id || mfgStepsSku._id;
             setAllSkus(prev => prev.map(s => s._id === targetId ? { ...s, ...updated, processSteps: updated.processSteps } : s));
-            if (selectedSku && selectedSku._id === targetId) {
-              setSelectedSku(prev => prev ? { ...prev, ...updated, processSteps: updated.processSteps } : prev);
+            if (selectedDrawerSku && selectedDrawerSku._id === targetId) {
+              setSelectedDrawerSku(prev => prev ? { ...prev, ...updated, processSteps: updated.processSteps } : prev);
             }
             loadAuxiliaryData(true);
           }}

@@ -1329,7 +1329,6 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         amount: Math.round(m.requiredQty * newRate * 100) / 100
       };
     }));
-    setActiveRateDropdownId(null);
   };
 
   // Material Table Row Handlers

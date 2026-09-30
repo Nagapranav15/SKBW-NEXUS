@@ -4608,7 +4608,7 @@ const PurchaseInvoicePage: React.FC = () => {
                     variant="compact"
                     hideLabel
                     unit={unitLabel}
-                    skuId={activeSku?._id || ''}
+                    skuId={selectedSku?._id || ''}
                   />
                 </div>
 

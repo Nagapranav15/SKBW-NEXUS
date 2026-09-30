@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Scissors, Search, Plus, Printer, 
-  Calendar, Layers, Scale, AlertTriangle, CheckCircle2, RotateCcw
+  Calendar, Layers, Scale, AlertTriangle, CheckCircle2, RotateCcw, X
 } from 'lucide-react';
 import { CuttingSlipV2, getCuttingSlipsV2, cancelCuttingSlipV2 } from '../../api/mfgApiV2';
 

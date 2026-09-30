@@ -3,7 +3,8 @@ import {
   Factory, Plus, Search, SlidersHorizontal, ArrowUpDown, Download, 
   RotateCcw, Eye, Pencil, MoreHorizontal, Calendar, Package, 
   FileText, LayoutGrid, History, Check, ChevronLeft, ChevronRight, 
-  Printer, Trash2, ArrowUp, ArrowDown, Filter, Columns, X, ShoppingBag, Scissors
+  Printer, Trash2, ArrowUp, ArrowDown, Filter, Columns, X, ShoppingBag, Scissors,
+  CheckCircle2
 } from 'lucide-react';
 import { ProductionOrder, ProductionStatus, ItemType } from '../../types/production';
 import * as XLSX from 'xlsx';

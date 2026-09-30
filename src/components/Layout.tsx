@@ -203,7 +203,7 @@ const Layout: React.FC = () => {
     hasMountedRef.current = true;
 
     // Track size changes during sidebar expand/collapse
-    let timer: NodeJS.Timeout | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const resizeObserver = new ResizeObserver(() => {
       updateIndicator(true);
     });

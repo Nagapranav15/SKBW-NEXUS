@@ -309,6 +309,7 @@ export const BusinessDirectoryV2: React.FC = () => {
   const [allCities, setAllCities] = useState<any[]>([]);
   const [allTransporters, setAllTransporters] = useState<any[]>([]);
   const [allCustomers, setAllCustomers] = useState<any[]>([]);
+  const [allVendors, setAllVendors] = useState<any[]>([]);
   const [, setAuxLoaded] = useState(false);
 
   // Modal Dialog Pop-up State
@@ -479,12 +480,13 @@ export const BusinessDirectoryV2: React.FC = () => {
   const loadAuxiliaryData = useCallback(async () => {
     if (!selectedCompany?._id) return;
     try {
-      const [agRes, rtRes, mkRes, trRes, custRes] = await Promise.all([
+      const [agRes, rtRes, mkRes, trRes, custRes, vnRes] = await Promise.all([
         getParties({ company: selectedCompany._id, type: 'agent', limit: 500, light: true }),
         getRoutes(selectedCompany._id),
         getParties({ company: selectedCompany._id, type: 'market', limit: 1000 }),
         getParties({ company: selectedCompany._id, type: 'transporter', limit: 500, light: true }),
-        getParties({ company: selectedCompany._id, type: 'customer', limit: 5000, light: true })
+        getParties({ company: selectedCompany._id, type: 'customer', limit: 5000, light: true }),
+        getParties({ company: selectedCompany._id, type: 'vendor', limit: 1000, light: true })
       ]);
 
       setAllAgents(agRes.data.parties || agRes.data || []);
@@ -492,6 +494,7 @@ export const BusinessDirectoryV2: React.FC = () => {
       setAllCities(mkRes.data.parties || mkRes.data || []);
       setAllTransporters(trRes.data.parties || trRes.data || []);
       setAllCustomers(custRes.data.parties || custRes.data || []);
+      setAllVendors(vnRes.data.parties || vnRes.data || []);
       setAuxLoaded(true);
     } catch (err) {
       console.error('Failed to load auxiliary dropdown lists:', err);

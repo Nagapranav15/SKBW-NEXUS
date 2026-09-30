@@ -1017,6 +1017,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   const handleAddProduct = () => {
     setItems(prev => [...prev, getEmptyRow()]);
   };
+  const handleAddItem = handleAddProduct;
 
   // Duplicate Item Row
   const handleDuplicateRow = (idx: number) => {

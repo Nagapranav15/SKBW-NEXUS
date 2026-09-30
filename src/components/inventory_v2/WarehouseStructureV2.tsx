@@ -2049,12 +2049,12 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
           setLocationDetails(null);
           setExpandedReels({});
         }}
-        maxWidth="max-w-4xl"
+        maxWidth="max-w-5xl"
         title={
           <div className="flex items-center justify-between w-full pr-6 text-left">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-blue-100/80 text-blue-700 flex items-center justify-center font-bold text-sm shrink-0">
-                <Scale className="w-4.5 h-4.5" />
+              <div className="w-7 h-7 rounded-lg bg-blue-100/80 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0">
+                <Scale className="w-4 h-4" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -2104,94 +2104,86 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
           </div>
         }
       >
-        <div className="space-y-4 text-xs text-left">
-          {/* Top 4 KPI Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            {/* Total Estimated Weight */}
-            <div className="p-3 bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-200/80 rounded-xl relative overflow-hidden shadow-2xs">
+        <div className="space-y-3 text-xs text-left flex flex-col">
+          {/* Top 3 Metric Cards - Bigger, Spacier & Clean (No Capacity Limit) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-3.5">
+            {/* 1. Total Net Weight */}
+            <div className="p-4 bg-blue-50/60 border border-blue-200/80 rounded-2xl flex flex-col justify-between shadow-2xs hover:shadow-xs transition-shadow">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">
-                  Total Net Weight
+                <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">
+                  TOTAL NET WEIGHT
                 </span>
-                <Scale className="w-3.5 h-3.5 text-blue-500" />
+                <div className="w-6 h-6 rounded-lg bg-blue-100/70 flex items-center justify-center text-blue-600 shrink-0">
+                  <Scale className="w-3.5 h-3.5" />
+                </div>
               </div>
-              <div className="text-base sm:text-lg font-extrabold text-blue-950 mt-1">
-                {inspectedTotals.totalWeight.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} <span className="text-xs font-bold text-blue-700">KG</span>
+              <div className="my-1.5 flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-[26px] font-black tracking-tight text-slate-900">
+                  {inspectedTotals.totalWeight.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                </span>
+                <span className="text-xs font-black text-blue-600 uppercase">KG</span>
               </div>
-              <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+              <p className="text-xs text-slate-500 font-medium truncate">
                 From {inspectedTotals.hasWeightItems} SKU(s)
               </p>
             </div>
 
-            {/* Total Stored Quantity */}
-            <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl shadow-2xs">
+            {/* 2. Total Stored Quantity */}
+            <div className="p-4 bg-white border border-slate-200/90 rounded-2xl flex flex-col justify-between shadow-2xs hover:shadow-xs transition-shadow">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
-                  Total Stored Qty
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  TOTAL STORED QTY
                 </span>
-                <Package className="w-3.5 h-3.5 text-slate-400" />
+                <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
+                  <Package className="w-3.5 h-3.5" />
+                </div>
               </div>
-              <div className="text-base sm:text-lg font-extrabold text-slate-900 mt-1">
-                {inspectedTotals.totalQty.toLocaleString('en-IN')} <span className="text-xs font-semibold text-slate-500">Units</span>
+              <div className="my-1.5 flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-[26px] font-black tracking-tight text-slate-900">
+                  {inspectedTotals.totalQty.toLocaleString('en-IN')}
+                </span>
+                <span className="text-xs font-semibold text-slate-400">Units</span>
               </div>
-              <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+              <p className="text-xs text-slate-500 font-medium truncate">
                 {inspectedTotals.totalCount} distinct SKU item(s)
               </p>
             </div>
 
-            {/* Category Breakdown */}
-            <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl shadow-2xs">
+            {/* 3. Breakdown */}
+            <div className="p-4 bg-white border border-slate-200/90 rounded-2xl flex flex-col justify-between shadow-2xs hover:shadow-xs transition-shadow">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
-                  Breakdown
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  BREAKDOWN
                 </span>
-                <Boxes className="w-3.5 h-3.5 text-slate-400" />
+                <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
+                  <Boxes className="w-3.5 h-3.5" />
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                <span className="px-1.5 py-0.5 rounded bg-blue-100/70 text-blue-800 text-[10px] font-bold">
+              <div className="my-1.5 flex items-center gap-1.5 flex-wrap">
+                <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[11px] font-extrabold">
                   {inspectedTotals.rawCount} RM
                 </span>
-                <span className="px-1.5 py-0.5 rounded bg-purple-100/70 text-purple-800 text-[10px] font-bold">
+                <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[11px] font-extrabold">
                   {inspectedTotals.semiCount} SF
                 </span>
-                <span className="px-1.5 py-0.5 rounded bg-emerald-100/70 text-emerald-800 text-[10px] font-bold">
+                <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[11px] font-extrabold">
                   {inspectedTotals.fgCount} FG
                 </span>
               </div>
-              <p className="text-[10px] text-slate-500 mt-1 truncate">
+              <p className="text-xs text-slate-500 font-medium truncate">
                 RM: {inspectedTotals.rawWeight.toLocaleString('en-IN', { maximumFractionDigits: 1 })} KG
-              </p>
-            </div>
-
-            {/* Capacity & Occupancy */}
-            <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl shadow-2xs">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
-                  Capacity Limit
-                </span>
-                <Layers className="w-3.5 h-3.5 text-slate-400" />
-              </div>
-              <div className="text-sm sm:text-base font-bold text-slate-800 mt-1">
-                {selectedLocationForDetails?.capacity
-                  ? `${selectedLocationForDetails.capacity.toLocaleString('en-IN')} ${selectedLocationForDetails.unit || 'KG'}`
-                  : 'Uncapped'}
-              </div>
-              <p className="text-[10px] text-slate-500 mt-0.5 truncate">
-                {selectedLocationForDetails?.occupiedPercent !== undefined
-                  ? `${selectedLocationForDetails.occupiedPercent}% occupied`
-                  : 'Flexible storage'}
               </p>
             </div>
           </div>
 
           {/* Filter & Tab Controls */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-0.5">
             <div className="flex items-center gap-1.5 flex-wrap">
               {/* Category Filter Chips */}
               <button
                 type="button"
                 onClick={() => setInspectCategoryFilter('ALL')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   inspectCategoryFilter === 'ALL'
                     ? 'bg-slate-900 text-white shadow-2xs'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
@@ -2202,7 +2194,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
               <button
                 type="button"
                 onClick={() => setInspectCategoryFilter('RAW')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   inspectCategoryFilter === 'RAW'
                     ? 'bg-blue-600 text-white shadow-2xs'
                     : 'bg-blue-50 text-blue-700 hover:bg-blue-100/70 border border-blue-200/60'
@@ -2213,7 +2205,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
               <button
                 type="button"
                 onClick={() => setInspectCategoryFilter('SEMI')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   inspectCategoryFilter === 'SEMI'
                     ? 'bg-purple-600 text-white shadow-2xs'
                     : 'bg-purple-50 text-purple-700 hover:bg-purple-100/70 border border-purple-200/60'
@@ -2224,7 +2216,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
               <button
                 type="button"
                 onClick={() => setInspectCategoryFilter('FINISHED')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   inspectCategoryFilter === 'FINISHED'
                     ? 'bg-emerald-600 text-white shadow-2xs'
                     : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100/70 border border-emerald-200/60'
@@ -2288,23 +2280,23 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
 
           {/* MAIN VIEW: Stored Items Table */}
           {inspectActiveTab === 'items' && (
-            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs bg-white">
-              <div className="overflow-x-auto max-h-[380px] overflow-y-auto">
+            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs bg-white flex-1 flex flex-col h-[380px]">
+              <div className="overflow-x-auto flex-1 overflow-y-auto">
                 <table className="w-full text-xs text-left">
                   <thead className="bg-slate-50/90 sticky top-0 z-10 border-b border-slate-200 text-[10.5px] font-semibold text-slate-500 uppercase tracking-wider backdrop-blur-xs">
                     <tr>
-                      <th className="px-3.5 py-2.5 w-10 text-center">#</th>
-                      <th className="px-3.5 py-2.5">Item / SKU Details</th>
-                      <th className="px-3.5 py-2.5 w-28">Category</th>
-                      <th className="px-3.5 py-2.5 text-right w-32">Stored Quantity</th>
-                      <th className="px-3.5 py-2.5 text-right w-44">Respective Weight</th>
-                      <th className="px-3.5 py-2.5 text-right w-24">Specs / Reels</th>
+                      <th className="px-3 py-2 w-10 text-center">#</th>
+                      <th className="px-3 py-2">Item / SKU Details</th>
+                      <th className="px-3 py-2 w-28">Category</th>
+                      <th className="px-3 py-2 text-right w-28">Stored Quantity</th>
+                      <th className="px-3 py-2 text-right w-44">Respective Weight</th>
+                      <th className="px-3 py-2 text-right w-24">Specs / Reels</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
                     {filteredInspectedItems.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-12 text-center text-slate-400">
+                        <td colSpan={6} className="h-[300px] text-center text-slate-400">
                           {inspectSearch ? (
                             <p>No items matching "{inspectSearch}" in this location.</p>
                           ) : (
@@ -2332,43 +2324,41 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                           <React.Fragment key={`${item.skuId}_${idx}`}>
                             <tr className="hover:bg-slate-50/70 transition-colors">
                               {/* # */}
-                              <td className="px-3.5 py-2.5 text-center font-semibold text-slate-400">
+                              <td className="px-3 py-2 text-center font-semibold text-slate-400">
                                 {idx + 1}
                               </td>
 
-                              {/* SKU Code & Name */}
-                              <td className="px-3.5 py-2.5">
-                                <div className="space-y-0.5">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-mono font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[11px] border border-slate-200/80">
-                                      {item.sku.skuCode}
-                                    </span>
-                                    {item.sku.paperType && item.sku.paperType !== 'None' && (
-                                      <span className="text-[10px] font-semibold text-slate-500 bg-slate-50 px-1 rounded border border-slate-200/60">
-                                        {item.sku.paperType}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <p className="text-slate-800 font-semibold text-xs leading-snug">
+                              {/* SKU Code & Name in ONE line */}
+                              <td className="px-3 py-2">
+                                <div className="flex items-center gap-2 whitespace-nowrap min-w-0">
+                                  <span className="font-mono font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[11px] border border-slate-200/80 shrink-0">
+                                    {item.sku.skuCode}
+                                  </span>
+                                  <span className="text-slate-800 font-semibold text-xs truncate max-w-[240px]" title={item.sku.name}>
                                     {item.sku.name}
-                                  </p>
+                                  </span>
+                                  {item.sku.paperType && item.sku.paperType !== 'None' && (
+                                    <span className="text-[10px] text-slate-400 shrink-0">
+                                      ({item.sku.paperType})
+                                    </span>
+                                  )}
                                   {item.subLocationName && (
-                                    <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                                      <span>Loc: {item.subLocationName}</span>
-                                    </p>
+                                    <span className="text-[10px] text-slate-400 shrink-0">
+                                      • Loc: {item.subLocationName}
+                                    </span>
                                   )}
                                 </div>
                               </td>
 
-                              {/* Category Badge */}
-                              <td className="px-3.5 py-2.5">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-bold border ${categoryBadge}`}>
+                              {/* Category Badge in ONE line */}
+                              <td className="px-3 py-2 whitespace-nowrap">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${categoryBadge}`}>
                                   {item.categoryType}
                                 </span>
                               </td>
 
-                              {/* Stored Quantity */}
-                              <td className="px-3.5 py-2.5 text-right font-bold text-slate-900">
+                              {/* Stored Quantity in ONE line */}
+                              <td className="px-3 py-2 text-right font-bold text-slate-900 whitespace-nowrap">
                                 <span className="text-xs">
                                   {item.quantity.toLocaleString('en-IN', { maximumFractionDigits: 3 })}
                                 </span>
@@ -2377,25 +2367,23 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                                 </span>
                               </td>
 
-                              {/* Respective Weight (KG) */}
-                              <td className="px-3.5 py-2.5 text-right">
-                                <div className="space-y-0.5">
-                                  <div className="flex items-center justify-end gap-1.5">
-                                    <Scale className="w-3 h-3 text-blue-500 shrink-0" />
-                                    <span className="font-extrabold text-blue-900 text-xs">
-                                      {item.formattedWeight}
+                              {/* Respective Weight (KG) in ONE line */}
+                              <td className="px-3 py-2 text-right whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <Scale className="w-3 h-3 text-blue-500 shrink-0" />
+                                  <span className="font-extrabold text-blue-900 text-xs">
+                                    {item.formattedWeight}
+                                  </span>
+                                  {item.weightNote && item.weightKg !== null && item.weightKg > 0 && (
+                                    <span className="text-[10px] text-slate-400 font-normal truncate max-w-[130px]" title={item.weightNote}>
+                                      ({item.weightNote})
                                     </span>
-                                  </div>
-                                  {item.weightNote && (
-                                    <p className="text-[10px] text-slate-400 font-normal truncate" title={item.weightNote}>
-                                      {item.weightNote}
-                                    </p>
                                   )}
                                 </div>
                               </td>
 
-                              {/* Specs / Reels */}
-                              <td className="px-3.5 py-2.5 text-right">
+                              {/* Specs / Reels in ONE line */}
+                              <td className="px-3 py-2 text-right whitespace-nowrap">
                                 {hasReels ? (
                                   <button
                                     type="button"
@@ -2406,10 +2394,10 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                                     {isReelsExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                                   </button>
                                 ) : (
-                                  <div className="text-[10.5px] text-slate-500 font-medium space-y-0.5">
-                                    {item.sku.gsm ? <div>{item.sku.gsm} GSM</div> : null}
+                                  <div className="text-[10.5px] text-slate-500 font-medium whitespace-nowrap inline-flex items-center gap-1">
+                                    {item.sku.gsm ? <span>{item.sku.gsm} GSM</span> : null}
                                     {(item.sku.width || item.sku.length) ? (
-                                      <div>{item.sku.width || ''}{item.sku.length ? `×${item.sku.length}` : ''}"</div>
+                                      <span>• {item.sku.width || ''}{item.sku.length ? `×${item.sku.length}` : ''}"</span>
                                     ) : null}
                                     {!item.sku.gsm && !item.sku.width && <span>—</span>}
                                   </div>
@@ -2482,8 +2470,8 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
 
           {/* SECONDARY VIEW: Recent Movements */}
           {inspectActiveTab === 'movements' && (
-            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs bg-white">
-              <div className="overflow-x-auto max-h-[350px] overflow-y-auto">
+            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs bg-white flex-1 flex flex-col h-[380px]">
+              <div className="overflow-x-auto flex-1 overflow-y-auto">
                 <table className="w-full text-xs text-left">
                   <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-200 text-[10.5px] font-semibold text-slate-500 uppercase tracking-wider">
                     <tr>
@@ -2498,7 +2486,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                   <tbody className="divide-y divide-slate-100 font-medium">
                     {(!locationDetails?.recentMovements || locationDetails.recentMovements.length === 0) ? (
                       <tr>
-                        <td colSpan={6} className="py-10 text-center text-slate-400">
+                        <td colSpan={6} className="h-[300px] text-center text-slate-400">
                           No recent inventory ledger movements recorded for this location.
                         </td>
                       </tr>
