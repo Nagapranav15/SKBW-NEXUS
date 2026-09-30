@@ -92,6 +92,13 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
   // Print Mode State
   const [isPrintMode, setIsPrintMode] = useState(false);
 
+  // Helper for clean currency/rate display (avoids long float precision artifacts)
+  const formatRate = (rate: number | string | undefined | null) => {
+    const n = Number(rate);
+    if (isNaN(n) || n === 0) return '0.00';
+    return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
   // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -748,99 +755,99 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
       onClose={onClose}
       size="max-w-[98vw] 2xl:max-w-[1760px]"
       maxWidth="max-w-[98vw] 2xl:max-w-[1760px]"
-      className="max-h-[96vh] h-[95vh] w-full"
+      className="max-h-[96vh] w-full"
       padding="p-0"
       hideCloseButton={true}
     >
-      <div className="flex flex-col h-full bg-slate-50 overflow-hidden font-sans">
-        {/* Voucher Header (Clean, Light, Modern ERP Style) */}
-        <div className="px-5 py-3.5 bg-white border-b border-slate-200/90 flex items-center justify-between shrink-0 shadow-3xs">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center shrink-0 shadow-3xs">
-              <Scissors className="w-5 h-5 stroke-[2.2]" />
+      <div className="flex flex-col min-h-0 h-full bg-slate-50 font-sans select-none overflow-hidden">
+        {/* Voucher Header (Clean Single-Color Blue ERP Style) */}
+        <div className="px-4 py-2 bg-white border-b border-blue-200 flex items-center justify-between shrink-0 shadow-3xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-3xs">
+              <Scissors className="w-4 h-4 stroke-[2.2]" />
             </div>
             <div>
-              <div className="flex items-center gap-2.5">
-                <span className="font-mono font-black text-sm sm:text-base tracking-wider text-teal-900 bg-teal-50 px-3 py-1 rounded-xl border border-teal-300 shadow-3xs">
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-bold text-xs sm:text-sm tracking-wider text-blue-900 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
                   {slipNumber || 'CS-001'}
                 </span>
-                <span className="text-xs px-3 py-1 rounded-full bg-slate-100 text-slate-700 font-bold border border-slate-200 uppercase tracking-wider">
-                  CUTTING SLIP VOUCHER (STOCK CONVERSION)
+                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-900 font-bold border border-blue-200 uppercase tracking-wider">
+                  Cutting Slip Voucher (Stock Conversion)
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5 font-medium">
+              <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
                 Reel → Sheet Stock Journal with Live Discrepancy & Scrap Reconciliation
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-slate-50 px-3.5 py-1.5 rounded-xl border border-slate-200 text-sm">
-              <span className="text-slate-500 font-semibold text-xs">Date:</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 text-xs">
+              <span className="text-slate-600 font-bold uppercase text-[11px]">Date:</span>
               <input 
                 type="date" 
                 value={date} 
                 onChange={e => setDate(e.target.value)}
-                className="bg-transparent text-slate-800 font-mono text-sm focus:outline-none cursor-pointer font-bold"
+                className="bg-transparent text-slate-900 font-mono text-xs focus:outline-none cursor-pointer font-bold"
               />
             </div>
             <button
               type="button"
               onClick={() => setIsPrintMode(!isPrintMode)}
-              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-3xs transition-all cursor-pointer"
+              className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-900 border border-blue-200 rounded-lg text-xs font-bold flex items-center gap-1 shadow-3xs transition-all cursor-pointer"
               title="Toggle printable machine slip view"
             >
-              <Printer className="w-4 h-4 text-teal-600" />
+              <Printer className="w-3.5 h-3.5 text-blue-600" />
               <span>{isPrintMode ? 'Voucher View' : 'Print Slip'}</span>
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all cursor-pointer"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* Printable View */}
         {isPrintMode ? (
-          <div className="flex-1 p-8 bg-white overflow-y-auto print:p-0">
-            <div className="max-w-4xl mx-auto border-2 border-slate-800 p-6 rounded-xl space-y-6">
-              <div className="flex justify-between items-start border-b-2 border-slate-800 pb-4">
+          <div className="flex-1 p-5 bg-white overflow-y-auto print:p-0">
+            <div className="max-w-4xl mx-auto border-2 border-slate-800 p-5 rounded-xl space-y-5">
+              <div className="flex justify-between items-start border-b-2 border-slate-800 pb-3">
                 <div>
-                  <h2 className="text-xl font-black text-slate-900">SRI KRISHNA BOOK WORKS</h2>
-                  <p className="text-xs text-slate-600 font-medium">PAPER SHEETING & SLITTING JOB ORDER SLIP</p>
+                  <h2 className="text-lg font-black text-slate-900">SRI KRISHNA BOOK WORKS</h2>
+                  <p className="text-xs text-slate-600 font-bold uppercase">Paper Sheeting & Slitting Job Order Slip</p>
                 </div>
                 <div className="text-right font-mono">
-                  <div className="text-sm font-bold text-slate-900">{slipNumber || 'CS-001'}</div>
-                  <div className="text-xs text-slate-500">{date}</div>
+                  <div className="text-xs font-bold text-slate-900">{slipNumber || 'CS-001'}</div>
+                  <div className="text-[11px] text-slate-600">{date}</div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                <div className="border border-slate-200 p-3 rounded-lg">
-                  <span className="font-bold text-slate-700 block mb-1">INPUT (REELS MOUNTED)</span>
+              <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm">
+                <div className="border border-slate-200 p-2.5 rounded-lg">
+                  <span className="font-bold text-slate-800 block mb-1">INPUT (REELS MOUNTED)</span>
                   <div>SKU: <span className="font-bold">{sourceSkuDoc?.name || 'Reels'}</span></div>
                   <div>Batch: <span className="font-bold font-mono">{selectedReels[0]?.purchaseBatch || 'N/A'}</span></div>
                   <div>Reels Count: <span className="font-bold">{selectedReels.length}</span></div>
                   <div>Total Weight: <span className="font-bold font-mono">{totalInputWeight} Kg</span></div>
                 </div>
-                <div className="border border-slate-200 p-3 rounded-lg">
-                  <span className="font-bold text-slate-700 block mb-1">OUTPUT (SHEETS REQUIRED)</span>
+                <div className="border border-slate-200 p-2.5 rounded-lg">
+                  <span className="font-bold text-slate-800 block mb-1">OUTPUT (SHEETS REQUIRED)</span>
                   <div>Target SKU: <span className="font-bold">{selectedTargetSkuDoc?.name || 'Sheets'}</span></div>
                   <div>Cut Size: <span className="font-bold">{sheetWidth} x {sheetLength} cm ({sheetGsm} GSM)</span></div>
                   <div>Machine Meter: <span className="font-bold font-mono">{cutsCountInput || '0'} Cuts ({reelsOnStand} Reels on Stand × {slitsCount} Slits)</span></div>
                   <div>Theoretical: <span className="font-bold font-mono">{theoreticalSheets} Sheets ({theoreticalReams} Reams)</span></div>
-                  <div>Actual Good: <span className="font-bold font-mono text-emerald-700">{numActualSheets} Sheets ({numActualReams} Reams)</span></div>
+                  <div>Actual Good: <span className="font-bold font-mono text-blue-900">{numActualSheets} Sheets ({numActualReams} Reams)</span></div>
                 </div>
               </div>
 
-              <div className="border border-slate-200 rounded-lg p-3">
-                <span className="font-bold text-xs text-slate-700 block mb-2">INDIVIDUAL REELS LOG</span>
+              <div className="border border-slate-200 rounded-lg p-2.5">
+                <span className="font-bold text-xs sm:text-sm text-slate-800 block mb-1.5">INDIVIDUAL REELS LOG</span>
                 <table className="w-full text-xs text-left">
                   <thead>
-                    <tr className="border-b text-slate-500 font-mono">
+                    <tr className="border-b text-slate-600 font-mono text-[11px]">
                       <th className="py-1">#</th>
                       <th className="py-1">Reel Number</th>
                       <th className="py-1">Weight (Kg)</th>
@@ -850,111 +857,111 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                   </thead>
                   <tbody>
                     {selectedReels.map((r, i) => (
-                      <tr key={i} className="border-b border-slate-100">
+                      <tr key={i} className="border-b border-slate-100 text-xs">
                         <td className="py-1">{i + 1}</td>
                         <td className="py-1 font-mono font-bold">{r.reelNumber}</td>
                         <td className="py-1 font-mono">{r.weight} kg</td>
                         <td className="py-1">{r.width || sheetWidth} cm</td>
-                        <td className="py-1 text-slate-500">{r.locationName}</td>
+                        <td className="py-1 text-slate-600">{r.locationName}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
 
-              <div className="flex justify-between items-end pt-8 text-xs border-t border-slate-200">
+              <div className="flex justify-between items-end pt-4 text-xs border-t border-slate-200">
                 <div className="space-y-1">
                   <div>Machine: <span className="font-bold">{machineName}</span></div>
                   <div>Operator: <span className="font-bold">{operatorName || '______________'}</span></div>
                 </div>
                 <div className="text-center">
-                  <div className="w-40 border-b border-slate-400 mb-1"></div>
-                  <span className="text-[10px] text-slate-500">Supervisor Signature</span>
+                  <div className="w-36 border-b border-slate-400 mb-1"></div>
+                  <span className="text-[11px] text-slate-600">Supervisor Signature</span>
                 </div>
               </div>
 
-              <div className="flex justify-end pt-4 gap-2">
+              <div className="flex justify-end pt-2 gap-2">
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-3xs"
                 >
-                  <Printer className="w-4 h-4" /> Print Hardcopy
+                  <Printer className="w-3.5 h-3.5" /> Print Hardcopy
                 </button>
               </div>
             </div>
           </div>
         ) : (
           /* Dual-Pane Voucher View (Tally Stock Journal) */
-          <div className="flex-1 flex flex-col p-4 overflow-hidden gap-3 min-h-0">
+          <div className="flex-1 flex flex-col p-2.5 sm:p-3 overflow-y-auto gap-2.5 min-h-0 custom-scrollbar">
             {/* Top Toolbar */}
-            <div className="bg-white px-3.5 py-2.5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between gap-4 flex-wrap text-sm shrink-0">
-              <div className="flex items-center gap-4 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Machine:</span>
+            <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-3xs flex items-center justify-between gap-2.5 flex-wrap text-xs shrink-0">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Machine:</span>
                   <input
                     type="text"
                     value={machineName}
                     onChange={e => setMachineName(e.target.value)}
-                    className="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all w-36 sm:w-44"
+                    className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-600 transition-all w-32 sm:w-36"
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Operator:</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Operator:</span>
                   <input
                     type="text"
                     value={operatorName}
                     onChange={e => setOperatorName(e.target.value)}
                     placeholder="Operator name"
-                    className="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all w-40 sm:w-48 placeholder:text-slate-400"
+                    className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-600 transition-all w-36 sm:w-44 placeholder:text-slate-400"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-500 font-medium">
-                <div className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl shadow-3xs">
-                  Available Stock: <span className="font-mono font-bold text-slate-900">{availableReels.length} Reels</span>
+              <div className="flex items-center gap-2 text-xs text-slate-700 font-semibold">
+                <div className="bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg shadow-3xs text-blue-900 font-bold">
+                  Available Stock: <span className="font-mono">{availableReels.length} Reels</span>
                 </div>
-                <div className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl shadow-3xs">
-                  Paper Items: <span className="font-mono font-bold text-slate-900">{reelItemsWithStock.length} SKUs</span>
+                <div className="bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg shadow-3xs text-blue-900 font-bold">
+                  Paper Items: <span className="font-mono">{reelItemsWithStock.length} SKUs</span>
                 </div>
               </div>
             </div>
 
             {/* Split Screen: Left (Consumption) vs Right (Production) */}
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-3 min-h-0 overflow-hidden">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 min-h-[460px]">
               {/* ── LEFT PANE: CONSUMPTION (Source Reels: Item -> Purchase Batch -> Reels) ── */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs flex flex-col overflow-hidden">
-                <div className="p-3 bg-rose-50/60 border-b border-rose-100 flex items-center justify-between shrink-0">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-black text-xs shadow-3xs">
+              <div className="bg-white rounded-xl border border-blue-200 shadow-3xs flex flex-col overflow-hidden min-h-[450px]">
+                <div className="px-3 py-1.5 bg-blue-50/70 border-b border-blue-100 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-3xs">
                       1
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                      <h4 className="text-xs font-bold text-blue-950 uppercase tracking-wider">
                         Consumption (Source Reels Out)
                       </h4>
-                      <p className="text-xs text-slate-500">
-                        Select paper reel item, then choose reels by purchase batch
+                      <p className="text-[11px] text-slate-500">
+                        Select paper reel SKU, then select available reels by batch
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* 1. Paper Reel Item Searchable Dropdown Popover matching Target SKU */}
-                <div className="p-3 bg-slate-50/90 border-b border-slate-200/80 space-y-1.5 relative" ref={reelDropdownRef}>
+                {/* 1. Paper Reel Item Searchable Dropdown - Neat & Clear */}
+                <div className="p-2.5 bg-blue-50/20 border-b border-blue-100 space-y-1 relative" ref={reelDropdownRef}>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                      <Package className="w-4 h-4 text-rose-600" />
-                      <span>Select Reel Item:</span>
+                    <span className="font-bold text-blue-950 uppercase tracking-wider flex items-center gap-1.5 text-[11px]">
+                      <Package className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Select Reel Item (Raw Material):</span>
                     </span>
-                    <span className="text-slate-500 font-medium text-xs">
-                      {reelItemsWithStock.length} Reel {reelItemsWithStock.length === 1 ? 'Item' : 'Items'} available
+                    <span className="text-blue-900 bg-blue-100/70 px-2 py-0.5 rounded font-bold text-[11px] border border-blue-200">
+                      {reelItemsWithStock.length} Reel {reelItemsWithStock.length === 1 ? 'Item' : 'Items'} In Stock
                     </span>
                   </div>
 
                   <div className="relative">
-                    <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400 pointer-events-none" />
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-blue-600 pointer-events-none" />
                     <input
                       type="text"
                       value={showReelDropdown ? reelItemSearch : (selectedReelItemDoc ? `${selectedReelItemDoc.name} ${selectedReelItemDoc.code ? `(${selectedReelItemDoc.code})` : ''}` : '')}
@@ -964,10 +971,10 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                       }}
                       onClick={() => setShowReelDropdown(true)}
                       onFocus={() => setShowReelDropdown(true)}
-                      placeholder="Search or select paper reel SKU..."
-                      className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-rose-500/25 focus:border-rose-500 shadow-2xs cursor-pointer transition-all"
+                      placeholder="Search paper reel name or code..."
+                      className="w-full pl-8 pr-8 h-9 bg-white border border-blue-300 hover:border-blue-500 focus:border-blue-600 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-1 focus:ring-blue-500/20 shadow-3xs cursor-pointer transition-all"
                     />
-                    <div className="absolute right-3 top-2.5 flex items-center gap-1 text-slate-400">
+                    <div className="absolute right-2.5 top-2 flex items-center gap-1">
                       {selectedReelItemKey ? (
                         <button
                           type="button"
@@ -977,28 +984,28 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                             setSelectedReelIds(new Set());
                             setReelItemSearch('');
                           }}
-                          className="p-1 hover:text-slate-600 rounded cursor-pointer"
+                          className="p-0.5 hover:bg-blue-100 text-blue-700 hover:text-blue-900 rounded cursor-pointer transition-colors"
                           title="Clear selected reel SKU"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       ) : (
                         <ChevronDown 
-                          className="w-4 h-4 cursor-pointer hover:text-slate-600" 
+                          className="w-3.5 h-3.5 cursor-pointer text-blue-600 hover:text-blue-800" 
                           onClick={() => setShowReelDropdown(!showReelDropdown)} 
                         />
                       )}
                     </div>
                   </div>
 
-                  {/* Dropdown Popover matching Target SKU 1:1 */}
+                  {/* Dropdown Popover */}
                   {showReelDropdown && (
-                    <div className="absolute left-2.5 right-2.5 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl z-[999] max-h-80 overflow-y-auto divide-y divide-slate-100 p-1">
+                    <div className="absolute left-2 right-2 top-full mt-1 bg-white border border-blue-200 rounded-xl shadow-2xl z-[999] max-h-72 overflow-y-auto divide-y divide-slate-100 p-1">
                       {/* Category Filter Chips Header */}
-                      <div className="sticky top-0 bg-white/95 backdrop-blur-xs p-2 border-b border-slate-100 z-10 space-y-1.5 shadow-3xs">
-                        <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                      <div className="sticky top-0 bg-white/95 backdrop-blur-xs p-1.5 border-b border-blue-100 z-10 space-y-1 shadow-3xs">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
                           <span className="flex items-center gap-1">
-                            <Tag className="w-3 h-3 text-rose-600" />
+                            <Tag className="w-3 h-3 text-blue-600" />
                             <span>Filter Category:</span>
                           </span>
                           <span>Showing {filteredReelItems.length} of {reelCategoryBreakdown.total}</span>
@@ -1007,10 +1014,10 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                           <button
                             type="button"
                             onClick={() => setReelCategoryFilter('ALL')}
-                            className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 transition-all cursor-pointer ${
                               reelCategoryFilter === 'ALL'
-                                ? 'bg-rose-600 text-white shadow-3xs'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                ? 'bg-blue-600 text-white shadow-3xs'
+                                : 'bg-blue-50 text-blue-900 hover:bg-blue-100 border border-blue-200'
                             }`}
                           >
                             All ({reelCategoryBreakdown.total})
@@ -1020,10 +1027,10 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                               key={cat}
                               type="button"
                               onClick={() => setReelCategoryFilter(cat)}
-                              className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 transition-all cursor-pointer ${
                                 reelCategoryFilter === cat
-                                  ? 'bg-rose-600 text-white shadow-3xs'
-                                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                  ? 'bg-blue-600 text-white shadow-3xs'
+                                  : 'bg-blue-50 text-blue-900 hover:bg-blue-100 border border-blue-200'
                               }`}
                             >
                               {cat} ({count})
@@ -1034,7 +1041,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
 
                       {/* List of Paper Reel SKUs */}
                       {filteredReelItems.length === 0 ? (
-                        <div className="p-4 text-center text-xs text-slate-400 italic">
+                        <div className="p-4 text-center text-xs text-slate-500 italic">
                           No paper reel SKUs found matching search.
                         </div>
                       ) : (
@@ -1044,39 +1051,39 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                             <div
                               key={item.key}
                               onClick={() => handleSelectReelItem(item.key)}
-                              className={`p-2.5 cursor-pointer rounded-lg transition-colors flex items-center justify-between text-xs ${
-                                isSelected ? 'bg-rose-50/90 font-bold border border-rose-200' : 'hover:bg-rose-50/50'
+                              className={`p-2 cursor-pointer rounded-lg transition-colors flex items-center justify-between text-xs ${
+                                isSelected ? 'bg-blue-50 font-bold border border-blue-400' : 'hover:bg-blue-50/50'
                               }`}
                             >
-                              <div className="flex-1 min-w-0 pr-3">
-                                <div className="font-bold text-slate-900 break-words leading-snug text-xs sm:text-[13px]">
+                              <div className="flex-1 min-w-0 pr-2">
+                                <div className="font-bold text-slate-900 break-words leading-tight text-xs">
                                   {item.name}
                                 </div>
                                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                  <span className="text-[10px] text-slate-400 font-mono">{item.code}</span>
+                                  <span className="text-[10px] text-slate-500 font-mono font-bold">{item.code}</span>
                                   <span className="text-[10px] text-slate-300">•</span>
-                                  <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200/60">
+                                  <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
                                     {item.category || 'Paper Reels'}
                                   </span>
                                   {(item.width || item.gsm) && (
                                     <>
                                       <span className="text-[10px] text-slate-300">•</span>
-                                      <span className="text-[10px] font-semibold text-rose-700">
+                                      <span className="text-[10px] font-bold text-blue-700">
                                         {item.width ? `${item.width} CM` : ''} {item.gsm ? `${item.gsm} GSM` : ''}
                                       </span>
                                     </>
                                   )}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <span className={`px-2 py-0.5 text-[9.5px] font-black rounded-full border ${
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg border ${
                                   item.reelsCount > 0 
-                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                                    : 'bg-slate-100 text-slate-400 border-slate-200'
+                                    ? 'bg-blue-50 text-blue-900 border-blue-200' 
+                                    : 'bg-slate-50 text-slate-500 border-slate-200'
                                 }`}>
                                   {item.reelsCount} {item.reelsCount === 1 ? 'Reel' : 'Reels'} ({item.totalWeight.toLocaleString()} kg)
                                 </span>
-                                <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded-full border bg-rose-50 text-rose-700 border-rose-200">
+                                <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase rounded-lg border bg-blue-50 text-blue-700 border-blue-200">
                                   Raw Reel
                                 </span>
                               </div>
@@ -1089,30 +1096,30 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                 </div>
 
                 {!selectedReelItemKey ? (
-                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200 m-3">
-                    <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-3 shadow-3xs">
-                      <Package className="w-6 h-6 stroke-[1.8]" />
+                  <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-slate-50/50 rounded-xl border border-dashed border-blue-200 m-2.5 min-h-[300px]">
+                    <div className="w-11 h-11 rounded-xl bg-blue-100 border border-blue-300 text-blue-700 flex items-center justify-center mb-2 shadow-3xs">
+                      <Package className="w-5 h-5 stroke-[2]" />
                     </div>
-                    <h5 className="text-xs font-bold text-slate-800 uppercase tracking-wider">No Paper Reel Selected</h5>
-                    <p className="text-[11px] text-slate-500 max-w-xs mt-1">
-                      Search and select a paper reel above to browse its available purchase batches and individual reels.
+                    <h5 className="text-xs font-bold text-slate-900 uppercase tracking-wider">No Paper Reel Selected</h5>
+                    <p className="text-[11px] text-slate-600 max-w-xs mt-1 font-medium leading-relaxed">
+                      Click the search box above to choose a paper reel SKU. All available reels and batches will display here with full details.
                     </p>
                   </div>
                 ) : (
                   <>
                     {/* 2. Purchase Batch Filter Tabs */}
-                    <div className="px-3.5 py-2.5 bg-white border-b border-slate-100 flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-thin">
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider shrink-0 mr-0.5">
+                    <div className="px-2.5 py-1.5 bg-white border-b border-blue-100 flex items-center justify-between gap-1.5 flex-wrap shrink-0">
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-thin">
+                        <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider shrink-0 mr-0.5">
                           Purchase Batch:
                         </span>
                         <button
                           type="button"
                           onClick={() => setSelectedBatch('ALL')}
-                          className={`px-3 py-1 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all cursor-pointer ${
                             selectedBatch === 'ALL'
-                              ? 'bg-rose-600 text-white shadow-2xs'
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                              ? 'bg-blue-600 text-white shadow-3xs'
+                              : 'bg-blue-50 text-blue-900 hover:bg-blue-100 border border-blue-200'
                           }`}
                         >
                           All Batches ({reelsForSelectedItem.length} Reels)
@@ -1122,13 +1129,13 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                             key={b.batch}
                             type="button"
                             onClick={() => setSelectedBatch(b.batch)}
-                            className={`px-3 py-1 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all cursor-pointer ${
                               selectedBatch === b.batch
-                                ? 'bg-rose-600 text-white shadow-2xs'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                ? 'bg-blue-600 text-white shadow-3xs'
+                                : 'bg-blue-50 text-blue-900 hover:bg-blue-100 border border-blue-200'
                             }`}
                           >
-                            {b.batch} ({b.count} Reels • ₹{b.avgRate}/kg)
+                            {b.batch} ({b.count} Reels • ₹{formatRate(b.avgRate)}/kg)
                           </button>
                         ))}
                       </div>
@@ -1137,7 +1144,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                         <button
                           type="button"
                           onClick={handleToggleAllDisplayed}
-                          className="text-xs text-rose-700 hover:text-rose-900 font-bold shrink-0 cursor-pointer"
+                          className="text-xs text-blue-700 hover:text-blue-900 hover:bg-blue-100 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200 font-bold shrink-0 cursor-pointer transition-colors shadow-3xs"
                         >
                           {displayedReels.every(r => selectedReelIds.has(r.id)) ? 'Deselect In View' : 'Select In View'}
                         </button>
@@ -1145,9 +1152,9 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                     </div>
 
                     {/* 3. Reel Cards Grouped by Purchase Batch */}
-                    <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+                    <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar min-h-[340px] max-h-[460px] bg-slate-50/40">
                       {displayedReels.length === 0 ? (
-                        <div className="p-8 text-center text-slate-400 text-xs">
+                        <div className="p-6 text-center text-slate-600 text-xs font-medium">
                           No reels found in inventory for the selected item and batch.
                         </div>
                       ) : (
@@ -1160,15 +1167,15 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                           const isBatchAllSelected = batchReels.every(r => selectedReelIds.has(r.id));
 
                           return (
-                            <div key={batchInfo.batch} className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-3xs">
+                            <div key={batchInfo.batch} className="rounded-lg border border-blue-200 overflow-hidden bg-white shadow-3xs">
                               {/* Batch Header */}
-                              <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-mono font-bold text-xs text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200/80 shadow-3xs">
-                                    {batchInfo.batch}
+                              <div className="px-2.5 py-1 bg-blue-50/60 border-b border-blue-100 flex items-center justify-between">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-mono font-bold text-xs text-blue-950 bg-white px-2 py-0.5 rounded border border-blue-200 shadow-3xs">
+                                    Batch: {batchInfo.batch}
                                   </span>
-                                  <span className="text-xs text-slate-500 font-medium">
-                                    {batchReels.length} {batchReels.length === 1 ? 'Reel' : 'Reels'} • {batchInfo.totalWeight.toLocaleString()} kg • ₹{batchInfo.avgRate}/kg
+                                  <span className="text-xs text-slate-600 font-medium">
+                                    {batchReels.length} {batchReels.length === 1 ? 'Reel' : 'Reels'} • {batchInfo.totalWeight.toLocaleString()} kg • ₹{formatRate(batchInfo.avgRate)}/kg
                                   </span>
                                 </div>
                                 <button
@@ -1184,14 +1191,14 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                                       return next;
                                     });
                                   }}
-                                  className="text-xs font-bold text-rose-700 hover:text-rose-900 bg-white hover:bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 cursor-pointer transition-colors"
+                                  className="text-[11px] font-bold text-blue-700 hover:text-blue-900 hover:bg-blue-50 bg-white px-2 py-0.5 rounded border border-blue-200 cursor-pointer transition-colors shadow-3xs"
                                 >
                                   {isBatchAllSelected ? 'Deselect Batch' : `Select Batch (${batchReels.length})`}
                                 </button>
                               </div>
 
                               {/* Individual Reels */}
-                              <div className="p-2 space-y-1.5">
+                              <div className="p-1.5 space-y-1.5">
                                 {batchReels.map(r => {
                                   const isSelected = selectedReelIds.has(r.id);
                                   const reelCost = Math.round((Number(r.weight) || 0) * (Number(r.ratePerKg) || 0));
@@ -1199,38 +1206,42 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                                     <div
                                       key={r.id}
                                       onClick={() => handleToggleReel(r.id)}
-                                      className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                                      className={`p-2 sm:p-2.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
                                         isSelected
-                                          ? 'bg-rose-50/80 border-rose-300 shadow-3xs'
-                                          : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                                          ? 'bg-blue-50/80 border-2 border-blue-600 shadow-3xs'
+                                          : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-blue-50/30'
                                       }`}
                                     >
-                                      <div className="flex items-center gap-3 min-w-0">
+                                      <div className="flex items-center gap-2.5 min-w-0">
                                         <input
                                           type="checkbox"
                                           checked={isSelected}
                                           onChange={() => {}}
-                                          className="w-4 h-4 text-rose-600 rounded cursor-pointer pointer-events-none accent-rose-600"
+                                          className="w-4 h-4 rounded cursor-pointer pointer-events-none accent-blue-600 shrink-0"
                                         />
                                         <div className="min-w-0">
-                                          <div className="flex items-center gap-2">
-                                            <span className="font-mono font-bold text-xs sm:text-sm text-slate-900">{r.reelNumber}</span>
-                                            <span className="text-xs text-slate-500 font-medium truncate">
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="font-mono font-bold text-xs sm:text-sm text-slate-900">
+                                              {r.reelNumber}
+                                            </span>
+                                            <span className="text-[10px] sm:text-[11px] font-semibold text-blue-900 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
                                               {r.locationName || 'Godown'}
                                             </span>
                                           </div>
-                                          <div className="text-xs text-slate-400 mt-0.5">
-                                            {r.width ? `${r.width} cm` : ''} {r.gsm ? `• ${r.gsm} GSM` : ''}
+                                          <div className="text-[11px] text-slate-500 mt-0.5 font-medium flex items-center gap-1.5">
+                                            {r.width && <span>{r.width} cm</span>}
+                                            {r.width && r.gsm && <span>•</span>}
+                                            {r.gsm && <span>{r.gsm} GSM</span>}
                                           </div>
                                         </div>
                                       </div>
 
                                       <div className="text-right shrink-0">
-                                        <div className="font-mono font-black text-xs sm:text-sm text-slate-900">
+                                        <div className="font-mono font-bold text-sm sm:text-base text-blue-950">
                                           {r.weight} <span className="text-xs text-slate-500 font-normal">kg</span>
                                         </div>
-                                        <div className="text-xs font-mono text-slate-500">
-                                          @₹{r.ratePerKg}/kg = <span className="font-bold text-slate-800">₹{reelCost.toLocaleString('en-IN')}</span>
+                                        <div className="text-xs font-mono text-slate-600 mt-0.5">
+                                          @₹{formatRate(r.ratePerKg)}/kg = <span className="font-bold text-slate-900">₹{reelCost.toLocaleString('en-IN')}</span>
                                         </div>
                                       </div>
                                     </div>
@@ -1246,50 +1257,50 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                 )}
 
                 {/* Left Footer Summary */}
-                <div className="p-3.5 bg-slate-50 border-t border-slate-200 shrink-0 flex items-center justify-between text-xs sm:text-sm">
+                <div className="p-2 bg-blue-50/60 border-t border-blue-200 shrink-0 flex items-center justify-between text-xs flex-wrap gap-2">
                   <div>
-                    <span className="text-slate-500 font-medium">Selected Reels: </span>
-                    <span className="font-bold text-slate-900">{selectedReels.length}</span>
+                    <span className="text-slate-600 font-medium">Selected Reels: </span>
+                    <span className="font-mono font-bold text-blue-950 text-xs sm:text-sm">{selectedReels.length}</span>
                   </div>
-                  <div className="flex items-center gap-5">
+                  <div className="flex items-center gap-3 sm:gap-5">
                     <div>
-                      <span className="text-slate-500 font-medium">Total Weight: </span>
-                      <span className="font-mono font-black text-rose-700 text-sm sm:text-base">{totalInputWeight.toLocaleString()} kg</span>
+                      <span className="text-slate-600 font-medium">Total Weight: </span>
+                      <span className="font-mono font-bold text-blue-950 text-xs sm:text-sm">{totalInputWeight.toLocaleString()} kg</span>
                     </div>
                     <div>
-                      <span className="text-slate-500 font-medium">Value: </span>
-                      <span className="font-mono font-bold text-slate-900 text-sm sm:text-base">₹{totalInputCost.toLocaleString('en-IN')}</span>
+                      <span className="text-slate-600 font-medium">Value: </span>
+                      <span className="font-mono font-bold text-blue-950 text-xs sm:text-sm">₹{totalInputCost.toLocaleString('en-IN')}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* ── RIGHT PANE: GENERATION (Target Sheets & Direct Cuts Meter) ── */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs flex flex-col overflow-hidden">
-                <div className="p-3 bg-emerald-50/60 border-b border-emerald-100 flex items-center justify-between shrink-0">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-xs shadow-3xs">
+              <div className="bg-white rounded-xl border border-blue-200 shadow-3xs flex flex-col overflow-hidden min-h-[450px]">
+                <div className="px-3 py-1.5 bg-blue-50/70 border-b border-blue-100 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-3xs">
                       2
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                      <h4 className="text-xs font-bold text-blue-950 uppercase tracking-wider">
                         Generation (Target Sheets In)
                       </h4>
-                      <p className="text-xs text-slate-500">
-                        Cut dimensions, dual-unit live production (Sheets ↔ Reams), & godown
+                      <p className="text-[11px] text-slate-500">
+                        Cut dimensions, live production meter (Sheets ↔ Reams), & godown
                       </p>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5 custom-scrollbar">
-                  {/* Target SKU Searchable Dropdown Popover matching Image 2 1:1 */}
+                <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5 custom-scrollbar">
+                  {/* Target SKU Searchable Dropdown */}
                   <div className="relative" ref={targetDropdownRef}>
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                    <label className="text-[11px] font-bold text-blue-950 uppercase tracking-wider block mb-0.5">
                       Target Converted Sheet SKU (Semi Good) *
                     </label>
                     <div className="relative">
-                      <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400 pointer-events-none" />
+                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-blue-600 pointer-events-none" />
                       <input
                         type="text"
                         value={showTargetDropdown ? targetSkuSearch : (selectedTargetSkuDoc?.name || '')}
@@ -1300,9 +1311,9 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                         onClick={() => setShowTargetDropdown(true)}
                         onFocus={() => setShowTargetDropdown(true)}
                         placeholder="Search semi-finished sheet..."
-                        className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-emerald-500/25 focus:border-emerald-500 shadow-2xs cursor-pointer transition-all"
+                        className="w-full pl-8 pr-8 h-9 bg-white border border-blue-300 hover:border-blue-500 focus:border-blue-600 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-1 focus:ring-blue-500/20 shadow-3xs cursor-pointer transition-all"
                       />
-                      <div className="absolute right-3 top-2.5 flex items-center gap-1 text-slate-400">
+                      <div className="absolute right-2.5 top-2 flex items-center gap-1">
                         {targetSkuId ? (
                           <button
                             type="button"
@@ -1310,29 +1321,29 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                               setTargetSkuId('');
                               setTargetSkuSearch('');
                             }}
-                            className="p-1 hover:text-slate-600 rounded cursor-pointer"
+                            className="p-0.5 hover:bg-blue-100 text-blue-700 hover:text-blue-900 rounded cursor-pointer transition-colors"
                             title="Clear selected target SKU"
                           >
-                            <X className="w-4 h-4" />
+                            <X className="w-3.5 h-3.5" />
                           </button>
                         ) : (
                           <ChevronDown 
-                            className="w-4 h-4 cursor-pointer hover:text-slate-600" 
+                            className="w-3.5 h-3.5 cursor-pointer text-blue-600 hover:text-blue-800" 
                             onClick={() => setShowTargetDropdown(!showTargetDropdown)} 
                           />
                         )}
                       </div>
                     </div>
 
-                    {/* Dropdown Popover matching Image 2 1:1 */}
+                    {/* Dropdown Popover */}
                     {showTargetDropdown && (
-                      <div className="absolute left-0 top-full mt-1 w-full min-w-[340px] sm:min-w-[460px] bg-white border border-slate-200 rounded-xl shadow-2xl z-[999] max-h-80 overflow-y-auto divide-y divide-slate-100 p-1">
+                      <div className="absolute left-0 top-full mt-1 w-full min-w-[320px] sm:min-w-[400px] bg-white border border-blue-200 rounded-xl shadow-2xl z-[999] max-h-72 overflow-y-auto divide-y divide-slate-100 p-1">
                         {/* Category Filter Chips Header */}
-                        <div className="sticky top-0 bg-white/95 backdrop-blur-xs p-2 border-b border-slate-100 z-10 space-y-1.5 shadow-3xs">
-                          <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                        <div className="sticky top-0 bg-white/95 backdrop-blur-xs p-1.5 border-b border-blue-100 z-10 space-y-1 shadow-3xs">
+                          <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
                             <span className="flex items-center gap-1">
-                              <Tag className="w-3 h-3 text-emerald-600" />
-                              <span>Shift Category:</span>
+                              <Tag className="w-3 h-3 text-blue-600" />
+                              <span>Filter Category:</span>
                             </span>
                             <span>Showing {filteredTargetSkus.length} of {semiCategoryBreakdown.total}</span>
                           </div>
@@ -1340,10 +1351,10 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                             <button
                               type="button"
                               onClick={() => setTargetCategoryFilter('ALL')}
-                              className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 transition-all cursor-pointer ${
                                 targetCategoryFilter === 'ALL'
-                                  ? 'bg-emerald-600 text-white shadow-3xs'
-                                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                  ? 'bg-blue-600 text-white shadow-3xs'
+                                  : 'bg-blue-50 text-blue-900 hover:bg-blue-100 border border-blue-200'
                               }`}
                             >
                               All ({semiCategoryBreakdown.total})
@@ -1353,10 +1364,10 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                                 key={cat}
                                 type="button"
                                 onClick={() => setTargetCategoryFilter(cat)}
-                                className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 transition-all cursor-pointer ${
                                   targetCategoryFilter === cat
-                                    ? 'bg-emerald-600 text-white shadow-3xs'
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    ? 'bg-blue-600 text-white shadow-3xs'
+                                    : 'bg-blue-50 text-blue-900 hover:bg-blue-100 border border-blue-200'
                                 }`}
                               >
                                 {cat} ({count})
@@ -1367,7 +1378,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
 
                         {/* List of Semi-Finished Good SKUs */}
                         {filteredTargetSkus.length === 0 ? (
-                          <div className="p-4 text-center text-xs text-slate-400 italic">
+                          <div className="p-4 text-center text-xs text-slate-500 italic">
                             No semi-finished good sheets found matching search.
                           </div>
                         ) : (
@@ -1378,31 +1389,31 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                               <div
                                 key={s._id}
                                 onClick={() => handleSelectTargetSku(s)}
-                                className={`p-2.5 cursor-pointer rounded-lg transition-colors flex items-center justify-between text-xs ${
-                                  isSelected ? 'bg-emerald-50/90 font-bold border border-emerald-200' : 'hover:bg-emerald-50/50'
+                                className={`p-2 cursor-pointer rounded-lg transition-colors flex items-center justify-between text-xs ${
+                                  isSelected ? 'bg-blue-50 font-bold border border-blue-400' : 'hover:bg-blue-50/50'
                                 }`}
                               >
-                                <div className="flex-1 min-w-0 pr-3">
-                                  <div className="font-bold text-slate-900 break-words leading-snug text-xs sm:text-[13px]">{s.name}</div>
+                                <div className="flex-1 min-w-0 pr-2">
+                                  <div className="font-bold text-slate-900 break-words leading-tight text-xs">{s.name}</div>
                                   <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                    <span className="text-[10px] text-slate-400 font-mono">{s.skuCode}</span>
+                                    <span className="text-[10px] text-slate-500 font-mono font-bold">{s.skuCode}</span>
                                     <span className="text-[10px] text-slate-300">•</span>
-                                    <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200/60">
+                                    <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
                                       {s.category || 'Semi Goods'}
                                     </span>
                                     {spec && (
                                       <>
                                         <span className="text-[10px] text-slate-300">•</span>
-                                        <span className="text-[10px] font-semibold text-emerald-700">{spec}</span>
+                                        <span className="text-[10px] font-bold text-blue-700">{spec}</span>
                                       </>
                                     )}
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded-full border bg-purple-50 text-purple-700 border-purple-200">
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase rounded-lg border bg-blue-50 text-blue-700 border-blue-200">
                                     Semi Good
                                   </span>
-                                  <span className="px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                                  <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase rounded-lg border bg-blue-50 text-blue-900 border-blue-200">
                                     {s.status || 'Active'}
                                   </span>
                                 </div>
@@ -1415,67 +1426,67 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                   </div>
 
                   {/* Cut Specifications Grid */}
-                  <div className="grid grid-cols-4 gap-3 bg-slate-50/90 p-3 rounded-2xl border border-slate-200">
+                  <div className="grid grid-cols-4 gap-2 bg-blue-50/30 p-2 rounded-xl border border-blue-100">
                     <div>
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">Width (cm)</label>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-0.5">Width (cm)</label>
                       <input
                         type="number"
                         step="any"
                         value={sheetWidth}
                         onChange={e => setSheetWidth(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-bold font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-2xs"
+                        className="w-full h-8 px-2 bg-white border border-slate-200 rounded-lg text-xs font-bold font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs"
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">Length (cm)</label>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-0.5">Length (cm)</label>
                       <input
                         type="number"
                         step="any"
                         value={sheetLength}
                         onChange={e => setSheetLength(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-bold font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-2xs"
+                        className="w-full h-8 px-2 bg-white border border-slate-200 rounded-lg text-xs font-bold font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs"
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">GSM</label>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-0.5">GSM</label>
                       <input
                         type="number"
                         step="any"
                         value={sheetGsm}
                         onChange={e => setSheetGsm(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-bold font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-2xs"
+                        className="w-full h-8 px-2 bg-white border border-slate-200 rounded-lg text-xs font-bold font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs"
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">Sheets / Ream</label>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-0.5">Sheets / Ream</label>
                       <input
                         type="number"
                         value={sheetsPerReamInput}
                         onChange={e => handleSheetsPerReamChange(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-bold font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-2xs"
+                        className="w-full h-8 px-2 bg-white border border-slate-200 rounded-lg text-xs font-bold font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs"
                       />
                     </div>
                   </div>
 
                   {/* ── MACHINE CUTTING METER (DIRECT KNIFE CUTS ONLY) ── */}
-                  <div className="bg-gradient-to-br from-indigo-50/80 via-blue-50/50 to-slate-50 border border-indigo-200 rounded-2xl p-3.5 space-y-3 shadow-2xs">
+                  <div className="bg-blue-50/30 border border-blue-200 rounded-xl p-2.5 space-y-2 shadow-3xs">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Activity className="w-4.5 h-4.5 text-indigo-700" />
+                      <div className="flex items-center gap-1.5">
+                        <Activity className="w-3.5 h-3.5 text-blue-600" />
                         <div>
-                          <span className="text-xs sm:text-sm font-bold text-indigo-950 uppercase tracking-wide block">
+                          <span className="text-xs font-bold text-blue-950 uppercase tracking-wide block">
                             Machine Cutting Meter (Direct Knife Strokes)
                           </span>
-                          <span className="text-xs text-slate-500 block">
+                          <span className="text-[10px] text-slate-500 block">
                             Derived Sheets = Knife Cuts × Reels on Stand × Slits Across
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <div className="sm:col-span-1">
-                        <label className="text-xs font-bold text-indigo-950 uppercase tracking-wider block mb-1">
+                        <label className="text-[11px] font-bold text-blue-950 uppercase tracking-wider block mb-0.5">
                           Knife Cuts (Strokes) *
                         </label>
                         <div className="relative">
@@ -1485,16 +1496,16 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                             value={cutsCountInput}
                             onChange={e => handleCutsChange(e.target.value)}
                             placeholder="0"
-                            className="w-full pl-3.5 pr-14 py-2.5 bg-white border-2 border-indigo-300 hover:border-indigo-400 rounded-xl text-base font-black font-mono text-indigo-950 focus:outline-none focus:ring-3 focus:ring-indigo-500/25 focus:border-indigo-600 shadow-xs transition-all"
+                            className="w-full h-9 pl-2.5 pr-12 bg-white border-2 border-blue-200 hover:border-blue-400 rounded-lg text-xs sm:text-sm font-bold font-mono text-blue-950 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs transition-all"
                           />
-                          <span className="absolute right-3 top-3 text-[11px] font-bold text-indigo-600 select-none">
+                          <span className="absolute right-2 top-2 text-[10px] font-bold text-blue-700 select-none">
                             CUTS
                           </span>
                         </div>
                       </div>
 
                       <div>
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                        <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-0.5">
                           Reels on Stand
                         </label>
                         <input
@@ -1502,12 +1513,12 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                           min="1"
                           value={reelsOnStandInput}
                           onChange={e => handleReelsOnStandChange(e.target.value)}
-                          className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-bold font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-2xs"
+                          className="w-full h-9 px-2.5 bg-white border border-slate-200 rounded-lg text-xs sm:text-sm font-bold font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs"
                         />
                       </div>
 
                       <div>
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                        <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-0.5">
                           Slits Across
                         </label>
                         <input
@@ -1515,17 +1526,17 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                           min="1"
                           value={slitsCountInput}
                           onChange={e => handleSlitsCountChange(e.target.value)}
-                          className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-bold font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-2xs"
+                          className="w-full h-9 px-2.5 bg-white border border-slate-200 rounded-lg text-xs sm:text-sm font-bold font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs"
                         />
                       </div>
                     </div>
 
                     {/* Live Cut Calculation Display */}
-                    <div className="flex items-center justify-between flex-wrap gap-2 pt-1.5 border-t border-indigo-100 text-xs">
-                      <div className="flex items-center gap-2 text-indigo-950">
-                        <span className="font-semibold text-slate-600">Machine Output:</span>
-                        <span className="font-mono bg-white px-2.5 py-1 rounded-lg border border-indigo-200 font-bold shadow-3xs">
-                          {numCutsCount} cuts × {sheetsPerCut} sh/cut = <span className="text-indigo-700 font-black">{machineDerivedSheets.toLocaleString()} Sheets</span> ({machineDerivedReams} Reams)
+                    <div className="flex items-center justify-between flex-wrap gap-1.5 pt-1 border-t border-blue-100 text-xs">
+                      <div className="flex items-center gap-1.5 text-blue-950">
+                        <span className="font-semibold text-slate-500 text-[11px]">Output:</span>
+                        <span className="font-mono bg-white px-2 py-0.5 rounded border border-blue-200 font-bold shadow-3xs">
+                          {numCutsCount} cuts × {sheetsPerCut} sh/cut = <span className="text-blue-700 font-bold">{machineDerivedSheets.toLocaleString()} Sheets</span> ({machineDerivedReams} Reams)
                         </span>
                       </div>
 
@@ -1533,31 +1544,31 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                         <button
                           type="button"
                           onClick={handleUseTheoreticalCuts}
-                          className="text-xs text-indigo-700 hover:text-indigo-950 font-bold underline flex items-center gap-1 cursor-pointer"
+                          className="text-[11px] text-blue-600 hover:text-blue-800 font-bold underline flex items-center gap-0.5 cursor-pointer"
                           title="Auto-fill machine cuts using theoretical formula"
                         >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>Use Theo Cuts: {theoreticalCuts.toLocaleString()}</span>
+                          <RotateCcw className="w-3 h-3" />
+                          <span>Use Theo: {theoreticalCuts.toLocaleString()}</span>
                         </button>
                       )}
                     </div>
                   </div>
 
                   {/* Simultaneous Dual-Unit Actual Production Inputs */}
-                  <div className="bg-emerald-50/50 border border-emerald-200 rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
+                  <div className="bg-blue-50/30 border border-blue-200 rounded-xl p-2.5 space-y-2 shadow-3xs">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs sm:text-sm font-bold text-emerald-950 flex items-center gap-1.5">
-                        <Layers className="w-4 h-4 text-emerald-700" />
+                      <span className="text-xs font-bold text-blue-950 flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-blue-600" />
                         <span>Actual Good Production (Dual Unit Linked)</span>
                       </span>
-                      <span className="text-xs text-emerald-800 font-semibold bg-emerald-100/70 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                      <span className="text-[10px] text-blue-900 font-bold bg-white px-2 py-0.5 rounded-full border border-blue-200 font-mono">
                         1 Ream = {sheetsPerReam} Sheets
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3.5">
+                    <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                        <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-0.5">
                           Reams Produced
                         </label>
                         <div className="relative">
@@ -1567,16 +1578,16 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                             value={actualReamsInput}
                             onChange={e => handleReamsChange(e.target.value)}
                             placeholder="0.00"
-                            className="w-full pl-3.5 pr-16 py-2.5 bg-white border-2 border-emerald-300 hover:border-emerald-400 rounded-xl text-base font-black font-mono text-emerald-950 focus:outline-none focus:ring-3 focus:ring-emerald-500/25 focus:border-emerald-600 shadow-xs transition-all"
+                            className="w-full h-9 pl-2.5 pr-14 bg-white border-2 border-blue-200 hover:border-blue-400 rounded-lg text-xs sm:text-sm font-bold font-mono text-blue-950 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs transition-all"
                           />
-                          <span className="absolute right-3.5 top-3 text-xs font-bold text-emerald-700 select-none">
+                          <span className="absolute right-2 top-2 text-[10px] font-bold text-blue-700 select-none">
                             REAMS
                           </span>
                         </div>
                       </div>
 
                       <div>
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
+                        <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-0.5">
                           Sheets Count
                         </label>
                         <div className="relative">
@@ -1586,9 +1597,9 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                             value={actualSheetsInput}
                             onChange={e => handleSheetsChange(e.target.value)}
                             placeholder="0"
-                            className="w-full pl-3.5 pr-16 py-2.5 bg-white border-2 border-emerald-300 hover:border-emerald-400 rounded-xl text-base font-black font-mono text-emerald-950 focus:outline-none focus:ring-3 focus:ring-emerald-500/25 focus:border-emerald-600 shadow-xs transition-all"
+                            className="w-full h-9 pl-2.5 pr-14 bg-white border-2 border-blue-200 hover:border-blue-400 rounded-lg text-xs sm:text-sm font-bold font-mono text-blue-950 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs transition-all"
                           />
-                          <span className="absolute right-3.5 top-3 text-xs font-bold text-emerald-700 select-none">
+                          <span className="absolute right-2 top-2 text-[10px] font-bold text-blue-700 select-none">
                             SHEETS
                           </span>
                         </div>
@@ -1597,38 +1608,32 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                   </div>
 
                   {/* Theoretical vs Actual Live Variance Meter */}
-                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-                    <div className="flex items-center justify-between text-xs sm:text-sm">
+                  <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl space-y-1 text-xs">
+                    <div className="flex items-center justify-between text-[11px]">
                       <span className="font-semibold text-slate-500">Theoretical (Formula Math):</span>
                       <span className="font-mono font-bold text-slate-800">
                         {theoreticalSheets.toLocaleString()} Sheets ({theoreticalReams} Reams)
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between text-xs sm:text-sm">
+                    <div className="flex items-center justify-between text-[11px]">
                       <span className="font-semibold text-slate-500">Machine Cuts Output:</span>
-                      <span className="font-mono font-bold text-indigo-700">
+                      <span className="font-mono font-bold text-blue-800">
                         {machineDerivedSheets.toLocaleString()} Sheets ({numCutsCount} cuts @ {reelsOnStand}R)
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between text-xs sm:text-sm">
+                    <div className="flex items-center justify-between text-[11px]">
                       <span className="font-semibold text-slate-500">Actual Good Stock In:</span>
-                      <span className="font-mono font-bold text-emerald-700">
+                      <span className="font-mono font-bold text-blue-900">
                         {numActualSheets.toLocaleString()} Sheets ({numActualReams} Reams)
                       </span>
                     </div>
 
-                    <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
-                      <span className="text-xs sm:text-sm font-bold text-slate-700">Live Production Variance:</span>
-                      <span className={`px-3 py-1 rounded-full text-xs font-mono font-black flex items-center gap-1.5 ${
-                        varianceSheets < 0
-                          ? 'bg-rose-100 text-rose-800 border border-rose-300'
-                          : varianceSheets > 0
-                          ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                          : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                      }`}>
-                        {varianceSheets < 0 ? <AlertTriangle className="w-3.5 h-3.5 text-rose-700" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />}
+                    <div className="pt-1 border-t border-slate-200 flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-700">Live Production Variance:</span>
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold flex items-center gap-1 bg-blue-600 text-white shadow-3xs">
+                        {varianceSheets < 0 ? <AlertTriangle className="w-3 h-3 text-white" /> : <CheckCircle2 className="w-3 h-3 text-white" />}
                         <span>
                           {varianceSheets > 0 ? '+' : ''}{varianceSheets.toLocaleString()} Sheets ({wastePercentage > 0 ? `-${wastePercentage}% Loss` : '100% Tally'})
                         </span>
@@ -1636,10 +1641,10 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Destination Location with Mini Factory Warehouse Modal */}
+                  {/* Destination Location */}
                   <div>
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-1.5">
-                      Destination Warehouse Location <span className="text-rose-500">*</span>
+                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-0.5">
+                      Destination Warehouse Location <span className="text-blue-600">*</span>
                     </label>
                     <LocationSelectPopup
                       hideLabel
@@ -1649,7 +1654,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                       zoneId={destZoneId}
                       locationId={destinationLocationId}
                       displayValue={destLocationDisplay}
-                      badgeColor="emerald"
+                      badgeColor="blue"
                       companyId={companyId}
                       skuId={targetSkuId}
                       variant="compact"
@@ -1672,159 +1677,128 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
               </div>
             </div>
 
-            {/* ── BOTTOM PANE: By-Products, Scrap Recovery & Landed Costing ── */}
-            <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs space-y-2.5 shrink-0">
-              <div className="flex items-center justify-between text-xs sm:text-sm">
-                <span className="font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
-                  <Scale className="w-4 h-4 text-emerald-600" />
+            {/* ── BOTTOM PANE: Scrap Recovery & Landed Costing ── */}
+            <div className="bg-white p-2.5 rounded-xl border border-blue-200 shadow-3xs space-y-2 shrink-0">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-blue-950 uppercase tracking-wide flex items-center gap-1.5">
+                  <Scale className="w-3.5 h-3.5 text-blue-600" />
                   <span>Costing Valuation, Scrap Salvage & Landed Absorption</span>
                 </span>
-                <span className="text-xs text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 font-semibold flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-[10px] text-blue-800 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 font-semibold flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-blue-600" />
                   Formula: Net Cost = (Reel Value - Scrap Recovery) ÷ Good Sheets
                 </span>
               </div>
 
-              {/* Real-time Costing Breakdown Strip */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs bg-slate-50/90 p-2.5 rounded-xl border border-slate-200/80">
-                <div className="px-3 py-1.5 bg-white rounded-xl border border-slate-200 shadow-3xs">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">1. Gross Raw Reel Input</span>
-                  <span className="font-mono font-black text-slate-900 text-sm">
-                    ₹{totalInputCost.toLocaleString('en-IN')}
-                  </span>
-                  <span className="text-[10px] text-slate-500 block font-mono">
-                    {totalInputWeight.toLocaleString()} kg @ ₹{avgInputRatePerKg}/kg
-                  </span>
-                </div>
-
-                <div className="px-3 py-1.5 bg-white rounded-xl border border-slate-200 shadow-3xs">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">2. Scrap Salvage Credit</span>
-                  <span className="font-mono font-black text-rose-600 text-sm">
-                    - ₹{totalScrapCredit.toFixed(2)}
-                  </span>
-                  <span className="text-[10px] text-slate-500 block font-mono">
-                    Trim Waste + Cores
-                  </span>
-                </div>
-
-                <div className="px-3 py-1.5 bg-white rounded-xl border border-slate-200 shadow-3xs">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">3. Net Converted Value</span>
-                  <span className="font-mono font-black text-indigo-700 text-sm">
-                    = ₹{netProductionCost.toLocaleString('en-IN')}
-                  </span>
-                  <span className="text-[10px] text-slate-500 block font-mono">
-                    Absorbed into output
-                  </span>
-                </div>
-
-                <div className="px-3 py-1.5 bg-emerald-50/90 rounded-xl border border-emerald-200 shadow-3xs">
-                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">4. Effective Landed Rate</span>
-                  <span className="font-mono font-black text-emerald-950 text-sm">
-                    ₹{effectiveCostPerSheet.toFixed(3)} <span className="text-[10px] font-normal text-emerald-700">/ sheet</span>
-                  </span>
-                  <span className="text-[10px] text-emerald-800 block font-mono">
-                    ₹{effectiveCostPerReam.toFixed(2)} / ream ({sheetsPerReam} sheets)
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs items-center bg-slate-50/90 p-3 rounded-xl border border-slate-200/80">
+              {/* Compact High-Contrast 1-Row Costing & Scrap Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 items-stretch text-xs">
                 {/* Trimming Waste */}
-                <div>
-                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                <div className="lg:col-span-3 bg-slate-50 p-2 rounded-lg border border-slate-200">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-0.5">
                     Trimming Waste (kg)
                   </label>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1">
                     <input
                       type="number"
                       step="any"
                       placeholder="0"
                       value={scrapWeightKg}
                       onChange={e => setScrapWeightKg(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-bold font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-2xs"
+                      className="w-full h-8 px-2 bg-white border border-slate-200 rounded text-xs font-bold font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs"
                     />
-                    <span className="text-xs font-mono font-bold text-slate-400">@₹</span>
+                    <span className="text-xs font-mono font-bold text-slate-500">@₹</span>
                     <input
                       type="number"
                       step="any"
                       value={scrapRatePerKg}
                       onChange={e => setScrapRatePerKg(e.target.value)}
                       title="Rate per kg of trim scrap"
-                      className="w-20 px-2 py-2 bg-white border border-slate-300 rounded-xl text-sm font-bold font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-2xs text-center"
+                      className="w-16 h-8 px-1.5 bg-white border border-slate-200 rounded text-xs font-bold font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs text-center"
                     />
                   </div>
                 </div>
 
                 {/* Reel Cores */}
-                <div>
-                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                <div className="lg:col-span-3 bg-slate-50 p-2 rounded-lg border border-slate-200">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-0.5">
                     Reel Cores (pcs)
                   </label>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1">
                     <input
                       type="number"
                       placeholder="0"
                       value={coreCount}
                       onChange={e => setCoreCount(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-bold font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-2xs"
+                      className="w-full h-8 px-2 bg-white border border-slate-200 rounded text-xs font-bold font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs"
                     />
-                    <span className="text-xs font-mono font-bold text-slate-400">@₹</span>
+                    <span className="text-xs font-mono font-bold text-slate-500">@₹</span>
                     <input
                       type="number"
                       step="any"
                       value={coreRatePerPc}
                       onChange={e => setCoreRatePerPc(e.target.value)}
                       title="Salvage rate per empty paper core"
-                      className="w-20 px-2 py-2 bg-white border border-slate-300 rounded-xl text-sm font-bold font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-2xs text-center"
+                      className="w-16 h-8 px-1.5 bg-white border border-slate-200 rounded text-xs font-bold font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs text-center"
                     />
                   </div>
                 </div>
 
-                {/* Total Scrap Credit */}
-                <div>
-                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                {/* Total Scrap Salvage Credit */}
+                <div className="lg:col-span-2 bg-slate-50 p-2 rounded-lg border border-slate-200 flex flex-col justify-between">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
                     Total Scrap Salvage
                   </label>
-                  <div className="px-3.5 py-2 bg-white border border-slate-300 rounded-xl font-mono font-black text-sm text-rose-600 shadow-2xs flex items-center h-[38px]">
+                  <div className="font-mono font-bold text-xs sm:text-sm text-blue-900 py-0.5">
                     - ₹{totalScrapCredit.toFixed(2)}
                   </div>
+                  <span className="text-[10px] text-slate-500 font-medium">Trim Waste + Cores</span>
                 </div>
 
-                {/* Effective Landed Rate Summary */}
-                <div className="bg-emerald-50 border border-emerald-300 p-2.5 rounded-xl text-right shadow-3xs">
-                  <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
-                    Inventory Valuation Rate
-                  </span>
-                  <div className="font-mono font-black text-emerald-950 text-base">
-                    ₹{effectiveCostPerSheet.toFixed(3)} <span className="text-xs font-normal text-emerald-700">/ sheet</span>
+                {/* High-Contrast Single Landed Rate Card */}
+                <div className="lg:col-span-4 bg-blue-900 text-white p-2.5 rounded-lg flex items-center justify-between shadow-3xs border border-blue-800">
+                  <div>
+                    <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider block">
+                      Effective Landed Rate
+                    </span>
+                    <div className="font-mono font-bold text-sm sm:text-base text-white">
+                      ₹{effectiveCostPerSheet.toFixed(3)} <span className="text-[10px] font-normal text-blue-200">/ sheet</span>
+                    </div>
+                    <div className="text-[10px] font-mono text-blue-200 font-medium mt-0.5">
+                      ₹{effectiveCostPerReam.toFixed(2)} / ream ({sheetsPerReam} sheets)
+                    </div>
                   </div>
-                  <div className="text-xs font-mono text-emerald-800 font-bold">
-                    ₹{effectiveCostPerReam.toFixed(2)} / ream
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5 font-mono">
-                    Net Batch: ₹{netProductionCost.toLocaleString('en-IN')}
+                  <div className="text-right border-l border-blue-700/80 pl-3">
+                    <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider block">
+                      Net Converted
+                    </span>
+                    <div className="font-mono font-bold text-xs sm:text-sm text-white">
+                      ₹{netProductionCost.toLocaleString('en-IN')}
+                    </div>
+                    <span className="text-[10px] text-blue-300 font-mono">
+                      Gross ₹{totalInputCost.toLocaleString('en-IN')}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center justify-between pt-1">
-                <div className="flex items-center gap-2.5 text-xs sm:text-sm">
-                  <span className="text-slate-500 font-bold">Remarks:</span>
+              {/* Action Buttons & Remarks */}
+              <div className="flex items-center justify-between pt-0.5 gap-2.5 flex-wrap">
+                <div className="flex items-center gap-2 text-xs flex-1 min-w-[240px]">
+                  <span className="text-slate-600 font-bold uppercase tracking-wider text-[11px]">Remarks:</span>
                   <input
                     type="text"
                     value={notes}
                     onChange={e => setNotes(e.target.value)}
                     placeholder="e.g. Sized for long notebook production batch"
-                    className="w-80 sm:w-96 px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 shadow-2xs"
+                    className="w-full max-w-sm h-8.5 px-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs"
                   />
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={onClose}
-                    className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition-colors cursor-pointer shadow-3xs"
+                    className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition-colors cursor-pointer shadow-3xs border border-slate-200"
                   >
                     Discard
                   </button>
@@ -1832,16 +1806,16 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                     type="button"
                     onClick={handleSubmit}
                     disabled={submitting || selectedReels.length === 0}
-                    className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-sm shadow-md hover:shadow-lg flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                    className="px-4.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs shadow-3xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-40"
                   >
                     {submitting ? (
                       <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                         <span>Posting Stock Journal...</span>
                       </>
                     ) : (
                       <>
-                        <CheckCircle2 className="w-4 h-4 text-teal-400" />
+                        <CheckCircle2 className="w-3.5 h-3.5 text-white" />
                         <span>Post Stock Journal & Convert (Ctrl+Enter)</span>
                       </>
                     )}
