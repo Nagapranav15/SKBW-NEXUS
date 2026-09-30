@@ -890,15 +890,26 @@ exports.createProductionOrder = async (req, res) => {
 exports.updateProductionOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    const updated = await ProductionOrder.findByIdAndUpdate(
-      id,
-      { $set: req.body },
-      { new: true }
-    );
-
-    if (!updated) {
+    const existing = await ProductionOrder.findById(id);
+    if (!existing) {
       return res.status(404).json({ msg: "Production order not found" });
     }
+
+    const updateData = { ...req.body };
+    const plannedQty = updateData.plannedQty !== undefined ? Number(updateData.plannedQty) : existing.plannedQty;
+    const plannedPcs = updateData.plannedPcs !== undefined ? Number(updateData.plannedPcs) : existing.plannedPcs;
+    const producedQty = existing.producedQty || 0;
+    const producedPcs = existing.producedPcs || 0;
+
+    updateData.balanceQty = Math.max(0, plannedQty - producedQty);
+    updateData.balancePcs = Math.max(0, plannedPcs - producedPcs);
+    updateData.progress = Math.min(100, Math.round((producedPcs / (plannedPcs || 1)) * 100));
+
+    const updated = await ProductionOrder.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true }
+    );
 
     // Dynamically sync prepared stock in Item Stock & Inventory
     await syncProductionOrderLedger(updated);

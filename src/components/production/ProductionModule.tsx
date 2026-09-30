@@ -57,10 +57,11 @@ export const ProductionModule: React.FC = () => {
     setSelectedOrder(null);
   };
 
-  // View state: 'list' | 'new' | 'detail' | 'entries'
-  const [currentView, setCurrentView] = useState<'list' | 'new' | 'detail' | 'entries'>(() => {
+  // View state: 'list' | 'new' | 'edit' | 'detail' | 'entries'
+  const [currentView, setCurrentView] = useState<'list' | 'new' | 'edit' | 'detail' | 'entries'>(() => {
     const v = searchParams.get('view');
     if (v === 'new') return 'new';
+    if (v === 'edit') return 'edit';
     if (v === 'detail') return 'detail';
     if (v === 'entries') return 'entries';
     return 'list';
@@ -68,6 +69,7 @@ export const ProductionModule: React.FC = () => {
 
   // Selected Order for Detail or Record Entries
   const [selectedOrder, setSelectedOrder] = useState<ProductionOrder | null>(null);
+  const [editingOrder, setEditingOrder] = useState<ProductionOrder | null>(null);
 
   // Printing Modal Order
   const [printOrder, setPrintOrder] = useState<ProductionOrder | null>(null);
@@ -277,10 +279,17 @@ export const ProductionModule: React.FC = () => {
     });
   };
 
+  // Navigate to Edit Order
+  const handleOpenEditOrder = (order: ProductionOrder) => {
+    setEditingOrder(order);
+    setCurrentView('edit');
+  };
+
   // Back to Orders List
   const handleBackToList = () => {
     setCurrentView('list');
     setSelectedOrder(null);
+    setEditingOrder(null);
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
       next.delete('view');
@@ -2912,6 +2921,7 @@ export const ProductionModule: React.FC = () => {
         onPrintOrder={setPrintOrder}
         onDeleteOrder={handleDeleteOrder}
         onRefresh={loadOrders}
+        onEditOrder={handleOpenEditOrder}
         tabCounts={tabCounts}
       />
     );
@@ -2921,8 +2931,8 @@ export const ProductionModule: React.FC = () => {
     <>
       {renderActiveTabContent()}
 
-      {/* ── CREATE NEW PRODUCTION ORDER DIALOG BOX ── */}
-      {currentView === 'new' && typeof document !== 'undefined' && (
+      {/* ── CREATE / EDIT PRODUCTION ORDER DIALOG BOX ── */}
+      {(currentView === 'new' || (currentView === 'edit' && editingOrder)) && typeof document !== 'undefined' && (
         createPortal(
           <div
             className="fixed inset-0 z-[9000] flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden animate-in fade-in duration-200"
@@ -2944,9 +2954,13 @@ export const ProductionModule: React.FC = () => {
             >
               <NewProductionOrderWizard
                 onCancel={handleBackToList}
-                onCreated={handleOrderCreated}
+                onCreated={(order) => {
+                  handleOrderCreated(order);
+                  setEditingOrder(null);
+                }}
                 companyId={selectedCompany?._id}
                 initialSkus={backendSkus}
+                editOrder={currentView === 'edit' ? editingOrder : null}
               />
             </div>
           </div>,
@@ -2983,6 +2997,7 @@ export const ProductionModule: React.FC = () => {
                 onRecordEntries={handleOpenRecordEntries}
                 onPrint={setPrintOrder}
                 onCompleteOrder={() => handleCompleteOrder(selectedOrder._id)}
+                onEdit={handleOpenEditOrder}
               />
             </div>
           </div>,

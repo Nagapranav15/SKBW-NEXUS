@@ -23,6 +23,7 @@ interface ProductionOrdersListProps {
   onPrintOrder: (order: ProductionOrder) => void;
   onDeleteOrder: (orderId: string) => void;
   onRefresh: () => void;
+  onEditOrder?: (order: ProductionOrder) => void;
   tabCounts?: Record<string, number>;
 }
 
@@ -36,6 +37,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
   onPrintOrder,
   onDeleteOrder,
   onRefresh,
+  onEditOrder,
   tabCounts
 }) => {
   // Period filter
@@ -1063,13 +1065,24 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                               <Eye className="w-4 h-4" />
                             </button>
 
-                            {/* Edit / Record Entries */}
+                            {/* Edit Production Order */}
+                            {onEditOrder && (
+                              <button
+                                onClick={() => onEditOrder(order)}
+                                title="Edit Production Order"
+                                className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors cursor-pointer"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                            )}
+
+                            {/* Record Entries */}
                             <button
                               onClick={() => onRecordEntries(order)}
-                              title="Record Production Entries / Edit"
-                              className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors cursor-pointer"
+                              title="Record Production Entries"
+                              className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors cursor-pointer"
                             >
-                              <Pencil className="w-4 h-4" />
+                              <CheckCircle2 className="w-4 h-4" />
                             </button>
 
                             {/* More Options */}
@@ -1098,6 +1111,19 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                                     <span>View Overview</span>
                                   </button>
 
+                                  {onEditOrder && (
+                                    <button
+                                      onClick={() => {
+                                        setActionMenuOrderId(null);
+                                        onEditOrder(order);
+                                      }}
+                                      className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5 text-amber-500" />
+                                      <span>Edit Order</span>
+                                    </button>
+                                  )}
+
                                   <button
                                     onClick={() => {
                                       setActionMenuOrderId(null);
@@ -1105,7 +1131,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                                     }}
                                     className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
                                   >
-                                    <Pencil className="w-3.5 h-3.5 text-amber-500" />
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                                     <span>Record Entries</span>
                                   </button>
 

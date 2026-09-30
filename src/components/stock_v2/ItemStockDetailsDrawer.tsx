@@ -455,7 +455,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
 
   const totalStock = summary ? summary.onHand : (Number((sku as any)?.preparedStock ?? (sku as any)?.onHand ?? (sku as any)?.presentStock) || 0);
   const reservedStock = (summary && summary.reserved !== undefined && summary.reserved > 0) ? summary.reserved : (Number((sku as any)?.reserved) || 0);
-  const availableStock = summary ? summary.available : Math.max(0, totalStock - reservedStock);
+  const availableStock = summary?.available !== undefined ? summary.available : (totalStock - reservedStock);
   const inProcessStock = (summary && summary.inProcess !== undefined && summary.inProcess > 0) ? summary.inProcess : (Number((sku as any)?.inProduction) || 0);
   const stockValue = summary ? summary.stockValue : (totalStock * (Number((sku as any)?.avgRate) || 0));
   const avgRate = (summary && summary.avgRate > 0) ? summary.avgRate : (Number((sku as any)?.avgRate) || (totalStock > 0 ? Math.round(stockValue / totalStock) : 0));
@@ -501,7 +501,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
   const getStatusBadge = () => {
     if (availableStock <= 0) {
       return {
-        label: 'Out of Stock',
+        label: availableStock < 0 ? `Deficit (${availableStock.toLocaleString('en-IN')})` : 'Out of Stock',
         color: 'bg-rose-50 text-rose-700 border-rose-200'
       };
     }
@@ -561,7 +561,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
         path: l.hierarchyPath || `${l.warehouseName || 'SKBW'} ➔ ${l.floorName || 'Ground'} ➔ ${l.zoneName || 'A'} ➔ ${l.locationName}`,
         onHand: l.onHand || 0,
         reserved: l.reserved || 0,
-        available: l.available || Math.max(0, (l.onHand || 0) - (l.reserved || 0)),
+        available: l.available !== undefined ? l.available : ((l.onHand || 0) - (l.reserved || 0)),
         unitCost: l.unitCost || (l.onHand > 0 ? Math.round((l.stockValue || 0) / l.onHand) : (avgRate || 250)),
         stockValue: l.stockValue || (l.onHand * (avgRate || 250)),
         locationId: l.locationId

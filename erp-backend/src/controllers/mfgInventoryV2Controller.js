@@ -2694,7 +2694,7 @@ exports.recordAdjustment = async (req, res, next) => {
     const currentOnHand = currentLedgerAgg.length > 0 ? currentLedgerAgg[0].onHand : 0;
     const isIncrease = diffQty > 0;
     const absQty = Math.abs(diffQty);
-    const newBalance = isIncrease ? currentOnHand + absQty : Math.max(0, currentOnHand - absQty);
+    const newBalance = isIncrease ? currentOnHand + absQty : (currentOnHand - absQty);
 
     const referenceId = `ADJ-${Date.now()}`;
     const transactionNumber = await Sequence.getNextSequence("IL", session);
@@ -3273,7 +3273,7 @@ exports.getSkuStockDetails = async (req, res, next) => {
     const onHandTotal = totalLedgerBalance.length > 0
       ? Math.round((totalLedgerBalance[0].qtyIn - totalLedgerBalance[0].qtyOut) * 1000) / 1000
       : populatedLocations.reduce((sum, l) => sum + (l.onHand || 0), 0);
-    const availableTotal = Math.max(0, onHandTotal - totalReserved);
+    const availableTotal = onHandTotal - totalReserved;
     const totalBatchesVal = batchesWithCosting.reduce((sum, b) => sum + (b.value || 0), 0);
     const unitPrice = Number(sku.costPrice || sku.rate || (batchesWithCosting.length > 0 ? totalBatchesVal / onHandTotal : 0) || 0);
     const stockValue = totalBatchesVal > 0 ? totalBatchesVal : (onHandTotal * unitPrice);

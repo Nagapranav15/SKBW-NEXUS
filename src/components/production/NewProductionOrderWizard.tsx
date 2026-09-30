@@ -8,7 +8,7 @@ import {
   BarChart3, Clock, Pencil, Tag, TrendingUp, Scissors
 } from 'lucide-react';
 import { ProductionOrder } from '../../types/production';
-import { getNextProductionOrderNumber, createProductionOrder } from '../../api/productionApi';
+import { getNextProductionOrderNumber, createProductionOrder, updateProductionOrder } from '../../api/productionApi';
 import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2, getProductionMaterialRates, MaterialRateInfo, getMetadataV2, updateMetadataV2, getBalancesV2 } from '../../api/mfgApiV2';
 import { LocationSelectPopup } from '../stock_v2/LocationSelectPopup';
 import { BomCopyPasteControls } from '../inventory_v2/BomCopyPasteControls';
@@ -24,6 +24,7 @@ interface NewProductionOrderWizardProps {
   onCreated: (order: ProductionOrder) => void;
   companyId?: string;
   initialSkus?: SkuV2[];
+  editOrder?: ProductionOrder | null;
 }
 
 export interface DepartmentPreset {
@@ -207,7 +208,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   onCancel,
   onCreated,
   companyId,
-  initialSkus = []
+  initialSkus = [],
+  editOrder = null
 }) => {
   const [submitting, setSubmitting] = useState<boolean>(false);
 
@@ -292,37 +294,61 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   const [selectedLocId, setSelectedLocId] = useState<string>('loc-top');
 
   // Order Details
-  const [orderNumber, setOrderNumber] = useState<string>('');
+  const [orderNumber, setOrderNumber] = useState<string>(() => editOrder?.orderNumber || '');
   const [orderDate, setOrderDate] = useState<string>(() => {
+    if (editOrder?.orderDate) return editOrder.orderDate.slice(0, 10);
+    if (editOrder?.plannedStartDate) return editOrder.plannedStartDate.slice(0, 10);
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   });
-  const [department, setDepartment] = useState<string>('');
-  const [orderStatus, setOrderStatus] = useState<'Planned' | 'Draft'>('Planned');
+  const [department, setDepartment] = useState<string>(() => editOrder?.department || '');
+  const [orderStatus, setOrderStatus] = useState<'Planned' | 'Draft'>(() => (editOrder?.status === 'Draft' ? 'Draft' : 'Planned'));
 
   // Product Selection fields
-  const [selectedSkuId, setSelectedSkuId] = useState<string>('');
-  const [productName, setProductName] = useState<string>('');
-  const [productCode, setProductCode] = useState<string>('');
+  const [selectedSkuId, setSelectedSkuId] = useState<string>(() => editOrder?.itemId || '');
+  const [productName, setProductName] = useState<string>(() => editOrder?.itemName || '');
+  const [productCode, setProductCode] = useState<string>(() => editOrder?.itemCode || '');
   const [showProductDropdown, setShowProductDropdown] = useState<boolean>(false);
   const [productSearch, setProductSearch] = useState<string>('');
   const productDropdownRef = useRef<HTMLDivElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
 
   // Output Location & Planned Qty
-  const [outputLocation, setOutputLocation] = useState<string>('SKBW - Ground Floor');
-  const [plannedQty, setPlannedQty] = useState<number | string>('');
-  const [uom, setUom] = useState<string>('PCS');
-  const [conversionFactor, setConversionFactor] = useState<number>(0);
+  const [outputLocation, setOutputLocation] = useState<string>(() => editOrder?.factory || editOrder?.outputLocation || 'SKBW - Ground Floor');
+  const [plannedQty, setPlannedQty] = useState<number | string>(() => (editOrder?.plannedQty !== undefined ? editOrder.plannedQty : ''));
+  const [uom, setUom] = useState<string>(() => editOrder?.plannedUom || 'PCS');
+  const [conversionFactor, setConversionFactor] = useState<number>(() => editOrder?.conversionFactor || 0);
 
   // Remarks
-  const [remarks, setRemarks] = useState<string>('');
+  const [remarks, setRemarks] = useState<string>(() => editOrder?.remarks || '');
 
   // Materials Table
-  const [materials, setMaterials] = useState<MaterialRow[]>([]);
+  const [materials, setMaterials] = useState<MaterialRow[]>(() => {
+    if (editOrder?.bomItems && Array.isArray(editOrder.bomItems) && editOrder.bomItems.length > 0) {
+      return editOrder.bomItems.map((m: any, idx: number) => ({
+        id: m.id || `mat-edit-${idx}`,
+        skuId: m.skuId,
+        component: m.component,
+        code: m.code || '',
+        uom: m.uom || 'PCS',
+        requiredQty: Number(m.totalRequired) || Number(m.qtyPerBatch) || 0,
+        sourceLocation: m.sourceLocation || 'Main Factory',
+        locationId: m.locationId,
+        warehouseId: m.warehouseId,
+        floorId: m.floorId,
+        zoneId: m.zoneId,
+        rateMode: m.rateMode || 'avg_purchase',
+        rate: Number(m.rate) || 0,
+        amount: Number(m.amount) || 0,
+        batchesAllocated: m.batchesAllocated,
+        fifoBatchInfo: m.fifoBatchInfo
+      }));
+    }
+    return [];
+  });
   const [activeMaterialDropdownId, setActiveMaterialDropdownId] = useState<string | null>(null);
   const [materialDropdownPosition, setMaterialDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const [componentSearchMap, setComponentSearchMap] = useState<Record<string, string>>({});
@@ -345,15 +371,46 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   const [loadingMaterialRates, setLoadingMaterialRates] = useState<boolean>(false);
 
   // Scrap / By-Products Table
-  const [scrapItems, setScrapItems] = useState<ScrapRow[]>([]);
+  const [scrapItems, setScrapItems] = useState<ScrapRow[]>(() => {
+    if (editOrder?.byProducts && Array.isArray(editOrder.byProducts)) {
+      return editOrder.byProducts.map((s: any, idx: number) => ({
+        id: s.id || `scrap-${idx}`,
+        item: s.item,
+        uom: s.uom,
+        qty: Number(s.qty) || 0,
+        rate: Number(s.rate) || 0,
+        amount: Number(s.amount) || 0
+      }));
+    }
+    return [];
+  });
 
   // Additional Costs Table
-  const [additionalCosts, setAdditionalCosts] = useState<AdditionalCostRow[]>([]);
+  const [additionalCosts, setAdditionalCosts] = useState<AdditionalCostRow[]>(() => {
+    if (editOrder?.additionalCosts && Array.isArray(editOrder.additionalCosts)) {
+      return editOrder.additionalCosts.map((c: any, idx: number) => ({
+        id: c.id || `cost-${idx}`,
+        costType: c.costType,
+        basis: (c.basis as any) || 'Per GBL',
+        amount: Number(c.amount) || 0,
+        appliedAs: (c as any).appliedAs || 'Per Unit (GBL)'
+      }));
+    }
+    return [];
+  });
 
   // Profit & Pricing (Optional)
-  const [profitPricing, setProfitPricing] = useState<ProfitPricingState>({
-    pricingMethod: 'Margin %',
-    markupPercentage: ''
+  const [profitPricing, setProfitPricing] = useState<ProfitPricingState>(() => {
+    if ((editOrder as any)?.profitPricing) {
+      return {
+        pricingMethod: (editOrder as any).profitPricing.pricingMethod || 'Margin %',
+        markupPercentage: (editOrder as any).profitPricing.markupPercentage || ''
+      };
+    }
+    return {
+      pricingMethod: 'Margin %',
+      markupPercentage: ''
+    };
   });
 
   // Paper Cutting Slip Voucher (Reel -> Sheet Conversion)
@@ -385,7 +442,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             loadedWhLocs = whRes.value;
             setWarehouseLocations(whRes.value);
           }
-          if (nextNum.status === 'fulfilled' && nextNum.value) {
+          if (!editOrder && nextNum.status === 'fulfilled' && nextNum.value) {
             setOrderNumber(nextNum.value);
           }
           if (skusRes.status === 'fulfilled' && Array.isArray(skusRes.value)) {
@@ -1679,13 +1736,13 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         plannedUom: uom,
         plannedPcs: plannedPcs,
         conversionFactor: conversionFactor,
-        producedQty: 0,
-        producedPcs: 0,
-        balanceQty: numPlannedQty,
-        balancePcs: plannedPcs,
-        materialStatus: 'Ready',
+        producedQty: editOrder?.producedQty || 0,
+        producedPcs: editOrder?.producedPcs || 0,
+        balanceQty: Math.max(0, numPlannedQty - (editOrder?.producedQty || 0)),
+        balancePcs: Math.max(0, plannedPcs - (editOrder?.producedPcs || 0)),
+        materialStatus: editOrder?.materialStatus || 'Ready',
         status: finalStatus,
-        progress: 0,
+        progress: editOrder?.progress || 0,
         department: department.trim(),
         factory: outputLocation.trim(),
         outputLocation: outputLocation.trim(),
@@ -1697,7 +1754,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         orderDate: orderDate,
         plannedStartDate: orderDate,
         requiredCompletionDate: orderDate,
-        priority: 'Normal',
+        priority: editOrder?.priority || 'Normal',
         remarks: remarks.trim(),
         bomType: 'Custom BOM (Production Order Only)',
         bomItems: materials.map(m => ({
@@ -1739,16 +1796,22 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           suggestedPricePcs: profitCostingSummary.suggestedPricePcs,
           suggestedPriceGbl: profitCostingSummary.suggestedPriceGbl
         },
-        productionEntries: [],
+        productionEntries: editOrder?.productionEntries || [],
         company: companyId
       };
 
-      const created = await createProductionOrder(payload);
-      showToast(`Production Order ${created.orderNumber} created successfully!`, 'success');
-      onCreated(created);
+      if (editOrder) {
+        const updated = await updateProductionOrder(editOrder._id, payload);
+        showToast(`Production Order ${updated.orderNumber} updated successfully!`, 'success');
+        onCreated(updated);
+      } else {
+        const created = await createProductionOrder(payload);
+        showToast(`Production Order ${created.orderNumber} created successfully!`, 'success');
+        onCreated(created);
+      }
     } catch (err: any) {
-      console.error('Failed to create production order:', err);
-      showToast(err.response?.data?.msg || err.message || 'Failed to create production order', 'error');
+      console.error('Failed to save production order:', err);
+      showToast(err.response?.data?.msg || err.message || 'Failed to save production order', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -1820,11 +1883,18 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             <Layers className="w-6 h-6 stroke-[2.2]" />
           </div>
           <div>
-            <h2 className="text-lg font-black text-gray-900 tracking-tight">
-              Create Production Order
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-black text-gray-900 tracking-tight">
+                {editOrder ? `Edit Production Order (${editOrder.orderNumber})` : 'Create Production Order'}
+              </h2>
+              {editOrder && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                  Editing Mode
+                </span>
+              )}
+            </div>
             <p className="text-xs text-gray-500 font-medium mt-0.5">
-              Manufacturing execution with bill of materials & cost ledger
+              {editOrder ? 'Update planned quantities, schedule, components & costing' : 'Manufacturing execution with bill of materials & cost ledger'}
             </p>
           </div>
         </div>
@@ -1845,7 +1915,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             title="Save order as Draft"
           >
             <FileText className="w-3.5 h-3.5 text-slate-600" />
-            <span>Draft Order</span>
+            <span>{editOrder ? 'Save as Draft' : 'Draft Order'}</span>
           </button>
           <button
             type="button"
@@ -1856,12 +1926,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             {submitting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin stroke-[2.5]" />
-                <span>Creating...</span>
+                <span>{editOrder ? 'Saving...' : 'Creating...'}</span>
               </>
             ) : (
               <>
                 <Save className="w-4 h-4 stroke-[2.5]" />
-                <span>Create Production Order</span>
+                <span>{editOrder ? 'Save Changes' : 'Create Production Order'}</span>
               </>
             )}
           </button>

@@ -742,9 +742,9 @@ export const StockInventoryV2: React.FC = () => {
 
         const inProduction = prodStats?.inProduction || 0;
         const reserved = rmReservedMap.get(sId) || rmReservedMap.get(sCode) || rmReservedMap.get(sName) || 0;
-        const availableStock = Math.max(0, liveOnHand - reserved);
+        const availableStock = liveOnHand - reserved;
 
-        const locBreakdown = (skuLocationsMap.get(sId) || []).filter(l => (l.onHand || 0) > 0);
+        const locBreakdown = (skuLocationsMap.get(sId) || []).filter(l => (l.onHand || 0) !== 0);
         let primaryLocationInfo: SkuLocationInfo;
 
         if (locBreakdown.length > 0) {
@@ -2121,9 +2121,15 @@ export const StockInventoryV2: React.FC = () => {
                             {/* 6. Available Stock */}
                             {columnsConfig.find(c => c.id === 'presentStock')?.visible !== false && (
                               <td className="px-4 py-3 text-right whitespace-nowrap">
-                                <div className="font-mono font-bold text-gray-900 text-sm">
-                                  {Number((sku as any).availableStock ?? onHand ?? 0).toLocaleString('en-IN')}
-                                </div>
+                                {(() => {
+                                  const availStock = Number((sku as any).availableStock ?? onHand ?? 0);
+                                  const isNegative = availStock < 0;
+                                  return (
+                                    <div className={`font-mono font-bold text-sm ${isNegative ? 'text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded inline-block' : 'text-gray-900'}`}>
+                                      {isNegative ? `-${Math.abs(availStock).toLocaleString('en-IN')}` : availStock.toLocaleString('en-IN')}
+                                    </div>
+                                  );
+                                })()}
                                 <div className="flex items-center justify-end gap-1 mt-0.5">
                                   {Number((sku as any).inProduction || 0) > 0 && (
                                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200" title="In Production (Reserved Place)">
