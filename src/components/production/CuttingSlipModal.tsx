@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   X, Scissors, Printer, CheckCircle2, AlertTriangle, 
   ArrowRight, Layers, Box, Scale, RefreshCw, FileText,
-  Activity, RotateCcw, Calculator
+  Activity, RotateCcw, Calculator, Search, Tag, ChevronDown, Check, Package, Sparkles
 } from 'lucide-react';
 import Modal from '../ui/Modal';
 import { 
   SkuV2, WarehouseLocationV2, AvailableReelV2, 
   getNextCuttingSlipNumberV2, getAvailableReelsV2, createCuttingSlipV2, CuttingSlipV2
 } from '../../api/mfgApiV2';
+import { getItemClassification } from '../../utils/skuClassification';
 
 interface CuttingSlipModalProps {
   isOpen: boolean;
@@ -39,32 +40,35 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
   const [operatorName, setOperatorName] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Available & Selected Reels
+  // ── 1. AVAILABLE REELS & LEFT-SIDE SELECTION BY ITEM + PURCHASE BATCH ──
   const [availableReels, setAvailableReels] = useState<AvailableReelV2[]>([]);
+  const [selectedReelItemKey, setSelectedReelItemKey] = useState<string>('ALL');
   const [selectedBatch, setSelectedBatch] = useState<string>(initialBatch || 'ALL');
   const [selectedReelIds, setSelectedReelIds] = useState<Set<string>>(new Set());
 
-  // Target Sheets Spec
+  // ── 2. TARGET SHEETS SPEC & RICH SEARCHABLE SEMI-GOOD DROPDOWN ──
   const [targetSkuId, setTargetSkuId] = useState<string>('');
+  const [targetSkuSearch, setTargetSkuSearch] = useState<string>('');
+  const [targetCategoryFilter, setTargetCategoryFilter] = useState<string>('ALL');
+  const [showTargetDropdown, setShowTargetDropdown] = useState<boolean>(false);
+  const targetDropdownRef = useRef<HTMLDivElement>(null);
+
   const [destinationLocationId, setDestinationLocationId] = useState<string>('');
   const [sheetWidth, setSheetWidth] = useState<string>('57');
   const [sheetLength, setSheetLength] = useState<string>('70');
   const [sheetGsm, setSheetGsm] = useState<string>('52');
   const [sheetsPerReam, setSheetsPerReam] = useState<number>(500);
 
-  // Machine Sheeter Meter & Knife Strokes
+  // ── 3. MACHINE CUTTING METER (DIRECT KNIFE CUTS ONLY) ──
   const [cutsCountInput, setCutsCountInput] = useState<string>('');
-  const [startMeterReading, setStartMeterReading] = useState<string>('');
-  const [endMeterReading, setEndMeterReading] = useState<string>('');
   const [reelsOnStand, setReelsOnStand] = useState<number>(1);
   const [slitsCount, setSlitsCount] = useState<number>(1);
-  const [meterMode, setMeterMode] = useState<'cuts' | 'odometer'>('cuts');
 
   // Simultaneous Dual Units (Sheets <-> Reams)
   const [actualSheetsInput, setActualSheetsInput] = useState<string>('');
   const [actualReamsInput, setActualReamsInput] = useState<string>('');
 
-  // Scrap & By-products
+  // ── 4. SCRAP & BY-PRODUCTS (RECOVERY & LANDED COSTING) ──
   const [scrapWeightKg, setScrapWeightKg] = useState<string>('');
   const [scrapRatePerKg, setScrapRatePerKg] = useState<string>('18');
   const [coreCount, setCoreCount] = useState<string>('');
@@ -72,6 +76,86 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
 
   // Print Mode State
   const [isPrintMode, setIsPrintMode] = useState(false);
+
+  // Close target dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (targetDropdownRef.current && !targetDropdownRef.current.contains(e.target as Node)) {
+        setShowTargetDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // ── SEMI-FINISHED GOODS FILTERED LIST (STRICTLY SEMI GOODS) ──
+  const semiGoodSkus = useMemo(() => {
+    const strictlySemi = skus.filter(s => {
+      if (!s || s.isDeleted) return false;
+      const type = getItemClassification(s);
+      const rawType = ((s as any).itemType || '').toLowerCase();
+      const code = (s.skuCode || '').toUpperCase();
+      const cat = (s.category || '').toLowerCase();
+      return type === 'semi' || 
+             rawType.includes('semi') || 
+             code.startsWith('SM-') || 
+             code.startsWith('SFG-') || 
+             cat.includes('semi');
+    });
+
+    if (strictlySemi.length > 0) return strictlySemi;
+
+    // Fallback if no strict semi goods exist
+    return skus.filter(s => {
+      if (!s || s.isDeleted) return false;
+      const cat = (s.category || '').toLowerCase();
+      const name = (s.name || '').toLowerCase();
+      return s.paperType === 'Sheets' || cat.includes('sheet') || name.includes('sheet');
+    });
+  }, [skus]);
+
+  // Semi-goods category breakdown for filter chips
+  const semiCategoryBreakdown = useMemo(() => {
+    const catMap = new Map<string, number>();
+    semiGoodSkus.forEach(s => {
+      const cat = s.category?.trim() || 'General';
+      catMap.set(cat, (catMap.get(cat) || 0) + 1);
+    });
+    return {
+      total: semiGoodSkus.length,
+      categories: Array.from(catMap.entries()).sort((a, b) => b[1] - a[1])
+    };
+  }, [semiGoodSkus]);
+
+  // Filtered target SKUs matching search & category
+  const filteredTargetSkus = useMemo(() => {
+    return semiGoodSkus.filter(s => {
+      if (targetCategoryFilter !== 'ALL') {
+        const cat = s.category?.trim() || 'General';
+        if (cat.toLowerCase() !== targetCategoryFilter.toLowerCase()) return false;
+      }
+      if (!targetSkuSearch.trim()) return true;
+      const q = targetSkuSearch.toLowerCase().trim();
+      const name = (s.name || '').toLowerCase();
+      const code = (s.skuCode || '').toLowerCase();
+      const cat = (s.category || '').toLowerCase();
+      const dims = `${s.width || ''}x${s.length || ''} ${s.gsm || ''}`.toLowerCase();
+      return name.includes(q) || code.includes(q) || cat.includes(q) || dims.includes(q);
+    });
+  }, [semiGoodSkus, targetCategoryFilter, targetSkuSearch]);
+
+  const selectedTargetSkuDoc = useMemo(() => {
+    return skus.find(s => s._id === targetSkuId) || null;
+  }, [skus, targetSkuId]);
+
+  // Spec badge helper
+  const getSkuSpecOrConversion = (sku: SkuV2) => {
+    const parts: string[] = [];
+    if (sku.width && sku.length) parts.push(`${sku.width} x ${sku.length} cm`);
+    if (sku.gsm) parts.push(`${sku.gsm} GSM`);
+    if (sku.altUnitConversion) parts.push(`1 Ream = ${sku.altUnitConversion} Sheets`);
+    return parts.join(' • ');
+  };
 
   // 1. Load initial data
   useEffect(() => {
@@ -88,7 +172,8 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
 
         if (!isMounted) return;
         setSlipNumber(numRes.slipNumber);
-        setAvailableReels(reelsRes.availableReels || []);
+        const loadedReels = reelsRes.availableReels || [];
+        setAvailableReels(loadedReels);
 
         // Default destination location
         if (locations.length > 0 && !destinationLocationId) {
@@ -100,18 +185,18 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
           setDestinationLocationId(cutLoc._id);
         }
 
-        // If initial SKU provided or auto-pick first sheet SKU
-        const sheetSkus = skus.filter(s => 
-          s.paperType === 'Sheets' || 
-          (s.category || '').toLowerCase().includes('sheet') ||
-          (s.name || '').toLowerCase().includes('sheet')
-        );
-        if (sheetSkus.length > 0 && !targetSkuId) {
-          setTargetSkuId(sheetSkus[0]._id);
-          if (sheetSkus[0].width) setSheetWidth(String(sheetSkus[0].width));
-          if (sheetSkus[0].length) setSheetLength(String(sheetSkus[0].length));
-          if (sheetSkus[0].gsm) setSheetGsm(String(sheetSkus[0].gsm));
-          if (sheetSkus[0].altUnitConversion) setSheetsPerReam(sheetSkus[0].altUnitConversion);
+        // Auto-pick first semi-finished good if none selected
+        if (semiGoodSkus.length > 0 && !targetSkuId) {
+          const first = semiGoodSkus[0];
+          setTargetSkuId(first._id || '');
+          if (first.width) setSheetWidth(String(first.width));
+          if (first.length) setSheetLength(String(first.length));
+          if (first.gsm) setSheetGsm(String(first.gsm));
+          if (first.altUnitConversion) {
+            setSheetsPerReam(Number(first.altUnitConversion));
+          } else if (first.booksGbl) {
+            setSheetsPerReam(Number(first.booksGbl));
+          }
         }
       } catch (err) {
         console.error('Failed to init cutting slip voucher:', err);
@@ -122,34 +207,98 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
 
     fetchInit();
     return () => { isMounted = false; };
-  }, [isOpen, companyId]);
+  }, [isOpen, companyId, semiGoodSkus.length]);
 
-  // Target SKU change auto-fills dimensions
-  const handleTargetSkuChange = (skuId: string) => {
-    setTargetSkuId(skuId);
-    const sku = skus.find(s => s._id === skuId);
-    if (sku) {
-      if (sku.width) setSheetWidth(String(sku.width));
-      if (sku.length) setSheetLength(String(sku.length));
-      if (sku.gsm) setSheetGsm(String(sku.gsm));
-      if (sku.altUnitConversion) setSheetsPerReam(sku.altUnitConversion);
+  // Target SKU select handler
+  const handleSelectTargetSku = (sku: SkuV2) => {
+    setTargetSkuId(sku._id || '');
+    if (sku.width) setSheetWidth(String(sku.width));
+    if (sku.length) setSheetLength(String(sku.length));
+    if (sku.gsm) setSheetGsm(String(sku.gsm));
+    if (sku.altUnitConversion) {
+      setSheetsPerReam(Number(sku.altUnitConversion));
+    } else if (sku.booksGbl) {
+      setSheetsPerReam(Number(sku.booksGbl));
     }
+    setTargetSkuSearch('');
+    setShowTargetDropdown(false);
   };
 
-  // Unique batches available
-  const availableBatches = useMemo(() => {
-    const batches = new Set<string>();
+  // ── GROUP AVAILABLE REELS BY ITEM (PAPER REEL SKU) ──
+  const uniqueReelItems = useMemo(() => {
+    const map = new Map<string, {
+      key: string;
+      skuId: string;
+      code: string;
+      name: string;
+      category?: string;
+      reelsCount: number;
+      totalWeight: number;
+      batches: string[];
+    }>();
+
     availableReels.forEach(r => {
-      if (r.purchaseBatch) batches.add(r.purchaseBatch);
+      const key = r.skuId || r.skuCode || r.skuName || 'unknown';
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          skuId: r.skuId,
+          code: r.skuCode || '',
+          name: r.skuName || 'Paper Reel',
+          reelsCount: 0,
+          totalWeight: 0,
+          batches: []
+        });
+      }
+      const item = map.get(key)!;
+      item.reelsCount += 1;
+      item.totalWeight += Number(r.weight) || 0;
+      if (r.purchaseBatch && !item.batches.includes(r.purchaseBatch)) {
+        item.batches.push(r.purchaseBatch);
+      }
     });
-    return Array.from(batches);
+
+    return Array.from(map.values()).sort((a, b) => b.reelsCount - a.reelsCount);
   }, [availableReels]);
 
-  // Filtered reels by batch
+  // Default selectedReelItemKey
+  useEffect(() => {
+    if (uniqueReelItems.length > 0 && (selectedReelItemKey === 'ALL' || !uniqueReelItems.some(i => i.key === selectedReelItemKey))) {
+      if (initialSkuId && uniqueReelItems.some(i => i.skuId === initialSkuId || i.key === initialSkuId)) {
+        setSelectedReelItemKey(initialSkuId);
+      } else {
+        setSelectedReelItemKey(uniqueReelItems[0].key);
+      }
+    }
+  }, [uniqueReelItems, initialSkuId]);
+
+  // Reels for the selected item
+  const reelsForSelectedItem = useMemo(() => {
+    if (selectedReelItemKey === 'ALL') return availableReels;
+    return availableReels.filter(r => (r.skuId || r.skuCode || r.skuName) === selectedReelItemKey);
+  }, [availableReels, selectedReelItemKey]);
+
+  // Batches for the selected item
+  const batchesForSelectedItem = useMemo(() => {
+    const map = new Map<string, { batch: string; count: number; totalWeight: number; avgRate: number }>();
+    reelsForSelectedItem.forEach(r => {
+      const b = r.purchaseBatch || 'No Batch';
+      if (!map.has(b)) {
+        map.set(b, { batch: b, count: 0, totalWeight: 0, avgRate: Number(r.ratePerKg) || 0 });
+      }
+      const entry = map.get(b)!;
+      entry.count += 1;
+      entry.totalWeight += Number(r.weight) || 0;
+      entry.avgRate = Number(r.ratePerKg) || entry.avgRate;
+    });
+    return Array.from(map.values()).sort((a, b) => a.batch.localeCompare(b.batch));
+  }, [reelsForSelectedItem]);
+
+  // Filtered reels to display (based on selectedBatch)
   const displayedReels = useMemo(() => {
-    if (selectedBatch === 'ALL') return availableReels;
-    return availableReels.filter(r => r.purchaseBatch === selectedBatch);
-  }, [availableReels, selectedBatch]);
+    if (selectedBatch === 'ALL') return reelsForSelectedItem;
+    return reelsForSelectedItem.filter(r => (r.purchaseBatch || 'No Batch') === selectedBatch);
+  }, [reelsForSelectedItem, selectedBatch]);
 
   // Toggle single reel
   const handleToggleReel = (reelId: string) => {
@@ -163,7 +312,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
 
   // Toggle all reels in current view
   const handleToggleAllDisplayed = () => {
-    const allSelected = displayedReels.every(r => selectedReelIds.has(r.id));
+    const allSelected = displayedReels.length > 0 && displayedReels.every(r => selectedReelIds.has(r.id));
     setSelectedReelIds(prev => {
       const next = new Set(prev);
       if (allSelected) {
@@ -187,26 +336,31 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
     }
   }, [selectedReels.length]);
 
-  // Source consumption metrics
+  // Source consumption metrics & accurate cost calculation
   const totalInputWeight = useMemo(() => {
     return selectedReels.reduce((sum, r) => sum + (Number(r.weight) || 0), 0);
   }, [selectedReels]);
 
+  const totalInputCost = useMemo(() => {
+    const sum = selectedReels.reduce((acc, r) => acc + ((Number(r.weight) || 0) * (Number(r.ratePerKg) || 0)), 0);
+    return Math.round(sum * 100) / 100;
+  }, [selectedReels]);
+
   const avgInputRatePerKg = useMemo(() => {
     if (totalInputWeight <= 0) return 0;
-    const totalCost = selectedReels.reduce((sum, r) => sum + ((Number(r.weight) || 0) * (Number(r.ratePerKg) || 60)), 0);
-    return Math.round((totalCost / totalInputWeight) * 100) / 100;
-  }, [selectedReels, totalInputWeight]);
-
-  const totalInputCost = useMemo(() => {
-    return Math.round(totalInputWeight * avgInputRatePerKg * 100) / 100;
-  }, [totalInputWeight, avgInputRatePerKg]);
+    return Math.round((totalInputCost / totalInputWeight) * 100) / 100;
+  }, [totalInputCost, totalInputWeight]);
 
   // Primary source SKU
   const sourceSkuDoc = useMemo(() => {
-    if (selectedReels.length === 0) return null;
-    return skus.find(s => s._id === selectedReels[0].skuId) || null;
-  }, [selectedReels, skus]);
+    if (selectedReels.length === 0) {
+      if (selectedReelItemKey !== 'ALL') {
+        return skus.find(s => s._id === selectedReelItemKey || s.skuCode === selectedReelItemKey || s.name === selectedReelItemKey) || null;
+      }
+      return null;
+    }
+    return skus.find(s => s._id === selectedReels[0].skuId || s.skuCode === selectedReels[0].skuCode) || null;
+  }, [selectedReels, selectedReelItemKey, skus]);
 
   // Theoretical Yield Calculation (Standard Paper Formula)
   // Sheets = (Weight in Kg * 10,000,000) / (Length_cm * Width_cm * GSM)
@@ -224,8 +378,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
     return Math.round((theoreticalSheets / spr) * 100) / 100;
   }, [theoreticalSheets, sheetsPerReam]);
 
-  // Machine Sheeter Output Formulas:
-  // 1 Cut Stroke cuts across all reels mounted on stand and slits across width
+  // Machine Sheeter Output Formulas (Direct Knife Cuts only)
   // Sheets per Cut = Reels on Stand * Slits across Width
   const sheetsPerCut = useMemo(() => {
     return Math.max(1, reelsOnStand) * Math.max(1, slitsCount);
@@ -258,27 +411,12 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
     }
   }, [theoreticalSheets, theoreticalCuts]);
 
-  // Machine Meter Handlers
+  // Machine Meter Handlers (Direct Cuts)
   const handleCutsChange = (val: string) => {
     setCutsCountInput(val);
     const cuts = parseFloat(val);
     if (!isNaN(cuts) && cuts >= 0) {
       const totalGenSheets = Math.round(cuts * sheetsPerCut);
-      setActualSheetsInput(String(totalGenSheets));
-      const spr = sheetsPerReam || 500;
-      setActualReamsInput(String(Math.round((totalGenSheets / spr) * 100) / 100));
-    }
-  };
-
-  const handleMeterReadingChange = (startVal: string, endVal: string) => {
-    setStartMeterReading(startVal);
-    setEndMeterReading(endVal);
-    const s = parseFloat(startVal);
-    const e = parseFloat(endVal);
-    if (!isNaN(s) && !isNaN(e) && e >= s) {
-      const diff = Math.round(e - s);
-      setCutsCountInput(String(diff));
-      const totalGenSheets = Math.round(diff * sheetsPerCut);
       setActualSheetsInput(String(totalGenSheets));
       const spr = sheetsPerReam || 500;
       setActualReamsInput(String(Math.round((totalGenSheets / spr) * 100) / 100));
@@ -372,14 +510,14 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
     return (numScrapWeight * numScrapRate) + (numCores * numCoreRate);
   }, [numScrapWeight, numScrapRate, numCores, numCoreRate]);
 
-  // Landed cost allocation
+  // Landed cost allocation & accurate costing
   const netProductionCost = useMemo(() => {
     return Math.max(0, totalInputCost - totalScrapCredit);
   }, [totalInputCost, totalScrapCredit]);
 
   const effectiveCostPerSheet = useMemo(() => {
     if (numActualSheets <= 0) return 0;
-    return Math.round((netProductionCost / numActualSheets) * 1000) / 1000;
+    return Math.round((netProductionCost / numActualSheets) * 10000) / 10000;
   }, [netProductionCost, numActualSheets]);
 
   const effectiveCostPerReam = useMemo(() => {
@@ -430,8 +568,8 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
         sheetLength: parseFloat(sheetLength) || 70,
         sheetGsm: parseFloat(sheetGsm) || 52,
         sheetsPerReam: sheetsPerReam || 500,
-        startMeterReading: parseFloat(startMeterReading) || 0,
-        endMeterReading: parseFloat(endMeterReading) || 0,
+        startMeterReading: 0,
+        endMeterReading: 0,
         cutsCount: numCutsCount,
         reelsOnStand: reelsOnStand || 1,
         slitsCount: slitsCount || 1,
@@ -495,7 +633,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                 </span>
               </div>
               <p className="text-[10px] text-slate-400">
-                Tally-style Reel $\rightarrow$ Sheet Stock Journal with Live Discrepancy & Scrap Reconciliation
+                Reel → Sheet Stock Journal with Live Discrepancy & Scrap Reconciliation
               </p>
             </div>
           </div>
@@ -554,12 +692,9 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                 </div>
                 <div className="border border-slate-200 p-3 rounded-lg">
                   <span className="font-bold text-slate-700 block mb-1">OUTPUT (SHEETS REQUIRED)</span>
-                  <div>Target SKU: <span className="font-bold">{skus.find(s => s._id === targetSkuId)?.name || 'Sheets'}</span></div>
+                  <div>Target SKU: <span className="font-bold">{selectedTargetSkuDoc?.name || 'Sheets'}</span></div>
                   <div>Cut Size: <span className="font-bold">{sheetWidth} x {sheetLength} cm ({sheetGsm} GSM)</span></div>
                   <div>Machine Meter: <span className="font-bold font-mono">{cutsCountInput || '0'} Cuts ({reelsOnStand} Reels on Stand × {slitsCount} Slits)</span></div>
-                  {(startMeterReading || endMeterReading) ? (
-                    <div>Odometer: <span className="font-bold font-mono">{startMeterReading || '0'} → {endMeterReading || '0'}</span></div>
-                  ) : null}
                   <div>Theoretical: <span className="font-bold font-mono">{theoreticalSheets} Sheets ({theoreticalReams} Reams)</span></div>
                   <div>Actual Good: <span className="font-bold font-mono text-emerald-700">{numActualSheets} Sheets ({numActualReams} Reams)</span></div>
                 </div>
@@ -617,7 +752,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
           /* Dual-Pane Voucher View (Tally Stock Journal) */
           <div className="flex-1 flex flex-col p-4 overflow-hidden gap-3 min-h-0">
             {/* Top Toolbar */}
-            <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between gap-4 flex-wrap text-xs shrink-0">
+            <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between gap-4 flex-wrap text-xs shrink-0">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5">
                   <span className="text-slate-500 font-semibold">Machine:</span>
@@ -640,24 +775,19 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <span className="text-slate-500 font-semibold">Filter Batch (PB):</span>
-                <select
-                  value={selectedBatch}
-                  onChange={e => setSelectedBatch(e.target.value)}
-                  className="px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 cursor-pointer focus:outline-none focus:ring-1 focus:ring-teal-500"
-                >
-                  <option value="ALL">All Batches ({availableReels.length} Reels)</option>
-                  {availableBatches.map(b => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                </select>
+              <div className="flex items-center gap-4 text-xs text-slate-500 font-medium">
+                <div>
+                  Available Stock: <span className="font-bold text-slate-900">{availableReels.length} Reels</span>
+                </div>
+                <div>
+                  Paper Items: <span className="font-bold text-slate-900">{uniqueReelItems.length} SKUs</span>
+                </div>
               </div>
             </div>
 
             {/* Split Screen: Left (Consumption) vs Right (Production) */}
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-3 min-h-0 overflow-hidden">
-              {/* LEFT PANE: CONSUMPTION (Source Reels) */}
+              {/* ── LEFT PANE: CONSUMPTION (Source Reels: Item -> Purchase Batch -> Reels) ── */}
               <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs flex flex-col overflow-hidden">
                 <div className="p-3 bg-rose-50/50 border-b border-rose-100 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-2">
@@ -669,65 +799,175 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                         Consumption (Source Reels Out)
                       </h4>
                       <p className="text-[10px] text-slate-500">
-                        Select raw reels loaded onto sheeting stand from godowns
+                        Select paper reel item, then choose reels by purchase batch
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleToggleAllDisplayed}
-                    className="text-[11px] text-rose-700 hover:text-rose-900 font-bold cursor-pointer"
-                  >
-                    {displayedReels.every(r => selectedReelIds.has(r.id)) ? 'Deselect All' : 'Select All'}
-                  </button>
                 </div>
 
-                {/* Reels Table */}
-                <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+                {/* 1. Item Selector */}
+                <div className="p-2.5 bg-slate-50/90 border-b border-slate-200/80 space-y-1">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Package className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Select Reel Item:</span>
+                    </span>
+                    <span className="text-slate-400 font-medium">
+                      {uniqueReelItems.length} Reel {uniqueReelItems.length === 1 ? 'Item' : 'Items'} available
+                    </span>
+                  </div>
+                  <select
+                    value={selectedReelItemKey}
+                    onChange={e => {
+                      setSelectedReelItemKey(e.target.value);
+                      setSelectedBatch('ALL');
+                    }}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500 shadow-3xs cursor-pointer"
+                  >
+                    {uniqueReelItems.map(item => (
+                      <option key={item.key} value={item.key}>
+                        {item.name} {item.code ? `(${item.code})` : ''} • {item.reelsCount} Reels ({item.totalWeight.toLocaleString()} kg)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Purchase Batch Filter Tabs */}
+                <div className="px-3 py-2 bg-white border-b border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-thin">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+                      Purchase Batch:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBatch('ALL')}
+                      className={`px-2 py-0.5 rounded-lg text-[10.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                        selectedBatch === 'ALL'
+                          ? 'bg-rose-600 text-white shadow-3xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      All Batches ({reelsForSelectedItem.length} Reels)
+                    </button>
+                    {batchesForSelectedItem.map(b => (
+                      <button
+                        key={b.batch}
+                        type="button"
+                        onClick={() => setSelectedBatch(b.batch)}
+                        className={`px-2 py-0.5 rounded-lg text-[10.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                          selectedBatch === b.batch
+                            ? 'bg-rose-600 text-white shadow-3xs'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {b.batch} ({b.count} Reels • ₹{b.avgRate}/kg)
+                      </button>
+                    ))}
+                  </div>
+
+                  {displayedReels.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleToggleAllDisplayed}
+                      className="text-[11px] text-rose-700 hover:text-rose-900 font-bold shrink-0 cursor-pointer"
+                    >
+                      {displayedReels.every(r => selectedReelIds.has(r.id)) ? 'Deselect In View' : 'Select In View'}
+                    </button>
+                  )}
+                </div>
+
+                {/* 3. Reel Cards Grouped by Purchase Batch */}
+                <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5 custom-scrollbar">
                   {displayedReels.length === 0 ? (
                     <div className="p-8 text-center text-slate-400 text-xs">
-                      No reels found in inventory for the selected batch.
+                      No reels found in inventory for the selected item and batch.
                     </div>
                   ) : (
-                    displayedReels.map(r => {
-                      const isSelected = selectedReelIds.has(r.id);
+                    (selectedBatch === 'ALL' 
+                      ? batchesForSelectedItem 
+                      : [{ batch: selectedBatch, count: displayedReels.length, totalWeight: displayedReels.reduce((s, r) => s + (Number(r.weight) || 0), 0), avgRate: displayedReels[0]?.ratePerKg || 0 }]
+                    ).map(batchInfo => {
+                      const batchReels = displayedReels.filter(r => (r.purchaseBatch || 'No Batch') === batchInfo.batch);
+                      if (batchReels.length === 0) return null;
+                      const isBatchAllSelected = batchReels.every(r => selectedReelIds.has(r.id));
+
                       return (
-                        <div
-                          key={r.id}
-                          onClick={() => handleToggleReel(r.id)}
-                          className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                            isSelected
-                              ? 'bg-rose-50/80 border-rose-300 shadow-2xs'
-                              : 'bg-white border-slate-200/80 hover:bg-slate-50 hover:border-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => {}}
-                              className="w-4 h-4 text-rose-600 rounded cursor-pointer pointer-events-none"
-                            />
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono font-bold text-xs text-slate-900">{r.reelNumber}</span>
-                                <span className="text-[9.5px] px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded font-mono">
-                                  {r.purchaseBatch}
-                                </span>
-                              </div>
-                              <div className="text-[10.5px] text-slate-500 truncate mt-0.5">
-                                {r.skuName} • <span className="text-slate-400">{r.locationName}</span>
-                              </div>
+                        <div key={batchInfo.batch} className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-3xs">
+                          {/* Batch Header */}
+                          <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-xs text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200/80 shadow-3xs">
+                                {batchInfo.batch}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-medium">
+                                {batchReels.length} {batchReels.length === 1 ? 'Reel' : 'Reels'} • {batchInfo.totalWeight.toLocaleString()} kg • ₹{batchInfo.avgRate}/kg
+                              </span>
                             </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedReelIds(prev => {
+                                  const next = new Set(prev);
+                                  if (isBatchAllSelected) {
+                                    batchReels.forEach(r => next.delete(r.id));
+                                  } else {
+                                    batchReels.forEach(r => next.add(r.id));
+                                  }
+                                  return next;
+                                });
+                              }}
+                              className="text-[10px] font-bold text-rose-700 hover:text-rose-900 bg-white hover:bg-rose-50 px-2 py-0.5 rounded border border-rose-200 cursor-pointer transition-colors"
+                            >
+                              {isBatchAllSelected ? 'Deselect Batch' : `Select Batch (${batchReels.length})`}
+                            </button>
                           </div>
 
-                          <div className="text-right shrink-0">
-                            <div className="font-mono font-black text-xs text-slate-900">
-                              {r.weight} <span className="text-[10px] text-slate-500">kg</span>
-                            </div>
-                            <div className="text-[10px] font-mono text-slate-400">
-                              ₹{r.ratePerKg}/kg
-                            </div>
+                          {/* Individual Reels */}
+                          <div className="p-1.5 space-y-1">
+                            {batchReels.map(r => {
+                              const isSelected = selectedReelIds.has(r.id);
+                              const reelCost = Math.round((Number(r.weight) || 0) * (Number(r.ratePerKg) || 0));
+                              return (
+                                <div
+                                  key={r.id}
+                                  onClick={() => handleToggleReel(r.id)}
+                                  className={`p-2 rounded-lg border transition-all cursor-pointer flex items-center justify-between ${
+                                    isSelected
+                                      ? 'bg-rose-50/80 border-rose-300 shadow-3xs'
+                                      : 'bg-white border-slate-200/70 hover:bg-slate-50 hover:border-slate-300'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => {}}
+                                      className="w-4 h-4 text-rose-600 rounded cursor-pointer pointer-events-none accent-rose-600"
+                                    />
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-mono font-bold text-xs text-slate-900">{r.reelNumber}</span>
+                                        <span className="text-[10px] text-slate-500 font-medium truncate">
+                                          {r.locationName || 'Godown'}
+                                        </span>
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 mt-0.5">
+                                        {r.width ? `${r.width} cm` : ''} {r.gsm ? `• ${r.gsm} GSM` : ''}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="text-right shrink-0">
+                                    <div className="font-mono font-black text-xs text-slate-900">
+                                      {r.weight} <span className="text-[10px] text-slate-500 font-normal">kg</span>
+                                    </div>
+                                    <div className="text-[10px] font-mono text-slate-500">
+                                      @₹{r.ratePerKg}/kg = <span className="font-bold text-slate-800">₹{reelCost.toLocaleString('en-IN')}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       );
@@ -744,7 +984,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                   <div className="flex items-center gap-4">
                     <div>
                       <span className="text-slate-500">Total Weight: </span>
-                      <span className="font-mono font-black text-rose-700 text-sm">{totalInputWeight} kg</span>
+                      <span className="font-mono font-black text-rose-700 text-sm">{totalInputWeight.toLocaleString()} kg</span>
                     </div>
                     <div>
                       <span className="text-slate-500">Value: </span>
@@ -754,7 +994,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                 </div>
               </div>
 
-              {/* RIGHT PANE: GENERATION (Target Sheets & Live Variance) */}
+              {/* ── RIGHT PANE: GENERATION (Target Sheets & Direct Cuts Meter) ── */}
               <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs flex flex-col overflow-hidden">
                 <div className="p-3 bg-emerald-50/50 border-b border-emerald-100 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-2">
@@ -766,32 +1006,142 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                         Generation (Target Sheets In)
                       </h4>
                       <p className="text-[10px] text-slate-500">
-                        Cut dimensions, dual-unit live production (Sheets $\leftrightarrow$ Reams), & godown
+                        Cut dimensions, dual-unit live production (Sheets ↔ Reams), & godown
                       </p>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
-                  {/* Target SKU Selector */}
-                  <div>
+                  {/* Target SKU Searchable Dropdown Popover matching Image 2 1:1 */}
+                  <div className="relative" ref={targetDropdownRef}>
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                      Target Converted Sheet SKU *
+                      Target Converted Sheet SKU (Semi Good) *
                     </label>
-                    <select
-                      value={targetSkuId}
-                      onChange={e => handleTargetSkuChange(e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    >
-                      <option value="">Select target converted sheet...</option>
-                      {skus
-                        .filter(s => s.paperType === 'Sheets' || (s.category || '').toLowerCase().includes('sheet') || (s.name || '').toLowerCase().includes('sheet'))
-                        .map(s => (
-                          <option key={s._id} value={s._id}>
-                            {s.name} ({s.skuCode})
-                          </option>
-                        ))}
-                    </select>
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={showTargetDropdown ? targetSkuSearch : (selectedTargetSkuDoc?.name || '')}
+                        onChange={e => {
+                          setTargetSkuSearch(e.target.value);
+                          setShowTargetDropdown(true);
+                        }}
+                        onClick={() => setShowTargetDropdown(true)}
+                        onFocus={() => setShowTargetDropdown(true)}
+                        placeholder="Search semi-finished sheet..."
+                        className="w-full pl-8 pr-10 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-3xs cursor-pointer"
+                      />
+                      <div className="absolute right-2 top-2 flex items-center gap-1 text-slate-400">
+                        {targetSkuId ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTargetSkuId('');
+                              setTargetSkuSearch('');
+                            }}
+                            className="p-0.5 hover:text-slate-600 rounded cursor-pointer"
+                            title="Clear selected target SKU"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <ChevronDown 
+                            className="w-4 h-4 cursor-pointer hover:text-slate-600" 
+                            onClick={() => setShowTargetDropdown(!showTargetDropdown)} 
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Dropdown Popover matching Image 2 1:1 */}
+                    {showTargetDropdown && (
+                      <div className="absolute left-0 top-full mt-1 w-full min-w-[340px] sm:min-w-[460px] bg-white border border-slate-200 rounded-xl shadow-2xl z-[999] max-h-80 overflow-y-auto divide-y divide-slate-100 p-1">
+                        {/* Category Filter Chips Header */}
+                        <div className="sticky top-0 bg-white/95 backdrop-blur-xs p-2 border-b border-slate-100 z-10 space-y-1.5 shadow-3xs">
+                          <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                            <span className="flex items-center gap-1">
+                              <Tag className="w-3 h-3 text-emerald-600" />
+                              <span>Shift Category:</span>
+                            </span>
+                            <span>Showing {filteredTargetSkus.length} of {semiCategoryBreakdown.total}</span>
+                          </div>
+                          <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-thin">
+                            <button
+                              type="button"
+                              onClick={() => setTargetCategoryFilter('ALL')}
+                              className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                                targetCategoryFilter === 'ALL'
+                                  ? 'bg-emerald-600 text-white shadow-3xs'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                              }`}
+                            >
+                              All ({semiCategoryBreakdown.total})
+                            </button>
+                            {semiCategoryBreakdown.categories.slice(0, 10).map(([cat, count]) => (
+                              <button
+                                key={cat}
+                                type="button"
+                                onClick={() => setTargetCategoryFilter(cat)}
+                                className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                                  targetCategoryFilter === cat
+                                    ? 'bg-emerald-600 text-white shadow-3xs'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                  }`}
+                              >
+                                {cat} ({count})
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* List of Semi-Finished Good SKUs */}
+                        {filteredTargetSkus.length === 0 ? (
+                          <div className="p-4 text-center text-xs text-slate-400 italic">
+                            No semi-finished good sheets found matching search.
+                          </div>
+                        ) : (
+                          filteredTargetSkus.map(s => {
+                            const isSelected = s._id === targetSkuId;
+                            const spec = getSkuSpecOrConversion(s);
+                            return (
+                              <div
+                                key={s._id}
+                                onClick={() => handleSelectTargetSku(s)}
+                                className={`p-2.5 cursor-pointer rounded-lg transition-colors flex items-center justify-between text-xs ${
+                                  isSelected ? 'bg-emerald-50/90 font-bold border border-emerald-200' : 'hover:bg-emerald-50/50'
+                                }`}
+                              >
+                                <div className="flex-1 min-w-0 pr-3">
+                                  <div className="font-bold text-slate-900 break-words leading-snug text-xs sm:text-[13px]">{s.name}</div>
+                                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                    <span className="text-[10px] text-slate-400 font-mono">{s.skuCode}</span>
+                                    <span className="text-[10px] text-slate-300">•</span>
+                                    <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200/60">
+                                      {s.category || 'Semi Goods'}
+                                    </span>
+                                    {spec && (
+                                      <>
+                                        <span className="text-[10px] text-slate-300">•</span>
+                                        <span className="text-[10px] font-semibold text-emerald-700">{spec}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded-full border bg-purple-50 text-purple-700 border-purple-200">
+                                    Semi Good
+                                  </span>
+                                  <span className="px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                                    {s.status || 'Active'}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Cut Specifications Grid */}
@@ -837,154 +1187,68 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Machine Sheeter Cut Meter & Blade Strokes Panel */}
+                  {/* ── MACHINE CUTTING METER (DIRECT KNIFE CUTS ONLY) ── */}
                   <div className="bg-gradient-to-br from-indigo-50/70 via-blue-50/50 to-slate-50 border border-indigo-200/90 rounded-2xl p-3 space-y-2.5 shadow-2xs">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <Activity className="w-4 h-4 text-indigo-700" />
                         <div>
                           <span className="text-xs font-bold text-indigo-950 uppercase tracking-wide block">
-                            Machine Cutting Meter (Knife Strokes)
+                            Machine Cutting Meter (Direct Knife Strokes)
                           </span>
                           <span className="text-[10px] text-slate-500 block">
                             Derived Sheets = Knife Cuts × Reels on Stand × Slits Across
                           </span>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-indigo-200/80 text-[10.5px]">
-                        <button
-                          type="button"
-                          onClick={() => setMeterMode('cuts')}
-                          className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
-                            meterMode === 'cuts' ? 'bg-indigo-600 text-white shadow-3xs' : 'text-slate-600 hover:text-indigo-700'
-                          }`}
-                        >
-                          Direct Cuts
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setMeterMode('odometer')}
-                          className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
-                            meterMode === 'odometer' ? 'bg-indigo-600 text-white shadow-3xs' : 'text-slate-600 hover:text-indigo-700'
-                          }`}
-                        >
-                          Meter Odometer
-                        </button>
-                      </div>
                     </div>
 
-                    {meterMode === 'cuts' ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <div className="sm:col-span-1">
-                          <label className="text-[10px] font-bold text-indigo-900 uppercase block mb-1">
-                            Knife Cuts (Strokes) *
-                          </label>
-                          <div className="relative">
-                            <input
-                              type="number"
-                              step="1"
-                              value={cutsCountInput}
-                              onChange={e => handleCutsChange(e.target.value)}
-                              placeholder="0"
-                              className="w-full pl-3 pr-12 py-1.5 bg-white border border-indigo-300 rounded-xl text-sm font-black font-mono text-indigo-950 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-3xs"
-                            />
-                            <span className="absolute right-2.5 top-2 text-[10px] font-bold text-indigo-600">
-                              CUTS
-                            </span>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
-                            Reels on Stand
-                          </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="sm:col-span-1">
+                        <label className="text-[10px] font-bold text-indigo-900 uppercase block mb-1">
+                          Knife Cuts (Strokes) *
+                        </label>
+                        <div className="relative">
                           <input
                             type="number"
-                            min="1"
-                            value={reelsOnStand}
-                            onChange={e => handleReelsOnStandChange(parseInt(e.target.value) || 1)}
-                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            step="1"
+                            value={cutsCountInput}
+                            onChange={e => handleCutsChange(e.target.value)}
+                            placeholder="0"
+                            className="w-full pl-3 pr-12 py-1.5 bg-white border border-indigo-300 rounded-xl text-sm font-black font-mono text-indigo-950 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-3xs"
                           />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
-                            Slits Across
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={slitsCount}
-                            onChange={e => handleSlitsCountChange(parseInt(e.target.value) || 1)}
-                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                          />
+                          <span className="absolute right-2.5 top-2 text-[10px] font-bold text-indigo-600 select-none">
+                            CUTS
+                          </span>
                         </div>
                       </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                          <div>
-                            <label className="text-[10px] font-bold text-indigo-900 uppercase block mb-1">
-                              Start Meter
-                            </label>
-                            <input
-                              type="number"
-                              step="any"
-                              value={startMeterReading}
-                              onChange={e => handleMeterReadingChange(e.target.value, endMeterReading)}
-                              placeholder="0"
-                              className="w-full px-2.5 py-1.5 bg-white border border-indigo-200 rounded-xl text-xs font-bold font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                            />
-                          </div>
 
-                          <div>
-                            <label className="text-[10px] font-bold text-indigo-900 uppercase block mb-1">
-                              End Meter
-                            </label>
-                            <input
-                              type="number"
-                              step="any"
-                              value={endMeterReading}
-                              onChange={e => handleMeterReadingChange(startMeterReading, e.target.value)}
-                              placeholder="0"
-                              className="w-full px-2.5 py-1.5 bg-white border border-indigo-200 rounded-xl text-xs font-bold font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
-                              Reels on Stand
-                            </label>
-                            <input
-                              type="number"
-                              min="1"
-                              value={reelsOnStand}
-                              onChange={e => handleReelsOnStandChange(parseInt(e.target.value) || 1)}
-                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-800"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
-                              Slits Across
-                            </label>
-                            <input
-                              type="number"
-                              min="1"
-                              value={slitsCount}
-                              onChange={e => handleSlitsCountChange(parseInt(e.target.value) || 1)}
-                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-800"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between text-[11px] bg-indigo-100/50 px-2.5 py-1 rounded-lg text-indigo-900 font-mono">
-                          <span>Meter Stroke Difference: <strong>{cutsCountInput || 0} cuts</strong></span>
-                          <span>1 stroke = {sheetsPerCut} sheets</span>
-                        </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
+                          Reels on Stand
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={reelsOnStand}
+                          onChange={e => handleReelsOnStandChange(parseInt(e.target.value) || 1)}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
                       </div>
-                    )}
+
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">
+                          Slits Across
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={slitsCount}
+                          onChange={e => handleSlitsCountChange(parseInt(e.target.value) || 1)}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
 
                     {/* Live Cut Calculation Display */}
                     <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-indigo-100 text-[11px]">
@@ -1072,7 +1336,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                     </div>
 
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-500">Machine Meter Output:</span>
+                      <span className="font-semibold text-slate-500">Machine Cuts Output:</span>
                       <span className="font-mono font-bold text-indigo-700">
                         {machineDerivedSheets.toLocaleString()} Sheets ({numCutsCount} cuts @ {reelsOnStand}R)
                       </span>
@@ -1123,7 +1387,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
               </div>
             </div>
 
-            {/* BOTTOM PANE: By-Products, Scrap & Landed Rate Reconciliation (Tally Style) */}
+            {/* ── BOTTOM PANE: By-Products, Scrap Recovery & Landed Costing ── */}
             <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-2 shrink-0">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
@@ -1205,6 +1469,9 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                   </div>
                   <div className="text-[10px] font-mono text-emerald-800">
                     ₹{effectiveCostPerReam.toFixed(2)} / ream
+                  </div>
+                  <div className="text-[9px] text-slate-400 mt-0.5">
+                    Net: ₹{netProductionCost.toLocaleString('en-IN')}
                   </div>
                 </div>
               </div>
