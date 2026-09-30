@@ -2,11 +2,12 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   Building2, Layers, Search,
-  Edit2, Trash2, ChevronDown,
+  Edit2, Trash2, ChevronDown, ChevronUp,
   Plus, Package, Eye,
   Boxes, ArrowRight, Printer, Download,
   SlidersHorizontal, History, Sparkles,
-  FileSpreadsheet, ArrowUpRight, CheckCircle2
+  FileSpreadsheet, ArrowUpRight, CheckCircle2,
+  Scale, FileText, Info, X
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../../context/AuthContext';
@@ -52,6 +53,168 @@ const getZoneLetter = (zoneName: string) => {
   return clean.charAt(0) || zoneName.charAt(0).toUpperCase() || 'Z';
 };
 
+/**
+ * Calculates net weight in Kilograms (KG) for any inventory item / SKU
+ * taking into account explicit reels, units (KG, MT, gm), paper ream weights,
+ * sheets per ream, GSM x Dimensions, alt units, and bundle multipliers.
+ */
+export const calculateSkuWeightInKg = (
+  sku: SkuV2 | any,
+  quantity: number,
+  reels?: { weight: number; reelNumber?: string; gsm?: number; width?: any }[]
+): {
+  weightKg: number | null;
+  formattedWeight: string;
+  calcNote: string;
+} => {
+  const qty = Number(quantity) || 0;
+  if (!sku || isNaN(qty) || qty === 0) {
+    return { weightKg: 0, formattedWeight: '0.00 KG', calcNote: 'Zero quantity' };
+  }
+
+  // 1. Explicit reel weights from live reels array
+  if (Array.isArray(reels) && reels.length > 0) {
+    const reelsSum = reels.reduce((sum, r) => sum + (Number(r.weight) || 0), 0);
+    if (reelsSum > 0) {
+      return {
+        weightKg: reelsSum,
+        formattedWeight: `${reelsSum.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} KG`,
+        calcNote: `${reels.length} reel${reels.length > 1 ? 's' : ''} batch weight`
+      };
+    }
+  }
+
+  const unitLower = (sku.unit || '').toLowerCase().trim();
+
+  // 2. Unit is already in KG / KGS / Kilograms
+  if (['kg', 'kgs', 'kilogram', 'kilograms'].includes(unitLower)) {
+    return {
+      weightKg: qty,
+      formattedWeight: `${qty.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} KG`,
+      calcNote: 'Direct weight (KG)'
+    };
+  }
+
+  // Metric Tonne
+  if (['tonne', 'ton', 'tons', 'tonnes', 'mt'].includes(unitLower)) {
+    const kg = qty * 1000;
+    return {
+      weightKg: kg,
+      formattedWeight: `${kg.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} KG`,
+      calcNote: `${qty.toLocaleString('en-IN')} MT × 1,000`
+    };
+  }
+
+  // Grams
+  if (['g', 'gm', 'gms', 'gram', 'grams'].includes(unitLower)) {
+    const kg = qty / 1000;
+    return {
+      weightKg: kg,
+      formattedWeight: `${kg.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 3 })} KG`,
+      calcNote: `${qty.toLocaleString('en-IN')} g ÷ 1,000`
+    };
+  }
+
+  // 3. Alt Unit in KG
+  const altUnitLower = (sku.altUnit || '').toLowerCase().trim();
+  const altConversion = Number(sku.altUnitConversion) || 0;
+  if (altConversion > 0 && ['kg', 'kgs', 'kilogram', 'kilograms'].includes(altUnitLower)) {
+    const isAltPrimaryToAlt = sku.altUnitDirection !== 'ALT_TO_PRIMARY';
+    const kg = isAltPrimaryToAlt ? qty * altConversion : qty / altConversion;
+    return {
+      weightKg: kg,
+      formattedWeight: `${kg.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} KG`,
+      calcNote: `Alt Unit (${altConversion} KG/${sku.unit})`
+    };
+  }
+
+  // 4. Paper sheets / reams / pcs with explicit reamWeight
+  const reamWeight = Number(sku.reamWeight) || 0;
+  const sheetsPerReam = Number(sku.pages) || 500;
+
+  if (reamWeight > 0) {
+    if (['ream', 'reams'].includes(unitLower)) {
+      const kg = qty * reamWeight;
+      return {
+        weightKg: kg,
+        formattedWeight: `${kg.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} KG`,
+        calcNote: `${qty.toLocaleString('en-IN')} Reams × ${reamWeight} KG/Ream`
+      };
+    }
+    if (['sheet', 'sheets', 'pcs', 'pc', 'pieces'].includes(unitLower)) {
+      const kg = (qty / sheetsPerReam) * reamWeight;
+      return {
+        weightKg: kg,
+        formattedWeight: `${kg.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} KG`,
+        calcNote: `(${qty.toLocaleString('en-IN')} ÷ ${sheetsPerReam} sheets) × ${reamWeight} KG/Ream`
+      };
+    }
+  }
+
+  // 5. Paper dimensions fallback (GSM, width, length)
+  const gsm = Number(sku.gsm) || 0;
+  let w = Number(sku.width) || 0;
+  let l = Number(sku.length) || 0;
+
+  if ((w === 0 || l === 0) && sku.name) {
+    const match = sku.name.match(/(\d+(?:\.\d+)?)\s*[xX*]\s*(\d+(?:\.\d+)?)/i);
+    if (match) {
+      if (w === 0) w = Number(match[1]) || 0;
+      if (l === 0) l = Number(match[2]) || 0;
+    }
+  }
+
+  if (gsm > 0 && w > 0 && l > 0) {
+    const isInches = w <= 60 && l <= 60;
+    const wCm = isInches ? w * 2.54 : w;
+    const lCm = isInches ? l * 2.54 : l;
+    const singleSheetKg = (wCm * lCm * gsm) / 10000000;
+
+    if (['sheet', 'sheets', 'pcs', 'pc', 'pieces'].includes(unitLower)) {
+      const kg = qty * singleSheetKg;
+      return {
+        weightKg: kg,
+        formattedWeight: `${kg.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} KG`,
+        calcNote: `${qty.toLocaleString('en-IN')} sheets @ ${(singleSheetKg * 1000).toFixed(1)}g (${gsm} GSM ${w}×${l})`
+      };
+    }
+    if (['ream', 'reams'].includes(unitLower)) {
+      const calcRw = singleSheetKg * sheetsPerReam;
+      const kg = qty * calcRw;
+      return {
+        weightKg: kg,
+        formattedWeight: `${kg.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} KG`,
+        calcNote: `${qty.toLocaleString('en-IN')} Reams × ${calcRw.toFixed(2)} KG/Ream`
+      };
+    }
+  }
+
+  // 6. Finished Goods / Books (GBL / Bundle / PCS)
+  const booksPerGbl = Number(sku.booksGbl) || 0;
+  const pages = Number(sku.pages) || 0;
+  if (['gbl', 'bundle', 'bundles'].includes(unitLower) && booksPerGbl > 0 && pages > 0 && gsm > 0 && w > 0 && l > 0) {
+    const isInches = w <= 60 && l <= 60;
+    const wCm = isInches ? w * 2.54 : w;
+    const lCm = isInches ? l * 2.54 : l;
+    const singleLeafKg = (wCm * lCm * gsm) / 10000000;
+    const bookLeaves = pages / 2;
+    const bookKg = bookLeaves * singleLeafKg;
+    const totalBooks = qty * booksPerGbl;
+    const kg = totalBooks * bookKg;
+    return {
+      weightKg: kg,
+      formattedWeight: `${kg.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} KG`,
+      calcNote: `${totalBooks} books (${booksPerGbl}/Gbl) × ${(bookKg * 1000).toFixed(0)}g`
+    };
+  }
+
+  return {
+    weightKg: null,
+    formattedWeight: '—',
+    calcNote: `Unit: ${sku.unit || 'unit'}`
+  };
+};
+
 const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded = false }) => {
   const { selectedCompany } = useAuth();
   const [locations, setLocations] = useState<WarehouseLocationV2[]>([]);
@@ -72,6 +235,12 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
     totalQty: number;
   } | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
+
+  // Inspect Modal UI State (Search, Categories, Tabs, Reel Expand)
+  const [inspectSearch, setInspectSearch] = useState('');
+  const [inspectCategoryFilter, setInspectCategoryFilter] = useState<'ALL' | 'RAW' | 'SEMI' | 'FINISHED'>('ALL');
+  const [inspectActiveTab, setInspectActiveTab] = useState<'items' | 'movements'>('items');
+  const [expandedReels, setExpandedReels] = useState<Record<string, boolean>>({});
 
   // Search
   const [zoneSearch, setZoneSearch] = useState('');
@@ -317,16 +486,293 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
   // Inspect Location Details
   const handleInspectLocation = async (location: WarehouseLocationV2) => {
     setSelectedLocationForDetails(location);
+    setInspectSearch('');
+    setInspectCategoryFilter('ALL');
+    setInspectActiveTab('items');
+    setExpandedReels({});
     setDetailsLoading(true);
     try {
       const res = await getLocationDetailsV2(location._id!, selectedCompany?._id || '');
       setLocationDetails(res);
     } catch (e) {
       console.error(e);
-      showToast('Failed to load location stock details', 'error');
+      // Non-blocking: local balances & skus still render immediately
     } finally {
       setDetailsLoading(false);
     }
+  };
+
+  // Location Hierarchy Breadcrumb
+  const locationBreadcrumb = useMemo(() => {
+    if (!selectedLocationForDetails) return '';
+    const parts: string[] = [selectedLocationForDetails.name];
+    let currentParentId = selectedLocationForDetails.parentId;
+    while (currentParentId) {
+      const parent = locations.find(l => l._id === currentParentId);
+      if (parent) {
+        parts.unshift(parent.name);
+        currentParentId = parent.parentId;
+      } else {
+        break;
+      }
+    }
+    return parts.join(' › ');
+  }, [selectedLocationForDetails, locations]);
+
+  // Comprehensive items list & weights for the inspected location / zone
+  const inspectedItems = useMemo(() => {
+    if (!selectedLocationForDetails) return [];
+
+    const targetLoc = selectedLocationForDetails;
+    const targetLocIds = new Set<string>([String(targetLoc._id)]);
+    const targetLocNames = new Set<string>([targetLoc.name.toLowerCase().trim()]);
+
+    const childLocations = locations.filter(l => l.parentId === targetLoc._id);
+    childLocations.forEach(c => {
+      if (c._id) {
+        targetLocIds.add(String(c._id));
+        targetLocNames.add(c.name.toLowerCase().trim());
+      }
+    });
+
+    const parent = targetLoc.parentId ? locations.find(l => l._id === targetLoc.parentId) : null;
+    const parentName = parent ? parent.name.toLowerCase().trim() : '';
+
+    const itemsMap = new Map<string, {
+      skuId: string;
+      sku: SkuV2;
+      quantity: number;
+      categoryType: 'Raw Material' | 'Semi Finished' | 'Finished Goods';
+      weightKg: number | null;
+      formattedWeight: string;
+      weightNote: string;
+      reels?: any[];
+      subLocationName?: string;
+    }>();
+
+    // 1. Process from balances (live ledger aggregates)
+    if (Array.isArray(balances) && balances.length > 0) {
+      balances.forEach((b: any) => {
+        const bLocId = b.locationId ? String(b.locationId._id || b.locationId) : '';
+        const bLocName = (b.location?.name || b.locationName || '').toLowerCase().trim();
+
+        const isLocMatch = (bLocId && targetLocIds.has(bLocId)) ||
+          (bLocName && (targetLocNames.has(bLocName) || (parentName && bLocName.includes(parentName) && bLocName.includes(targetLoc.name.toLowerCase()))));
+
+        if (isLocMatch) {
+          const rawSkuId = b.skuId || b.sku?._id;
+          const skuIdStr = rawSkuId ? String(rawSkuId._id || rawSkuId) : '';
+          const skuObj: SkuV2 | undefined = b.sku || skus.find(s => String(s._id) === skuIdStr);
+          const qty = Number(b.onHand ?? b.quantity ?? b.qty) || 0;
+
+          if (qty > 0 && skuObj) {
+            const cat = (skuObj.category || '').toLowerCase();
+            const group = (skuObj.group || '').toLowerCase();
+            const itemType = (skuObj.itemType || '').toLowerCase();
+            const paperType = (skuObj.paperType || '').toLowerCase();
+
+            const isRaw = cat.includes('raw') || cat.includes('material') || cat.includes('paper') ||
+              group.includes('material') || group.includes('paper') || group.includes('raw') ||
+              itemType.includes('material') || itemType.includes('raw') || (paperType !== 'none' && paperType !== '');
+
+            const isSemi = !isRaw && (cat.includes('semi') || group.includes('semi') || itemType.includes('semi') || group.includes('work in progress') || group.includes('wip'));
+
+            const categoryType: 'Raw Material' | 'Semi Finished' | 'Finished Goods' = isRaw
+              ? 'Raw Material'
+              : isSemi
+                ? 'Semi Finished'
+                : 'Finished Goods';
+
+            const key = skuIdStr || skuObj.skuCode;
+            const weightInfo = calculateSkuWeightInKg(skuObj, qty, b.reels);
+
+            if (itemsMap.has(key)) {
+              const existing = itemsMap.get(key)!;
+              const newQty = existing.quantity + qty;
+              const combinedReels = [...(existing.reels || []), ...(b.reels || [])];
+              const combinedWeight = calculateSkuWeightInKg(skuObj, newQty, combinedReels);
+              itemsMap.set(key, {
+                ...existing,
+                quantity: newQty,
+                weightKg: combinedWeight.weightKg,
+                formattedWeight: combinedWeight.formattedWeight,
+                weightNote: combinedWeight.calcNote,
+                reels: combinedReels
+              });
+            } else {
+              itemsMap.set(key, {
+                skuId: key,
+                sku: skuObj,
+                quantity: qty,
+                categoryType,
+                weightKg: weightInfo.weightKg,
+                formattedWeight: weightInfo.formattedWeight,
+                weightNote: weightInfo.calcNote,
+                reels: b.reels,
+                subLocationName: b.location?.name || b.locationName || ''
+              });
+            }
+          }
+        }
+      });
+    }
+
+    // 2. Secondary fallback from skus default/initial locations
+    skus.forEach(s => {
+      const sId = String(s._id || s.skuCode);
+      if (itemsMap.has(sId)) return; // Already counted from ledger balances
+
+      const initialLocId = String(s.initialLocationId || (s as any).locationId || s.initialLocation?._id || '');
+      const defaultLocName = (s.defaultLocation || s.warehouseLocation || (s as any).location || '').toLowerCase().trim();
+
+      const isMatch = (initialLocId && targetLocIds.has(initialLocId)) ||
+        (defaultLocName && (targetLocNames.has(defaultLocName) || (parentName && defaultLocName.includes(parentName) && defaultLocName.includes(targetLoc.name.toLowerCase()))));
+
+      if (isMatch) {
+        const stock = Number(s.presentStock ?? s.openingStock) || 0;
+        if (stock > 0) {
+          const cat = (s.category || '').toLowerCase();
+          const group = (s.group || '').toLowerCase();
+          const itemType = (s.itemType || '').toLowerCase();
+          const paperType = (s.paperType || '').toLowerCase();
+
+          const isRaw = cat.includes('raw') || cat.includes('material') || cat.includes('paper') ||
+            group.includes('material') || group.includes('paper') || group.includes('raw') ||
+            itemType.includes('material') || itemType.includes('raw') || (paperType !== 'none' && paperType !== '');
+
+          const isSemi = !isRaw && (cat.includes('semi') || group.includes('semi') || itemType.includes('semi') || group.includes('work in progress') || group.includes('wip'));
+
+          const categoryType = isRaw ? 'Raw Material' : isSemi ? 'Semi Finished' : 'Finished Goods';
+          const weightInfo = calculateSkuWeightInKg(s, stock);
+
+          itemsMap.set(sId, {
+            skuId: sId,
+            sku: s,
+            quantity: stock,
+            categoryType,
+            weightKg: weightInfo.weightKg,
+            formattedWeight: weightInfo.formattedWeight,
+            weightNote: weightInfo.calcNote,
+            subLocationName: s.defaultLocation || ''
+          });
+        }
+      }
+    });
+
+    // 3. Merge in any items from backend locationDetails?.storedSkus if not already in itemsMap
+    if (locationDetails?.storedSkus && locationDetails.storedSkus.length > 0) {
+      locationDetails.storedSkus.forEach(item => {
+        if (!item.sku || !item.quantity || item.quantity <= 0) return;
+        const sId = String(item.sku._id || item.sku.skuCode);
+        if (!itemsMap.has(sId)) {
+          const cat = (item.sku.category || '').toLowerCase();
+          const group = (item.sku.group || '').toLowerCase();
+          const itemType = (item.sku.itemType || '').toLowerCase();
+          const isRaw = cat.includes('raw') || cat.includes('material') || cat.includes('paper') ||
+            group.includes('material') || group.includes('paper') || group.includes('raw') ||
+            itemType.includes('material') || itemType.includes('raw');
+          const isSemi = !isRaw && (cat.includes('semi') || group.includes('semi') || itemType.includes('semi') || group.includes('wip'));
+          const categoryType = isRaw ? 'Raw Material' : isSemi ? 'Semi Finished' : 'Finished Goods';
+          const weightInfo = calculateSkuWeightInKg(item.sku, item.quantity);
+          itemsMap.set(sId, {
+            skuId: sId,
+            sku: item.sku,
+            quantity: item.quantity,
+            categoryType,
+            weightKg: weightInfo.weightKg,
+            formattedWeight: weightInfo.formattedWeight,
+            weightNote: weightInfo.calcNote
+          });
+        }
+      });
+    }
+
+    return Array.from(itemsMap.values());
+  }, [selectedLocationForDetails, locations, balances, skus, locationDetails]);
+
+  // Filtered items based on search and category tab
+  const filteredInspectedItems = useMemo(() => {
+    return inspectedItems.filter(item => {
+      if (inspectCategoryFilter === 'RAW' && item.categoryType !== 'Raw Material') return false;
+      if (inspectCategoryFilter === 'SEMI' && item.categoryType !== 'Semi Finished') return false;
+      if (inspectCategoryFilter === 'FINISHED' && item.categoryType !== 'Finished Goods') return false;
+
+      if (inspectSearch.trim()) {
+        const q = inspectSearch.toLowerCase().trim();
+        const codeMatch = item.sku.skuCode.toLowerCase().includes(q);
+        const nameMatch = item.sku.name.toLowerCase().includes(q);
+        const catMatch = (item.sku.category || '').toLowerCase().includes(q);
+        return codeMatch || nameMatch || catMatch;
+      }
+      return true;
+    });
+  }, [inspectedItems, inspectCategoryFilter, inspectSearch]);
+
+  // Totals for inspected items
+  const inspectedTotals = useMemo(() => {
+    let totalWeight = 0;
+    let totalQty = 0;
+    let hasWeightItems = 0;
+
+    inspectedItems.forEach(item => {
+      totalQty += item.quantity;
+      if (item.weightKg !== null && item.weightKg !== undefined && item.weightKg > 0) {
+        totalWeight += item.weightKg;
+        hasWeightItems++;
+      }
+    });
+
+    const rawItems = inspectedItems.filter(i => i.categoryType === 'Raw Material');
+    const semiItems = inspectedItems.filter(i => i.categoryType === 'Semi Finished');
+    const fgItems = inspectedItems.filter(i => i.categoryType === 'Finished Goods');
+
+    const rawWeight = rawItems.reduce((sum, i) => sum + (i.weightKg || 0), 0);
+    const semiWeight = semiItems.reduce((sum, i) => sum + (i.weightKg || 0), 0);
+    const fgWeight = fgItems.reduce((sum, i) => sum + (i.weightKg || 0), 0);
+
+    return {
+      totalWeight,
+      totalQty,
+      hasWeightItems,
+      rawCount: rawItems.length,
+      rawWeight,
+      semiCount: semiItems.length,
+      semiWeight,
+      fgCount: fgItems.length,
+      fgWeight,
+      totalCount: inspectedItems.length
+    };
+  }, [inspectedItems]);
+
+  // Export inspected location items to Excel
+  const handleExportInspectedItemsExcel = () => {
+    if (!selectedLocationForDetails || inspectedItems.length === 0) {
+      showToast('No items to export', 'info');
+      return;
+    }
+    const data = inspectedItems.map((item, idx) => ({
+      '#': idx + 1,
+      'Location': selectedLocationForDetails.name,
+      'Level': selectedLocationForDetails.level,
+      'Hierarchy': locationBreadcrumb,
+      'SKU Code': item.sku.skuCode,
+      'Item Name': item.sku.name,
+      'Category': item.categoryType,
+      'Stored Quantity': item.quantity,
+      'Unit': item.sku.unit,
+      'Respective Weight (KG)': item.weightKg !== null ? item.weightKg : 'N/A',
+      'Weight Calculation Note': item.weightNote,
+      'GSM': item.sku.gsm || '',
+      'Width': item.sku.width || '',
+      'Length': item.sku.length || '',
+      'Brand': item.sku.brand || ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Stored_Items');
+    XLSX.writeFile(wb, `${selectedLocationForDetails.name.replace(/\s+/g, '_')}_Stock_and_Weights.xlsx`);
+    showToast('Exported location stock with weights', 'success');
   };
 
   // Hierarchy Data Parsing & Calculation
@@ -1199,10 +1645,15 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                     const zoneLetter = getZoneLetter(row.zone.name);
 
                     return (
-                      <tr key={`${row.zone._id}_${row.location._id}_${row.index}`} className="hover:bg-slate-50/60 transition-colors">
+                      <tr
+                        key={`${row.zone._id}_${row.location._id}_${row.index}`}
+                        onClick={() => handleInspectLocation(row.location)}
+                        className="hover:bg-blue-50/50 transition-colors cursor-pointer group"
+                        title="Click to view all items and respective weights in this storage location"
+                      >
 
                         {/* # */}
-                        <td className="px-3.5 py-2.5 text-center font-semibold text-slate-400">
+                        <td className="px-3.5 py-2.5 text-center font-semibold text-slate-400 group-hover:text-blue-600 transition-colors">
                           {row.index}
                         </td>
 
@@ -1216,12 +1667,15 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                         {/* Storage Location */}
                         <td className="px-3.5 py-2.5 font-semibold text-slate-900">
                           <div className="flex items-center gap-1.5">
-                            <span>{row.location.name}</span>
+                            <span className="group-hover:text-blue-700 transition-colors">{row.location.name}</span>
                             {row.location.level === 'Zone' && (
                               <button
                                 type="button"
-                                onClick={() => handleOpenAddModal('Storage Location', row.zone._id)}
-                                className="text-[10px] text-blue-600 font-semibold hover:underline ml-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenAddModal('Storage Location', row.zone._id);
+                                }}
+                                className="text-[10px] text-blue-600 font-semibold hover:underline ml-1 cursor-pointer"
                               >
                                 + Add Bin
                               </button>
@@ -1255,7 +1709,9 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
 
                         {/* Total SKUs */}
                         <td className="px-3.5 py-2.5 text-center font-bold text-slate-800">
-                          {row.totalSkus}
+                          <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-slate-100 group-hover:bg-blue-100 group-hover:text-blue-700 text-xs font-bold transition-colors">
+                            {row.totalSkus}
+                          </span>
                         </td>
 
                         {/* Actions */}
@@ -1265,9 +1721,12 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                             {/* Inspect */}
                             <button
                               type="button"
-                              onClick={() => handleInspectLocation(row.location)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleInspectLocation(row.location);
+                              }}
                               className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
-                              title="Inspect Live Stock"
+                              title="Inspect Live Stock & Weights"
                             >
                               <Eye className="w-3.5 h-3.5" />
                             </button>
@@ -1275,7 +1734,10 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                             {/* Edit */}
                             <button
                               type="button"
-                              onClick={() => handleOpenEditModal(row.location)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenEditModal(row.location);
+                              }}
                               className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
                               title="Edit Location"
                             >
@@ -1285,7 +1747,10 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                             {/* Delete */}
                             <button
                               type="button"
-                              onClick={() => setDeleteConfirmNode(row.location)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteConfirmNode(row.location);
+                              }}
                               className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
                               title="Delete Location"
                             >
@@ -1392,29 +1857,37 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
               return (
                 <div
                   key={zone._id}
-                  className="p-3.5 bg-white border border-slate-200/80 rounded-xl shadow-2xs hover:border-slate-300 transition-colors space-y-2.5"
+                  onClick={() => handleInspectLocation(zone)}
+                  className="p-3.5 bg-white border border-slate-200/80 rounded-xl shadow-2xs hover:border-blue-400 hover:shadow-xs transition-all space-y-2.5 cursor-pointer group"
+                  title="Click to view all items and respective weights in this zone"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className={`inline-flex items-center justify-center w-6 h-6 shrink-0 overflow-hidden rounded-md text-[11px] font-bold border ${zoneStyle.bg} ${zoneStyle.text} ${zoneStyle.border}`}>
                         {zoneLetter}
                       </span>
-                      <span className="font-bold text-slate-900 text-xs truncate">{zone.name}</span>
+                      <span className="font-bold text-slate-900 text-xs truncate group-hover:text-blue-700 transition-colors">{zone.name}</span>
                     </div>
 
                     {/* Zone Actions: Inspect, Edit & Delete */}
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => handleInspectLocation(zone)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleInspectLocation(zone);
+                        }}
                         className="text-slate-400 hover:text-blue-600 p-1 rounded transition-colors cursor-pointer flex items-center gap-0.5 text-[11px] font-medium"
-                        title="Inspect Live Stock in Zone"
+                        title="Inspect Live Stock & Weights in Zone"
                       >
                         <Eye className="w-3.5 h-3.5 text-slate-400 hover:text-blue-600" />
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleOpenEditModal(zone)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditModal(zone);
+                        }}
                         className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
                         title="Edit Zone"
                       >
@@ -1422,7 +1895,10 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                       </button>
                       <button
                         type="button"
-                        onClick={() => setDeleteConfirmNode(zone)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteConfirmNode(zone);
+                        }}
                         className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
                         title="Delete Zone"
                       >
@@ -1565,52 +2041,512 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
         </form>
       </Modal>
 
-      {/* MODAL: LOCATION INSPECT DETAILS */}
+      {/* MODAL: LOCATION INSPECT DETAILS & WEIGHTS */}
       <Modal
         isOpen={!!selectedLocationForDetails}
         onClose={() => {
           setSelectedLocationForDetails(null);
           setLocationDetails(null);
+          setExpandedReels({});
         }}
-        title={`Live Stock: ${selectedLocationForDetails?.name || 'Location'}`}
-      >
-        <div className="space-y-3.5 text-xs text-left">
-          {detailsLoading ? (
-            <div className="py-8 text-center text-slate-400 font-medium animate-pulse">
-              Loading live stock details...
-            </div>
-          ) : (
-            <>
-              <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-xl flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider block">Level</span>
-                  <span className="font-bold text-slate-900 text-xs">{selectedLocationForDetails?.level}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider block">Total Stored Qty</span>
-                  <span className="font-bold text-blue-700 text-xs">{locationDetails?.totalQty || 0} units</span>
-                </div>
+        maxWidth="max-w-4xl"
+        title={
+          <div className="flex items-center justify-between w-full pr-6 text-left">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-blue-100/80 text-blue-700 flex items-center justify-center font-bold text-sm shrink-0">
+                <Scale className="w-4.5 h-4.5" />
               </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm font-bold text-slate-900 truncate">
+                    {selectedLocationForDetails?.name || 'Location Stock & Weights'}
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+                    {selectedLocationForDetails?.level}
+                  </span>
+                  {selectedLocationForDetails?.status && (
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${
+                      selectedLocationForDetails.status === 'Active'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-amber-50 text-amber-700 border border-amber-200'
+                    }`}>
+                      {selectedLocationForDetails.status}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                  {locationBreadcrumb}
+                </p>
+              </div>
+            </div>
 
-              <div>
-                <h4 className="font-bold text-slate-900 mb-2">Stored SKU Items</h4>
-                {(!locationDetails?.storedSkus || locationDetails.storedSkus.length === 0) ? (
-                  <p className="text-slate-400 py-4 text-center">No active inventory balance assigned to this location yet.</p>
-                ) : (
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                    {locationDetails.storedSkus.map((item, idx) => (
-                      <div key={idx} className="p-2 bg-slate-50 border border-slate-200/80 rounded-lg flex items-center justify-between">
-                        <div>
-                          <span className="font-mono font-bold text-slate-900">{item.sku.skuCode}</span>
-                          <p className="text-slate-500 text-[11px]">{item.sku.name}</p>
-                        </div>
-                        <span className="font-bold text-blue-600">{item.quantity} {item.sku.unit}</span>
-                      </div>
-                    ))}
-                  </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleExportInspectedItemsExcel}
+                disabled={inspectedItems.length === 0}
+                className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer disabled:opacity-40"
+                title="Export this location's items and weights to Excel"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="hidden sm:inline">Export Excel</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                title="Print location inventory manifest"
+              >
+                <Printer className="w-3.5 h-3.5 text-slate-400" />
+                <span className="hidden sm:inline">Print</span>
+              </button>
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-4 text-xs text-left">
+          {/* Top 4 KPI Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {/* Total Estimated Weight */}
+            <div className="p-3 bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-200/80 rounded-xl relative overflow-hidden shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">
+                  Total Net Weight
+                </span>
+                <Scale className="w-3.5 h-3.5 text-blue-500" />
+              </div>
+              <div className="text-base sm:text-lg font-extrabold text-blue-950 mt-1">
+                {inspectedTotals.totalWeight.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} <span className="text-xs font-bold text-blue-700">KG</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+                From {inspectedTotals.hasWeightItems} SKU(s)
+              </p>
+            </div>
+
+            {/* Total Stored Quantity */}
+            <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
+                  Total Stored Qty
+                </span>
+                <Package className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+              <div className="text-base sm:text-lg font-extrabold text-slate-900 mt-1">
+                {inspectedTotals.totalQty.toLocaleString('en-IN')} <span className="text-xs font-semibold text-slate-500">Units</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+                {inspectedTotals.totalCount} distinct SKU item(s)
+              </p>
+            </div>
+
+            {/* Category Breakdown */}
+            <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
+                  Breakdown
+                </span>
+                <Boxes className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                <span className="px-1.5 py-0.5 rounded bg-blue-100/70 text-blue-800 text-[10px] font-bold">
+                  {inspectedTotals.rawCount} RM
+                </span>
+                <span className="px-1.5 py-0.5 rounded bg-purple-100/70 text-purple-800 text-[10px] font-bold">
+                  {inspectedTotals.semiCount} SF
+                </span>
+                <span className="px-1.5 py-0.5 rounded bg-emerald-100/70 text-emerald-800 text-[10px] font-bold">
+                  {inspectedTotals.fgCount} FG
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1 truncate">
+                RM: {inspectedTotals.rawWeight.toLocaleString('en-IN', { maximumFractionDigits: 1 })} KG
+              </p>
+            </div>
+
+            {/* Capacity & Occupancy */}
+            <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
+                  Capacity Limit
+                </span>
+                <Layers className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+              <div className="text-sm sm:text-base font-bold text-slate-800 mt-1">
+                {selectedLocationForDetails?.capacity
+                  ? `${selectedLocationForDetails.capacity.toLocaleString('en-IN')} ${selectedLocationForDetails.unit || 'KG'}`
+                  : 'Uncapped'}
+              </div>
+              <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+                {selectedLocationForDetails?.occupiedPercent !== undefined
+                  ? `${selectedLocationForDetails.occupiedPercent}% occupied`
+                  : 'Flexible storage'}
+              </p>
+            </div>
+          </div>
+
+          {/* Filter & Tab Controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Category Filter Chips */}
+              <button
+                type="button"
+                onClick={() => setInspectCategoryFilter('ALL')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  inspectCategoryFilter === 'ALL'
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200/70'
+                }`}
+              >
+                All ({inspectedItems.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setInspectCategoryFilter('RAW')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  inspectCategoryFilter === 'RAW'
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'bg-blue-50 text-blue-700 hover:bg-blue-100/70 border border-blue-200/60'
+                }`}
+              >
+                Raw Materials ({inspectedTotals.rawCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setInspectCategoryFilter('SEMI')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  inspectCategoryFilter === 'SEMI'
+                    ? 'bg-purple-600 text-white shadow-2xs'
+                    : 'bg-purple-50 text-purple-700 hover:bg-purple-100/70 border border-purple-200/60'
+                }`}
+              >
+                Semi Finished ({inspectedTotals.semiCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setInspectCategoryFilter('FINISHED')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  inspectCategoryFilter === 'FINISHED'
+                    ? 'bg-emerald-600 text-white shadow-2xs'
+                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100/70 border border-emerald-200/60'
+                }`}
+              >
+                Finished Goods ({inspectedTotals.fgCount})
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Search */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Filter items or SKU code..."
+                  value={inspectSearch}
+                  onChange={e => setInspectSearch(e.target.value)}
+                  className="pl-8 pr-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 w-44 sm:w-52"
+                />
+                {inspectSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setInspectSearch('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
                 )}
               </div>
-            </>
+
+              {/* View Tab Toggle */}
+              {locationDetails?.recentMovements && locationDetails.recentMovements.length > 0 && (
+                <div className="flex items-center bg-slate-100 p-0.5 rounded-lg shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setInspectActiveTab('items')}
+                    className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                      inspectActiveTab === 'items'
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Items
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInspectActiveTab('movements')}
+                    className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                      inspectActiveTab === 'movements'
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Movements ({locationDetails.recentMovements.length})
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* MAIN VIEW: Stored Items Table */}
+          {inspectActiveTab === 'items' && (
+            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs bg-white">
+              <div className="overflow-x-auto max-h-[380px] overflow-y-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-50/90 sticky top-0 z-10 border-b border-slate-200 text-[10.5px] font-semibold text-slate-500 uppercase tracking-wider backdrop-blur-xs">
+                    <tr>
+                      <th className="px-3.5 py-2.5 w-10 text-center">#</th>
+                      <th className="px-3.5 py-2.5">Item / SKU Details</th>
+                      <th className="px-3.5 py-2.5 w-28">Category</th>
+                      <th className="px-3.5 py-2.5 text-right w-32">Stored Quantity</th>
+                      <th className="px-3.5 py-2.5 text-right w-44">Respective Weight</th>
+                      <th className="px-3.5 py-2.5 text-right w-24">Specs / Reels</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {filteredInspectedItems.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-slate-400">
+                          {inspectSearch ? (
+                            <p>No items matching "{inspectSearch}" in this location.</p>
+                          ) : (
+                            <div className="space-y-1">
+                              <p className="font-semibold text-slate-600">No active inventory balance found in this location.</p>
+                              <p className="text-[11px] text-slate-400">Stock transfers or purchase batch receipts will automatically appear here.</p>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredInspectedItems.map((item, idx) => {
+                        const isRaw = item.categoryType === 'Raw Material';
+                        const isSemi = item.categoryType === 'Semi Finished';
+                        const categoryBadge = isRaw
+                          ? 'bg-blue-50 text-blue-700 border-blue-200'
+                          : isSemi
+                            ? 'bg-purple-50 text-purple-700 border-purple-200'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+
+                        const isReelsExpanded = !!expandedReels[item.skuId];
+                        const hasReels = Array.isArray(item.reels) && item.reels.length > 0;
+
+                        return (
+                          <React.Fragment key={`${item.skuId}_${idx}`}>
+                            <tr className="hover:bg-slate-50/70 transition-colors">
+                              {/* # */}
+                              <td className="px-3.5 py-2.5 text-center font-semibold text-slate-400">
+                                {idx + 1}
+                              </td>
+
+                              {/* SKU Code & Name */}
+                              <td className="px-3.5 py-2.5">
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-mono font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[11px] border border-slate-200/80">
+                                      {item.sku.skuCode}
+                                    </span>
+                                    {item.sku.paperType && item.sku.paperType !== 'None' && (
+                                      <span className="text-[10px] font-semibold text-slate-500 bg-slate-50 px-1 rounded border border-slate-200/60">
+                                        {item.sku.paperType}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-slate-800 font-semibold text-xs leading-snug">
+                                    {item.sku.name}
+                                  </p>
+                                  {item.subLocationName && (
+                                    <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                                      <span>Loc: {item.subLocationName}</span>
+                                    </p>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Category Badge */}
+                              <td className="px-3.5 py-2.5">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-bold border ${categoryBadge}`}>
+                                  {item.categoryType}
+                                </span>
+                              </td>
+
+                              {/* Stored Quantity */}
+                              <td className="px-3.5 py-2.5 text-right font-bold text-slate-900">
+                                <span className="text-xs">
+                                  {item.quantity.toLocaleString('en-IN', { maximumFractionDigits: 3 })}
+                                </span>
+                                <span className="text-[10.5px] font-semibold text-slate-500 ml-1">
+                                  {item.sku.unit}
+                                </span>
+                              </td>
+
+                              {/* Respective Weight (KG) */}
+                              <td className="px-3.5 py-2.5 text-right">
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <Scale className="w-3 h-3 text-blue-500 shrink-0" />
+                                    <span className="font-extrabold text-blue-900 text-xs">
+                                      {item.formattedWeight}
+                                    </span>
+                                  </div>
+                                  {item.weightNote && (
+                                    <p className="text-[10px] text-slate-400 font-normal truncate" title={item.weightNote}>
+                                      {item.weightNote}
+                                    </p>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Specs / Reels */}
+                              <td className="px-3.5 py-2.5 text-right">
+                                {hasReels ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedReels(prev => ({ ...prev, [item.skuId]: !prev[item.skuId] }))}
+                                    className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-[10.5px] font-bold border border-blue-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <span>{item.reels!.length} Reels</span>
+                                    {isReelsExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                  </button>
+                                ) : (
+                                  <div className="text-[10.5px] text-slate-500 font-medium space-y-0.5">
+                                    {item.sku.gsm ? <div>{item.sku.gsm} GSM</div> : null}
+                                    {(item.sku.width || item.sku.length) ? (
+                                      <div>{item.sku.width || ''}{item.sku.length ? `×${item.sku.length}` : ''}"</div>
+                                    ) : null}
+                                    {!item.sku.gsm && !item.sku.width && <span>—</span>}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+
+                            {/* Expandable Reels Sub-Row */}
+                            {hasReels && isReelsExpanded && (
+                              <tr className="bg-blue-50/30">
+                                <td colSpan={6} className="px-5 py-3">
+                                  <div className="bg-white border border-blue-100 rounded-lg p-2.5 shadow-2xs space-y-2">
+                                    <div className="flex items-center justify-between text-[11px] font-bold text-blue-900 border-b border-blue-100 pb-1">
+                                      <span>Stored Reels Breakdown ({item.reels!.length} reels)</span>
+                                      <span>Batch Weights</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                      {item.reels!.map((r: any, rIdx: number) => (
+                                        <div key={rIdx} className="p-2 bg-slate-50 border border-slate-200/80 rounded-md text-left">
+                                          <div className="font-mono font-bold text-slate-800 text-[11px]">
+                                            {r.reelNumber || `Reel #${rIdx + 1}`}
+                                          </div>
+                                          <div className="text-blue-700 font-extrabold text-xs mt-0.5">
+                                            {Number(r.weight || 0).toLocaleString('en-IN')} KG
+                                          </div>
+                                          {(r.gsm || r.width) && (
+                                            <div className="text-[9.5px] text-slate-400 mt-0.5">
+                                              {r.gsm ? `${r.gsm} GSM` : ''} {r.width ? `• ${r.width}"` : ''}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })
+                    )}
+                  </tbody>
+
+                  {/* Summary Totals Footer */}
+                  {filteredInspectedItems.length > 0 && (
+                    <tfoot className="bg-slate-50 border-t-2 border-slate-200 text-xs font-bold text-slate-900 sticky bottom-0 z-10">
+                      <tr>
+                        <td colSpan={3} className="px-3.5 py-2.5 text-slate-800">
+                          Total ({filteredInspectedItems.length} items shown)
+                        </td>
+                        <td className="px-3.5 py-2.5 text-right font-extrabold text-slate-900">
+                          {filteredInspectedItems.reduce((sum, i) => sum + i.quantity, 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} Units
+                        </td>
+                        <td className="px-3.5 py-2.5 text-right font-extrabold text-blue-900">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Scale className="w-3.5 h-3.5 text-blue-600" />
+                            <span>
+                              {filteredInspectedItems.reduce((sum, i) => sum + (i.weightKg || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} KG
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-3.5 py-2.5"></td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* SECONDARY VIEW: Recent Movements */}
+          {inspectActiveTab === 'movements' && (
+            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs bg-white">
+              <div className="overflow-x-auto max-h-[350px] overflow-y-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-200 text-[10.5px] font-semibold text-slate-500 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-3 py-2">Date & Time</th>
+                      <th className="px-3 py-2">SKU Item</th>
+                      <th className="px-3 py-2 text-center">Direction</th>
+                      <th className="px-3 py-2 text-right">Quantity</th>
+                      <th className="px-3 py-2">Transaction</th>
+                      <th className="px-3 py-2">User / Ref</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {(!locationDetails?.recentMovements || locationDetails.recentMovements.length === 0) ? (
+                      <tr>
+                        <td colSpan={6} className="py-10 text-center text-slate-400">
+                          No recent inventory ledger movements recorded for this location.
+                        </td>
+                      </tr>
+                    ) : (
+                      locationDetails.recentMovements.map((m: any, mIdx: number) => {
+                        const isDirIn = m.direction === 'IN' || (m.qtyIn && m.qtyIn > 0);
+                        const qty = m.quantity || m.qtyIn || m.qtyOut || 0;
+                        const dateStr = m.timestamp || m.createdAt ? new Date(m.timestamp || m.createdAt).toLocaleDateString('en-IN', {
+                          day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                        }) : '—';
+
+                        return (
+                          <tr key={m._id || mIdx} className="hover:bg-slate-50/60 transition-colors">
+                            <td className="px-3 py-2 text-slate-500 font-mono text-[11px] whitespace-nowrap">
+                              {dateStr}
+                            </td>
+                            <td className="px-3 py-2">
+                              <span className="font-mono font-bold text-slate-800 mr-1.5">
+                                {m.skuId?.skuCode || m.sku?.skuCode || 'SKU'}
+                              </span>
+                              <span className="text-slate-600 text-[11px]">
+                                {m.skuId?.name || m.sku?.name || ''}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                isDirIn ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
+                              }`}>
+                                {isDirIn ? 'IN' : 'OUT'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-right font-bold text-slate-900 whitespace-nowrap">
+                              {isDirIn ? '+' : '-'}{qty.toLocaleString('en-IN')} {m.skuId?.unit || m.sku?.unit || ''}
+                            </td>
+                            <td className="px-3 py-2 text-slate-600 text-[11px]">
+                              {m.transactionType || m.referenceType || 'Ledger Entry'}
+                            </td>
+                            <td className="px-3 py-2 text-slate-500 text-[11px] truncate max-w-[130px]" title={m.createdBy?.fullName || m.referenceNumber}>
+                              {m.createdBy?.fullName || m.referenceNumber || '—'}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
         </div>
       </Modal>
