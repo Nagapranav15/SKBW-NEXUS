@@ -155,7 +155,7 @@ exports.getAvailableReels = async (req, res) => {
       const sku = skuMap.get(String(group.skuId));
       const loc = locMap.get(String(group.locationId));
       const invItem = invoiceItemMap.get(`${group.batchNumber}_${String(group.skuId)}`);
-      const rate = invItem?.ratePerKg || (invItem?.purchasePrice && invItem?.quantity ? invItem.purchasePrice / invItem.quantity : 0) || 60;
+      const rate = invItem?.ratePerKg || (invItem?.purchasePrice && invItem?.quantity ? invItem.purchasePrice / invItem.quantity : 0) || sku?.avgCost || sku?.purchasePrice || sku?.costPrice || 60;
 
       const activeReels = group.activeReels || [];
       if (activeReels.length > 0) {

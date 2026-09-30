@@ -1198,6 +1198,22 @@ exports.getMaterialRates = async (req, res) => {
             if (prodRate > 0) {
               b.rate = Math.round(prodRate * 100) / 100;
             }
+          } else {
+            // Also check if batch is from a Cutting Slip (Paper Reel to Sheet conversion)
+            const csSlip = await CuttingSlip.findOne({
+              company: companyObjId,
+              slipNumber: b.batchNumber,
+              status: "Posted"
+            }).lean();
+            if (csSlip) {
+              const isReam = (sku.unit || '').toLowerCase().includes('ream');
+              const csRate = isReam
+                ? (csSlip.effectiveCostPerReam || (csSlip.effectiveCostPerSheet * (csSlip.sheetsPerReam || 500)))
+                : csSlip.effectiveCostPerSheet;
+              if (csRate > 0) {
+                b.rate = Math.round(csRate * 10000) / 10000;
+              }
+            }
           }
         }
       }

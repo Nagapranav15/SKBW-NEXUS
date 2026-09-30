@@ -10,6 +10,7 @@ import {
   getNextCuttingSlipNumberV2, getAvailableReelsV2, createCuttingSlipV2, CuttingSlipV2
 } from '../../api/mfgApiV2';
 import { getItemClassification } from '../../utils/skuClassification';
+import { LocationSelectPopup } from '../stock_v2/LocationSelectPopup';
 
 interface CuttingSlipModalProps {
   isOpen: boolean;
@@ -54,6 +55,10 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
   const targetDropdownRef = useRef<HTMLDivElement>(null);
 
   const [destinationLocationId, setDestinationLocationId] = useState<string>('');
+  const [destWarehouseId, setDestWarehouseId] = useState<string>('');
+  const [destFloorId, setDestFloorId] = useState<string>('');
+  const [destZoneId, setDestZoneId] = useState<string>('');
+  const [destLocationDisplay, setDestLocationDisplay] = useState<string>('');
   const [sheetWidth, setSheetWidth] = useState<string>('57');
   const [sheetLength, setSheetLength] = useState<string>('70');
   const [sheetGsm, setSheetGsm] = useState<string>('52');
@@ -182,7 +187,30 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
             (l.name || '').toLowerCase().includes('sheet') ||
             (l.name || '').toLowerCase().includes('gnd')
           ) || locations[0];
-          setDestinationLocationId(cutLoc._id);
+          if (cutLoc?._id) {
+            setDestinationLocationId(cutLoc._id);
+            setDestLocationDisplay(cutLoc.name || '');
+            if (cutLoc.level === 'Storage Location') {
+              const z = cutLoc.parentId ? locations.find(l => l._id === cutLoc.parentId) : undefined;
+              const f = z?.parentId ? locations.find(l => l._id === z.parentId) : undefined;
+              const w = f?.parentId ? locations.find(l => l._id === f.parentId) : undefined;
+              if (z?._id) setDestZoneId(z._id);
+              if (f?._id) setDestFloorId(f._id);
+              if (w?._id) setDestWarehouseId(w._id);
+            } else if (cutLoc.level === 'Zone') {
+              setDestZoneId(cutLoc._id);
+              const f = cutLoc.parentId ? locations.find(l => l._id === cutLoc.parentId) : undefined;
+              const w = f?.parentId ? locations.find(l => l._id === f.parentId) : undefined;
+              if (f?._id) setDestFloorId(f._id);
+              if (w?._id) setDestWarehouseId(w._id);
+            } else if (cutLoc.level === 'Floor') {
+              setDestFloorId(cutLoc._id);
+              const w = cutLoc.parentId ? locations.find(l => l._id === cutLoc.parentId) : undefined;
+              if (w?._id) setDestWarehouseId(w._id);
+            } else if (cutLoc.level === 'Factory') {
+              setDestWarehouseId(cutLoc._id);
+            }
+          }
         }
 
         // Auto-pick first semi-finished good if none selected
@@ -1366,22 +1394,37 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Destination Location */}
+                  {/* Destination Location with Mini Factory Warehouse Modal */}
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                      Destination Warehouse Location *
+                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                      Destination Warehouse Location <span className="text-rose-500">*</span>
                     </label>
-                    <select
-                      value={destinationLocationId}
-                      onChange={e => setDestinationLocationId(e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    >
-                      {locations.map(loc => (
-                        <option key={loc._id} value={loc._id}>
-                          {loc.name} {loc.code ? `(${loc.code})` : ''} - {loc.level || 'Location'}
-                        </option>
-                      ))}
-                    </select>
+                    <LocationSelectPopup
+                      hideLabel
+                      locations={locations}
+                      warehouseId={destWarehouseId}
+                      floorId={destFloorId}
+                      zoneId={destZoneId}
+                      locationId={destinationLocationId}
+                      displayValue={destLocationDisplay}
+                      badgeColor="emerald"
+                      companyId={companyId}
+                      skuId={targetSkuId}
+                      variant="compact"
+                      onChange={(wId, fId, zId, lId) => {
+                        setDestWarehouseId(wId);
+                        setDestFloorId(fId);
+                        setDestZoneId(zId);
+                        const chosen = lId || zId || fId || wId;
+                        setDestinationLocationId(chosen);
+                        const matched = locations.find(l => l._id === chosen);
+                        if (matched) {
+                          setDestLocationDisplay(matched.name);
+                        } else {
+                          setDestLocationDisplay('');
+                        }
+                      }}
+                    />
                   </div>
                 </div>
               </div>
@@ -1391,12 +1434,56 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
             <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-2 shrink-0">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
-                  <Scale className="w-4 h-4 text-slate-700" />
-                  <span>By-Products, Scrap Recovery & Landed Rate Absorption</span>
+                  <Scale className="w-4 h-4 text-emerald-600" />
+                  <span>Costing Valuation, Scrap Salvage & Landed Absorption</span>
                 </span>
-                <span className="text-[10px] text-slate-500 font-medium">
-                  Material loss cost is absorbed into good sheets for zero-discrepancy costing
+                <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 font-semibold flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-emerald-600" />
+                  Formula: Net Cost = (Reel Value) - (Scrap Recovery) ÷ Good Sheets
                 </span>
+              </div>
+
+              {/* Real-time Costing Breakdown Strip */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs bg-slate-50/80 p-2 rounded-xl border border-slate-200/80">
+                <div className="px-2 py-1 bg-white rounded-lg border border-slate-200">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase block">1. Gross Raw Reel Input</span>
+                  <span className="font-mono font-bold text-slate-900 text-xs">
+                    ₹{totalInputCost.toLocaleString('en-IN')}
+                  </span>
+                  <span className="text-[9px] text-slate-400 block font-mono">
+                    {totalInputWeight.toLocaleString()} kg @ ₹{avgInputRatePerKg}/kg
+                  </span>
+                </div>
+
+                <div className="px-2 py-1 bg-white rounded-lg border border-slate-200">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase block">2. Scrap Salvage Credit</span>
+                  <span className="font-mono font-bold text-rose-600 text-xs">
+                    - ₹{totalScrapCredit.toFixed(2)}
+                  </span>
+                  <span className="text-[9px] text-slate-400 block font-mono">
+                    Trim Waste + Cores
+                  </span>
+                </div>
+
+                <div className="px-2 py-1 bg-white rounded-lg border border-slate-200">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase block">3. Net Converted Value</span>
+                  <span className="font-mono font-bold text-indigo-700 text-xs">
+                    = ₹{netProductionCost.toLocaleString('en-IN')}
+                  </span>
+                  <span className="text-[9px] text-slate-400 block font-mono">
+                    Absorbed into output
+                  </span>
+                </div>
+
+                <div className="px-2 py-1 bg-emerald-50/80 rounded-lg border border-emerald-200">
+                  <span className="text-[9px] font-bold text-emerald-800 uppercase block">4. Effective Landed Rate</span>
+                  <span className="font-mono font-black text-emerald-950 text-xs">
+                    ₹{effectiveCostPerSheet.toFixed(3)} <span className="text-[9px] font-normal text-emerald-700">/ sheet</span>
+                  </span>
+                  <span className="text-[9px] text-emerald-800 block font-mono">
+                    ₹{effectiveCostPerReam.toFixed(2)} / ream ({sheetsPerReam} sheets)
+                  </span>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs items-center bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
@@ -1412,7 +1499,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                       placeholder="0"
                       value={scrapWeightKg}
                       onChange={e => setScrapWeightKg(e.target.value)}
-                      className="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold font-mono text-slate-800"
+                      className="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                     <span className="text-[10px] font-mono text-slate-400">@₹</span>
                     <input
@@ -1420,7 +1507,8 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                       step="any"
                       value={scrapRatePerKg}
                       onChange={e => setScrapRatePerKg(e.target.value)}
-                      className="w-14 px-1.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold font-mono text-slate-800"
+                      title="Rate per kg of trim scrap"
+                      className="w-14 px-1.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>
                 </div>
@@ -1436,7 +1524,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                       placeholder="0"
                       value={coreCount}
                       onChange={e => setCoreCount(e.target.value)}
-                      className="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold font-mono text-slate-800"
+                      className="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                     <span className="text-[10px] font-mono text-slate-400">@₹</span>
                     <input
@@ -1444,7 +1532,8 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                       step="any"
                       value={coreRatePerPc}
                       onChange={e => setCoreRatePerPc(e.target.value)}
-                      className="w-14 px-1.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold font-mono text-slate-800"
+                      title="Salvage rate per empty paper core"
+                      className="w-14 px-1.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-bold font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>
                 </div>
@@ -1454,24 +1543,24 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                   <label className="text-[9.5px] font-bold text-slate-500 uppercase block mb-0.5">
                     Total Scrap Salvage
                   </label>
-                  <div className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg font-mono font-bold text-xs text-slate-700">
+                  <div className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg font-mono font-bold text-xs text-rose-600">
                     - ₹{totalScrapCredit.toFixed(2)}
                   </div>
                 </div>
 
-                {/* Effective Landed Rate */}
+                {/* Effective Landed Rate Summary */}
                 <div className="bg-emerald-50 border border-emerald-200 p-2 rounded-xl text-right">
                   <span className="text-[9px] font-bold text-emerald-800 uppercase block">
-                    Effective Landed Sheet Cost
+                    Inventory Valuation Rate
                   </span>
                   <div className="font-mono font-black text-emerald-950 text-sm">
                     ₹{effectiveCostPerSheet.toFixed(3)} <span className="text-[10px] font-normal text-emerald-700">/ sheet</span>
                   </div>
-                  <div className="text-[10px] font-mono text-emerald-800">
+                  <div className="text-[10px] font-mono text-emerald-800 font-semibold">
                     ₹{effectiveCostPerReam.toFixed(2)} / ream
                   </div>
-                  <div className="text-[9px] text-slate-400 mt-0.5">
-                    Net: ₹{netProductionCost.toLocaleString('en-IN')}
+                  <div className="text-[9px] text-slate-500 mt-0.5 font-mono">
+                    Net Batch: ₹{netProductionCost.toLocaleString('en-IN')}
                   </div>
                 </div>
               </div>
