@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../../context/AuthContext';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import {
   getWarehouseHierarchyV2,
   createWarehouseLocationV2,
@@ -287,6 +288,12 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
       loadInitialData();
     }
   }, [selectedCompany?._id]);
+
+  useRealtimeSync(['warehouse_location', 'inventory'], () => {
+    if (selectedCompany?._id) {
+      loadInitialData();
+    }
+  });
 
   const loadInitialData = async () => {
     setLoading(true);

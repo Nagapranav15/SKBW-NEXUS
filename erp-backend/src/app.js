@@ -19,6 +19,7 @@ const mfgInventoryV2Routes = require("./routes/mfgInventoryV2Routes");
 const activityLogRoutes = require("./routes/activityLogRoutes");
 const dataManagerRoutes = require("./routes/dataManagerRoutes");
 const productionOrderRoutes = require("./routes/productionOrderRoutes");
+const realtimeRoutes = require("./routes/realtimeRoutes");
 
 const app = express();
 
@@ -56,6 +57,8 @@ app.use("/api/v2", mfgInventoryV2Routes);
 app.use("/api/activity-logs", activityLogRoutes);
 app.use("/api/data-manager", dataManagerRoutes);
 app.use("/api/production-orders", productionOrderRoutes);
+app.use("/api/realtime", realtimeRoutes);
+app.use("/api/v2/realtime", realtimeRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {

@@ -6,6 +6,8 @@ const PurchaseInvoiceV2 = require("../models/purchaseInvoiceV2Model");
 const CuttingSlip = require("../models/cuttingSlipModel");
 const Sequence = require("../models/sequenceModel");
 const mongoose = require("mongoose");
+const { getNextSequenceNumber } = require("../utils/sequenceManager");
+const { broadcast } = require("../utils/realtimeService");
 
 // Helper to resolve warehouse location hierarchy (Factory -> Floor -> Zone -> Location)
 const getHierarchy = async (locationId, companyId) => {
@@ -665,33 +667,9 @@ const syncProductionOrderLedger = async (order) => {
 };
 
 // Helper to generate next Order Number: PO-001, PO-002... up to 100,000+
+// Globally synchronized and thread-safe via atomic Sequence Manager
 const generateNextOrderNumber = async (companyId) => {
-  const prefix = "PO-";
-
-  // Find all orders starting with PO- or legacy PR- for this company
-  const orders = await ProductionOrder.find({
-    company: companyId,
-    orderNumber: /^(?:PO|PR)-\d+/
-  }).select("orderNumber").lean();
-
-  let maxSeq = 0;
-  orders.forEach(o => {
-    if (o.orderNumber) {
-      // Match PO-001, PO-100000, PR-0001, etc.
-      const match = o.orderNumber.match(/^(?:PO|PR)-(?:[0-9]{4}-)?([0-9]+)$/);
-      if (match && match[1]) {
-        const num = parseInt(match[1], 10);
-        if (!isNaN(num) && num > maxSeq) {
-          maxSeq = num;
-        }
-      }
-    }
-  });
-
-  const nextSeq = maxSeq + 1;
-  // Standard format PO-001, seamlessly accommodates > 1 lakh orders (e.g. PO-100000)
-  const padLength = Math.max(3, String(nextSeq).length);
-  return `${prefix}${String(nextSeq).padStart(padLength, "0")}`;
+  return await getNextSequenceNumber("PO", companyId);
 };
 
 // GET /api/production-orders
@@ -904,6 +882,14 @@ exports.createProductionOrder = async (req, res) => {
     // Dynamically sync prepared stock in Item Stock & Inventory (only records if actually prepared/completed)
     await syncProductionOrderLedger(newOrder);
 
+    // Broadcast live event to all connected users
+    broadcast(companyId, {
+      entity: "production_order",
+      action: "create",
+      id: newOrder._id,
+      data: newOrder
+    });
+
     res.status(201).json(newOrder);
   } catch (err) {
     console.error("Error creating production order:", err);
@@ -938,6 +924,13 @@ exports.updateProductionOrder = async (req, res) => {
 
     // Dynamically sync prepared stock in Item Stock & Inventory
     await syncProductionOrderLedger(updated);
+
+    broadcast(updated.company, {
+      entity: "production_order",
+      action: "update",
+      id: updated._id,
+      data: updated
+    });
 
     res.json(updated);
   } catch (err) {
@@ -1027,6 +1020,13 @@ exports.recordProductionEntry = async (req, res) => {
     // Dynamically sync prepared stock in Item Stock & Inventory according to production
     await syncProductionOrderLedger(order);
 
+    broadcast(order.company, {
+      entity: "production_order",
+      action: "update",
+      id: order._id,
+      data: order
+    });
+
     res.json(order);
   } catch (err) {
     console.error("Error recording production entry:", err);
@@ -1084,6 +1084,13 @@ exports.completeProductionOrder = async (req, res) => {
     // Directly reflect completed production order in Item Stock & Inventory
     await syncProductionOrderLedger(order);
 
+    broadcast(order.company, {
+      entity: "production_order",
+      action: "update",
+      id: order._id,
+      data: order
+    });
+
     res.json(order);
   } catch (err) {
     console.error("Error completing production order:", err);
@@ -1104,6 +1111,12 @@ exports.deleteProductionOrder = async (req, res) => {
     await InventoryLedger.deleteMany({
       referenceType: "ProductionOrder",
       referenceId: deleted.orderNumber
+    });
+
+    broadcast(deleted.company, {
+      entity: "production_order",
+      action: "delete",
+      id: deleted._id
     });
 
     res.json({ msg: "Production order deleted successfully", id });

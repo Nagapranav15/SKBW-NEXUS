@@ -11,6 +11,7 @@ const SalesOrderV2 = require("../models/salesOrderV2Model");
 const PurchaseInvoiceV2 = require("../models/purchaseInvoiceV2Model");
 const ProductionOrder = require("../models/productionOrderModel");
 const { validateUomConversion } = require("../utils/uomConversion");
+const { broadcast } = require("../utils/realtimeService");
 
 const toObjectId = (id) => {
   if (!id) return null;
@@ -373,6 +374,7 @@ exports.createSku = async (req, res, next) => {
       performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
       company: newSku.company
     }).catch(e => console.error("ActivityLog error:", e));
+    broadcast(newSku.company, { entity: "inventory", action: "create_sku", data: newSku });
     res.status(201).json(newSku);
   } catch (err) {
     next(err);
@@ -617,6 +619,7 @@ exports.updateSku = async (req, res, next) => {
       company: sku.company
     }).catch(e => console.error("ActivityLog error:", e));
 
+    broadcast(sku.company, { entity: "inventory", action: "update_sku", data: sku });
     res.json(sku);
   } catch (err) {
     next(err);
@@ -702,6 +705,7 @@ exports.deleteSku = async (req, res, next) => {
       company: companyObjId
     }).catch(e => console.error("ActivityLog error:", e));
 
+    broadcast(companyObjId, { entity: "inventory", action: "delete_sku", id });
     res.json({ msg: "SKU moved to recycle bin successfully" });
   } catch (err) {
     next(err);
@@ -1327,6 +1331,7 @@ exports.createWarehouseLocation = async (req, res, next) => {
     });
 
     await newLoc.save();
+    broadcast(newLoc.company, { entity: "warehouse_location", action: "create", data: newLoc });
     res.status(201).json(newLoc);
   } catch (err) {
     next(err);
@@ -1391,6 +1396,7 @@ exports.updateWarehouseLocation = async (req, res, next) => {
     loc.status = status || "Active";
 
     await loc.save();
+    broadcast(loc.company, { entity: "warehouse_location", action: "update", data: loc });
     res.json(loc);
   } catch (err) {
     next(err);
@@ -1539,6 +1545,7 @@ exports.deleteWarehouseLocation = async (req, res, next) => {
     }
 
     await WarehouseLocationV2.deleteMany({ _id: { $in: targetLocationIds } });
+    broadcast(companyObjId, { entity: "warehouse_location", action: "delete", id, targetLocationIds });
     res.json({ msg: `Location '${loc.name}' ${hasChildren ? 'and its sub-locations were' : 'was'} deleted successfully` });
   } catch (err) {
     next(err);
@@ -1904,6 +1911,7 @@ exports.recordTransfer = async (req, res, next) => {
     await session.commitTransaction();
     session.endSession();
 
+    broadcast(companyObjId, { entity: "inventory", action: "transfer", referenceId });
     res.status(201).json({ msg: "Transfer successful", referenceId });
   } catch (err) {
     await session.abortTransaction();
@@ -2601,6 +2609,7 @@ exports.createInventoryLedgerEntry = async (req, res, next) => {
     });
 
     await newEntry.save();
+    broadcast(companyObjId, { entity: "inventory", action: "ledger_entry", data: newEntry });
     res.status(201).json(newEntry);
   } catch (err) {
     next(err);
@@ -2826,6 +2835,7 @@ exports.recordAdjustment = async (req, res, next) => {
     await session.commitTransaction();
     session.endSession();
 
+    broadcast(companyObjId, { entity: "inventory", action: "adjustment", referenceId });
     res.status(201).json({
       msg: "Stock adjustment recorded successfully",
       referenceId,

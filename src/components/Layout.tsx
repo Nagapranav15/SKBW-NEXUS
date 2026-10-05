@@ -18,6 +18,7 @@ import {
   Factory
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useRealtime } from '../context/RealtimeContext';
 import DataManager from './DataManager';
 
 const Layout: React.FC = () => {
@@ -27,6 +28,7 @@ const Layout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, hasPermission, hasRole, selectedCompany } = useAuth();
+  const { isConnected } = useRealtime();
 
   // Sliding indicator refs and state
   const navRef = useRef<HTMLElement | null>(null);
@@ -311,9 +313,22 @@ const Layout: React.FC = () => {
             </div>
             {sidebarOpen && (
               <div className="truncate">
-                <h2 className="font-bold text-gray-900 text-xs tracking-wide uppercase truncate">
-                  {selectedCompany?.name || 'SKBW CORE'}
-                </h2>
+                <div className="flex items-center gap-1.5">
+                  <h2 className="font-bold text-gray-900 text-xs tracking-wide uppercase truncate">
+                    {selectedCompany?.name || 'SKBW CORE'}
+                  </h2>
+                  <span
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold tracking-normal shrink-0 ${
+                      isConnected
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-amber-50 text-amber-700 border border-amber-200'
+                    }`}
+                    title={isConnected ? 'Real-time multi-user sync active' : 'Connecting to live sync...'}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}`} />
+                    {isConnected ? 'Live' : 'Syncing'}
+                  </span>
+                </div>
                 <p className="text-[10px] text-gray-400 font-medium truncate">ERP Management System</p>
               </div>
             )}
@@ -430,7 +445,19 @@ const Layout: React.FC = () => {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <span className="font-extrabold text-gray-900 text-xs tracking-wide truncate max-w-[200px]">{selectedCompany?.name || 'SKBW ERP'}</span>
+          <div className="flex items-center gap-1.5 truncate">
+            <span className="font-extrabold text-gray-900 text-xs tracking-wide truncate max-w-[150px]">{selectedCompany?.name || 'SKBW ERP'}</span>
+            <span
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${
+                isConnected
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : 'bg-amber-50 text-amber-700 border border-amber-200'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}`} />
+              {isConnected ? 'Live' : 'Syncing'}
+            </span>
+          </div>
           <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs uppercase shrink-0 border border-blue-200">
             {user?.fullName?.charAt(0) || 'A'}
           </div>

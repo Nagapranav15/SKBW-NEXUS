@@ -1,6 +1,7 @@
 import { Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { RealtimeProvider } from './context/RealtimeContext';
 import { ToastContainer } from './components/ui/Toast';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -57,7 +58,8 @@ function App() {
 
   return (
     <AuthProvider>
-      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <RealtimeProvider>
+        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <div className="min-h-screen bg-white">
           <ToastContainer />
           <Analytics />
@@ -118,7 +120,8 @@ function App() {
           </Suspense>
         </ErrorBoundary>
         </div>
-      </Router>
+        </Router>
+      </RealtimeProvider>
     </AuthProvider>
   );
 }

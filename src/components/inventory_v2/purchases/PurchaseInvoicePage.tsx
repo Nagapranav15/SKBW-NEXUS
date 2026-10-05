@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../../context/AuthContext';
+import { useRealtimeSync } from '../../../hooks/useRealtimeSync';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getActivityLogs, createActivityLog } from '../../../api/activityLogApi';
 import { getParties } from '../../../api/partyApi';
@@ -678,13 +679,15 @@ const PurchaseInvoicePage: React.FC = () => {
 
   useEffect(() => {
     loadInvoices(true);
-
-    const interval = setInterval(() => {
-      loadInvoices(false);
-    }, 5000);
-
-    return () => clearInterval(interval);
   }, [selectedCompany?._id, page, vendorFilter, statusFilter, debouncedSearch]);
+
+  // Real-time synchronization for purchase invoices
+  useRealtimeSync(['purchase_invoice', 'inventory'], () => {
+    loadInvoices(false);
+    if (selectedCompany?._id && selectedInvoice) {
+      loadBalances(false);
+    }
+  });
 
   // Load balances and production orders when detailed invoice is selected
   useEffect(() => {
@@ -693,12 +696,6 @@ const PurchaseInvoicePage: React.FC = () => {
     getProductionOrders(selectedCompany._id).then(data => {
       if (Array.isArray(data)) setProductionOrders(data);
     }).catch(() => {});
-
-    const interval = setInterval(() => {
-      loadBalances(false);
-    }, 5000);
-
-    return () => clearInterval(interval);
   }, [selectedCompany?._id, selectedInvoice]);
 
   const loadBalances = async (showLoading = true) => {

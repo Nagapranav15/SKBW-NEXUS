@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import * as XLSX from 'xlsx';
 import { 
   getProductionOrders, 
@@ -176,6 +177,11 @@ export const ProductionModule: React.FC = () => {
   useEffect(() => {
     loadOrders();
   }, [selectedCompany?._id]);
+
+  // Real-time synchronization across multi-user devices
+  useRealtimeSync(['production_order', 'cutting_slip'], () => {
+    loadOrders();
+  });
 
   // Handle URL change
   useEffect(() => {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import { getDeliveryChallans, createDeliveryChallan, updateDeliveryChallan, deleteDeliveryChallan } from '../../api/deliveryChallanApi';
 import { getSalesOrders } from '../../api/salesOrderApi';
 
@@ -21,6 +22,10 @@ const DeliveryChallan: React.FC = () => {
   });
 
   useEffect(() => { fetchData(); }, [selectedCompany]);
+
+  useRealtimeSync(['delivery_challan', 'sales_order'], () => {
+    fetchData();
+  });
 
   const fetchData = async () => {
     try {

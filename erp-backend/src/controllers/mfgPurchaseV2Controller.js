@@ -7,6 +7,8 @@ const InventoryLedger = require("../models/inventoryLedgerModelV2");
 const Sequence = require("../models/sequenceModel");
 const Transaction = require("../models/transactionModel");
 const ActivityLog = require("../models/activityLogModel");
+const { getNextSequenceNumber } = require("../utils/sequenceManager");
+const { broadcast } = require("../utils/realtimeService");
 
 const toObjectId = (id) => {
   if (!id) return null;
@@ -148,30 +150,14 @@ exports.createPurchaseInvoice = async (req, res, next) => {
 
     const grandTotal = subTotal + Number(taxAmount) + Number(freight) + Number(craneCharges) + Number(otherCharges);
 
-    // 3. Generate sequential invoice number if not manually specified or resolve duplicate
+    // 3. Generate sequential invoice number atomically via global sequenceManager
     let finalInvoiceNo = invoiceNumber;
-    const generateNextPB = async () => {
-      const regex = /^PB-(?:[A-Z]{3}-)?(\d+)$/i;
-      const existingInvoices = await PurchaseInvoiceV2.find({ company: companyObjId, invoiceNumber: regex }).select('invoiceNumber').lean();
-      let maxNum = 0;
-      existingInvoices.forEach(inv => {
-        const match = inv.invoiceNumber ? inv.invoiceNumber.match(regex) : null;
-        if (match && match[1]) {
-          const num = parseInt(match[1], 10);
-          if (!isNaN(num) && num > maxNum) maxNum = num;
-        }
-      });
-      const nextSeq = maxNum + 1;
-      const padLen = Math.max(3, String(nextSeq).length);
-      return `PB-${String(nextSeq).padStart(padLen, '0')}`;
-    };
-
-    if (!finalInvoiceNo) {
-      finalInvoiceNo = await generateNextPB();
+    if (!finalInvoiceNo || !finalInvoiceNo.trim()) {
+      finalInvoiceNo = await getNextSequenceNumber("PB", companyObjId);
     } else {
       const exists = await PurchaseInvoiceV2.findOne({ invoiceNumber: finalInvoiceNo, company: companyObjId });
       if (exists) {
-        finalInvoiceNo = await generateNextPB();
+        finalInvoiceNo = await getNextSequenceNumber("PB", companyObjId);
       }
     }
 
@@ -437,6 +423,17 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       .populate("items.splits.locationId", "name level code")
       .populate("items.reels.locationId", "name level code")
       .populate("createdBy", "fullName");
+
+    broadcast(companyObjId, {
+      entity: "purchase_invoice",
+      action: "create",
+      id: invoice._id,
+      data: populatedInvoice || invoice
+    });
+    broadcast(companyObjId, {
+      entity: "inventory",
+      action: "update"
+    });
 
     res.status(201).json(populatedInvoice || invoice);
   } catch (err) {
@@ -1175,22 +1172,7 @@ exports.getNextInvoiceNumber = async (req, res, next) => {
     }
     const companyObjId = toObjectId(companyId);
 
-    const regex = /^PB-(?:[A-Z]{3}-)?(\d+)$/i;
-
-    const existingInvoices = await PurchaseInvoiceV2.find({ company: companyObjId, invoiceNumber: regex }).select('invoiceNumber').lean();
-
-    let maxNum = 0;
-    existingInvoices.forEach(inv => {
-      const match = inv.invoiceNumber ? inv.invoiceNumber.match(regex) : null;
-      if (match && match[1]) {
-        const num = parseInt(match[1], 10);
-        if (!isNaN(num) && num > maxNum) maxNum = num;
-      }
-    });
-
-    const nextSeq = maxNum + 1;
-    const padLen = Math.max(3, String(nextSeq).length);
-    const code = `PB-${String(nextSeq).padStart(padLen, '0')}`;
+    const code = await getNextSequenceNumber("PB", companyId);
 
     res.json({ nextInvoiceNumber: code });
   } catch (err) {

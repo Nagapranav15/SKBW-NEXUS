@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { enqueue } = require("../utils/transactionQueue");
 require("./inventoryLedgerModelV2");
 require("./purchaseInvoiceV2Model");
 
@@ -7,18 +8,19 @@ const sequenceSchema = new mongoose.Schema({
   sequence: { type: Number, default: 0 }
 }, { timestamps: true });
 
-sequenceSchema.statics.getNextSequence = async function(prefix, session) {
-  const InventoryLedger = mongoose.model("InventoryLedger");
-  const PurchaseInvoiceV2 = mongoose.model("PurchaseInvoiceV2");
+sequenceSchema.statics.getNextSequence = function(prefix, session) {
+  return enqueue(`SEQ_${prefix}`, async () => {
+    const InventoryLedger = mongoose.model("InventoryLedger");
+    const PurchaseInvoiceV2 = mongoose.model("PurchaseInvoiceV2");
 
-  const opts = { returnDocument: 'after', upsert: true };
-  if (session) opts.session = session;
+    const opts = { returnDocument: 'after', upsert: true };
+    if (session) opts.session = session;
 
-  let seqDoc = await this.findOneAndUpdate(
-    { prefix },
-    { $inc: { sequence: 1 } },
-    opts
-  );
+    let seqDoc = await this.findOneAndUpdate(
+      { prefix },
+      { $inc: { sequence: 1 } },
+      opts
+    );
 
   let attempts = 0;
   while (attempts < 10) {
@@ -74,12 +76,13 @@ sequenceSchema.statics.getNextSequence = async function(prefix, session) {
     attempts++;
   }
 
-  if (prefix === "PB") {
-    const padLen = Math.max(3, String(seqDoc.sequence).length);
-    return `PB-${String(seqDoc.sequence).padStart(padLen, '0')}`;
-  }
-  const monthShort = new Date().toLocaleString('en-US', { month: 'short' }).toUpperCase();
-  return `TRX-${monthShort}-${String(seqDoc.sequence).padStart(3, '0')}`;
+    if (prefix === "PB") {
+      const padLen = Math.max(3, String(seqDoc.sequence).length);
+      return `PB-${String(seqDoc.sequence).padStart(padLen, '0')}`;
+    }
+    const monthShort = new Date().toLocaleString('en-US', { month: 'short' }).toUpperCase();
+    return `TRX-${monthShort}-${String(seqDoc.sequence).padStart(3, '0')}`;
+  });
 };
 
 module.exports = mongoose.model("Sequence", sequenceSchema);

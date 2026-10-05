@@ -6,6 +6,8 @@ const SkuV2 = require("../models/skuV2Model");
 const WarehouseLocationV2 = require("../models/warehouseLocationV2Model");
 const Sequence = require("../models/sequenceModel");
 const PurchaseInvoiceV2 = require("../models/purchaseInvoiceV2Model");
+const { getNextSequenceNumber } = require("../utils/sequenceManager");
+const { broadcast } = require("../utils/realtimeService");
 
 const toObjectId = (id) => {
   if (!id) return null;
@@ -40,44 +42,9 @@ const getHierarchy = async (locId, companyId, session) => {
   return { warehouseId, floorId, zoneId, locationId };
 };
 
-// Helper: Generate next slip number dynamically (CS-001, CS-002, ..., CS-999, CS-1000...)
+// Helper: Generate next slip number dynamically (CS-0001, CS-0002... via global sequenceManager)
 const generateNextCuttingSlipNumber = async (companyId, session = null) => {
-  const compId = toObjectId(companyId);
-  const query = CuttingSlip.find({ company: compId }).select('slipNumber').lean();
-  if (session) query.session(session);
-  const slips = await query;
-
-  let maxSeq = 0;
-  for (const slip of slips) {
-    if (!slip.slipNumber) continue;
-    // Match CS-001, CS-999, CS-1000, and legacy CS-2026-0001
-    const match = slip.slipNumber.match(/^CS-(?:(?:\d{4})-)?(\d+)$/i);
-    if (match) {
-      const num = parseInt(match[1], 10);
-      if (!isNaN(num) && num > maxSeq) {
-        maxSeq = num;
-      }
-    }
-  }
-
-  let candidateSeq = maxSeq + 1;
-  let padLen = Math.max(3, String(candidateSeq).length);
-  let candidateNumber = `CS-${String(candidateSeq).padStart(padLen, '0')}`;
-
-  // Collision safety check
-  let checkQuery = CuttingSlip.findOne({ company: compId, slipNumber: candidateNumber });
-  if (session) checkQuery.session(session);
-  let exists = await checkQuery;
-  while (exists) {
-    candidateSeq++;
-    padLen = Math.max(3, String(candidateSeq).length);
-    candidateNumber = `CS-${String(candidateSeq).padStart(padLen, '0')}`;
-    checkQuery = CuttingSlip.findOne({ company: compId, slipNumber: candidateNumber });
-    if (session) checkQuery.session(session);
-    exists = await checkQuery;
-  }
-
-  return candidateNumber;
+  return await getNextSequenceNumber("CS", companyId);
 };
 
 // 1. Get next slip number (e.g. CS-001, CS-002, ... dynamically infinite)
@@ -364,11 +331,12 @@ exports.createCuttingSlip = async (req, res) => {
     let finalSlipNumber = reqSlipNumber;
     if (!finalSlipNumber) {
       finalSlipNumber = await generateNextCuttingSlipNumber(companyId, session);
+    } else {
+      const existing = await CuttingSlip.findOne({ company: companyId, slipNumber: finalSlipNumber }).session(session);
+      if (existing) {
+        finalSlipNumber = await generateNextCuttingSlipNumber(companyId, session);
+      }
     }
-
-    // Check duplicate
-    const existing = await CuttingSlip.findOne({ company: companyId, slipNumber: finalSlipNumber }).session(session);
-    if (existing) throw new Error(`Cutting slip ${finalSlipNumber} already exists`);
 
     // Verify SKUs
     const sourceSkuDoc = await SkuV2.findById(sourceSku).session(session);
@@ -610,6 +578,17 @@ exports.createCuttingSlip = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
+    broadcast(companyId, {
+      entity: "cutting_slip",
+      action: "create",
+      id: cuttingSlip._id,
+      data: cuttingSlip
+    });
+    broadcast(companyId, {
+      entity: "inventory",
+      action: "update"
+    });
+
     return res.status(201).json({
       msg: "Cutting Slip posted successfully",
       cuttingSlip
@@ -718,6 +697,17 @@ exports.cancelCuttingSlip = async (req, res) => {
 
     await session.commitTransaction();
     session.endSession();
+
+    broadcast(companyId, {
+      entity: "cutting_slip",
+      action: "update",
+      id: slip._id,
+      data: slip
+    });
+    broadcast(companyId, {
+      entity: "inventory",
+      action: "update"
+    });
 
     return res.json({ msg: "Cutting slip cancelled and stock reversed successfully" });
   } catch (error) {

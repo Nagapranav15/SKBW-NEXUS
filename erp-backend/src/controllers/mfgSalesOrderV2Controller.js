@@ -5,6 +5,8 @@ const SkuV2 = require("../models/skuV2Model");
 const Party = require("../models/partyModel");
 const ActivityLog = require("../models/activityLogModel");
 const Transaction = require("../models/transactionModel");
+const { getNextSequenceNumber } = require("../utils/sequenceManager");
+const { broadcast } = require("../utils/realtimeService");
 
 const generateTransactionId = (date) => {
   const d = new Date(date || Date.now());
@@ -31,18 +33,7 @@ exports.getNextSalesOrderNumber = async (req, res, next) => {
     }
 
     const companyObjId = toObjectId(companyId);
-    const companyQuery = companyObjId ? { $in: [companyObjId, String(companyId)] } : companyId;
-
-    const orders = await SalesOrderV2.find({ company: companyQuery }).select("orderNumber");
-    const legacyOrders = await SalesOrder.find({ company: companyQuery }).select("orderNumber");
-
-    const allNumbers = [...orders, ...legacyOrders].map(o => {
-      const match = (o.orderNumber || "").match(/SO-?(\d+)/i);
-      return match ? parseInt(match[1], 10) : NaN;
-    }).filter(n => !isNaN(n));
-
-    const nextCount = allNumbers.length > 0 ? Math.max(...allNumbers) + 1 : 1;
-    const nextOrderNumber = `SO-${String(nextCount).padStart(4, "0")}`;
+    const nextOrderNumber = await getNextSequenceNumber("SO", companyObjId || companyId);
 
     res.json({ nextOrderNumber });
   } catch (err) {
@@ -214,18 +205,16 @@ exports.createSalesOrder = async (req, res, next) => {
 
     const companyObjId = toObjectId(company);
 
-    // Generate SO order number if not supplied
+    // Generate SO order number atomically if not supplied or duplicate
     let orderNumber = req.body.orderNumber;
-    if (!orderNumber) {
+    if (!orderNumber || !orderNumber.trim()) {
+      orderNumber = await getNextSequenceNumber("SO", companyObjId || company);
+    } else {
       const companyQuery = companyObjId ? { $in: [companyObjId, String(company)] } : company;
-      const orders = await SalesOrderV2.find({ company: companyQuery }).select("orderNumber");
-      const legacyOrders = await SalesOrder.find({ company: companyQuery }).select("orderNumber");
-      const allNumbers = [...orders, ...legacyOrders].map(o => {
-        const match = (o.orderNumber || "").match(/SO-?(\d+)/i);
-        return match ? parseInt(match[1], 10) : NaN;
-      }).filter(n => !isNaN(n));
-      const nextCount = allNumbers.length > 0 ? Math.max(...allNumbers) + 1 : 1;
-      orderNumber = `SO-${String(nextCount).padStart(4, "0")}`;
+      const existing = await SalesOrderV2.findOne({ company: companyQuery, orderNumber }).lean();
+      if (existing) {
+        orderNumber = await getNextSequenceNumber("SO", companyObjId || company);
+      }
     }
 
     // Validate that no line item is inactive or deleted
@@ -388,6 +377,13 @@ exports.createSalesOrder = async (req, res, next) => {
       company: companyObjId
     }).catch(e => console.error("ActivityLog error:", e));
 
+    broadcast(companyObjId, {
+      entity: "sales_order",
+      action: "create",
+      id: newOrder._id,
+      data: newOrder
+    });
+
     res.status(201).json(newOrder);
   } catch (err) {
     next(err);
@@ -522,6 +518,13 @@ exports.updateSalesOrderStatus = async (req, res, next) => {
       }
     }
 
+    broadcast(order.company, {
+      entity: "sales_order",
+      action: "update",
+      id: order._id,
+      data: order
+    });
+
     res.json({ msg: "Status updated successfully", order });
   } catch (err) {
     next(err);
@@ -649,6 +652,13 @@ exports.recordSalesOrderPayment = async (req, res, next) => {
       order,
       customer: updatedCustomer,
       payment: paymentRecord
+    });
+
+    broadcast(order.company, {
+      entity: "sales_order",
+      action: "update",
+      id: order._id,
+      data: order
     });
   } catch (err) {
     next(err);

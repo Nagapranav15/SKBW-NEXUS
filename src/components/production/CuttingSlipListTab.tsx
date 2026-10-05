@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { CuttingSlipV2, getCuttingSlipsV2, cancelCuttingSlipV2 } from '../../api/mfgApiV2';
 import UniversalPrintVoucherModal from '../ui/UniversalPrintVoucherModal';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 
 interface CuttingSlipListTabProps {
   companyId: string;
@@ -39,6 +40,10 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
   useEffect(() => {
     fetchSlips();
   }, [companyId]);
+
+  useRealtimeSync(['cutting_slip'], () => {
+    fetchSlips();
+  });
 
   const handleCancelSlip = async (slipId: string, slipNumber: string) => {
     if (!window.confirm(`Are you sure you want to cancel ${slipNumber}? This will reverse the stock deduction and addition in inventory.`)) {

@@ -5,6 +5,8 @@ const InventoryLedgerV2 = require("../models/inventoryLedgerV2Model");
 const SkuV2 = require("../models/skuV2Model");
 const WarehouseLocationV2 = require("../models/warehouseLocationV2Model");
 const SalesOrderV2 = require("../models/salesOrderV2Model");
+const { getNextSequenceNumber } = require("../utils/sequenceManager");
+const { broadcast } = require("../utils/realtimeService");
 
 const toObjectId = (id) => {
   if (!id) return null;
@@ -216,12 +218,29 @@ exports.getDeliveryChallanById = async (req, res) => {
 
 exports.createDeliveryChallan = async (req, res) => {
   try {
-    const challan = await DeliveryChallan.create(req.body);
+    let dcNumber = req.body.dcNumber;
+    if (!dcNumber || !dcNumber.trim()) {
+      dcNumber = await getNextSequenceNumber("DC", req.body.company);
+    } else {
+      const exists = await DeliveryChallan.findOne({ dcNumber, company: req.body.company });
+      if (exists) {
+        dcNumber = await getNextSequenceNumber("DC", req.body.company);
+      }
+    }
+
+    const challan = await DeliveryChallan.create({ ...req.body, dcNumber });
 
     // If status is dispatched or delivered, automatically post stock-out and release reservation
     if (challan.status === "dispatched" || challan.status === "delivered") {
       await postDispatchInventory(challan, req.user?._id || req.body.createdBy);
     }
+
+    broadcast(challan.company, {
+      entity: "delivery_challan",
+      action: "create",
+      id: challan._id,
+      data: challan
+    });
 
     res.status(201).json(challan);
   } catch (err) {
@@ -244,6 +263,13 @@ exports.updateDeliveryChallan = async (req, res) => {
       await postDispatchInventory(challan, req.user?._id || req.body.createdBy);
     }
 
+    broadcast(challan.company, {
+      entity: "delivery_challan",
+      action: "update",
+      id: challan._id,
+      data: challan
+    });
+
     res.json(challan);
   } catch (err) {
     res.status(500).json({ msg: err.message });
@@ -259,6 +285,13 @@ exports.deleteDeliveryChallan = async (req, res) => {
     await reverseDispatchInventory(challan);
 
     await DeliveryChallan.findByIdAndDelete(req.params.id);
+
+    broadcast(challan.company, {
+      entity: "delivery_challan",
+      action: "delete",
+      id: challan._id
+    });
+
     res.json({ msg: "Delivery Challan deleted and inventory movements reversed successfully" });
   } catch (err) {
     res.status(500).json({ msg: err.message });

@@ -22,6 +22,7 @@ import SalesOrderSuccessModal from './SalesOrderSuccessModal';
 import PrintOrderEstimationModal from './PrintOrderEstimationModal';
 import RecordPaymentModal from './RecordPaymentModal';
 import { showToast } from '../ui/Toast';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -337,13 +338,12 @@ const SalesOrders: React.FC = () => {
 
   useEffect(() => {
     fetchOrders(true);
-
-    const interval = setInterval(() => {
-      fetchOrders(false);
-    }, 5000);
-
-    return () => clearInterval(interval);
   }, [selectedCompany?._id]);
+
+  // Instantly refresh when other users create, update, or pay a sales order
+  useRealtimeSync(['sales_order'], () => {
+    fetchOrders(false);
+  });
 
   // Global Keyboard Shortcuts (Matching Purchase Batch UI)
   useEffect(() => {

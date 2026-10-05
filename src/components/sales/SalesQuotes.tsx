@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import { getQuotes, createQuote, updateQuote, deleteQuote, updateQuoteStatus } from '../../api/quoteApi';
 import { getParties } from '../../api/partyApi';
 import { getItems } from '../../api/itemApi';
@@ -57,6 +58,10 @@ const SalesQuotes: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [selectedCompany]);
+
+  useRealtimeSync(['quote'], () => {
+    fetchData();
+  });
 
   useEffect(() => {
     let filtered = quotes;

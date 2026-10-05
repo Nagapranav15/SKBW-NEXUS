@@ -33,13 +33,12 @@ const server = app.listen(PORT, "0.0.0.0", () => {
 
 server.on("error", (err) => {
   if (err.code === "EADDRINUSE") {
-    console.warn(`Port ${PORT} is busy. Trying fallback port 5000...`);
-    const fallbackServer = app.listen(5000, "0.0.0.0", () => {
-      console.log(`Server running successfully on fallback port 5000 bound to 0.0.0.0`);
-    });
-    fallbackServer.on("error", (fErr) => {
-      console.error("Fallback server listen error:", fErr.message);
-    });
+    console.warn(`Port ${PORT} is busy. Retrying in 1s...`);
+    setTimeout(() => {
+      app.listen(PORT, "0.0.0.0", () => {
+        console.log(`Server running successfully on port ${PORT} bound to 0.0.0.0`);
+      });
+    }, 1000);
   } else {
     console.error("Server listen error:", err.message);
   }

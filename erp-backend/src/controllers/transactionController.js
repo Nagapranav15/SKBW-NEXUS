@@ -2,8 +2,10 @@ const Transaction = require("../models/transactionModel");
 const Party = require("../models/partyModel");
 const Item = require("../models/itemModel");
 const ExcelJS = require("exceljs");
+const { getNextSequenceNumber } = require("../utils/sequenceManager");
+const { broadcast } = require("../utils/realtimeService");
 
-// Helper: generate transaction ID
+// Helper: generate transaction ID with sequential numbering fallback
 const generateTransactionId = (date) => {
   const d = new Date(date);
   const ymd = d.toISOString().split("T")[0].replace(/-/g, "");
@@ -75,7 +77,11 @@ exports.createTransaction = async (req, res) => {
   try {
     const data = { ...req.body, createdBy: req.user.id };
     if (!data.transactionId) {
-      data.transactionId = generateTransactionId(data.date || new Date());
+      try {
+        data.transactionId = await getNextSequenceNumber("TRX", data.company);
+      } catch (seqErr) {
+        data.transactionId = generateTransactionId(data.date || new Date());
+      }
     }
     if (!data.dataYear) {
       data.dataYear = new Date(data.date || Date.now()).getFullYear();
@@ -84,6 +90,7 @@ exports.createTransaction = async (req, res) => {
     // Manual entries from the transaction page
     if (!data.source_type) data.source_type = "MANUAL";
     const txn = await Transaction.create(data);
+    broadcast(txn.company, { entity: "transaction", action: "create", data: txn });
     res.status(201).json(txn);
   } catch (err) {
     if (err.code === 11000) {
@@ -98,6 +105,7 @@ exports.updateTransaction = async (req, res) => {
   try {
     const txn = await Transaction.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
     if (!txn) return res.status(404).json({ msg: "Transaction not found" });
+    broadcast(txn.company, { entity: "transaction", action: "update", data: txn });
     res.json(txn);
   } catch (err) {
     res.status(500).json({ msg: err.message });
@@ -109,6 +117,7 @@ exports.deleteTransaction = async (req, res) => {
   try {
     const txn = await Transaction.findByIdAndDelete(req.params.id);
     if (!txn) return res.status(404).json({ msg: "Transaction not found" });
+    broadcast(txn.company, { entity: "transaction", action: "delete", id: req.params.id });
     res.json({ msg: "Transaction deleted" });
   } catch (err) {
     res.status(500).json({ msg: err.message });

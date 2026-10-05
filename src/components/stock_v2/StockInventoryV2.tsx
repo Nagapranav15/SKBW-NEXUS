@@ -45,6 +45,7 @@ import {
 import * as XLSX from 'xlsx';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
 import AddSkuDrawerV2 from '../inventory_v2/AddSkuDrawerV2';
@@ -788,6 +789,13 @@ export const StockInventoryV2: React.FC = () => {
       loadAuxiliaryData(true);
     }
   }, [selectedCompany?._id, loadAuxiliaryData]);
+
+  // Real-time synchronization when any user updates stock, warehouse locations, orders, or invoices
+  useRealtimeSync(['inventory', 'warehouse_location', 'production_order', 'purchase_invoice'], () => {
+    if (selectedCompany?._id) {
+      loadAuxiliaryData(false);
+    }
+  });
 
   // Lazy-load ledger entries on-demand when transfers or adjustments tab is clicked
   useEffect(() => {

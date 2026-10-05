@@ -3,6 +3,7 @@ const Party = require('../models/partyModel');
 const Route = require('../models/routeModel');
 const ActivityLog = require('../models/activityLogModel');
 const Sequence = require('../models/sequenceModel');
+const { broadcast } = require('../utils/realtimeService');
 
 const toObjectId = (id) => {
   if (!id) return null;
@@ -1354,6 +1355,7 @@ exports.createParty = async (req, res) => {
     }).catch(err => console.error("Activity log failed:", err));
 
     const enriched = await enrichPartyObj(party);
+    broadcast(party.company, { entity: "party", action: "create", data: enriched });
     res.status(201).json(enriched);
   } catch (err) {
     res.status(500).json({ msg: err.message });
@@ -1438,6 +1440,7 @@ exports.updateParty = async (req, res) => {
     }).catch(err => console.error("Activity log failed:", err));
 
     const enriched = await enrichPartyObj(party);
+    broadcast(party.company, { entity: "party", action: "update", data: enriched });
     res.json(enriched);
   } catch (err) {
     res.status(500).json({ msg: err.message });
@@ -1484,6 +1487,7 @@ exports.deleteParty = async (req, res) => {
       company: party.company
     }).catch(err => console.error("Activity log failed:", err));
 
+    broadcast(party.company, { entity: "party", action: "delete", id: req.params.id });
     res.json({ msg: 'Party moved to recycle bin' });
   } catch (err) {
     res.status(500).json({ msg: err.message });
