@@ -10,7 +10,7 @@ import {
   recordProductionEntry as recordProductionEntryApi,
   completeProductionOrder as completeProductionOrderApi
 } from '../../api/productionApi';
-import { getSkusV2, SkuV2 } from '../../api/mfgApiV2';
+import { getSkusV2, getBalancesV2, SkuV2 } from '../../api/mfgApiV2';
 import { clearLocalProductionOrders } from '../../utils/productionStorage';
 import { ProductionOrder, ProductionEntry } from '../../types/production';
 import { ProductionOrdersList } from './ProductionOrdersList';
@@ -36,6 +36,7 @@ export const ProductionModule: React.FC = () => {
   // Orders State (Loaded from backend only)
   const [orders, setOrders] = useState<ProductionOrder[]>([]);
   const [backendSkus, setBackendSkus] = useState<SkuV2[]>([]);
+  const [liveStockMap, setLiveStockMap] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState<boolean>(true);
 
   // Active top tab: 'orders' | 'cutting' | 'entries' | 'materials' | 'history'
@@ -125,11 +126,12 @@ export const ProductionModule: React.FC = () => {
     if (!selectedCompany?._id) return;
     try {
       setLoading(true);
-      const [listRes, skusRes, locsRes, slipsRes] = await Promise.allSettled([
+      const [listRes, skusRes, locsRes, slipsRes, balancesRes] = await Promise.allSettled([
         getProductionOrders({ companyId: selectedCompany._id }),
         getSkusV2(selectedCompany._id),
         getWarehouseHierarchyV2(selectedCompany._id),
-        getCuttingSlipsV2(selectedCompany._id, { limit: 1 })
+        getCuttingSlipsV2(selectedCompany._id, { limit: 1 }),
+        getBalancesV2(selectedCompany._id)
       ]);
 
       let loadedOrders: ProductionOrder[] = [];
@@ -159,6 +161,33 @@ export const ProductionModule: React.FC = () => {
       if (skusRes.status === 'fulfilled' && Array.isArray(skusRes.value)) {
         setBackendSkus(skusRes.value);
       }
+
+      // Build live stock map from ledger balances and SKU on-hand values
+      const bMap = new Map<string, number>();
+      if (balancesRes.status === 'fulfilled' && Array.isArray(balancesRes.value)) {
+        balancesRes.value.forEach((b: any) => {
+          const rawId = b.skuId || b.sku?._id;
+          const sId = rawId ? String((rawId as any)._id || rawId) : '';
+          const sCode = (b.sku?.skuCode || b.skuCode || '').toLowerCase().trim();
+          const sName = (b.sku?.name || b.name || '').toLowerCase().trim();
+          const qty = Number(b.onHand) || Number(b.quantity) || 0;
+          if (sId) bMap.set(sId, (bMap.get(sId) || 0) + qty);
+          if (sCode) bMap.set(sCode, (bMap.get(sCode) || 0) + qty);
+          if (sName) bMap.set(sName, (bMap.get(sName) || 0) + qty);
+        });
+      }
+
+      const skusList = skusRes.status === 'fulfilled' && Array.isArray(skusRes.value) ? skusRes.value : [];
+      skusList.forEach(s => {
+        const sId = s._id ? String(s._id) : '';
+        const sCode = (s.skuCode || '').toLowerCase().trim();
+        const sName = (s.name || '').toLowerCase().trim();
+        const fallback = Number(s.presentStock !== undefined ? s.presentStock : (s.openingStock || 0));
+        if (sId && !bMap.has(sId)) bMap.set(sId, fallback);
+        if (sCode && !bMap.has(sCode)) bMap.set(sCode, fallback);
+        if (sName && !bMap.has(sName)) bMap.set(sName, fallback);
+      });
+      setLiveStockMap(bMap);
 
       // Sync selected order if open
       const orderIdParam = searchParams.get('orderId');
@@ -247,8 +276,10 @@ export const ProductionModule: React.FC = () => {
 
   // Order created callback
   const handleOrderCreated = (newOrder: ProductionOrder) => {
+    setOrders(prev => [newOrder, ...prev.filter(o => o._id !== newOrder._id)]);
+    setActiveTabState('orders');
+    handleBackToList();
     loadOrders();
-    handleOpenOrderDetail(newOrder);
   };
 
   // Detail active tab state
@@ -569,7 +600,8 @@ export const ProductionModule: React.FC = () => {
     return orders.map((o) => {
       globalIdx++;
       const orderNo = o.orderNumber || `PO-${String(globalIdx).padStart(3, '0')}`;
-      const itemCode = o.itemCode || `FG-${String(((globalIdx - 1) % 8) + 1).padStart(3, '0')}`;
+      const matchedSku = backendSkus.find(s => s.name === o.itemName || s.skuCode === o.itemCode);
+      const itemCode = o.itemCode || o.rawOrder?.itemCode || matchedSku?.skuCode || 'FG-001';
       const plannedQty = Number(o.plannedQty) || 10;
       const plannedUom = o.plannedUom || 'GBL';
       const plannedPcs = Number(o.plannedPcs) || (plannedQty * (o.conversionFactor || 1));
@@ -617,24 +649,41 @@ export const ProductionModule: React.FC = () => {
         bomItems = [];
       }
 
-      // Format detail items for expanded sub-table (dynamically aligned with database)
+      // Format detail items for expanded sub-table (dynamically aligned with database & real stock)
       const materialDetails = bomItems.map((b, bIdx) => {
         const requiredQty = Number(b.totalRequired) || 0;
 
         // Dynamic alignment with database items & live inventory stock
         const compSku = backendSkus.find(s => 
+          (b.skuId && s._id === b.skuId) ||
           (b.code && (s.skuCode === b.code || s._id === b.code)) || 
           (s.name && b.component && s.name.trim().toLowerCase() === b.component.trim().toLowerCase())
         );
-        const liveStock = compSku ? Number(compSku.presentStock ?? compSku.openingStock ?? 0) : 0;
-        const availableQty = (b.availableStock !== undefined && Number(b.availableStock) > 0) 
-          ? Number(b.availableStock) 
+
+        let liveStock = 0;
+        const sId = b.skuId ? String(b.skuId) : (compSku?._id ? String(compSku._id) : '');
+        const sCode = (b.code || compSku?.skuCode || '').toLowerCase().trim();
+        const sName = (b.component || compSku?.name || '').toLowerCase().trim();
+
+        if (sId && liveStockMap.has(sId)) {
+          liveStock = liveStockMap.get(sId)!;
+        } else if (sCode && liveStockMap.has(sCode)) {
+          liveStock = liveStockMap.get(sCode)!;
+        } else if (sName && liveStockMap.has(sName)) {
+          liveStock = liveStockMap.get(sName)!;
+        } else if (compSku) {
+          liveStock = Number(compSku.presentStock ?? compSku.openingStock ?? 0);
+        }
+
+        const rawAvail = Number(b.availableStock);
+        const availableQty = (rawAvail !== undefined && !isNaN(rawAvail) && rawAvail > 0 && rawAvail < 900000)
+          ? rawAvail
           : liveStock;
-        const reservedQty = Number(b.issuedQty !== undefined ? b.issuedQty : Math.min(availableQty, requiredQty));
+        const reservedQty = Number(b.issuedQty !== undefined ? b.issuedQty : Math.min(Math.max(0, availableQty), requiredQty));
         const shortageQty = Math.max(0, requiredQty - availableQty);
         const itemStatus: 'Shortage' | 'Ready' | 'Partial' = shortageQty > 0 
-          ? 'Shortage' 
-          : (availableQty >= requiredQty ? 'Ready' : 'Partial');
+          ? (availableQty > 0 ? 'Partial' : 'Shortage') 
+          : 'Ready';
 
         return {
           id: b.id || `${o._id}-m-${bIdx}`,
@@ -681,7 +730,7 @@ export const ProductionModule: React.FC = () => {
         materialDetails
       };
     });
-  }, [orders, backendSkus]);
+  }, [orders, backendSkus, liveStockMap]);
 
   // Tab 3: Grouped by Product (Items) with nested Production Orders Info
   const productRequirementsList = useMemo(() => {
@@ -714,7 +763,10 @@ export const ProductionModule: React.FC = () => {
     }>();
 
     orderRequirementsList.forEach(ord => {
-      const pKey = ord.itemCode || ord.itemName || ord.id;
+      const pKey = (ord.rawOrder?.itemId ? String(ord.rawOrder.itemId) : '') ||
+                   (ord.itemName || ord.productName || '').trim().toLowerCase() ||
+                   ord.itemCode ||
+                   ord.id;
       if (!productMap.has(pKey)) {
         const skuMatch = backendSkus.find(s => s.skuCode === ord.itemCode || s.name === ord.itemName);
         const stockOnHand = skuMatch ? Number(skuMatch.presentStock ?? skuMatch.openingStock ?? 0) : 0;
@@ -746,7 +798,7 @@ export const ProductionModule: React.FC = () => {
 
       // Consolidate materials across orders for this product
       ord.materialDetails.forEach(m => {
-        const mKey = m.materialCode || m.materialName;
+        const mKey = (m.materialCode || m.materialName || '').trim().toLowerCase();
         if (!pGroup.materialsMap.has(mKey)) {
           pGroup.materialsMap.set(mKey, {
             id: m.id,
@@ -771,8 +823,8 @@ export const ProductionModule: React.FC = () => {
       const materialDetails = Array.from(p.materialsMap.values()).map((mat, idx) => {
         const shortage = Math.max(0, mat.totalRequired - mat.availableQty);
         const status: 'Ready' | 'Partial' | 'Shortage' = shortage > 0
-          ? 'Shortage'
-          : (mat.availableQty >= mat.totalRequired ? 'Ready' : 'Partial');
+          ? (mat.availableQty > 0 ? 'Partial' : 'Shortage')
+          : 'Ready';
         return {
           ...mat,
           index: idx + 1,
@@ -808,19 +860,26 @@ export const ProductionModule: React.FC = () => {
         dueDate: p.earliestDueDate
       };
     });
-  }, [orderRequirementsList, backendSkus]);
+  }, [orderRequirementsList, backendSkus, liveStockMap]);
 
-  // Tab 3 KPI Cards calculations (Product-Centric)
+  // Tab 3 KPI Cards calculations (Product-Centric & Order-Centric)
   const totalProductsCount = productRequirementsList.length;
+  const totalRequirementsCount = orderRequirementsList.length;
   const readyRequirementsCount = useMemo(() => {
-    return productRequirementsList.filter(r => r.overallStatus === 'Ready').length;
-  }, [productRequirementsList]);
+    return matViewMode === 'product'
+      ? productRequirementsList.filter(r => r.overallStatus === 'Ready').length
+      : orderRequirementsList.filter(r => r.overallStatus === 'Ready').length;
+  }, [productRequirementsList, orderRequirementsList, matViewMode]);
   const partialRequirementsCount = useMemo(() => {
-    return productRequirementsList.filter(r => r.overallStatus === 'Partial').length;
-  }, [productRequirementsList]);
+    return matViewMode === 'product'
+      ? productRequirementsList.filter(r => r.overallStatus === 'Partial').length
+      : orderRequirementsList.filter(r => r.overallStatus === 'Partial').length;
+  }, [productRequirementsList, orderRequirementsList, matViewMode]);
   const shortageRequirementsCount = useMemo(() => {
-    return productRequirementsList.filter(r => r.overallStatus === 'Shortage').length;
-  }, [productRequirementsList]);
+    return matViewMode === 'product'
+      ? productRequirementsList.filter(r => r.overallStatus === 'Shortage').length
+      : orderRequirementsList.filter(r => r.overallStatus === 'Shortage').length;
+  }, [productRequirementsList, orderRequirementsList, matViewMode]);
 
   // Distinct types & departments for Tab 3 filter dropdowns
   const distinctReqMaterialTypes = useMemo(() => {
@@ -3347,6 +3406,7 @@ export const ProductionModule: React.FC = () => {
                 companyId={selectedCompany?._id}
                 initialSkus={backendSkus}
                 editOrder={currentView === 'edit' ? editingOrder : null}
+                existingOrders={orders}
               />
             </div>
           </div>,

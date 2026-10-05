@@ -15,7 +15,8 @@ import {
   Building2,
   ChevronLeft, 
   ChevronRight,
-  Factory
+  Factory,
+  Truck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useRealtime } from '../context/RealtimeContext';
@@ -159,6 +160,9 @@ const Layout: React.FC = () => {
     if (path === '/production') {
       return location.pathname.startsWith('/production');
     }
+    if (path === '/dispatch') {
+      return location.pathname.startsWith('/dispatch');
+    }
     if (path === '/dashboard') {
       return location.pathname === '/dashboard' || location.pathname === '/';
     }
@@ -249,6 +253,7 @@ const Layout: React.FC = () => {
         { label: 'Purchase Batches', path: '/inventory-v2/purchases', icon: Receipt, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
         { label: 'Sale Orders', path: '/sales/orders', icon: ShoppingBag, permission: ['MANAGE_ORDERS', 'VIEW_ORDERS'] },
         { label: 'Production', path: '/production', icon: Factory, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS', 'MANAGE_ORDERS', 'VIEW_ORDERS'] },
+        { label: 'Dispatch', path: '/dispatch', icon: Truck, permission: ['MANAGE_ORDERS', 'VIEW_ORDERS', 'MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
       ]
     }
   ];

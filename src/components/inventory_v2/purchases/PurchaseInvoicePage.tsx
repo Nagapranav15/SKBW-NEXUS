@@ -1576,8 +1576,9 @@ const PurchaseInvoicePage: React.FC = () => {
         status: targetStatus
       };
 
+      let savedResult: any = null;
       if (isEditing && editingInvoiceId) {
-        await updatePurchaseInvoiceV2(editingInvoiceId, invoiceData);
+        savedResult = await updatePurchaseInvoiceV2(editingInvoiceId, invoiceData);
         showToast(targetStatus === 'Draft' ? 'Draft purchase batch updated successfully!' : 'Purchase batch updated & received successfully!', 'success');
         createActivityLog({
           action: 'UPDATE',
@@ -1587,7 +1588,7 @@ const PurchaseInvoicePage: React.FC = () => {
           company: selectedCompany?._id
         }).catch(() => {});
       } else {
-        await createPurchaseInvoiceV2(invoiceData);
+        savedResult = await createPurchaseInvoiceV2(invoiceData);
         showToast(targetStatus === 'Draft' ? 'Draft purchase order saved successfully!' : 'Purchase batch inwarded & received successfully!', 'success');
         createActivityLog({
           action: 'CREATE',
@@ -1597,6 +1598,12 @@ const PurchaseInvoicePage: React.FC = () => {
           company: selectedCompany?._id
         }).catch(() => {});
       }
+
+      if (savedResult && savedResult._id) {
+        setInvoices(prev => [savedResult, ...prev.filter(inv => inv._id !== savedResult._id)]);
+      }
+      setStatusFilter('');
+      setPage(1);
       setActiveSubPage('list');
       setIsEditing(false);
       setEditingInvoiceId(null);

@@ -5,7 +5,7 @@ const SkuV2 = require("../models/skuV2Model");
 const Party = require("../models/partyModel");
 const ActivityLog = require("../models/activityLogModel");
 const Transaction = require("../models/transactionModel");
-const { getNextSequenceNumber } = require("../utils/sequenceManager");
+const { getNextSequenceNumber, peekNextSequenceNumber, syncSequenceNumber } = require("../utils/sequenceManager");
 const { broadcast } = require("../utils/realtimeService");
 
 const generateTransactionId = (date) => {
@@ -24,7 +24,7 @@ const toObjectId = (id) => {
   }
 };
 
-// Autogenerate next order number (SO-0001, SO-0002...)
+// Autogenerate next order number (SO-0001, SO-0002...) (READ-ONLY: PREVIEW ONLY)
 exports.getNextSalesOrderNumber = async (req, res, next) => {
   try {
     const { companyId } = req.query;
@@ -33,7 +33,7 @@ exports.getNextSalesOrderNumber = async (req, res, next) => {
     }
 
     const companyObjId = toObjectId(companyId);
-    const nextOrderNumber = await getNextSequenceNumber("SO", companyObjId || companyId);
+    const nextOrderNumber = await peekNextSequenceNumber("SO", companyObjId || companyId);
 
     res.json({ nextOrderNumber });
   } catch (err) {
@@ -214,6 +214,8 @@ exports.createSalesOrder = async (req, res, next) => {
       const existing = await SalesOrderV2.findOne({ company: companyQuery, orderNumber }).lean();
       if (existing) {
         orderNumber = await getNextSequenceNumber("SO", companyObjId || company);
+      } else {
+        await syncSequenceNumber("SO", companyObjId || company, orderNumber);
       }
     }
 

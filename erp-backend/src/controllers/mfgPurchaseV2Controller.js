@@ -7,7 +7,7 @@ const InventoryLedger = require("../models/inventoryLedgerModelV2");
 const Sequence = require("../models/sequenceModel");
 const Transaction = require("../models/transactionModel");
 const ActivityLog = require("../models/activityLogModel");
-const { getNextSequenceNumber } = require("../utils/sequenceManager");
+const { getNextSequenceNumber, peekNextSequenceNumber, syncSequenceNumber } = require("../utils/sequenceManager");
 const { broadcast } = require("../utils/realtimeService");
 
 const toObjectId = (id) => {
@@ -158,6 +158,8 @@ exports.createPurchaseInvoice = async (req, res, next) => {
       const exists = await PurchaseInvoiceV2.findOne({ invoiceNumber: finalInvoiceNo, company: companyObjId });
       if (exists) {
         finalInvoiceNo = await getNextSequenceNumber("PB", companyObjId);
+      } else {
+        await syncSequenceNumber("PB", companyObjId, finalInvoiceNo);
       }
     }
 
@@ -521,7 +523,8 @@ exports.getPurchaseInvoices = async (req, res, next) => {
       migratedCompanies.add(String(companyObjId));
     }
 
-    const query = { company: companyObjId };
+    const companyQuery = companyObjId ? { $in: [companyObjId, String(companyId)] } : companyId;
+    const query = { company: companyQuery };
     if (vendorId) query.vendorId = toObjectId(vendorId);
     if (paymentStatus) query.paymentStatus = paymentStatus;
     if (status) query.status = status;
@@ -1172,7 +1175,7 @@ exports.getNextInvoiceNumber = async (req, res, next) => {
     }
     const companyObjId = toObjectId(companyId);
 
-    const code = await getNextSequenceNumber("PB", companyId);
+    const code = await peekNextSequenceNumber("PB", companyObjId || companyId);
 
     res.json({ nextInvoiceNumber: code });
   } catch (err) {

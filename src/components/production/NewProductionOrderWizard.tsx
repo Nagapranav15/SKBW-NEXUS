@@ -8,7 +8,7 @@ import {
   BarChart3, Clock, Pencil, Tag, TrendingUp, Scissors
 } from 'lucide-react';
 import { ProductionOrder } from '../../types/production';
-import { getNextProductionOrderNumber, createProductionOrder, updateProductionOrder } from '../../api/productionApi';
+import { getNextProductionOrderNumber, createProductionOrder, updateProductionOrder, getProductionOrders } from '../../api/productionApi';
 import { getSkusV2, getWarehouseHierarchyV2, SkuV2, WarehouseLocationV2, getProductionMaterialRates, MaterialRateInfo, getMetadataV2, updateMetadataV2, getBalancesV2 } from '../../api/mfgApiV2';
 import { LocationSelectPopup } from '../stock_v2/LocationSelectPopup';
 import { BomCopyPasteControls } from '../inventory_v2/BomCopyPasteControls';
@@ -25,6 +25,7 @@ interface NewProductionOrderWizardProps {
   companyId?: string;
   initialSkus?: SkuV2[];
   editOrder?: ProductionOrder | null;
+  existingOrders?: ProductionOrder[];
 }
 
 export interface DepartmentPreset {
@@ -209,9 +210,18 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   onCreated,
   companyId,
   initialSkus = [],
-  editOrder = null
+  editOrder = null,
+  existingOrders = []
 }) => {
   const [submitting, setSubmitting] = useState<boolean>(false);
+
+  // Existing orders list for duplicate detection & auto-accumulation
+  const [existingOrdersList, setExistingOrdersList] = useState<ProductionOrder[]>(existingOrders);
+  useEffect(() => {
+    if (existingOrders && existingOrders.length > 0) {
+      setExistingOrdersList(existingOrders);
+    }
+  }, [existingOrders]);
 
   // Master Data
   const [backendSkus, setBackendSkus] = useState<SkuV2[]>(initialSkus);
@@ -427,15 +437,20 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       try {
         if (companyId) {
           setIsStockLoading(true);
-          const [nextNum, skusRes, whRes, metaRes, balancesRes] = await Promise.allSettled([
+          const [nextNum, skusRes, whRes, metaRes, balancesRes, poRes] = await Promise.allSettled([
             getNextProductionOrderNumber(companyId),
             getSkusV2(companyId),
             getWarehouseHierarchyV2(companyId),
             getMetadataV2(companyId),
-            getBalancesV2(companyId)
+            getBalancesV2(companyId),
+            getProductionOrders({ companyId })
           ]);
 
           if (!isMounted) return;
+
+          if (poRes.status === 'fulfilled' && Array.isArray(poRes.value)) {
+            setExistingOrdersList(poRes.value);
+          }
 
           let loadedWhLocs: WarehouseLocationV2[] = [];
           if (whRes.status === 'fulfilled' && Array.isArray(whRes.value)) {
@@ -1892,25 +1907,44 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         priority: editOrder?.priority || 'Normal',
         remarks: remarks.trim(),
         bomType: 'Custom BOM (Production Order Only)',
-        bomItems: materials.map(m => ({
-          id: m.id,
-          skuId: m.skuId,
-          component: m.component,
-          code: m.code,
-          type: 'Raw',
-          qtyPerBatch: m.requiredQty,
-          totalRequired: m.requiredQty,
-          uom: m.uom,
-          availableStock: 999999,
-          stockStatus: 'Available',
-          rateMode: m.rateMode || 'avg_purchase',
-          rate: m.rate,
-          amount: m.amount,
-          sourceLocation: m.sourceLocation,
-          locationId: m.locationId,
-          batchesAllocated: m.batchesAllocated,
-          fifoBatchInfo: m.fifoBatchInfo
-        })),
+        bomItems: materials.map(m => {
+          const sId = m.skuId ? String(m.skuId) : '';
+          const sCode = (m.code || '').toLowerCase().trim();
+          const sName = (m.component || '').toLowerCase().trim();
+          let realStock = 0;
+          if (sId && liveStockMap.has(sId)) realStock = liveStockMap.get(sId)!;
+          else if (sCode && liveStockMap.has(sCode)) realStock = liveStockMap.get(sCode)!;
+          else if (sName && liveStockMap.has(sName)) realStock = liveStockMap.get(sName)!;
+          else {
+            const matchedSku = backendSkus.find(s => 
+              (sId && s._id === sId) || 
+              (sCode && (s.skuCode || '').toLowerCase() === sCode) || 
+              (sName && (s.name || '').toLowerCase() === sName)
+            );
+            realStock = Number(matchedSku?.presentStock ?? matchedSku?.openingStock ?? 0);
+          }
+
+          return {
+            id: m.id,
+            skuId: m.skuId,
+            component: m.component,
+            code: m.code,
+            type: 'Raw',
+            qtyPerBatch: m.requiredQty,
+            totalRequired: m.requiredQty,
+            uom: m.uom,
+            availableStock: realStock,
+            stockStatus: realStock >= m.requiredQty ? 'Available' : 'Shortage',
+            rateMode: m.rateMode || 'avg_purchase',
+            rate: m.rate,
+            amount: m.amount,
+            sourceLocation: m.sourceLocation,
+            batchesAllocated: (m.batchesAllocated && m.batchesAllocated.reduce((acc: number, b: any) => acc + (Number(b.qty) || 0), 0) >= (Number(m.requiredQty) || 0) * 0.95)
+              ? m.batchesAllocated
+              : undefined,
+            fifoBatchInfo: m.fifoBatchInfo
+          };
+        }),
         byProducts: scrapItems,
         additionalCosts: additionalCosts.map(c => {
           const amt = Number(c.amount) || 0;
@@ -2749,8 +2783,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                       type: 'Raw',
                       uom: l.uom || 'Kg',
                       requiredQty: Number(l.qty) || 1,
-                      availableStock: l.inStock ?? 999999,
-                      stockStatus: 'Available',
+                      availableStock: Number(l.inStock) || 0,
+                      stockStatus: (Number(l.inStock) || 0) >= (Number(l.qty) || 1) ? 'Available' : 'Shortage',
                       rateMode: 'custom',
                       rate: Number(l.rate) || 0,
                       amount: Math.round((Number(l.qty) || 1) * (Number(l.rate) || 0) * 100) / 100,
@@ -2784,8 +2818,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         type: 'Raw' as const,
                         uom: l.uom || 'Kg',
                         requiredQty: Number(l.qty) || 1,
-                        availableStock: l.inStock ?? 999999,
-                        stockStatus: 'Available' as const,
+                        availableStock: Number(l.inStock) || 0,
+                        stockStatus: (Number(l.inStock) || 0) >= (Number(l.qty) || 1) ? 'Available' as const : 'Shortage' as const,
                         rateMode: 'custom' as const,
                         rate: Number(l.rate) || 0,
                         amount: Math.round((Number(l.qty) || 1) * (Number(l.rate) || 0) * 100) / 100,

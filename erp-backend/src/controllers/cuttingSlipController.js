@@ -6,7 +6,7 @@ const SkuV2 = require("../models/skuV2Model");
 const WarehouseLocationV2 = require("../models/warehouseLocationV2Model");
 const Sequence = require("../models/sequenceModel");
 const PurchaseInvoiceV2 = require("../models/purchaseInvoiceV2Model");
-const { getNextSequenceNumber } = require("../utils/sequenceManager");
+const { getNextSequenceNumber, peekNextSequenceNumber, syncSequenceNumber } = require("../utils/sequenceManager");
 const { broadcast } = require("../utils/realtimeService");
 
 const toObjectId = (id) => {
@@ -47,13 +47,13 @@ const generateNextCuttingSlipNumber = async (companyId, session = null) => {
   return await getNextSequenceNumber("CS", companyId);
 };
 
-// 1. Get next slip number (e.g. CS-001, CS-002, ... dynamically infinite)
+// 1. Get next slip number (READ-ONLY: PREVIEW ONLY)
 exports.getNextSlipNumber = async (req, res) => {
   try {
     const companyId = req.companyId || req.query.companyId;
     if (!companyId) return res.status(400).json({ msg: "companyId is required" });
 
-    const formatted = await generateNextCuttingSlipNumber(companyId);
+    const formatted = await peekNextSequenceNumber("CS", companyId);
     return res.json({ slipNumber: formatted });
   } catch (error) {
     console.error("Error generating cutting slip number:", error);
@@ -335,6 +335,8 @@ exports.createCuttingSlip = async (req, res) => {
       const existing = await CuttingSlip.findOne({ company: companyId, slipNumber: finalSlipNumber }).session(session);
       if (existing) {
         finalSlipNumber = await generateNextCuttingSlipNumber(companyId, session);
+      } else {
+        await syncSequenceNumber("CS", companyId, finalSlipNumber);
       }
     }
 

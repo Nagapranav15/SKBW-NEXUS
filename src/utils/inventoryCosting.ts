@@ -194,7 +194,8 @@ export const resolveComponentCosting = (
   costings: StockCostingData | null
 ): ComponentCostingResult => {
   const fallbackRate = Number(component.rate) > 0 ? Number(component.rate) : 0;
-  const fallbackStock = Number(component.availableStock ?? component.inStock ?? 0);
+  const rawStock = Number(component.availableStock ?? component.inStock ?? 0);
+  const fallbackStock = (rawStock >= 900000 || isNaN(rawStock)) ? 0 : rawStock;
 
   if (!costings) {
     return {

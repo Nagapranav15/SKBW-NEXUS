@@ -23,6 +23,7 @@ const SalesReports = lazyWithRetry(() => import('./components/sales/SalesReports
 const TransactionTools = lazyWithRetry(() => import('./components/TransactionTools'));
 const AnalyzerDashboard = lazyWithRetry(() => import('./components/AnalyzerDashboard'));
 const ProductionModule = lazyWithRetry(() => import('./components/production/ProductionModule'));
+const DispatchModule = lazyWithRetry(() => import('./components/dispatch/DispatchModule'));
 
 // Inventory V2 (Beta) sub-pages
 const DashboardV2 = lazyWithRetry(() => import('./components/inventory_v2/DashboardV2'));
@@ -98,6 +99,8 @@ function App() {
                 <Route path="sales/reports" element={<SalesReports />} />
                 <Route path="production/*" element={<ProductionModule />} />
                 <Route path="production" element={<ProductionModule />} />
+                <Route path="dispatch/*" element={<DispatchModule />} />
+                <Route path="dispatch" element={<DispatchModule />} />
                 <Route path="transactions" element={<TransactionTools />} />
                 <Route path="analyzer" element={<AnalyzerDashboard />} />
 

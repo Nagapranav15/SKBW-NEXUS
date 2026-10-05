@@ -6,7 +6,7 @@ const PurchaseInvoiceV2 = require("../models/purchaseInvoiceV2Model");
 const CuttingSlip = require("../models/cuttingSlipModel");
 const Sequence = require("../models/sequenceModel");
 const mongoose = require("mongoose");
-const { getNextSequenceNumber } = require("../utils/sequenceManager");
+const { getNextSequenceNumber, peekNextSequenceNumber, syncSequenceNumber } = require("../utils/sequenceManager");
 const { broadcast } = require("../utils/realtimeService");
 
 // Helper to resolve warehouse location hierarchy (Factory -> Floor -> Zone -> Location)
@@ -473,43 +473,17 @@ const syncProductionOrderLedger = async (order) => {
               return q;
             };
 
-            // Case A: Explicit batchesAllocated array was stored on BOM item
-            if (m.batchesAllocated && Array.isArray(m.batchesAllocated) && m.batchesAllocated.length > 0) {
-              for (const alloc of m.batchesAllocated) {
-                const batchAllocReq = Number(alloc.qty) || 0;
-                const batchConsumed = Math.round(batchAllocReq * progressRatio * 1000) / 1000;
-                if (batchConsumed <= 0) continue;
-                const batchLedgerQty = convertToLedgerQty(batchConsumed);
-                const transactionNumber = await Sequence.getNextSequence("IL");
+            const targetLedgerQty = convertToLedgerQty(consumedQty);
+            let remainingToDeduct = targetLedgerQty;
 
-                ledgerDocs.push({
-                  transactionNumber,
-                  transactionType: "Production Consumption",
-                  skuId: matSku._id,
-                  quantity: batchLedgerQty,
-                  unit: matSku.unit || m.uom || "Pcs",
-                  direction: "OUT",
-                  referenceType: "ProductionOrder",
-                  referenceId: order.orderNumber,
-                  batchNumber: alloc.batchNumber || order.orderNumber,
-                  warehouseId: h.warehouseId,
-                  floorId: h.floorId,
-                  zoneId: h.zoneId,
-                  locationId: h.locationId,
-                  remarks: `Consumed from Batch ${alloc.batchNumber} for Production Order ${order.orderNumber} (${order.itemName}) [${batchConsumed} ${m.uom || 'Pcs'}]`,
-                  createdBy: order.createdBy,
-                  company: companyObjId,
-                  status: "Posted"
-                });
-              }
-            } else if (m.batchNumber && m.batchNumber !== order.orderNumber) {
-              // Case B: Explicit single batchNumber on BOM item
+            // Priority 1: User explicitly assigned a specific batchNumber for this material
+            if (m.batchNumber && m.batchNumber !== order.orderNumber) {
               const transactionNumber = await Sequence.getNextSequence("IL");
               ledgerDocs.push({
                 transactionNumber,
                 transactionType: "Production Consumption",
                 skuId: matSku._id,
-                quantity: convertToLedgerQty(consumedQty),
+                quantity: targetLedgerQty,
                 unit: matSku.unit || m.uom || "Pcs",
                 direction: "OUT",
                 referenceType: "ProductionOrder",
@@ -524,11 +498,50 @@ const syncProductionOrderLedger = async (order) => {
                 company: companyObjId,
                 status: "Posted"
               });
-            } else {
-              // Case C: Dynamic FIFO deduction against real active purchase batches
+              remainingToDeduct = 0;
+            }
+
+            // Priority 2: User explicitly provided multi-batch allocation that matches consumedQty (not a 1-unit preview)
+            if (remainingToDeduct > 0.0001 && m.batchesAllocated && Array.isArray(m.batchesAllocated) && m.batchesAllocated.length > 0) {
+              const sumAlloc = m.batchesAllocated.reduce((s, a) => s + (Number(a.qty) || 0), 0);
+              // Only apply if the allocated total genuinely covers the requirement (e.g. within 5%)
+              if (sumAlloc >= consumedQty * 0.95) {
+                for (const alloc of m.batchesAllocated) {
+                  if (remainingToDeduct <= 0.0001) break;
+                  const batchAllocReq = Number(alloc.qty) || 0;
+                  const batchConsumed = Math.round(batchAllocReq * progressRatio * 1000) / 1000;
+                  if (batchConsumed <= 0) continue;
+                  const takeQty = Math.min(remainingToDeduct, convertToLedgerQty(batchConsumed));
+                  const transactionNumber = await Sequence.getNextSequence("IL");
+
+                  ledgerDocs.push({
+                    transactionNumber,
+                    transactionType: "Production Consumption",
+                    skuId: matSku._id,
+                    quantity: takeQty,
+                    unit: matSku.unit || m.uom || "Pcs",
+                    direction: "OUT",
+                    referenceType: "ProductionOrder",
+                    referenceId: order.orderNumber,
+                    batchNumber: alloc.batchNumber || order.orderNumber,
+                    warehouseId: h.warehouseId,
+                    floorId: h.floorId,
+                    zoneId: h.zoneId,
+                    locationId: h.locationId,
+                    remarks: `Consumed from Batch ${alloc.batchNumber} for Production Order ${order.orderNumber} (${order.itemName}) [${batchConsumed} ${m.uom || 'Pcs'}]`,
+                    createdBy: order.createdBy,
+                    company: companyObjId,
+                    status: "Posted"
+                  });
+                  remainingToDeduct -= takeQty;
+                }
+              }
+            }
+
+            // Priority 3: Dynamic FIFO deduction against live active purchase batches for all remaining quantity
+            if (remainingToDeduct > 0.0001) {
               const activeInfo = await getActiveBatchesForSku(matSku, companyObjId);
               const activeBatches = activeInfo.batches || [];
-              let remainingToDeduct = convertToLedgerQty(consumedQty);
 
               for (const ab of activeBatches) {
                 if (remainingToDeduct <= 0.0001) break;
@@ -557,30 +570,30 @@ const syncProductionOrderLedger = async (order) => {
                   remainingToDeduct -= take;
                 }
               }
+            }
 
-              // Any shortage remaining
-              if (remainingToDeduct > 0.0001) {
-                const transactionNumber = await Sequence.getNextSequence("IL");
-                ledgerDocs.push({
-                  transactionNumber,
-                  transactionType: "Production Consumption",
-                  skuId: matSku._id,
-                  quantity: Math.round(remainingToDeduct * 1000000) / 1000000,
-                  unit: matSku.unit || m.uom || "Pcs",
-                  direction: "OUT",
-                  referenceType: "ProductionOrder",
-                  referenceId: order.orderNumber,
-                  batchNumber: order.orderNumber,
-                  warehouseId: h.warehouseId,
-                  floorId: h.floorId,
-                  zoneId: h.zoneId,
-                  locationId: h.locationId,
-                  remarks: `Consumed (unassigned shortage) for Production Order ${order.orderNumber} (${order.itemName})`,
-                  createdBy: order.createdBy,
-                  company: companyObjId,
-                  status: "Posted"
-                });
-              }
+            // Priority 4: Any shortage beyond active batches is recorded with order.orderNumber so total stock reduction is 100% exact
+            if (remainingToDeduct > 0.0001) {
+              const transactionNumber = await Sequence.getNextSequence("IL");
+              ledgerDocs.push({
+                transactionNumber,
+                transactionType: "Production Consumption",
+                skuId: matSku._id,
+                quantity: Math.round(remainingToDeduct * 1000000) / 1000000,
+                unit: matSku.unit || m.uom || "Pcs",
+                direction: "OUT",
+                referenceType: "ProductionOrder",
+                referenceId: order.orderNumber,
+                batchNumber: order.orderNumber,
+                warehouseId: h.warehouseId,
+                floorId: h.floorId,
+                zoneId: h.zoneId,
+                locationId: h.locationId,
+                remarks: `Consumed (unassigned shortage) for Production Order ${order.orderNumber} (${order.itemName})`,
+                createdBy: order.createdBy,
+                company: companyObjId,
+                status: "Posted"
+              });
             }
           }
         }
@@ -672,6 +685,10 @@ const generateNextOrderNumber = async (companyId) => {
   return await getNextSequenceNumber("PO", companyId);
 };
 
+const peekNextOrderNumber = async (companyId) => {
+  return await peekNextSequenceNumber("PO", companyId);
+};
+
 // GET /api/production-orders
 exports.getProductionOrders = async (req, res) => {
   try {
@@ -733,7 +750,7 @@ exports.getProductionOrders = async (req, res) => {
   }
 };
 
-// GET /api/production-orders/next-number
+// GET /api/production-orders/next-number (READ-ONLY: DOES NOT ADVANCE SEQUENCE COUNTER)
 exports.getNextOrderNumber = async (req, res) => {
   try {
     const companyId = req.query.companyId || req.user?.company;
@@ -741,7 +758,7 @@ exports.getNextOrderNumber = async (req, res) => {
       return res.status(400).json({ msg: "Company ID is required" });
     }
 
-    const nextNumber = await generateNextOrderNumber(companyId);
+    const nextNumber = await peekNextOrderNumber(companyId);
     res.json({ nextNumber });
   } catch (err) {
     console.error("Error generating next production order number:", err);
@@ -783,7 +800,7 @@ exports.getProductionOrderById = async (req, res) => {
 // POST /api/production-orders
 exports.createProductionOrder = async (req, res) => {
   try {
-    const companyId = req.body.company || req.query.companyId || req.user?.company;
+    const companyId = req.body.company || req.body.companyId || req.query?.companyId || req.user?.company;
     if (!companyId) {
       return res.status(400).json({ msg: "Company ID is required" });
     }
@@ -791,12 +808,14 @@ exports.createProductionOrder = async (req, res) => {
     let orderNumber = req.body.orderNumber;
     if (!orderNumber || !orderNumber.trim()) {
       orderNumber = await generateNextOrderNumber(companyId);
-    }
-
-    // Check duplicate orderNumber within company
-    const existing = await ProductionOrder.findOne({ company: companyId, orderNumber }).lean();
-    if (existing) {
-      orderNumber = await generateNextOrderNumber(companyId);
+    } else {
+      // Check duplicate orderNumber within company
+      const existing = await ProductionOrder.findOne({ company: companyId, orderNumber }).lean();
+      if (existing) {
+        orderNumber = await generateNextOrderNumber(companyId);
+      } else {
+        await syncSequenceNumber("PO", companyId, orderNumber);
+      }
     }
 
     const plannedQty = Number(req.body.plannedQty) || 0;

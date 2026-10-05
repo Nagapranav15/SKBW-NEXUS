@@ -57,7 +57,10 @@ const shutdown = () => {
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
 
-// Connect to MongoDB asynchronously
-connectDB().catch((err) => {
+// Connect to MongoDB asynchronously and repair any inflated sequence counters
+connectDB().then(() => {
+  const { repairAllSequences } = require("./src/utils/sequenceManager");
+  repairAllSequences().catch(e => console.error("Sequence repair error:", e));
+}).catch((err) => {
   console.error("MongoDB Connection Error:", err.message);
 });
