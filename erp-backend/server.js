@@ -47,9 +47,15 @@ server.on("error", (err) => {
 // Graceful shutdown for watch mode and container environments
 const shutdown = () => {
   try {
+    if (typeof server.closeAllConnections === "function") {
+      server.closeAllConnections();
+    }
     server.close(() => {
       process.exit(0);
     });
+    setTimeout(() => {
+      process.exit(0);
+    }, 500).unref();
   } catch (_) {
     process.exit(0);
   }
