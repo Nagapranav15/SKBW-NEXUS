@@ -18,6 +18,7 @@ github-actions.pub
 
 # macOS
 .DS_Store
+**/.DS_Store
 
 # TS incremental build cache
 *.tsbuildinfo
