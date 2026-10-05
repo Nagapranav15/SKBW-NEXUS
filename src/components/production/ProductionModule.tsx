@@ -97,9 +97,10 @@ export const ProductionModule: React.FC = () => {
   const [materialsStatusFilter, setMaterialsStatusFilter] = useState<string>('ALL'); // 'ALL' | 'Ready' | 'Partial' | 'Shortage'
   const [materialsTypeFilter, setMaterialsTypeFilter] = useState('ALL');
   const [materialsDeptFilter, setMaterialsDeptFilter] = useState('ALL');
+  const [matViewMode, setMatViewMode] = useState<'product' | 'order'>('product');
   const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string>>(new Set());
   const [selectedRequirementIds, setSelectedRequirementIds] = useState<Set<string>>(new Set());
-  const [matSortField, setMatSortField] = useState<string>('orderNumber');
+  const [matSortField, setMatSortField] = useState<string>('productName');
   const [matSortAsc, setMatSortAsc] = useState<boolean>(true);
   const [matCurrentPage, setMatCurrentPage] = useState<number>(1);
   const [matRowsPerPage, setMatRowsPerPage] = useState<number>(10);
@@ -676,17 +677,144 @@ export const ProductionModule: React.FC = () => {
     });
   }, [orders, backendSkus]);
 
-  // Tab 3 KPI Cards calculations
-  const totalRequirementsCount = orderRequirementsList.length;
+  // Tab 3: Grouped by Product (Items) with nested Production Orders Info
+  const productRequirementsList = useMemo(() => {
+    const productMap = new Map<string, {
+      id: string;
+      productName: string;
+      productCode: string;
+      category: string;
+      plannedUom: string;
+      totalPlannedQty: number;
+      totalPlannedPcs: number;
+      totalProducedPcs: number;
+      totalBalancePcs: number;
+      stockOnHand: number;
+      orders: typeof orderRequirementsList;
+      materialsMap: Map<string, {
+        id: string;
+        materialName: string;
+        materialCode: string;
+        type: string;
+        uom: string;
+        totalRequired: number;
+        availableQty: number;
+        reservedQty: number;
+        shortageQty: number;
+        status: 'Ready' | 'Partial' | 'Shortage';
+      }>;
+      earliestDueDate: string;
+      departments: Set<string>;
+    }>();
+
+    orderRequirementsList.forEach(ord => {
+      const pKey = ord.itemCode || ord.itemName || ord.id;
+      if (!productMap.has(pKey)) {
+        const skuMatch = backendSkus.find(s => s.skuCode === ord.itemCode || s.name === ord.itemName);
+        const stockOnHand = skuMatch ? Number(skuMatch.presentStock ?? skuMatch.openingStock ?? 0) : 0;
+        productMap.set(pKey, {
+          id: pKey,
+          productName: ord.itemName || 'Product',
+          productCode: ord.itemCode || 'SKU',
+          category: skuMatch?.category || 'Finished Goods',
+          plannedUom: ord.plannedUom || 'PCS',
+          totalPlannedQty: 0,
+          totalPlannedPcs: 0,
+          totalProducedPcs: 0,
+          totalBalancePcs: 0,
+          stockOnHand,
+          orders: [],
+          materialsMap: new Map(),
+          earliestDueDate: ord.dueDate || '—',
+          departments: new Set()
+        });
+      }
+
+      const pGroup = productMap.get(pKey)!;
+      pGroup.totalPlannedQty += Number(ord.plannedQty) || 0;
+      pGroup.totalPlannedPcs += Number(ord.plannedPcs) || 0;
+      pGroup.totalProducedPcs += Number(ord.rawOrder.producedPcs) || 0;
+      pGroup.totalBalancePcs += Number(ord.rawOrder.balancePcs) || (Number(ord.plannedPcs) || 0);
+      pGroup.orders.push(ord);
+      if (ord.department) pGroup.departments.add(ord.department);
+
+      // Consolidate materials across orders for this product
+      ord.materialDetails.forEach(m => {
+        const mKey = m.materialCode || m.materialName;
+        if (!pGroup.materialsMap.has(mKey)) {
+          pGroup.materialsMap.set(mKey, {
+            id: m.id,
+            materialName: m.materialName,
+            materialCode: m.materialCode,
+            type: m.type,
+            uom: m.uom,
+            totalRequired: 0,
+            availableQty: m.availableQty,
+            reservedQty: 0,
+            shortageQty: 0,
+            status: 'Ready'
+          });
+        }
+        const mat = pGroup.materialsMap.get(mKey)!;
+        mat.totalRequired += Number(m.requiredQty) || 0;
+        mat.reservedQty += Number(m.reservedQty) || 0;
+      });
+    });
+
+    return Array.from(productMap.values()).map(p => {
+      const materialDetails = Array.from(p.materialsMap.values()).map((mat, idx) => {
+        const shortage = Math.max(0, mat.totalRequired - mat.availableQty);
+        const status: 'Ready' | 'Partial' | 'Shortage' = shortage > 0
+          ? 'Shortage'
+          : (mat.availableQty >= mat.totalRequired ? 'Ready' : 'Partial');
+        return {
+          ...mat,
+          index: idx + 1,
+          shortageQty: shortage,
+          status
+        };
+      });
+
+      const shortageCount = materialDetails.filter(m => m.shortageQty > 0).length;
+      let overallStatus: 'Ready' | 'Partial' | 'Shortage' = 'Ready';
+      if (shortageCount === 0) overallStatus = 'Ready';
+      else if (shortageCount === 1) overallStatus = 'Partial';
+      else overallStatus = 'Shortage';
+
+      return {
+        id: p.id,
+        productName: p.productName,
+        productCode: p.productCode,
+        category: p.category,
+        plannedUom: p.plannedUom,
+        totalPlannedQty: p.totalPlannedQty,
+        totalPlannedPcs: p.totalPlannedPcs,
+        totalProducedPcs: p.totalProducedPcs,
+        totalBalancePcs: p.totalBalancePcs,
+        stockOnHand: p.stockOnHand,
+        ordersCount: p.orders.length,
+        orders: p.orders,
+        departments: Array.from(p.departments),
+        materialDetails,
+        materialItemsCount: materialDetails.length,
+        shortageItemsCount: shortageCount,
+        overallStatus,
+        dueDate: p.earliestDueDate
+      };
+    });
+  }, [orderRequirementsList, backendSkus]);
+
+  // Tab 3 KPI Cards calculations (Product-Centric)
+  const totalProductsCount = productRequirementsList.length;
   const readyRequirementsCount = useMemo(() => {
-    return orderRequirementsList.filter(r => r.overallStatus === 'Ready').length;
-  }, [orderRequirementsList]);
+    return productRequirementsList.filter(r => r.overallStatus === 'Ready').length;
+  }, [productRequirementsList]);
   const partialRequirementsCount = useMemo(() => {
-    return orderRequirementsList.filter(r => r.overallStatus === 'Partial').length;
-  }, [orderRequirementsList]);
+    return productRequirementsList.filter(r => r.overallStatus === 'Partial').length;
+  }, [productRequirementsList]);
   const shortageRequirementsCount = useMemo(() => {
-    return orderRequirementsList.filter(r => r.overallStatus === 'Shortage').length;
-  }, [orderRequirementsList]);
+    return productRequirementsList.filter(r => r.overallStatus === 'Shortage').length;
+  }, [productRequirementsList]);
 
   // Distinct types & departments for Tab 3 filter dropdowns
   const distinctReqMaterialTypes = useMemo(() => {
@@ -707,7 +835,33 @@ export const ProductionModule: React.FC = () => {
     return Array.from(depts);
   }, [orderRequirementsList]);
 
-  // Filtered & sorted requirements list
+  // Filtered product requirements
+  const filteredProductRequirements = useMemo(() => {
+    return productRequirementsList.filter(p => {
+      if (materialsStatusFilter !== 'ALL' && p.overallStatus !== materialsStatusFilter) return false;
+      if (materialsDeptFilter !== 'ALL' && !p.departments.includes(materialsDeptFilter)) return false;
+      if (materialsTypeFilter !== 'ALL' && !p.materialDetails.some(m => m.type === materialsTypeFilter)) return false;
+      if (!materialsSearch.trim()) return true;
+      const q = materialsSearch.toLowerCase();
+      return (
+        p.productName.toLowerCase().includes(q) ||
+        p.productCode.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q) ||
+        p.orders.some(o => o.orderNumber.toLowerCase().includes(q)) ||
+        p.materialDetails.some(m => m.materialName.toLowerCase().includes(q) || m.materialCode.toLowerCase().includes(q))
+      );
+    }).sort((a, b) => {
+      let valA = (a as any)[matSortField] ?? '';
+      let valB = (b as any)[matSortField] ?? '';
+      if (typeof valA === 'string') {
+        const cmp = valA.localeCompare(valB);
+        return matSortAsc ? cmp : -cmp;
+      }
+      return matSortAsc ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+    });
+  }, [productRequirementsList, materialsSearch, materialsStatusFilter, materialsDeptFilter, materialsTypeFilter, matSortField, matSortAsc]);
+
+  // Filtered order requirements (for fallback order view mode)
   const filteredOrderRequirements = useMemo(() => {
     return orderRequirementsList.filter(r => {
       if (materialsStatusFilter !== 'ALL' && r.overallStatus !== materialsStatusFilter) return false;
@@ -732,12 +886,15 @@ export const ProductionModule: React.FC = () => {
     });
   }, [orderRequirementsList, materialsSearch, materialsStatusFilter, materialsDeptFilter, materialsTypeFilter, matSortField, matSortAsc]);
 
+  // Active dataset according to View Mode
+  const activeRequirementsList = matViewMode === 'product' ? filteredProductRequirements : filteredOrderRequirements;
+
   // Pagination for Tab 3
-  const matTotalPages = Math.ceil(filteredOrderRequirements.length / matRowsPerPage) || 1;
+  const matTotalPages = Math.ceil(activeRequirementsList.length / matRowsPerPage) || 1;
   const matStartIndex = (matCurrentPage - 1) * matRowsPerPage;
-  const paginatedOrderRequirements = useMemo(() => {
-    return filteredOrderRequirements.slice(matStartIndex, matStartIndex + matRowsPerPage);
-  }, [filteredOrderRequirements, matStartIndex, matRowsPerPage]);
+  const paginatedRequirements = useMemo(() => {
+    return activeRequirementsList.slice(matStartIndex, matStartIndex + matRowsPerPage);
+  }, [activeRequirementsList, matStartIndex, matRowsPerPage]);
 
   const matPageNumbers = useMemo(() => {
     const pages: (number | string)[] = [];
@@ -777,7 +934,7 @@ export const ProductionModule: React.FC = () => {
 
   const handleSelectAllRequirements = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedRequirementIds(new Set(paginatedOrderRequirements.map(r => r.id)));
+      setSelectedRequirementIds(new Set(paginatedRequirements.map(r => r.id)));
     } else {
       setSelectedRequirementIds(new Set());
     }
@@ -800,12 +957,20 @@ export const ProductionModule: React.FC = () => {
     setMatCurrentPage(1);
   };
 
-  const handleShareWhatsApp = (req: any) => {
-    const text = encodeURIComponent(
-      `*Material Requirements*\nOrder: ${req.orderNumber} - ${req.itemName}\nPlanned: ${req.plannedQty} ${req.plannedUom} (${req.plannedPcs.toLocaleString()} PCS)\nStatus: ${req.overallStatus}\nShortage Items: ${req.shortageItemsCount}\nDue Date: ${req.dueDate}`
-    );
+  const handleShareWhatsApp = (item: any) => {
+    let text = '';
+    if (item.productName) {
+      text = encodeURIComponent(
+        `*Material Requirements for Product*\nItem: ${item.productName} (${item.productCode})\nTotal Planned: ${item.totalPlannedQty} ${item.plannedUom} (${item.totalPlannedPcs.toLocaleString()} PCS)\nProduction Orders: ${item.ordersCount}\nStatus: ${item.overallStatus}\nShortage Items: ${item.shortageItemsCount}\nEarliest Due Date: ${item.dueDate}`
+      );
+    } else {
+      text = encodeURIComponent(
+        `*Material Requirements*\nOrder: ${item.orderNumber} - ${item.itemName}\nPlanned: ${item.plannedQty} ${item.plannedUom} (${item.plannedPcs.toLocaleString()} PCS)\nStatus: ${item.overallStatus}\nShortage Items: ${item.shortageItemsCount}\nDue Date: ${item.dueDate}`
+      );
+    }
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
+
 
 
 
@@ -850,7 +1015,7 @@ export const ProductionModule: React.FC = () => {
     orders: orders.length,
     cutting: cuttingSlipsCount,
     entries: allEntries.length,
-    materials: orderRequirementsList.length,
+    materials: productRequirementsList.length,
     history: orders.length
   };
 
@@ -1670,10 +1835,10 @@ export const ProductionModule: React.FC = () => {
               <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
                 <span>Material Requirements</span>
                 <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold transition-all">
-                  {orderRequirementsList.length} Active Orders
+                  {matViewMode === 'product' ? `${productRequirementsList.length} Products` : `${orderRequirementsList.length} Orders`} ({orderRequirementsList.length} Active Orders)
                 </span>
               </h1>
-              <p className="text-xs text-gray-500 font-medium">Check material requirements for production orders and track availability.</p>
+              <p className="text-xs text-gray-500 font-medium">Check material requirements by product and track raw material availability across production orders.</p>
             </div>
           </div>
 
@@ -1700,15 +1865,19 @@ export const ProductionModule: React.FC = () => {
 
         {/* 3. Top 4 KPI Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {/* Card 1: Total Requirements */}
+          {/* Card 1: Total Products / Requirements */}
           <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                 <Layers className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Requirements</p>
-                <h3 className="text-lg font-bold text-gray-900 font-mono">{totalRequirementsCount}</h3>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  {matViewMode === 'product' ? 'Total Products' : 'Total Requirements'}
+                </p>
+                <h3 className="text-lg font-bold text-gray-900 font-mono">
+                  {matViewMode === 'product' ? totalProductsCount : totalRequirementsCount}
+                </h3>
                 <div className="flex items-center space-x-1 mt-0.5">
                   <span className="text-[10px] font-semibold text-emerald-600">↑ 12%</span>
                   <span className="text-[10px] text-gray-400 font-medium">vs last month</span>
@@ -1854,10 +2023,54 @@ export const ProductionModule: React.FC = () => {
           </div>
         </div>
 
-        {/* 5. Sub-toolbar: count & Export/Print tools */}
-        <div className="flex items-center justify-between pt-1 text-xs">
-          <div className="font-semibold text-gray-600">
-            Showing all {filteredOrderRequirements.length} material requirements
+        {/* 5. Sub-toolbar: View Switcher, count & Export/Print tools */}
+        <div className="flex items-center justify-between flex-wrap gap-2 pt-1 text-xs">
+          <div className="flex items-center flex-wrap gap-3">
+            {/* View Mode Switcher: By Products (Items) vs By Production Orders */}
+            <div className="inline-flex p-0.5 bg-gray-100 rounded-xl border border-gray-200 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setMatViewMode('product');
+                  setMatSortField('productName');
+                  setMatCurrentPage(1);
+                }}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  matViewMode === 'product'
+                    ? 'bg-white text-blue-700 shadow-2xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Package className="w-3.5 h-3.5" />
+                <span>By Products (Items)</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-700 font-mono font-bold">
+                  {productRequirementsList.length}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMatViewMode('order');
+                  setMatSortField('orderNumber');
+                  setMatCurrentPage(1);
+                }}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  matViewMode === 'order'
+                    ? 'bg-white text-blue-700 shadow-2xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>By Production Orders</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-gray-200 text-gray-700 font-mono font-bold">
+                  {orderRequirementsList.length}
+                </span>
+              </button>
+            </div>
+
+            <div className="font-semibold text-gray-500">
+              Showing {activeRequirementsList.length} {matViewMode === 'product' ? 'products' : 'orders'}
+            </div>
           </div>
 
           <div className="flex items-center space-x-2">
@@ -1885,302 +2098,412 @@ export const ProductionModule: React.FC = () => {
           <div className="overflow-x-auto min-h-[380px]">
             <table className="w-full text-left border-collapse text-xs">
               <thead className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider select-none">
-                <tr>
-                  <th className="py-3 px-3 w-8 text-center">
-                    <input 
-                      type="checkbox" 
-                      checked={paginatedOrderRequirements.length > 0 && paginatedOrderRequirements.every(r => selectedRequirementIds.has(r.id))}
-                      onChange={handleSelectAllRequirements}
-                      className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
-                    />
-                  </th>
-                  <th className="py-3 px-3 w-16 text-center">#</th>
-                  <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('orderNumber')}>
-                    <div className="flex items-center space-x-1">
-                      <span>Production Order</span>
-                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                    </div>
-                  </th>
-                  <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('itemName')}>
-                    <div className="flex items-center space-x-1">
-                      <span>Product</span>
-                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                    </div>
-                  </th>
-                  <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('plannedQty')}>
-                    <div className="flex items-center space-x-1">
-                      <span>Planned Qty</span>
-                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                    </div>
-                  </th>
-                  <th className="py-3 px-3 cursor-pointer select-none text-center" onClick={() => handleMatSort('materialItemsCount')}>
-                    <div className="flex items-center justify-center space-x-1">
-                      <span>Material Items</span>
-                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                    </div>
-                  </th>
-                  <th className="py-3 px-3 cursor-pointer select-none text-center" onClick={() => handleMatSort('shortageItemsCount')}>
-                    <div className="flex items-center justify-center space-x-1">
-                      <span>Shortage Items</span>
-                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                    </div>
-                  </th>
-                  <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('overallStatus')}>
-                    <div className="flex items-center space-x-1">
-                      <span>Overall Status</span>
-                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                    </div>
-                  </th>
-                  <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('dueDate')}>
-                    <div className="flex items-center space-x-1">
-                      <span>Due Date</span>
-                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                    </div>
-                  </th>
-                  <th className="py-3 px-3 text-center">Actions</th>
-                </tr>
+                {matViewMode === 'product' ? (
+                  <tr>
+                    <th className="py-3 px-3 w-8 text-center">
+                      <input 
+                        type="checkbox" 
+                        checked={paginatedRequirements.length > 0 && paginatedRequirements.every(r => selectedRequirementIds.has(r.id))}
+                        onChange={handleSelectAllRequirements}
+                        className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
+                      />
+                    </th>
+                    <th className="py-3 px-3 w-16 text-center">#</th>
+                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('productName')}>
+                      <div className="flex items-center space-x-1">
+                        <span>Product / Item</span>
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      </div>
+                    </th>
+                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('category')}>
+                      <div className="flex items-center space-x-1">
+                        <span>Category</span>
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      </div>
+                    </th>
+                    <th className="py-3 px-3 cursor-pointer select-none text-center" onClick={() => handleMatSort('ordersCount')}>
+                      <div className="flex items-center justify-center space-x-1">
+                        <span>Production Orders</span>
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      </div>
+                    </th>
+                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('totalPlannedPcs')}>
+                      <div className="flex items-center space-x-1">
+                        <span>Total Planned Output</span>
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      </div>
+                    </th>
+                    <th className="py-3 px-3 cursor-pointer select-none text-right" onClick={() => handleMatSort('stockOnHand')}>
+                      <div className="flex items-center justify-end space-x-1">
+                        <span>Stock On Hand</span>
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      </div>
+                    </th>
+                    <th className="py-3 px-3 cursor-pointer select-none text-center" onClick={() => handleMatSort('materialItemsCount')}>
+                      <div className="flex items-center justify-center space-x-1">
+                        <span>Components</span>
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      </div>
+                    </th>
+                    <th className="py-3 px-3 cursor-pointer select-none text-center" onClick={() => handleMatSort('shortageItemsCount')}>
+                      <div className="flex items-center justify-center space-x-1">
+                        <span>Shortages</span>
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      </div>
+                    </th>
+                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('overallStatus')}>
+                      <div className="flex items-center space-x-1">
+                        <span>Readiness</span>
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      </div>
+                    </th>
+                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('dueDate')}>
+                      <div className="flex items-center space-x-1">
+                        <span>Earliest Due Date</span>
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      </div>
+                    </th>
+                    <th className="py-3 px-3 text-center">Actions</th>
+                  </tr>
+                ) : (
+                  <tr>
+                    <th className="py-3 px-3 w-8 text-center">
+                      <input 
+                        type="checkbox" 
+                        checked={paginatedRequirements.length > 0 && paginatedRequirements.every(r => selectedRequirementIds.has(r.id))}
+                        onChange={handleSelectAllRequirements}
+                        className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
+                      />
+                    </th>
+                    <th className="py-3 px-3 w-16 text-center">#</th>
+                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('orderNumber')}>
+                      <div className="flex items-center space-x-1">
+                        <span>Production Order</span>
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      </div>
+                    </th>
+                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('itemName')}>
+                      <div className="flex items-center space-x-1">
+                        <span>Product</span>
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      </div>
+                    </th>
+                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('plannedQty')}>
+                      <div className="flex items-center space-x-1">
+                        <span>Planned Qty</span>
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      </div>
+                    </th>
+                    <th className="py-3 px-3 cursor-pointer select-none text-center" onClick={() => handleMatSort('materialItemsCount')}>
+                      <div className="flex items-center justify-center space-x-1">
+                        <span>Material Items</span>
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      </div>
+                    </th>
+                    <th className="py-3 px-3 cursor-pointer select-none text-center" onClick={() => handleMatSort('shortageItemsCount')}>
+                      <div className="flex items-center justify-center space-x-1">
+                        <span>Shortage Items</span>
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      </div>
+                    </th>
+                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('overallStatus')}>
+                      <div className="flex items-center space-x-1">
+                        <span>Overall Status</span>
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      </div>
+                    </th>
+                    <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleMatSort('dueDate')}>
+                      <div className="flex items-center space-x-1">
+                        <span>Due Date</span>
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      </div>
+                    </th>
+                    <th className="py-3 px-3 text-center">Actions</th>
+                  </tr>
+                )}
               </thead>
               <tbody className="divide-y divide-gray-100 text-xs">
-                  {paginatedOrderRequirements.length === 0 ? (
-                    <tr>
-                      <td colSpan={10} className="py-12 text-center text-gray-400">
-                        {materialsSearch ? 'No material requirements matching your search criteria.' : 'No active production orders found.'}
-                      </td>
-                    </tr>
-                  ) : (
-                    paginatedOrderRequirements.map((req, idx) => {
-                      const isSelected = selectedRequirementIds.has(req.id);
-                      const isExpanded = expandedOrderIds.has(req.id);
-                      return (
-                        <React.Fragment key={req.id}>
-                          {/* Parent Row - Click anywhere on row to open/close */}
-                          <tr 
-                            onClick={() => handleToggleExpandOrder(req.id)}
-                            className={`hover:bg-blue-50/20 transition-colors cursor-pointer select-none ${isSelected ? 'bg-blue-50/40' : ''} ${isExpanded ? 'bg-blue-50/30' : ''}`}
-                          >
-                            {/* Checkbox */}
-                            <td className="py-3 px-3 text-center">
-                              <input 
-                                type="checkbox" 
-                                checked={isSelected}
-                                onClick={e => e.stopPropagation()}
-                                onChange={() => handleToggleSelectRequirement(req.id)}
-                                className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
-                              />
-                            </td>
+                {paginatedRequirements.length === 0 ? (
+                  <tr>
+                    <td colSpan={12} className="py-12 text-center text-gray-400">
+                      {materialsSearch ? 'No items matching your search criteria.' : 'No active requirements found.'}
+                    </td>
+                  </tr>
+                ) : matViewMode === 'product' ? (
+                  (paginatedRequirements as any[]).map((prod, idx) => {
+                    const isSelected = selectedRequirementIds.has(prod.id);
+                    const isExpanded = expandedOrderIds.has(prod.id);
+                    return (
+                      <React.Fragment key={prod.id}>
+                        {/* Parent Product Row */}
+                        <tr
+                          onClick={() => handleToggleExpandOrder(prod.id)}
+                          className={`hover:bg-blue-50/20 transition-colors cursor-pointer select-none ${isSelected ? 'bg-blue-50/40' : ''} ${isExpanded ? 'bg-blue-50/30' : ''}`}
+                        >
+                          {/* Checkbox */}
+                          <td className="py-3 px-3 text-center">
+                            <input 
+                              type="checkbox" 
+                              checked={isSelected}
+                              onClick={e => e.stopPropagation()}
+                              onChange={() => handleToggleSelectRequirement(prod.id)}
+                              className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
+                            />
+                          </td>
 
-                            {/* Chevron Expand & Row Number */}
-                            <td className="py-3 px-3 text-center whitespace-nowrap">
-                              <div className="flex items-center justify-center space-x-1">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleExpandOrder(req.id);
-                                  }}
-                                  className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors cursor-pointer"
-                                  title={isExpanded ? 'Collapse Materials' : 'Expand Materials'}
-                                >
-                                  {isExpanded ? (
-                                    <ChevronDown className="w-3.5 h-3.5 text-gray-600" />
-                                  ) : (
-                                    <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-                                  )}
-                                </button>
-                                <span className="text-gray-500 font-semibold">{matStartIndex + idx + 1}</span>
-                              </div>
-                            </td>
-
-                            {/* Production Order No */}
-                            <td className="py-3 px-3 font-bold font-mono text-blue-600 whitespace-nowrap">
+                          {/* Chevron Expand & Index */}
+                          <td className="py-3 px-3 text-center whitespace-nowrap">
+                            <div className="flex items-center justify-center space-x-1">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleOpenRecordEntries(req.rawOrder);
+                                  handleToggleExpandOrder(prod.id);
                                 }}
-                                className="hover:underline cursor-pointer"
+                                className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                                title={isExpanded ? 'Collapse Orders & Materials' : 'Expand Orders & Materials'}
                               >
-                                {req.orderNumber}
+                                {isExpanded ? (
+                                  <ChevronDown className="w-3.5 h-3.5 text-blue-600" />
+                                ) : (
+                                  <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                                )}
                               </button>
-                            </td>
+                              <span className="text-gray-500 font-semibold">{matStartIndex + idx + 1}</span>
+                            </div>
+                          </td>
 
-                            {/* Product */}
-                            <td className="py-3 px-3">
-                              <div className="font-bold text-gray-900 uppercase text-xs">
-                                {req.itemName}
-                              </div>
-                              <div className="text-[11px] text-gray-400 font-mono">
-                                {req.itemCode}
-                              </div>
-                            </td>
+                          {/* Product / Item */}
+                          <td className="py-3 px-3">
+                            <div className="font-bold text-gray-900 uppercase text-xs flex items-center gap-1.5">
+                              <span>{prod.productName}</span>
+                            </div>
+                            <div className="text-[11px] text-gray-400 font-mono">
+                              {prod.productCode}
+                            </div>
+                          </td>
 
-                            {/* Planned Qty */}
-                            <td className="py-3 px-3">
-                              <div className="font-bold text-gray-900 text-xs">
-                                {req.plannedQty} {req.plannedUom}
-                              </div>
-                              <div className="text-[11px] text-gray-400">
-                                {req.plannedPcs.toLocaleString()} PCS
-                              </div>
-                            </td>
+                          {/* Category */}
+                          <td className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
+                            <span className="px-2 py-0.5 bg-gray-100 rounded-md text-[11px] font-semibold text-gray-700">
+                              {prod.category}
+                            </span>
+                          </td>
 
-                            {/* Material Items Count */}
-                            <td className="py-3 px-3 text-center text-gray-700 font-medium">
-                              {req.materialItemsCount}
-                            </td>
-
-                            {/* Shortage Items Count */}
-                            <td className="py-3 px-3 text-center font-bold">
-                              <span className={req.shortageItemsCount > 0 ? 'text-rose-600 font-bold' : 'text-gray-700'}>
-                                {req.shortageItemsCount}
-                              </span>
-                            </td>
-
-                            {/* Overall Status */}
-                            <td className="py-3 px-3 whitespace-nowrap">
-                              {req.overallStatus === 'Ready' ? (
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  Ready
-                                </span>
-                              ) : req.overallStatus === 'Partial' ? (
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                  Partial
-                                </span>
+                          {/* Production Orders Dropdown Count Badge */}
+                          <td className="py-3 px-3 text-center whitespace-nowrap">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleExpandOrder(prod.id);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg text-xs transition-colors cursor-pointer border border-blue-200/60"
+                              title="Click to view production orders info"
+                            >
+                              <span>{prod.ordersCount} {prod.ordersCount === 1 ? 'Order' : 'Orders'}</span>
+                              {isExpanded ? (
+                                <ChevronDown className="w-3 h-3 text-blue-600" />
                               ) : (
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                                  Shortage
-                                </span>
+                                <ChevronRight className="w-3 h-3 text-blue-500" />
                               )}
-                            </td>
+                            </button>
+                          </td>
 
-                            {/* Due Date */}
-                            <td className="py-3 px-3 text-gray-700 whitespace-nowrap">
-                              {req.dueDate}
-                            </td>
+                          {/* Total Planned Output */}
+                          <td className="py-3 px-3 whitespace-nowrap">
+                            <div className="font-bold text-gray-900 text-xs">
+                              {prod.totalPlannedQty.toLocaleString()} {prod.plannedUom}
+                            </div>
+                            <div className="text-[11px] text-gray-400">
+                              {prod.totalPlannedPcs.toLocaleString()} PCS
+                            </div>
+                          </td>
 
-                            {/* Actions (Eye, FileText, MessageCircle, MoreVertical) */}
-                            <td className="py-3 px-3 text-center whitespace-nowrap">
-                              <div className="flex items-center justify-center space-x-1.5 text-gray-400">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleOpenOrderDetail(req.rawOrder);
-                                  }}
-                                  title="View Order Details"
-                                  className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
-                                >
-                                  <Eye className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setPrintOrder(req.rawOrder);
-                                  }}
-                                  title="Print / View BOM Document"
-                                  className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
-                                >
-                                  <FileText className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleShareWhatsApp(req);
-                                  }}
-                                  title="Share Requirements via WhatsApp"
-                                  className="p-1 hover:text-emerald-600 transition-colors cursor-pointer"
-                                >
-                                  <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleOpenRecordEntries(req.rawOrder);
-                                  }}
-                                  title="More Actions"
-                                  className="p-1 hover:text-gray-600 transition-colors cursor-pointer"
-                                >
-                                  <MoreVertical className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
+                          {/* Stock On Hand */}
+                          <td className="py-3 px-3 text-right whitespace-nowrap">
+                            <span className="font-mono font-bold text-emerald-700">
+                              {Number(prod.stockOnHand || 0).toLocaleString()}
+                            </span>
+                            <span className="text-[10px] text-gray-400 ml-1">PCS</span>
+                          </td>
 
-                          {/* Expanded Nested Sub-table: Material Details */}
-                          {isExpanded && (
-                            <tr className="bg-slate-50/50">
-                              <td colSpan={10} className="p-4 pl-12 border-b border-gray-200">
-                                <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs space-y-3">
-                                  <div className="flex items-center justify-between">
-                                    <h4 className="text-xs font-bold text-gray-900">
-                                      Material Details ({req.materialDetails.length} items)
-                                    </h4>
+                          {/* Material Items Count */}
+                          <td className="py-3 px-3 text-center text-gray-700 font-medium">
+                            {prod.materialItemsCount}
+                          </td>
+
+                          {/* Shortage Items Count */}
+                          <td className="py-3 px-3 text-center font-bold">
+                            <span className={prod.shortageItemsCount > 0 ? 'text-rose-600 font-bold' : 'text-gray-700'}>
+                              {prod.shortageItemsCount}
+                            </span>
+                          </td>
+
+                          {/* Overall Readiness Status */}
+                          <td className="py-3 px-3 whitespace-nowrap">
+                            {prod.overallStatus === 'Ready' ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Ready
+                              </span>
+                            ) : prod.overallStatus === 'Partial' ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                Partial
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                Shortage
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Earliest Due Date */}
+                          <td className="py-3 px-3 text-gray-700 whitespace-nowrap">
+                            {prod.dueDate}
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-3 px-3 text-center whitespace-nowrap">
+                            <div className="flex items-center justify-center space-x-1.5 text-gray-400">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleExpandOrder(prod.id);
+                                }}
+                                title="Expand Details"
+                                className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-blue-600" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleShareWhatsApp(prod);
+                                }}
+                                title="Share via WhatsApp"
+                                className="p-1 hover:text-emerald-600 transition-colors cursor-pointer"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* Expanded Dropdown Content: 1. Production Orders Info + 2. Consolidated Materials */}
+                        {isExpanded && (
+                          <tr className="bg-slate-50/60">
+                            <td colSpan={12} className="p-4 pl-10 border-b border-gray-200">
+                              <div className="space-y-4">
+                                {/* SECTION 1: Production Orders Info */}
+                                <div className="bg-white rounded-xl border border-blue-200/70 p-4 shadow-2xs space-y-3">
+                                  <div className="flex items-center justify-between flex-wrap gap-2 border-b border-gray-100 pb-2.5">
+                                    <div className="flex items-center space-x-2">
+                                      <div className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                                        <Layers className="w-3.5 h-3.5" />
+                                      </div>
+                                      <h4 className="text-xs font-bold text-gray-900">
+                                        Production Orders Info ({prod.orders.length} {prod.orders.length === 1 ? 'Order' : 'Orders'})
+                                      </h4>
+                                    </div>
+                                    <span className="text-[11px] text-gray-500 font-medium">
+                                      Total Planned: <span className="font-bold text-gray-800">{prod.totalPlannedQty} {prod.plannedUom} ({prod.totalPlannedPcs.toLocaleString()} PCS)</span>
+                                    </span>
                                   </div>
 
                                   <div className="overflow-x-auto custom-scrollbar">
                                     <table className="w-full text-left text-xs border-collapse">
                                       <thead>
-                                        <tr className="border-b border-gray-150 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-50/80">
-                                          <th className="py-2.5 px-3 w-8 text-center">#</th>
-                                          <th className="py-2.5 px-3">
-                                            <div className="flex items-center space-x-1">
-                                              <span>Material</span>
-                                              <ArrowUpDown className="w-2.5 h-2.5 text-gray-400" />
-                                            </div>
-                                          </th>
-                                          <th className="py-2.5 px-3">Material Code</th>
-                                          <th className="py-2.5 px-3 text-right">Required Qty</th>
-                                          <th className="py-2.5 px-3 text-right">Available Qty</th>
-                                          <th className="py-2.5 px-3 text-right">Reserved Qty</th>
-                                          <th className="py-2.5 px-3 text-right">Shortage Qty</th>
-                                          <th className="py-2.5 px-3">UOM</th>
-                                          <th className="py-2.5 px-3">Status</th>
+                                        <tr className="border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-50/80">
+                                          <th className="py-2.5 px-3">Order Number</th>
+                                          <th className="py-2.5 px-3">Order Date</th>
+                                          <th className="py-2.5 px-3">Department</th>
+                                          <th className="py-2.5 px-3 text-right">Planned Qty</th>
+                                          <th className="py-2.5 px-3 text-right">Produced / Balance</th>
+                                          <th className="py-2.5 px-3 text-center">Priority</th>
+                                          <th className="py-2.5 px-3 text-center">Order Status</th>
+                                          <th className="py-2.5 px-3">Due Date</th>
                                           <th className="py-2.5 px-3 text-center">Actions</th>
                                         </tr>
                                       </thead>
                                       <tbody className="divide-y divide-gray-100">
-                                        {req.materialDetails.map((m) => (
-                                          <tr key={m.id} className="hover:bg-gray-50/80 transition-colors">
-                                            <td className="py-2.5 px-3 text-center text-gray-400 font-semibold">{m.index}</td>
-                                            <td className="py-2.5 px-3 font-semibold text-gray-900">{m.materialName}</td>
-                                            <td className="py-2.5 px-3 font-mono text-[11px] text-gray-500">{m.materialCode}</td>
-                                            <td className="py-2.5 px-3 text-right font-medium text-gray-900">{m.requiredQty.toLocaleString()}</td>
-                                            <td className="py-2.5 px-3 text-right font-medium text-gray-700">{m.availableQty.toLocaleString()}</td>
-                                            <td className="py-2.5 px-3 text-right font-medium text-gray-700">{m.reservedQty.toLocaleString()}</td>
-                                            <td className="py-2.5 px-3 text-right font-bold">
-                                              <span className={m.shortageQty > 0 ? 'text-rose-600 font-bold' : 'text-emerald-700'}>
-                                                {m.shortageQty.toLocaleString()}
+                                        {prod.orders.map((ord: any) => (
+                                          <tr key={ord.id} className="hover:bg-blue-50/30 transition-colors">
+                                            <td className="py-2.5 px-3 font-mono font-bold text-blue-600 whitespace-nowrap">
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleOpenOrderDetail(ord.rawOrder);
+                                                }}
+                                                className="hover:underline cursor-pointer"
+                                              >
+                                                {ord.orderNumber}
+                                              </button>
+                                            </td>
+                                            <td className="py-2.5 px-3 text-gray-600">{ord.orderDate || '—'}</td>
+                                            <td className="py-2.5 px-3 text-gray-700 font-medium">{ord.department || '—'}</td>
+                                            <td className="py-2.5 px-3 text-right font-bold text-gray-900 whitespace-nowrap">
+                                              {ord.plannedQty} {ord.plannedUom}
+                                              <span className="text-[10px] text-gray-400 font-normal ml-1">
+                                                ({Number(ord.plannedPcs).toLocaleString()} PCS)
                                               </span>
                                             </td>
-                                            <td className="py-2.5 px-3 text-gray-600 font-medium">{m.uom}</td>
-                                            <td className="py-2.5 px-3">
-                                              {m.status === 'Ready' ? (
-                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                  Ready
-                                                </span>
-                                              ) : m.status === 'Partial' ? (
-                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                                  Partial
-                                                </span>
-                                              ) : (
-                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                                                  Shortage
-                                                </span>
-                                              )}
+                                            <td className="py-2.5 px-3 text-right text-gray-700 font-medium whitespace-nowrap">
+                                              <span className="text-emerald-700 font-bold">{Number(ord.rawOrder?.producedPcs || 0).toLocaleString()}</span>
+                                              {' / '}
+                                              <span className="text-gray-500">{Number(ord.rawOrder?.balancePcs ?? ord.plannedPcs).toLocaleString()} PCS</span>
                                             </td>
                                             <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                ord.priority === 'High' || ord.priority === 'Urgent'
+                                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                                  : ord.priority === 'Medium'
+                                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                  : 'bg-gray-100 text-gray-700 border border-gray-200'
+                                              }`}>
+                                                {ord.priority || 'Normal'}
+                                              </span>
+                                            </td>
+                                            <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                ord.rawOrder?.status === 'Completed'
+                                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                  : ord.rawOrder?.status === 'In Production' || ord.rawOrder?.status === 'In Progress'
+                                                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                                  : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                              }`}>
+                                                {ord.rawOrder?.status || 'Scheduled'}
+                                              </span>
+                                            </td>
+                                            <td className="py-2.5 px-3 text-gray-700 whitespace-nowrap">{ord.dueDate || '—'}</td>
+                                            <td className="py-2.5 px-3 text-center whitespace-nowrap">
                                               <div className="flex items-center justify-center space-x-1.5 text-gray-400">
-                                                <button 
-                                                  onClick={() => showToast(`Stock ledger preview for ${m.materialName}`, 'info')}
-                                                  title="View Material Stock" 
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenOrderDetail(ord.rawOrder);
+                                                  }}
+                                                  title="View Order Details"
                                                   className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
                                                 >
                                                   <Eye className="w-3.5 h-3.5 text-blue-600" />
                                                 </button>
-                                                <button 
-                                                  onClick={() => showToast(`Material allocation recorded for ${m.materialName}`, 'success')}
-                                                  title="Issue Material / PO" 
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenRecordEntries(ord.rawOrder);
+                                                  }}
+                                                  title="Record Entries"
                                                   className="p-1 hover:text-emerald-600 transition-colors cursor-pointer"
                                                 >
-                                                  <Package className="w-3.5 h-3.5 text-blue-600" />
+                                                  <Package className="w-3.5 h-3.5 text-emerald-600" />
+                                                </button>
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setPrintOrder(ord.rawOrder);
+                                                  }}
+                                                  title="Print Order"
+                                                  className="p-1 hover:text-gray-700 transition-colors cursor-pointer"
+                                                >
+                                                  <Printer className="w-3.5 h-3.5 text-gray-600" />
                                                 </button>
                                               </div>
                                             </td>
@@ -2190,14 +2513,360 @@ export const ProductionModule: React.FC = () => {
                                     </table>
                                   </div>
                                 </div>
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
-                      );
-                    })
-                  )}
-                </tbody>
+
+                                {/* SECTION 2: Consolidated Material Requirements */}
+                                <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs space-y-3">
+                                  <div className="flex items-center justify-between flex-wrap gap-2 border-b border-gray-100 pb-2.5">
+                                    <div className="flex items-center space-x-2">
+                                      <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
+                                        <Boxes className="w-3.5 h-3.5" />
+                                      </div>
+                                      <h4 className="text-xs font-bold text-gray-900">
+                                        Consolidated Material Requirements ({prod.materialDetails.length} items)
+                                      </h4>
+                                    </div>
+                                    <span className="text-[11px] text-gray-500 font-medium">
+                                      Aggregated raw materials needed across all {prod.orders.length} orders
+                                    </span>
+                                  </div>
+
+                                  <div className="overflow-x-auto custom-scrollbar">
+                                    <table className="w-full text-left text-xs border-collapse">
+                                      <thead>
+                                        <tr className="border-b border-gray-150 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-50/80">
+                                          <th className="py-2.5 px-3 w-8 text-center">#</th>
+                                          <th className="py-2.5 px-3">Material</th>
+                                          <th className="py-2.5 px-3">Material Code</th>
+                                          <th className="py-2.5 px-3">Type</th>
+                                          <th className="py-2.5 px-3 text-right">Total Required</th>
+                                          <th className="py-2.5 px-3 text-right">Available Qty</th>
+                                          <th className="py-2.5 px-3 text-right">Shortage Qty</th>
+                                          <th className="py-2.5 px-3">UOM</th>
+                                          <th className="py-2.5 px-3">Status</th>
+                                          <th className="py-2.5 px-3 text-center">Actions</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-100">
+                                        {prod.materialDetails.length === 0 ? (
+                                          <tr>
+                                            <td colSpan={10} className="py-4 text-center text-gray-400">
+                                              No component materials found for this product.
+                                            </td>
+                                          </tr>
+                                        ) : (
+                                          prod.materialDetails.map((m: any) => (
+                                            <tr key={m.id} className="hover:bg-gray-50/80 transition-colors">
+                                              <td className="py-2.5 px-3 text-center text-gray-400 font-semibold">{m.index}</td>
+                                              <td className="py-2.5 px-3 font-semibold text-gray-900">{m.materialName}</td>
+                                              <td className="py-2.5 px-3 font-mono text-[11px] text-gray-500">{m.materialCode}</td>
+                                              <td className="py-2.5 px-3 text-gray-600 font-medium">{m.type || 'Raw Material'}</td>
+                                              <td className="py-2.5 px-3 text-right font-bold text-gray-900">{m.totalRequired.toLocaleString()}</td>
+                                              <td className="py-2.5 px-3 text-right font-medium text-gray-700">{m.availableQty.toLocaleString()}</td>
+                                              <td className="py-2.5 px-3 text-right font-bold">
+                                                <span className={m.shortageQty > 0 ? 'text-rose-600 font-bold' : 'text-emerald-700'}>
+                                                  {m.shortageQty.toLocaleString()}
+                                                </span>
+                                              </td>
+                                              <td className="py-2.5 px-3 text-gray-600 font-medium">{m.uom}</td>
+                                              <td className="py-2.5 px-3">
+                                                {m.status === 'Ready' ? (
+                                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                    Ready
+                                                  </span>
+                                                ) : m.status === 'Partial' ? (
+                                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                                    Partial
+                                                  </span>
+                                                ) : (
+                                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                                    Shortage
+                                                  </span>
+                                                )}
+                                              </td>
+                                              <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                                                <div className="flex items-center justify-center space-x-1.5 text-gray-400">
+                                                  <button 
+                                                    onClick={() => showToast(`Stock ledger preview for ${m.materialName}`, 'info')}
+                                                    title="View Material Stock" 
+                                                    className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
+                                                  >
+                                                    <Eye className="w-3.5 h-3.5 text-blue-600" />
+                                                  </button>
+                                                  <button 
+                                                    onClick={() => showToast(`Material allocation recorded for ${m.materialName}`, 'success')}
+                                                    title="Issue Material / PO" 
+                                                    className="p-1 hover:text-emerald-600 transition-colors cursor-pointer"
+                                                  >
+                                                    <Package className="w-3.5 h-3.5 text-blue-600" />
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          ))
+                                        )}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                ) : (
+                  /* Order View Mode fallback */
+                  (paginatedRequirements as any[]).map((req, idx) => {
+                    const isSelected = selectedRequirementIds.has(req.id);
+                    const isExpanded = expandedOrderIds.has(req.id);
+                    return (
+                      <React.Fragment key={req.id}>
+                        {/* Parent Row - Click anywhere on row to open/close */}
+                        <tr 
+                          onClick={() => handleToggleExpandOrder(req.id)}
+                          className={`hover:bg-blue-50/20 transition-colors cursor-pointer select-none ${isSelected ? 'bg-blue-50/40' : ''} ${isExpanded ? 'bg-blue-50/30' : ''}`}
+                        >
+                          {/* Checkbox */}
+                          <td className="py-3 px-3 text-center">
+                            <input 
+                              type="checkbox" 
+                              checked={isSelected}
+                              onClick={e => e.stopPropagation()}
+                              onChange={() => handleToggleSelectRequirement(req.id)}
+                              className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
+                            />
+                          </td>
+
+                          {/* Chevron Expand & Row Number */}
+                          <td className="py-3 px-3 text-center whitespace-nowrap">
+                            <div className="flex items-center justify-center space-x-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleExpandOrder(req.id);
+                                }}
+                                className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                                title={isExpanded ? 'Collapse Materials' : 'Expand Materials'}
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="w-3.5 h-3.5 text-gray-600" />
+                                ) : (
+                                  <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                                )}
+                              </button>
+                              <span className="text-gray-500 font-semibold">{matStartIndex + idx + 1}</span>
+                            </div>
+                          </td>
+
+                          {/* Production Order No */}
+                          <td className="py-3 px-3 font-bold font-mono text-blue-600 whitespace-nowrap">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenRecordEntries(req.rawOrder);
+                              }}
+                              className="hover:underline cursor-pointer"
+                            >
+                              {req.orderNumber}
+                            </button>
+                          </td>
+
+                          {/* Product */}
+                          <td className="py-3 px-3">
+                            <div className="font-bold text-gray-900 uppercase text-xs">
+                              {req.itemName}
+                            </div>
+                            <div className="text-[11px] text-gray-400 font-mono">
+                              {req.itemCode}
+                            </div>
+                          </td>
+
+                          {/* Planned Qty */}
+                          <td className="py-3 px-3">
+                            <div className="font-bold text-gray-900 text-xs">
+                              {req.plannedQty} {req.plannedUom}
+                            </div>
+                            <div className="text-[11px] text-gray-400">
+                              {req.plannedPcs.toLocaleString()} PCS
+                            </div>
+                          </td>
+
+                          {/* Material Items Count */}
+                          <td className="py-3 px-3 text-center text-gray-700 font-medium">
+                            {req.materialItemsCount}
+                          </td>
+
+                          {/* Shortage Items Count */}
+                          <td className="py-3 px-3 text-center font-bold">
+                            <span className={req.shortageItemsCount > 0 ? 'text-rose-600 font-bold' : 'text-gray-700'}>
+                              {req.shortageItemsCount}
+                            </span>
+                          </td>
+
+                          {/* Overall Status */}
+                          <td className="py-3 px-3 whitespace-nowrap">
+                            {req.overallStatus === 'Ready' ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Ready
+                              </span>
+                            ) : req.overallStatus === 'Partial' ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                Partial
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                Shortage
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Due Date */}
+                          <td className="py-3 px-3 text-gray-700 whitespace-nowrap">
+                            {req.dueDate}
+                          </td>
+
+                          {/* Actions (Eye, FileText, MessageCircle, MoreVertical) */}
+                          <td className="py-3 px-3 text-center whitespace-nowrap">
+                            <div className="flex items-center justify-center space-x-1.5 text-gray-400">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenOrderDetail(req.rawOrder);
+                                }}
+                                title="View Order Details"
+                                className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPrintOrder(req.rawOrder);
+                                }}
+                                title="Print / View BOM Document"
+                                className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleShareWhatsApp(req);
+                                }}
+                                title="Share Requirements via WhatsApp"
+                                className="p-1 hover:text-emerald-600 transition-colors cursor-pointer"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenRecordEntries(req.rawOrder);
+                                }}
+                                title="More Actions"
+                                className="p-1 hover:text-gray-600 transition-colors cursor-pointer"
+                              >
+                                <MoreVertical className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* Expanded Nested Sub-table: Material Details */}
+                        {isExpanded && (
+                          <tr className="bg-slate-50/50">
+                            <td colSpan={10} className="p-4 pl-12 border-b border-gray-200">
+                              <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <h4 className="text-xs font-bold text-gray-900">
+                                    Material Details ({req.materialDetails.length} items)
+                                  </h4>
+                                </div>
+
+                                <div className="overflow-x-auto custom-scrollbar">
+                                  <table className="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                      <tr className="border-b border-gray-150 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-50/80">
+                                        <th className="py-2.5 px-3 w-8 text-center">#</th>
+                                        <th className="py-2.5 px-3">
+                                          <div className="flex items-center space-x-1">
+                                            <span>Material</span>
+                                            <ArrowUpDown className="w-2.5 h-2.5 text-gray-400" />
+                                          </div>
+                                        </th>
+                                        <th className="py-2.5 px-3">Material Code</th>
+                                        <th className="py-2.5 px-3 text-right">Required Qty</th>
+                                        <th className="py-2.5 px-3 text-right">Available Qty</th>
+                                        <th className="py-2.5 px-3 text-right">Reserved Qty</th>
+                                        <th className="py-2.5 px-3 text-right">Shortage Qty</th>
+                                        <th className="py-2.5 px-3">UOM</th>
+                                        <th className="py-2.5 px-3">Status</th>
+                                        <th className="py-2.5 px-3 text-center">Actions</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                      {req.materialDetails.map((m: any) => (
+                                        <tr key={m.id} className="hover:bg-gray-50/80 transition-colors">
+                                          <td className="py-2.5 px-3 text-center text-gray-400 font-semibold">{m.index}</td>
+                                          <td className="py-2.5 px-3 font-semibold text-gray-900">{m.materialName}</td>
+                                          <td className="py-2.5 px-3 font-mono text-[11px] text-gray-500">{m.materialCode}</td>
+                                          <td className="py-2.5 px-3 text-right font-medium text-gray-900">{m.requiredQty.toLocaleString()}</td>
+                                          <td className="py-2.5 px-3 text-right font-medium text-gray-700">{m.availableQty.toLocaleString()}</td>
+                                          <td className="py-2.5 px-3 text-right font-medium text-gray-700">{m.reservedQty.toLocaleString()}</td>
+                                          <td className="py-2.5 px-3 text-right font-bold">
+                                            <span className={m.shortageQty > 0 ? 'text-rose-600 font-bold' : 'text-emerald-700'}>
+                                              {m.shortageQty.toLocaleString()}
+                                            </span>
+                                          </td>
+                                          <td className="py-2.5 px-3 text-gray-600 font-medium">{m.uom}</td>
+                                          <td className="py-2.5 px-3">
+                                            {m.status === 'Ready' ? (
+                                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                Ready
+                                              </span>
+                                            ) : m.status === 'Partial' ? (
+                                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                                Partial
+                                              </span>
+                                            ) : (
+                                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                                Shortage
+                                              </span>
+                                            )}
+                                          </td>
+                                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                                            <div className="flex items-center justify-center space-x-1.5 text-gray-400">
+                                              <button 
+                                                onClick={() => showToast(`Stock ledger preview for ${m.materialName}`, 'info')}
+                                                title="View Material Stock" 
+                                                className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
+                                              >
+                                                <Eye className="w-3.5 h-3.5 text-blue-600" />
+                                              </button>
+                                              <button 
+                                                onClick={() => showToast(`Material allocation recorded for ${m.materialName}`, 'success')}
+                                                title="Issue Material / PO" 
+                                                className="p-1 hover:text-emerald-600 transition-colors cursor-pointer"
+                                              >
+                                                <Package className="w-3.5 h-3.5 text-blue-600" />
+                                              </button>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                )}
+              </tbody>
               </table>
             </div>
 
