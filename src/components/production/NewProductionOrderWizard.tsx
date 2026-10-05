@@ -524,6 +524,20 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     }
   }, [initialSkus]);
 
+  // Dynamically update backendSkus and current order recipe when BOM changes anywhere in the app
+  useEffect(() => {
+    const handleBomUpdated = (e: any) => {
+      const updatedSku = e.detail;
+      if (!updatedSku || !updatedSku._id) return;
+      setBackendSkus(prev => prev.map(s => s._id === updatedSku._id ? { ...s, ...updatedSku } : s));
+      if (selectedSkuId === updatedSku._id || (productCode && productCode.toLowerCase() === (updatedSku.skuCode || '').toLowerCase())) {
+        handleSelectSku(updatedSku);
+      }
+    };
+    window.addEventListener('skbw_bom_updated', handleBomUpdated);
+    return () => window.removeEventListener('skbw_bom_updated', handleBomUpdated);
+  }, [selectedSkuId, productCode]);
+
   // Close menus on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -1120,14 +1134,31 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     // Dynamic Overheads / Additional Costs from SKU BOM (blank by default)
     if (Array.isArray((sku as any).additionalCosts) && (sku as any).additionalCosts.length > 0) {
       setAdditionalCosts((sku as any).additionalCosts.map((c: any, i: number) => {
-        const basis = c.calcBasis || c.basis || 'Per Piece';
-        const isBatch = basis === 'Per Batch' || basis === 'Fixed' || basis === 'Total / Batch';
+        let basis = c.calcBasis || c.basis || 'Per Piece';
+        let applied = c.appliedAs || '';
+
+        const isBatch = basis.toLowerCase().includes('batch') || applied.toLowerCase().includes('batch') || basis.toLowerCase().includes('bom') || applied.toLowerCase().includes('bom') || basis.toLowerCase().includes('total') || applied.toLowerCase().includes('total') || basis === 'Fixed' || applied === 'Fixed';
+        if (isBatch) {
+          if (!basis.toLowerCase().includes('batch') && !basis.toLowerCase().includes('bom') && !basis.toLowerCase().includes('total') && basis !== 'Fixed') {
+            basis = applied.toLowerCase().includes('bom') ? 'Per BOM' : 'Per Batch';
+          }
+          if (!applied) {
+            applied = basis === 'Per BOM' ? 'Per BOM' : (basis === 'Total / Batch' ? 'Total Cost for this production/batch' : 'Per Batch');
+          } else if (basis === 'Per Batch' && applied !== 'Per Batch') {
+            applied = 'Per Batch';
+          }
+        } else if (basis === 'Per Piece') {
+          applied = 'Per Unit (PCS)';
+        } else if (basis === 'Per GBL') {
+          applied = 'Per Unit (GBL)';
+        }
+
         return {
           id: c.id || `cost-${Date.now()}-${i}`,
           costType: c.costType || '',
           basis: basis as any,
           amount: Number(c.amount) || 0,
-          appliedAs: (c.appliedAs || (isBatch ? 'Total Cost for this production/batch' : 'Per Unit (PCS)')) as any,
+          appliedAs: (applied || (isBatch ? 'Per Batch' : 'Per Unit (PCS)')) as any,
           totalAmount: 0
         };
       }));
@@ -1559,40 +1590,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   };
 
   const handleUpdateCost = (id: string, field: keyof AdditionalCostRow, value: any) => {
-    setAdditionalCosts(prev => prev.map(c => {
-      if (c.id !== id) return c;
-      const updated = { ...c, [field]: value };
-      if (field === 'basis') {
-        if (value === 'Per BOM') {
-          updated.appliedAs = 'Per BOM';
-        } else if (value === 'Total / Batch') {
-          updated.appliedAs = 'Total Cost for this production/batch';
-        } else if (value === 'Per Batch') {
-          updated.appliedAs = 'Per Batch';
-        } else if (value === 'Per Piece') {
-          updated.appliedAs = 'Per Unit (PCS)';
-        } else if (value === 'Per GBL') {
-          updated.appliedAs = 'Per Unit (GBL)';
-        }
-      } else if (field === 'appliedAs') {
-        if (value === 'Per BOM') {
-          updated.basis = 'Per BOM';
-        } else if (value === 'Total Cost for this production/batch' || value === 'Total Cost for this production') {
-          if (c.basis === 'Per Piece' || c.basis === 'Per GBL') {
-            updated.basis = 'Total / Batch';
-          }
-        } else if (value === 'Per Batch') {
-          if (c.basis === 'Per Piece' || c.basis === 'Per GBL') {
-            updated.basis = 'Per Batch';
-          }
-        } else if (value === 'Per Unit (PCS)') {
-          updated.basis = 'Per Piece';
-        } else if (value === 'Per Unit (GBL)') {
-          updated.basis = 'Per GBL';
-        }
-      }
-      return updated;
-    }));
+    setAdditionalCosts(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
   };
 
   // Financial Cost Totals

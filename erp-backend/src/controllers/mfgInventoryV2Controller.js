@@ -948,6 +948,10 @@ exports.bulkImportSkus = async (req, res, next) => {
         skuCode: item.skuCode,
         name: item.name,
         category: item.category,
+        itemType: item.itemType || 
+          (item.skuCode?.toUpperCase().startsWith('FG') ? 'products' : 
+           item.skuCode?.toUpperCase().startsWith('RM') ? 'materials' : 
+           (item.skuCode?.toUpperCase().startsWith('SM') || item.skuCode?.toUpperCase().startsWith('SF')) ? 'semi' : 'products'),
         paperType: item.paperType || "None",
         unit: item.unit,
         altUnit: item.altUnit || undefined,

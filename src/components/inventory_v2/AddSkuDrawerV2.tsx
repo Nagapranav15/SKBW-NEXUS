@@ -1647,6 +1647,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           });
         }
 
+        try {
+          window.dispatchEvent(new CustomEvent('skbw_bom_updated', { detail: saved }));
+          window.dispatchEvent(new CustomEvent('skbw_skus_changed'));
+        } catch (_) {}
+
         onSaveSuccess(saved);
       } catch (err: any) {
         console.error(err);

@@ -28,22 +28,29 @@ export function isBatchOrTotalCost(cost: { calcBasis?: string; basis?: string; a
   const basis = (cost.calcBasis || cost.basis || '').toLowerCase().trim();
   const applied = (cost.appliedAs || '').toLowerCase().trim();
 
-  // If designated as BOM, batch, total, fixed, or lump sum
+  // If appliedAs is explicitly per unit (PCS or GBL), it is NOT a batch cost
+  if (applied.includes('(pcs)') || applied.includes('(gbl)')) {
+    return false;
+  }
+
+  // If appliedAs is explicitly batch, bom, total, fixed, or lump sum
+  if (
+    applied.includes('bom') ||
+    applied.includes('batch') ||
+    applied.includes('total') ||
+    applied === 'fixed' ||
+    applied === 'lump sum'
+  ) {
+    return true;
+  }
+
+  // If appliedAs is not set or empty, check calcBasis
   if (
     basis.includes('bom') ||
     basis.includes('batch') ||
     basis.includes('total') ||
     basis === 'fixed' ||
     basis === 'lump sum'
-  ) {
-    return true;
-  }
-
-  if (
-    applied.includes('bom') ||
-    applied.includes('batch') ||
-    applied.includes('total') ||
-    applied === 'fixed'
   ) {
     return true;
   }
@@ -74,16 +81,27 @@ export function calculateCosting({
 
   const totalAdditionalCost = (additionalCosts || []).reduce((sum, cost) => {
     const amt = Number(cost.amount) || 0;
-    // 1. Batch / Total / Fixed: apply ONCE to the entire batch, do NOT scale by output pieces!
+    const basis = (cost.calcBasis || cost.basis || '').toLowerCase().trim();
+    const applied = (cost.appliedAs || '').toLowerCase().trim();
+
+    // 1. If appliedAs is explicitly unit-based
+    if (applied.includes('(pcs)')) {
+      return sum + (amt * batchPcs);
+    }
+    if (applied.includes('(gbl)')) {
+      return sum + (amt * batchGbl);
+    }
+
+    // 2. Batch / Total / Fixed / BOM: apply ONCE to the entire batch, do NOT scale by output pieces!
     if (isBatchOrTotalCost(cost)) {
       return sum + amt;
     }
-    // 2. Per GBL
-    if (cost.calcBasis === 'Per GBL' || cost.appliedAs === 'Per Unit (GBL)') {
+
+    // 3. Fallback based on calcBasis if appliedAs was not explicitly unit-based
+    if (basis === 'per gbl') {
       return sum + (amt * batchGbl);
     }
-    // 3. Per Piece
-    if (cost.calcBasis === 'Per Piece' || cost.appliedAs === 'Per Unit (PCS)') {
+    if (basis === 'per piece') {
       return sum + (amt * batchPcs);
     }
     return sum + amt;

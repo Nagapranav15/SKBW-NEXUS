@@ -57,7 +57,8 @@ import {
   ArrowRight,
   ExternalLink,
   Bookmark,
-  ShieldAlert
+  ShieldAlert,
+  CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -666,6 +667,11 @@ const SkuMasterV2: React.FC = () => {
       }
       showToast('BOM Recipe & Costing saved!', 'success');
       setIsEditingItemBom(false);
+      try {
+        const fullUpdatedSku = { ...selectedSkuDetails, ...patch };
+        window.dispatchEvent(new CustomEvent('skbw_bom_updated', { detail: fullUpdatedSku }));
+        window.dispatchEvent(new CustomEvent('skbw_skus_changed'));
+      } catch (_) {}
       loadSkus(false);
     } catch (err: any) {
       console.error('Failed to save BOM recipe:', err);
@@ -762,6 +768,11 @@ const SkuMasterV2: React.FC = () => {
       }
 
       showToast(`Pasted BOM from "${copiedBom.sourceName}" to "${targetSku.name || targetSku.skuCode}"!`, 'success');
+      try {
+        const fullUpdatedSku = { ...targetSku, ...patchData };
+        window.dispatchEvent(new CustomEvent('skbw_bom_updated', { detail: fullUpdatedSku }));
+        window.dispatchEvent(new CustomEvent('skbw_skus_changed'));
+      } catch (_) {}
       loadSkus(false);
     } catch (err: any) {
       console.error('Failed to paste BOM:', err);
@@ -1080,6 +1091,22 @@ const SkuMasterV2: React.FC = () => {
   const [catalogSearch, setCatalogSearch] = useState('');
   const [isSavingBuildBom, setIsSavingBuildBom] = useState(false);
 
+  // Listen for dynamic BOM updates across app
+  useEffect(() => {
+    const handleBomUpdated = (e: any) => {
+      const updated = e.detail;
+      if (!updated || !updated._id) return;
+      setSkus(prev => prev.map(s => s._id === updated._id ? { ...s, ...updated } : s));
+      setSelectedSkuDetails(prev => (prev && prev._id === updated._id) ? { ...prev, ...updated } : prev);
+      if (activeBomProduct?._id === updated._id) {
+        setActiveBomProduct(prev => prev ? { ...prev, ...updated } : null);
+        if (updated.bomItems) setActiveRecipeItems(updated.bomItems);
+      }
+    };
+    window.addEventListener('skbw_bom_updated', handleBomUpdated);
+    return () => window.removeEventListener('skbw_bom_updated', handleBomUpdated);
+  }, [activeBomProduct?._id]);
+
   const [modalInitialLocationText, setModalInitialLocationText] = useState<string>('Loading...');
   const [modalDynamicLocationsText, setModalDynamicLocationsText] = useState<string>('Loading...');
   const [modalDynamicLiveStock, setModalDynamicLiveStock] = useState<number | null>(null);
@@ -1382,14 +1409,12 @@ const SkuMasterV2: React.FC = () => {
       // Load Additional Costs from saved SKU
       if (Array.isArray((selectedSkuDetails as any).additionalCosts)) {
         setBomAdditionalCosts((selectedSkuDetails as any).additionalCosts.map((c: any, i: number) => {
-          const basis = c.calcBasis || c.basis || 'Per Piece';
-          const isBatch = basis === 'Per Batch' || basis === 'Fixed' || basis === 'Total / Batch';
           return {
             id: c.id || `cost-${Date.now()}-${i}`,
             costType: c.costType || '',
-            basis: basis,
+            basis: c.calcBasis || c.basis || 'Per Piece',
             amount: c.amount ?? 0,
-            appliedAs: c.appliedAs || (isBatch ? 'Total Cost for this production/batch' : 'Per Unit (PCS)')
+            appliedAs: c.appliedAs || 'Per Unit (PCS)'
           };
         }));
       } else {
@@ -1886,14 +1911,6 @@ const SkuMasterV2: React.FC = () => {
     const list = semiList.length > 0 ? semiList : skus.filter(s => s.category === 'Semi Finished');
     return list.filter(s => (s.name || '').toLowerCase().includes(catalogSearch.toLowerCase()));
   }, [semiList, skus, catalogSearch]);
-
-  useEffect(() => {
-    if (showBuildBomsModal && filteredBuildProducts.length > 0) {
-      if (!activeBomProduct || !filteredBuildProducts.some(p => p._id === activeBomProduct._id)) {
-        handleSelectBomProduct(filteredBuildProducts[0]);
-      }
-    }
-  }, [showBuildBomsModal, filteredBuildProducts]);
 
   const handleSelectBomProduct = (prod: SkuV2) => {
     setActiveBomProduct(prod);
@@ -2746,12 +2763,37 @@ const SkuMasterV2: React.FC = () => {
         return;
       }
 
-      const headers: string[] = (rawRows[0] || []).map((h: any) => String(h || '').trim());
+      // Find header row (support leading title rows, e.g. rows with metadata or title banner)
+      let headerRowIdx = 0;
+      for (let r = 0; r < Math.min(rawRows.length, 5); r++) {
+        const row = rawRows[r];
+        if (!Array.isArray(row)) continue;
+        const cleanVals = row.map((c: any) => String(c || '').toLowerCase().replace(/[^a-z0-9]/g, ''));
+        const matchesCol = cleanVals.some(c => 
+          c.includes('sku') || c.includes('code') || c.includes('name') || 
+          c.includes('item') || c.includes('category') || c.includes('unit') || 
+          c.includes('uom') || c.includes('gsm') || c.includes('product') || 
+          c.includes('material') || c.includes('particular')
+        );
+        if (matchesCol) {
+          headerRowIdx = r;
+          break;
+        }
+      }
+
+      const headers: string[] = (rawRows[headerRowIdx] || []).map((h: any) => String(h || '').trim());
       const headerMap: Record<string, number> = {};
       headers.forEach((h, idx) => {
         const cleanH = h.toLowerCase().replace(/[^a-z0-9]/g, '');
         headerMap[cleanH] = idx;
       });
+
+      // Context domain: domain of the view we are currently in
+      const contextDomain: 'products' | 'materials' | 'semi' = 
+        activeMainTab === 'materials' ? 'materials' :
+        activeMainTab === 'semi' ? 'semi' :
+        activeMainTab === 'categories' ? activeCategorySubTab :
+        'products';
 
       // Scan all existing items to find the current highest sequential number per prefix
       const maxSeqMap: Record<string, number> = {};
@@ -2788,7 +2830,7 @@ const SkuMasterV2: React.FC = () => {
       const dynamicUnitsToCreate: string[] = [];
       const dynamicRuleTypesToCreate: string[] = [];
 
-      for (let i = 1; i < rawRows.length; i++) {
+      for (let i = headerRowIdx + 1; i < rawRows.length; i++) {
         const row = rawRows[i];
         if (!row || row.length === 0 || !row.some(Boolean)) continue;
 
@@ -2819,7 +2861,7 @@ const SkuMasterV2: React.FC = () => {
         const explicitSku = getFieldVal(
           'idskucode', 'skucode', 'itemcode', 'code', 'id', 'itemcodeskucode',
           'productcode', 'skuid', 'itemid', 'materialcode', 'semicode', 'sku',
-          'item_code', 'sku_code'
+          'item_code', 'sku_code', 'partnumber', 'partno', 'itemno', 'itemnumber'
         );
         let skuCode = explicitSku;
 
@@ -2828,32 +2870,72 @@ const SkuMasterV2: React.FC = () => {
           skuCode = '';
         }
 
-        if (!skuCode) {
-          const firstColStr = String(row[0] || '').trim();
-          if (firstColStr && !/^\d+$/.test(firstColStr) && !/^SKU-\d{8,}/i.test(firstColStr) && !/^TEMP-/i.test(firstColStr)) {
-            skuCode = firstColStr;
+        const explicitName = getFieldVal(
+          'skuname', 'itemname', 'name', 'materialname', 'productname', 'title',
+          'description', 'itemdescription', 'itemtitle', 'particulars', 'itemdetails', 'product', 'item'
+        );
+
+        let name = explicitName;
+        // Fallback: If no name found from header aliases, look at first non-numeric column
+        if (!name) {
+          for (let c = 0; c < row.length; c++) {
+            const val = String(row[c] || '').trim();
+            if (val && !/^\d+(\.\d+)?$/.test(val) && val !== explicitSku) {
+              name = val;
+              break;
+            }
+          }
+        }
+        if (!name && skuCode) name = skuCode;
+        if (!name && !skuCode) continue;
+
+        const explicitKind = getFieldVal(
+          'itemtype', 'materialkind', 'kindofmaterial', 'domain', 'type', 'kind', 'classification', 'materialtype'
+        ).toLowerCase();
+
+        const rawCategory = getFieldVal(
+          'category', 'itemcategory', 'group', 'itemgroup', 'categoryname', 'materialcategory', 'materialgroup', 'subgroup'
+        );
+
+        // Determine target domain respectively according to the kind of material we are in
+        let targetSection: 'products' | 'materials' | 'semi' = contextDomain;
+        let defaultPrefix = contextDomain === 'materials' ? 'RM' : contextDomain === 'semi' ? 'SM' : 'FG';
+
+        if (explicitKind.includes('raw') || explicitKind.includes('material') || explicitKind === 'rm') {
+          targetSection = 'materials';
+          defaultPrefix = 'RM';
+        } else if (explicitKind.includes('semi') || explicitKind.includes('wip') || explicitKind === 'sm' || explicitKind === 'sfg') {
+          targetSection = 'semi';
+          defaultPrefix = 'SM';
+        } else if (explicitKind.includes('finish') || explicitKind.includes('product') || explicitKind === 'fg') {
+          targetSection = 'products';
+          defaultPrefix = 'FG';
+        } else if (explicitSku && /^RM[-_]?\d+/i.test(explicitSku.trim())) {
+          targetSection = 'materials';
+          defaultPrefix = 'RM';
+        } else if (explicitSku && /^(SM|SFG|SF|SEM)[-_]?\d+/i.test(explicitSku.trim())) {
+          targetSection = 'semi';
+          defaultPrefix = 'SM';
+        } else if (explicitSku && /^FG[-_]?\d+/i.test(explicitSku.trim())) {
+          targetSection = 'products';
+          defaultPrefix = 'FG';
+        } else if (rawCategory) {
+          const rcLower = rawCategory.toLowerCase();
+          if (rcLower.includes('semi') || rcLower.includes('wip') || rcLower.includes('sub-assembly')) {
+            targetSection = 'semi';
+            defaultPrefix = 'SM';
+          } else if (rcLower.includes('raw material') || rcLower.includes('paper reel') || rcLower.includes('duplex board')) {
+            targetSection = 'materials';
+            defaultPrefix = 'RM';
           }
         }
 
-        const defaultTabCat = activeMainTab === 'materials' ? 'Raw Material' : activeMainTab === 'semi' ? 'Semi Finished' : 'Finished Goods';
-        const rawCategory = getFieldVal('category', 'itemcategory', 'group', 'itemgroup', 'categoryname');
-        const category = (rawCategory || defaultTabCat).trim();
+        const defaultCategory = categoryFilter && categoryFilter.trim()
+          ? categoryFilter.trim()
+          : (targetSection === 'materials' ? 'Raw Material' : targetSection === 'semi' ? 'Semi Finished' : 'Finished Goods');
+        const category = (rawCategory || defaultCategory).trim();
         const group = rawCategory || category;
-
-        const catLower = (category || '').toLowerCase();
-        let defaultPrefix = 'FG';
-        let targetSection: 'products' | 'materials' | 'semi' = 'products';
-
-        if (catLower.includes('semi') || catLower.includes('wip') || catLower.includes('sub') || activeMainTab === 'semi') {
-          defaultPrefix = 'SM';
-          targetSection = 'semi';
-        } else if (catLower.includes('raw') || catLower.includes('material') || catLower.includes('reel') || catLower.includes('board') || catLower.includes('paper') || activeMainTab === 'materials') {
-          defaultPrefix = 'RM';
-          targetSection = 'materials';
-        } else {
-          defaultPrefix = 'FG';
-          targetSection = 'products';
-        }
+        const catLower = category.toLowerCase();
 
         const unit = getFieldVal('uom', 'unit', 'primaryuom', 'primaryunit', 'baseunit', 'mainunit') || (targetSection === 'materials' ? 'Kg' : targetSection === 'semi' ? 'Ream' : 'Pcs');
 
@@ -2887,9 +2969,6 @@ const SkuMasterV2: React.FC = () => {
           maxSeqMap[pref] = nextSeq;
           skuCode = `${defaultPrefix}-${String(nextSeq).padStart(3, '0')}`;
         }
-
-        const name = getFieldVal('skuname', 'itemname', 'name', 'materialname', 'productname', 'title') || String(row[1] || '').trim();
-        if (!name && !skuCode) continue;
 
         let altUnit = getFieldVal('auomaltunit', 'auom', 'altunit', 'secondaryuom', 'secondaryunit', 'alternateunit', 'auomsecondaryunit') || '';
         if (
@@ -2988,7 +3067,7 @@ const SkuMasterV2: React.FC = () => {
           paperType = 'Reels';
         } else if (/sheet/i.test(rawPaperType) || /board/i.test(rawPaperType)) {
           paperType = 'Sheets';
-        } else if (activeMainTab === 'materials') {
+        } else if (targetSection === 'materials') {
           if ((rawCategory || '').toLowerCase().includes('reel') || (name || '').toLowerCase().includes('reel')) paperType = 'Reels';
           else if ((rawCategory || '').toLowerCase().includes('board') || (rawCategory || '').toLowerCase().includes('sheet')) paperType = 'Sheets';
           else paperType = 'Reels';
@@ -3013,10 +3092,15 @@ const SkuMasterV2: React.FC = () => {
         const rawStatus = getFieldVal('status', 'itemstatus', 'state').toLowerCase();
         const status: 'Active' | 'Inactive' = rawStatus === 'inactive' ? 'Inactive' : 'Active';
 
+        // Extract Opening Stock
+        const rawStock = getFieldVal('openingstock', 'openingbalance', 'stock', 'initialstock', 'presentstock', 'quantity', 'qty');
+        const openingStock = rawStock ? Number(rawStock) || 0 : 0;
+
         itemsToCreate.push({
           company: selectedCompany._id,
           skuCode: skuCode || `${defaultPrefix}-${String(((maxSeqMap[defaultPrefix.toUpperCase()] = (maxSeqMap[defaultPrefix.toUpperCase()] || 0) + 1))).padStart(3, '0')}`,
           name: name || skuCode,
+          itemType: targetSection,
           category,
           group,
           unit,
@@ -3028,8 +3112,8 @@ const SkuMasterV2: React.FC = () => {
           width,
           length,
           paperType,
-          openingStock: 0,
-          presentStock: 0,
+          openingStock,
+          presentStock: openingStock,
           minStockLevel,
           reorderLevel,
           preferredVendor,
@@ -4555,19 +4639,37 @@ const SkuMasterV2: React.FC = () => {
                                   </td>
                                 );
                               }
-                              const hasBom = Array.isArray((sku as any).bomItems) && (sku as any).bomItems.length > 0;
+                              const bomCount = Array.isArray((sku as any).bomItems) ? (sku as any).bomItems.length : 0;
+                              const hasBom = bomCount > 0;
                               return (
                                 <td key="bom" className="py-3 px-3 whitespace-nowrap">
                                   <div className="flex items-center gap-1.5">
-                                    {hasBom ? (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                        Defined
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                                        Pending
-                                      </span>
-                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveBomProduct(sku);
+                                        setShowBuildBomsModal(true);
+                                      }}
+                                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer shadow-3xs ${
+                                        hasBom
+                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/90 hover:bg-emerald-100 hover:border-emerald-300'
+                                          : 'bg-amber-50 text-amber-700 border border-amber-200/90 hover:bg-amber-100 hover:border-amber-300'
+                                      }`}
+                                      title={hasBom ? `View & Edit BOM (${bomCount} ingredients) for ${sku.name || sku.skuCode}` : `Click to build recipe / BOM for ${sku.name || sku.skuCode}`}
+                                    >
+                                      {hasBom ? (
+                                        <>
+                                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                          <span>{bomCount} Item{bomCount === 1 ? '' : 's'}</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Plus className="w-3.5 h-3.5 text-amber-600" />
+                                          <span>Set BOM</span>
+                                        </>
+                                      )}
+                                    </button>
 
                                     {/* Quick Copy BOM */}
                                     {hasBom && (
@@ -6257,22 +6359,7 @@ const SkuMasterV2: React.FC = () => {
                                       value={cost.basis}
                                       onChange={e => {
                                         const val = e.target.value;
-                                        setBomAdditionalCosts(prev => prev.map(c => {
-                                          if (c.id !== cost.id) return c;
-                                          const updated = { ...c, basis: val };
-                                          if (val === 'Per BOM') {
-                                            updated.appliedAs = 'Per BOM';
-                                          } else if (val === 'Total / Batch') {
-                                            updated.appliedAs = 'Total Cost for this production/batch';
-                                          } else if (val === 'Per Batch') {
-                                            updated.appliedAs = 'Per Batch';
-                                          } else if (val === 'Per Piece') {
-                                            updated.appliedAs = 'Per Unit (PCS)';
-                                          } else if (val === 'Per GBL') {
-                                            updated.appliedAs = 'Per Unit (GBL)';
-                                          }
-                                          return updated;
-                                        }));
+                                        setBomAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, basis: val } : c));
                                       }}
                                       className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer"
                                     >
@@ -6297,26 +6384,7 @@ const SkuMasterV2: React.FC = () => {
                                       value={cost.appliedAs}
                                       onChange={e => {
                                         const val = e.target.value;
-                                        setBomAdditionalCosts(prev => prev.map(c => {
-                                          if (c.id !== cost.id) return c;
-                                          const updated = { ...c, appliedAs: val };
-                                          if (val === 'Per BOM') {
-                                            updated.basis = 'Per BOM';
-                                          } else if (val === 'Total Cost for this production/batch' || val === 'Total Cost for this production') {
-                                            if (c.basis === 'Per Piece' || c.basis === 'Per GBL') {
-                                              updated.basis = 'Total / Batch';
-                                            }
-                                          } else if (val === 'Per Batch') {
-                                            if (c.basis === 'Per Piece' || c.basis === 'Per GBL') {
-                                              updated.basis = 'Per Batch';
-                                            }
-                                          } else if (val === 'Per Unit (PCS)') {
-                                            updated.basis = 'Per Piece';
-                                          } else if (val === 'Per Unit (GBL)') {
-                                            updated.basis = 'Per GBL';
-                                          }
-                                          return updated;
-                                        }));
+                                        setBomAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, appliedAs: val } : c));
                                       }}
                                       className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer"
                                     >

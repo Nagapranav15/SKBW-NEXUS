@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
+import {
   ClipboardList, Search, Download, X, Copy, Save, RefreshCw, Layers, Boxes, Package, Trash2,
   Settings, Plus, Tag, Receipt, Info
 } from 'lucide-react';
@@ -105,7 +105,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
       });
 
     return () => { isMounted = false; };
-  }, [isOpen, companyId, initialSelectedSkuId]);
+  }, [isOpen, companyId]);
 
   const productsList = useMemo(() => skus.filter(s => getItemClassification(s) === 'products'), [skus]);
   const materialsList = useMemo(() => skus.filter(s => getItemClassification(s) === 'materials'), [skus]);
@@ -141,7 +141,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
 
     if (buildBomsSearch.trim()) {
       const q = buildBomsSearch.toLowerCase().trim();
-      filtered = filtered.filter(p => 
+      filtered = filtered.filter(p =>
         (p.name && p.name.toLowerCase().includes(q)) ||
         (p.skuCode && p.skuCode.toLowerCase().includes(q)) ||
         (p.brand && p.brand.toLowerCase().includes(q)) ||
@@ -205,17 +205,14 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
     setActiveBomProduct(prod);
     const isFinished = getItemClassification(prod) === 'products';
     const rawYieldUnit = (prod as any).recipeYieldUnit || (prod as any).batchYieldUnit || prod.unit || 'Pcs';
-    const isYieldGbl = rawYieldUnit.toUpperCase().includes('GBL');
-    const defaultYieldQty = isFinished && !isYieldGbl
-      ? '1'
-      : String((prod as any).recipeYieldQty ?? (prod as any).batchYieldQty ?? '1');
+    const defaultYieldQty = String((prod as any).recipeYieldQty || (prod as any).batchYieldQty || '1');
 
     setBuildBatchYieldQty(defaultYieldQty);
     setBuildBatchYieldUnit(rawYieldUnit);
 
     if ((prod as any).bomItems && Array.isArray((prod as any).bomItems)) {
       setActiveRecipeItems((prod as any).bomItems.map((item: any, idx: number) => {
-        const matchedSku = currentSkus.find(s => 
+        const matchedSku = currentSkus.find(s =>
           (item.skuId && String(s._id) === String(item.skuId)) ||
           (item.skuCode && s.skuCode === item.skuCode) ||
           (item.id && String(s._id) === String(item.id)) ||
@@ -241,14 +238,12 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
 
     if (Array.isArray((prod as any).additionalCosts)) {
       setActiveAdditionalCosts((prod as any).additionalCosts.map((c: any, i: number) => {
-        const basis = c.calcBasis || c.basis || 'Per Piece';
-        const isBatch = basis === 'Per Batch' || basis === 'Fixed' || basis === 'Total / Batch';
         return {
           id: c.id || `cost-${Date.now()}-${i}`,
           costType: c.costType || '',
-          calcBasis: basis,
+          calcBasis: c.calcBasis || c.basis || 'Per Piece',
           amount: c.amount ?? '',
-          appliedAs: c.appliedAs || (isBatch ? 'Total Cost for this production/batch' : 'Per Unit (PCS)')
+          appliedAs: c.appliedAs || 'Per Unit (PCS)'
         };
       }));
     } else {
@@ -273,7 +268,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
   // Financial Costing Summary (Material Cost + Additional Costs + Profit & Pricing)
   const totalMaterialCost = useMemo(() => {
     return activeRecipeItems.reduce((sum, item) => {
-      const matchedSku = skus.find(s => 
+      const matchedSku = skus.find(s =>
         (item.skuId && String(s._id) === String(item.skuId)) ||
         (item.skuCode && s.skuCode === item.skuCode) ||
         (item.name && s.name === item.name)
@@ -495,17 +490,15 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                   setBuildBomsTitleFilter('');
                   setBuildBomsRulingFilter('');
                 }}
-                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  activeDomainTab === 'products'
-                    ? 'bg-white text-gray-900 shadow-2xs'
-                    : 'text-gray-500 hover:text-gray-800'
-                }`}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${activeDomainTab === 'products'
+                  ? 'bg-white text-gray-900 shadow-2xs'
+                  : 'text-gray-500 hover:text-gray-800'
+                  }`}
               >
                 <Boxes className="w-3.5 h-3.5 text-blue-600" />
                 <span>Finished Goods</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-                  activeDomainTab === 'products' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
-                }`}>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${activeDomainTab === 'products' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                  }`}>
                   {productsList.length}
                 </span>
               </button>
@@ -517,17 +510,15 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                   setBuildBomsTitleFilter('');
                   setBuildBomsRulingFilter('');
                 }}
-                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  activeDomainTab === 'semi'
-                    ? 'bg-white text-gray-900 shadow-2xs'
-                    : 'text-gray-500 hover:text-gray-800'
-                }`}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${activeDomainTab === 'semi'
+                  ? 'bg-white text-gray-900 shadow-2xs'
+                  : 'text-gray-500 hover:text-gray-800'
+                  }`}
               >
                 <Layers className="w-3.5 h-3.5 text-amber-600" />
                 <span>Semi Finished</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-                  activeDomainTab === 'semi' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'
-                }`}>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${activeDomainTab === 'semi' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'
+                  }`}>
                   {semiList.length}
                 </span>
               </button>
@@ -672,11 +663,10 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                   <div
                     key={prod._id}
                     onClick={() => handleSelectBomProduct(prod)}
-                    className={`p-2.5 rounded-xl cursor-pointer transition-all flex items-center justify-between border group/item ${
-                      isSelected
-                        ? 'bg-emerald-50/80 border-emerald-300 shadow-2xs'
-                        : 'bg-white border-transparent hover:bg-gray-100/80 hover:border-gray-200'
-                    }`}
+                    className={`p-2.5 rounded-xl cursor-pointer transition-all flex items-center justify-between border group/item ${isSelected
+                      ? 'bg-emerald-50/80 border-emerald-300 shadow-2xs'
+                      : 'bg-white border-transparent hover:bg-gray-100/80 hover:border-gray-200'
+                      }`}
                   >
                     <div className="flex items-start gap-2.5 min-w-0 flex-1">
                       <div className="mt-0.5 shrink-0">
@@ -711,7 +701,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                       </div>
                     </div>
 
-            {/* Quick Copy / Paste Icons */}
+                    {/* Quick Copy / Paste Icons */}
                     <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
                       {hasRecipe && (
                         <button
@@ -828,14 +818,12 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           if (copied.basisUnit) setBuildBatchYieldUnit(copied.basisUnit);
                           if (Array.isArray(copied.additionalCosts)) {
                             setActiveAdditionalCosts(copied.additionalCosts.map((c, i) => {
-                              const basis = c.calcBasis || 'Per Piece';
-                              const isBatch = basis === 'Per Batch' || basis === 'Fixed' || basis === 'Total / Batch';
                               return {
                                 id: `cost-paste-${Date.now()}-${i}`,
                                 costType: c.costType || '',
-                                calcBasis: basis,
+                                calcBasis: c.calcBasis || c.basis || 'Per Piece',
                                 amount: c.amount ?? '',
-                                appliedAs: c.appliedAs || (isBatch ? 'Total Cost for this production/batch' : 'Per Unit (PCS)')
+                                appliedAs: c.appliedAs || 'Per Unit (PCS)'
                               };
                             }));
                           }
@@ -872,14 +860,12 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                             const costsToAdd = copied.additionalCosts
                               .filter(c => !existingCostTypes.has((c.costType || '').toLowerCase().trim()))
                               .map((c, i) => {
-                                const basis = c.calcBasis || 'Per Piece';
-                                const isBatch = basis === 'Per Batch' || basis === 'Fixed' || basis === 'Total / Batch';
                                 return {
                                   id: `cost-merge-${Date.now()}-${i}`,
                                   costType: c.costType,
-                                  calcBasis: basis,
+                                  calcBasis: c.calcBasis || c.basis || 'Per Piece',
                                   amount: c.amount,
-                                  appliedAs: c.appliedAs || (isBatch ? 'Total Cost for this production/batch' : 'Per Unit (PCS)')
+                                  appliedAs: c.appliedAs || 'Per Unit (PCS)'
                                 };
                               });
                             setActiveAdditionalCosts(prev => [...prev, ...costsToAdd]);
@@ -932,15 +918,43 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           <input
                             type="number"
                             min="1"
+                            step="any"
                             placeholder="1"
                             value={buildBatchYieldQty}
-                            onChange={(e) => setBuildBatchYieldQty(e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setBuildBatchYieldQty(val);
+                              const numVal = Number(val) || 1;
+                              setActiveBomProduct(prev => prev ? {
+                                ...prev,
+                                batchYieldQty: numVal,
+                                recipeYieldQty: numVal
+                              } : null);
+                              setSkus(prev => prev.map(s => s._id === activeBomProduct?._id ? {
+                                ...s,
+                                batchYieldQty: numVal,
+                                recipeYieldQty: numVal
+                              } : s));
+                            }}
                             className="w-14 h-6 px-1 border border-blue-200 rounded-md text-xs font-bold text-blue-800 text-center bg-white shadow-3xs focus:ring-1 focus:ring-blue-400 focus:outline-none"
                           />
                           {options.length > 1 ? (
                             <select
                               value={currentUnit}
-                              onChange={(e) => setBuildBatchYieldUnit(e.target.value)}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setBuildBatchYieldUnit(val);
+                                setActiveBomProduct(prev => prev ? {
+                                  ...prev,
+                                  batchYieldUnit: val,
+                                  recipeYieldUnit: val
+                                } : null);
+                                setSkus(prev => prev.map(s => s._id === activeBomProduct?._id ? {
+                                  ...s,
+                                  batchYieldUnit: val,
+                                  recipeYieldUnit: val
+                                } : s));
+                              }}
                               className="h-6 px-1.5 border border-blue-200 rounded-md text-[11px] font-bold text-blue-900 bg-white cursor-pointer shadow-3xs focus:ring-1 focus:ring-blue-400 focus:outline-none"
                               title="Yield Unit (UOM / AUOM)"
                             >
@@ -1073,7 +1087,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                               </td>
                               <td className="py-1.5 px-1.5 text-center">
                                 {(() => {
-                                  const matchedSku = skus.find(s => 
+                                  const matchedSku = skus.find(s =>
                                     (b.skuId && String(s._id) === String(b.skuId)) ||
                                     (b.skuCode && s.skuCode === b.skuCode) ||
                                     (b.name && s.name === b.name)
@@ -1101,8 +1115,8 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                       onChange={(e) => {
                                         const val = e.target.value;
                                         const isAlt = hasAlt && val.toLowerCase() === altUom.trim().toLowerCase();
-                                        setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { 
-                                          ...item, 
+                                        setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? {
+                                          ...item,
                                           uom: val,
                                           auom: isAlt ? val : (altUom || ''),
                                           altUnit: isAlt ? val : (altUom || '')
@@ -1227,22 +1241,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                   value={cost.calcBasis}
                                   onChange={e => {
                                     const val = e.target.value;
-                                    setActiveAdditionalCosts(prev => prev.map(c => {
-                                      if (c.id !== cost.id) return c;
-                                      const updated = { ...c, calcBasis: val };
-                                      if (val === 'Per BOM') {
-                                        updated.appliedAs = 'Per BOM';
-                                      } else if (val === 'Total / Batch') {
-                                        updated.appliedAs = 'Total Cost for this production/batch';
-                                      } else if (val === 'Per Batch' || val === 'Fixed') {
-                                        updated.appliedAs = 'Per Batch';
-                                      } else if (val === 'Per Piece') {
-                                        updated.appliedAs = 'Per Unit (PCS)';
-                                      } else if (val === 'Per GBL') {
-                                        updated.appliedAs = 'Per Unit (GBL)';
-                                      }
-                                      return updated;
-                                    }));
+                                    setActiveAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, calcBasis: val } : c));
                                   }}
                                   className="h-7 px-1.5 py-0.5 bg-white border border-slate-200 rounded-md text-[11px] font-semibold text-slate-800 cursor-pointer focus:outline-none"
                                 >
@@ -1272,26 +1271,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                   value={cost.appliedAs}
                                   onChange={e => {
                                     const val = e.target.value as any;
-                                    setActiveAdditionalCosts(prev => prev.map(c => {
-                                      if (c.id !== cost.id) return c;
-                                      const updated = { ...c, appliedAs: val };
-                                      if (val === 'Per BOM') {
-                                        updated.calcBasis = 'Per BOM';
-                                      } else if (val === 'Total Cost for this production/batch' || val === 'Total Cost for this production' || val === 'Total Cost') {
-                                        if (c.calcBasis === 'Per Piece' || c.calcBasis === 'Per GBL') {
-                                          updated.calcBasis = 'Total / Batch';
-                                        }
-                                      } else if (val === 'Per Batch') {
-                                        if (c.calcBasis === 'Per Piece' || c.calcBasis === 'Per GBL') {
-                                          updated.calcBasis = 'Per Batch';
-                                        }
-                                      } else if (val === 'Per Unit (PCS)') {
-                                        updated.calcBasis = 'Per Piece';
-                                      } else if (val === 'Per Unit (GBL)') {
-                                        updated.calcBasis = 'Per GBL';
-                                      }
-                                      return updated;
-                                    }));
+                                    setActiveAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, appliedAs: val } : c));
                                   }}
                                   className="h-7 w-full max-w-[210px] px-1.5 py-0.5 bg-white border border-slate-200 rounded-md text-[11px] font-semibold text-slate-800 cursor-pointer focus:outline-none text-ellipsis overflow-hidden"
                                 >
@@ -1492,11 +1472,10 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           ]);
                         }
                       }}
-                      className={`p-2 rounded-xl text-xs font-semibold flex items-center justify-between cursor-pointer transition-all border ${
-                        isAdded
-                          ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
-                          : 'bg-white border-gray-200 hover:border-blue-300 text-gray-800 shadow-2xs'
-                      }`}
+                      className={`p-2 rounded-xl text-xs font-semibold flex items-center justify-between cursor-pointer transition-all border ${isAdded
+                        ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
+                        : 'bg-white border-gray-200 hover:border-blue-300 text-gray-800 shadow-2xs'
+                        }`}
                     >
                       <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-1">
                         <span className={isAdded ? 'text-emerald-600 font-bold shrink-0' : 'text-blue-600 font-bold shrink-0'}>
@@ -1545,11 +1524,10 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           ]);
                         }
                       }}
-                      className={`p-2 rounded-xl text-xs font-semibold flex items-center justify-between cursor-pointer transition-all border ${
-                        isAdded
-                          ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
-                          : 'bg-white border-gray-200 hover:border-blue-300 text-gray-800 shadow-2xs'
-                      }`}
+                      className={`p-2 rounded-xl text-xs font-semibold flex items-center justify-between cursor-pointer transition-all border ${isAdded
+                        ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
+                        : 'bg-white border-gray-200 hover:border-blue-300 text-gray-800 shadow-2xs'
+                        }`}
                     >
                       <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-1">
                         <span className={isAdded ? 'text-emerald-600 font-bold shrink-0' : 'text-blue-600 font-bold shrink-0'}>
