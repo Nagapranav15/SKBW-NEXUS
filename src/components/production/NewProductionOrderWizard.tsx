@@ -1104,10 +1104,17 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           (raw.name && s.name?.toLowerCase().trim() === raw.name.toLowerCase().trim())
         );
 
-        // Determine UOM: preserve selected UOM; if corrupted to GBL when auom/altUnit is PCS, resolve as PCS
-        let resolvedUom = raw.uom || raw.unit || 'PCS';
-        if ((resolvedUom === 'GBL' || !resolvedUom) && (raw.auom === 'PCS' || raw.altUnit === 'PCS')) {
-          resolvedUom = 'PCS';
+        // Determine UOM: raw materials (especially sheets/boards) must ALWAYS use their actual UOM (PCS).
+        // Never inherit GBL from an output item or an accidental GBL tag.
+        const isRawItem = (matchedSku && getItemClassification(matchedSku) === 'materials') ||
+                          (raw.skuCode && raw.skuCode.toUpperCase().startsWith('RM-')) ||
+                          (raw.code && raw.code.toUpperCase().startsWith('RM-')) ||
+                          (matchedSku?.category && /sheet|board|paper|reel/i.test(matchedSku.category)) ||
+                          (raw.name && /sheet|board/i.test(raw.name));
+
+        let resolvedUom = raw.uom || matchedSku?.unit || raw.unit || 'PCS';
+        if (isRawItem && (resolvedUom.toUpperCase() === 'GBL' || !resolvedUom)) {
+          resolvedUom = (matchedSku?.unit && matchedSku.unit.toUpperCase() !== 'GBL') ? matchedSku.unit : 'PCS';
         }
 
         return {
@@ -1249,22 +1256,59 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           (m.component && s.name?.toLowerCase().trim() === m.component.toLowerCase().trim())
         );
 
-        const skuStockingUnit = rateInfo.unit || matchedSku?.unit || 'GBL';
-        const currentUom = m.uom || 'PCS';
+        // Backend returns rates in the SKU's own primary stocking unit (rateInfo.unit = sku.unit).
+        // currentUom must be this material row's UOM (which, after the BOM loader fix, now
+        // equals matchedSku.unit for raw materials). So skuStockingUnit === currentUom → no conversion.
+        // Use rateInfo's own unit/altUnit/altUnitConversion for conversion (the raw material's own
+        // conversion data), never the finished good's conversion factor.
+        const skuStockingUnit = rateInfo.unit || matchedSku?.unit || 'PCS';
+        const currentUom = m.uom || matchedSku?.unit || 'PCS';
 
-        // Backend returns rates in skuStockingUnit (e.g. ₹166.40 / GBL)
+        // Build a conversion descriptor using this raw material's own conversion data
+        // (from rateInfo, which the backend explicitly returns per SKU).
+        const rateConvSku = {
+          unit: rateInfo.unit || matchedSku?.unit,
+          altUnit: rateInfo.altUnit || matchedSku?.altUnit,
+          altUnitConversion: rateInfo.altUnitConversion ?? matchedSku?.altUnitConversion,
+          altUnitDirection: rateInfo.altUnitDirection || matchedSku?.altUnitDirection
+        };
+
+        // Backend returns rates in skuStockingUnit (e.g. ₹10.61 / PCS for a PCS-stocked raw board)
         const rawProdRate = Number(rateInfo.productionRate) || 0;
         const rawLastProdRate = Number(rateInfo.lastProductionRate) || 0;
         const rawAvgRate = Number(rateInfo.avgRate) || 0;
         const rawFifoRate = Number(rateInfo.fifoRate) || 0;
         const rawStandardRate = Number(rateInfo.standardRate) || 0;
 
-        // Convert rates to currentUom (e.g. ₹0.416 / PCS if 1 GBL = 400 PCS)
-        const convertedAvgRate = rawAvgRate > 0 ? convertRateToUom(rawAvgRate, skuStockingUnit, currentUom, matchedSku) : 0;
-        const convertedFifoRate = rawFifoRate > 0 ? convertRateToUom(rawFifoRate, skuStockingUnit, currentUom, matchedSku) : 0;
-        const convertedProdRate = rawProdRate > 0 ? convertRateToUom(rawProdRate, skuStockingUnit, currentUom, matchedSku) : 0;
-        const convertedLastProdRate = rawLastProdRate > 0 ? convertRateToUom(rawLastProdRate, skuStockingUnit, currentUom, matchedSku) : 0;
-        const convertedStandardRate = rawStandardRate > 0 ? convertRateToUom(rawStandardRate, skuStockingUnit, currentUom, matchedSku) : 0;
+        const isRawItem = (matchedSku && getItemClassification(matchedSku) === 'materials') ||
+                          (m.code && m.code.toUpperCase().startsWith('RM-')) ||
+                          (matchedSku?.category && /sheet|board|paper|reel/i.test(matchedSku.category)) ||
+                          (m.component && /sheet|board/i.test(m.component));
+
+        // For raw materials, purchase rates are natively per actual unit (PCS/sheet/KG) and NEVER per GBL.
+        // Never convert or divide a raw material's purchase rate using GBL conversion!
+        const shouldBypassGblConversion = isRawItem && (
+          skuStockingUnit.toUpperCase() === 'GBL' ||
+          (rateConvSku.altUnitConversion && Number(rateConvSku.altUnitConversion) > 1 && currentUom.toUpperCase() === 'PCS')
+        );
+
+        // Convert rates to currentUom only if stocking unit differs from BOM UOM and not bypassed.
+        // Use rateConvSku (this raw material's own conversion) NOT the finished good's.
+        const convertedAvgRate = shouldBypassGblConversion
+          ? rawAvgRate
+          : (rawAvgRate > 0 ? convertRateToUom(rawAvgRate, skuStockingUnit, currentUom, rateConvSku) : 0);
+        const convertedFifoRate = shouldBypassGblConversion
+          ? rawFifoRate
+          : (rawFifoRate > 0 ? convertRateToUom(rawFifoRate, skuStockingUnit, currentUom, rateConvSku) : 0);
+        const convertedProdRate = shouldBypassGblConversion
+          ? rawProdRate
+          : (rawProdRate > 0 ? convertRateToUom(rawProdRate, skuStockingUnit, currentUom, rateConvSku) : 0);
+        const convertedLastProdRate = shouldBypassGblConversion
+          ? rawLastProdRate
+          : (rawLastProdRate > 0 ? convertRateToUom(rawLastProdRate, skuStockingUnit, currentUom, rateConvSku) : 0);
+        const convertedStandardRate = shouldBypassGblConversion
+          ? rawStandardRate
+          : (rawStandardRate > 0 ? convertRateToUom(rawStandardRate, skuStockingUnit, currentUom, rateConvSku) : 0);
 
         const mode = modeToApply || m.rateMode || globalRateMode;
         let finalRate = m.rate;
@@ -1735,7 +1779,22 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       if (batchTotal > 0) stockQty = batchTotal;
     }
 
-    const uom = matchedSku?.unit || m.uom || 'PCS';
+    const isRaw = (matchedSku && getItemClassification(matchedSku) === 'materials') ||
+                  (m.code && m.code.toUpperCase().startsWith('RM-')) ||
+                  (matchedSku?.category && /sheet|board|paper|reel/i.test(matchedSku.category)) ||
+                  (m.component && /sheet|board/i.test(m.component));
+
+    // Raw materials (especially boards/sheets) must stay in their own actual UOM (PCS) and NEVER display as GBL
+    let resolvedStockUom = m.uom || 'PCS';
+    if (isRaw) {
+      if (resolvedStockUom.toUpperCase() === 'GBL' || (matchedSku?.unit && matchedSku.unit.toUpperCase() === 'GBL')) {
+        resolvedStockUom = (m.uom && m.uom.toUpperCase() !== 'GBL') ? m.uom : 'PCS';
+      }
+    } else {
+      resolvedStockUom = matchedSku?.unit || m.uom || 'PCS';
+    }
+
+    const uom = resolvedStockUom;
     const reqQty = Number(m.requiredQty) || 0;
     const isAvailable = stockQty >= reqQty;
     const shortage = Math.max(0, reqQty - stockQty);

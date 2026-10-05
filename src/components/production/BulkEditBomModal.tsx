@@ -295,7 +295,17 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
       let effectiveRate = rawRate;
       const skuUnit = matchedSku?.unit || '';
       const itemUom = item.uom || '';
-      if (rawRate > 0 && skuUnit && itemUom && skuUnit.trim().toLowerCase() !== itemUom.trim().toLowerCase()) {
+      const isRaw = (matchedSku && getItemClassification(matchedSku) === 'materials') ||
+                    (item.skuCode && item.skuCode.toUpperCase().startsWith('RM-')) ||
+                    (matchedSku?.category && /sheet|board|paper|reel/i.test(matchedSku.category)) ||
+                    (item.name && /sheet|board/i.test(item.name));
+
+      const shouldBypassGbl = isRaw && (
+        skuUnit.toUpperCase() === 'GBL' ||
+        (matchedSku?.altUnitConversion && Number(matchedSku.altUnitConversion) > 1 && itemUom.toUpperCase() === 'PCS')
+      );
+
+      if (!shouldBypassGbl && rawRate > 0 && skuUnit && itemUom && skuUnit.trim().toLowerCase() !== itemUom.trim().toLowerCase()) {
         effectiveRate = convertRateToUom(rawRate, skuUnit, itemUom, matchedSku);
       }
 

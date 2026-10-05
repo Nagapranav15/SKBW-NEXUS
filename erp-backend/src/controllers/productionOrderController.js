@@ -1170,13 +1170,19 @@ exports.getMaterialRates = async (req, res) => {
       let reqQty = itemInput ? (Number(itemInput.requiredQty) || 0) : 0;
 
       // Convert reqQty from input UOM to SKU stocking unit if different
+      const isRawMat = (sku.itemType === 'materials') || 
+                       (sku.skuCode && sku.skuCode.toUpperCase().startsWith('RM-')) || 
+                       (sku.category && /sheet|board|paper|reel/i.test(sku.category)) ||
+                       (sku.name && /sheet|board/i.test(sku.name));
+
       if (reqQty > 0 && itemInput && itemInput.uom && sku.unit) {
         const inUom = itemInput.uom.trim().toLowerCase();
         const skuUnit = sku.unit.trim().toLowerCase();
         const altUnit = (sku.altUnit || '').trim().toLowerCase();
         const convFactor = Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 1);
 
-        if (inUom !== skuUnit && convFactor > 0) {
+        // Never divide or convert raw materials using GBL conversion
+        if (!isRawMat && inUom !== skuUnit && convFactor > 0) {
           if (inUom === altUnit || inUom === 'pcs' || inUom === 'pieces' || inUom === 'pc') {
             reqQty = reqQty / convFactor;
           } else if (skuUnit === 'pcs' || skuUnit === 'pieces' || skuUnit === 'pc') {
@@ -1387,13 +1393,19 @@ exports.getMaterialRates = async (req, res) => {
 
       const effectiveRate = avgRate > 0 ? avgRate : (productionRate > 0 ? productionRate : (lastProductionRate > 0 ? lastProductionRate : standardRate));
 
+      const reportedUnit = (isRawMat && ((sku.unit || '').toUpperCase() === 'GBL' || !sku.unit)) 
+        ? 'PCS' 
+        : (sku.unit || 'PCS');
+      const reportedAltUnit = isRawMat ? '' : (sku.altUnit || '');
+      const reportedConv = isRawMat ? 1 : Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 1);
+
       rates[skuIdStr] = {
         skuId: skuIdStr,
         skuCode: sku.skuCode,
         skuName: sku.name,
-        unit: sku.unit || '',
-        altUnit: sku.altUnit || '',
-        altUnitConversion: sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 1,
+        unit: reportedUnit,
+        altUnit: reportedAltUnit,
+        altUnitConversion: reportedConv,
         altUnitDirection: sku.altUnitDirection || 'PRIMARY_TO_ALT',
         standardRate: standardRate || productionRate,
         productionRate: productionRate > 0 ? productionRate : 0,
