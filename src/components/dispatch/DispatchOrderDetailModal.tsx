@@ -182,6 +182,7 @@ export const DispatchOrderDetailModal: React.FC<DispatchOrderDetailModalProps> =
                     <th className="py-2.5 px-2 text-right font-black text-blue-600">Pending</th>
                     <th className="py-2.5 px-2 text-right">GBL</th>
                     <th className="py-2.5 px-3 text-right">PCS</th>
+                    <th className="py-2.5 px-3 text-center">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
@@ -207,6 +208,18 @@ export const DispatchOrderDetailModal: React.FC<DispatchOrderDetailModalProps> =
                       </td>
                       <td className="py-3 px-3 text-right font-mono font-medium text-gray-600">
                         {item.pcs.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
+                        {item.isAvailable ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            Completed / In Stock
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                            Needs Mfg
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Truck, FileText, Package, CheckCircle2, Clock, AlertCircle,
   Search, Filter, RefreshCw, SlidersHorizontal, ChevronDown,
@@ -9,7 +10,7 @@ import * as XLSX from 'xlsx';
 import { useAuth } from '../../context/AuthContext';
 import { getSalesOrdersV2, SalesOrderV2, updateSalesOrderV2 } from '../../api/salesOrderApiV2';
 import { getCustomSalesOrders, saveCustomSalesOrder } from '../../utils/salesOrderStorage';
-import { getBalancesV2 } from '../../api/mfgApiV2';
+import { getBalancesV2, getSkusV2 } from '../../api/mfgApiV2';
 import { getDeliveryChallans, createDeliveryChallan } from '../../api/deliveryChallanApi';
 import { CreateDispatchModal } from './CreateDispatchModal';
 import { ViewDeliveryChallanModal } from './ViewDeliveryChallanModal';
@@ -33,12 +34,16 @@ export interface DispatchRowOrder {
   items: Array<{
     itemName: string;
     skuCode?: string;
+    skuId?: string;
     uom: string;
     orderedQty: number;
     dispatchedQty: number;
     pendingQty: number;
     gbl: number;
     pcs: number;
+    stockOnHandGbl?: number;
+    stockOnHandPcs?: number;
+    isAvailable?: boolean;
   }>;
   rawOrder: SalesOrderV2;
 }
@@ -225,7 +230,9 @@ export const DispatchModule: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [salesOrders, setSalesOrders] = useState<SalesOrderV2[]>([]);
-  const [liveStockMap, setLiveStockMap] = useState<Map<string, number>>(new Map());
+  const [liveStockMap, setLiveStockMap] = useState<Map<string, { pcs: number; gbl: number }>>(new Map());
+  const [searchParams] = useSearchParams();
+  const urlOrderIdHandled = useRef(false);
 
   // Top Tabs: 'all' | 'ready' | 'partial' | 'not_ready' | 'history'
   const [activeTab, setActiveTab] = useState<'all' | 'ready' | 'partial' | 'not_ready' | 'history'>('all');
@@ -316,21 +323,53 @@ export const DispatchModule: React.FC = () => {
 
       setSalesOrders(combined);
 
-      // 2. Fetch Live Stock Balances
+      // 2. Fetch Live Stock Balances & SKU Master Data for accurate stock readiness
       try {
-        const balances = await getBalancesV2(companyId);
-        const map = new Map<string, number>();
-        if (Array.isArray(balances)) {
-          balances.forEach(b => {
-            const key = b.skuCode || (b.sku && (b.sku as any).code);
-            if (key) {
-              map.set(key, (map.get(key) || 0) + (Number(b.onHand) || 0));
-            }
-          });
-        }
-        setLiveStockMap(map);
+        const [balances, skus] = await Promise.all([
+          getBalancesV2(companyId).catch(() => []),
+          getSkusV2(companyId).catch(() => [])
+        ]);
+
+        const smap = new Map<string, { pcs: number; gbl: number }>();
+        const skuPcsMap = new Map<string, number>();
+        const bList = Array.isArray(balances) ? balances : [];
+        const sList = Array.isArray(skus) ? skus : [];
+
+        bList.forEach((b: any) => {
+          const rawId = b.skuId || b.sku?._id;
+          const sId = rawId ? String((rawId as any)._id || rawId) : '';
+          const qty = Number(b.onHand) || Number(b.quantity) || 0;
+          if (sId) skuPcsMap.set(sId, (skuPcsMap.get(sId) || 0) + qty);
+        });
+
+        sList.forEach((s: any) => {
+          const sId = String(s._id || s.id || '');
+          const code = (s.skuCode || '').toLowerCase().trim();
+          const name = (s.name || '').toLowerCase().trim();
+          const pcsPerGbl = Number(s.altUnitConversion || s.booksGbl || 100) || 100;
+          const rawOnHand = skuPcsMap.get(sId) ?? (Number(s.presentStock || s.openingStock || 0));
+          const unit = (s.unit || '').toUpperCase().trim();
+          const altUnit = (s.altUnit || '').toUpperCase().trim();
+
+          let gbl: number;
+          let pcs: number;
+          if (unit === 'GBL' || (altUnit && altUnit !== 'GBL' && unit.includes('GBL'))) {
+            gbl = rawOnHand;
+            pcs = rawOnHand * pcsPerGbl;
+          } else {
+            pcs = rawOnHand;
+            gbl = pcsPerGbl > 0 ? Math.floor(rawOnHand / pcsPerGbl) : rawOnHand;
+          }
+
+          const val = { pcs, gbl };
+          if (sId) smap.set(sId, val);
+          if (code) smap.set(code, val);
+          if (name) smap.set(name, val);
+        });
+
+        setLiveStockMap(smap);
       } catch (err) {
-        console.warn('getBalancesV2 error:', err);
+        console.warn('Stock loading error in dispatch:', err);
       }
 
       // 3. Fetch Delivery Challans
@@ -391,52 +430,91 @@ export const DispatchModule: React.FC = () => {
       let someItemsReady = false;
 
       const itemsTransformed = (o.items || []).map(item => {
-        const ordered = Number(item.quantity) || 0;
-        const dispatched = Number(item.dispatchedQty) || 0;
-        const pending = Math.max(0, ordered - dispatched);
+        const rawOrdered = Number(item.quantity) || 0;
         const conv = Number(item.pcsPerGbl) || Number(item.altUnitConversion) || 100;
+        const itemGbl = Number(item.gbl) || 0;
 
-        let gblVal = 0;
-        let pcsVal = 0;
+        let orderedPcs = 0;
+        let orderedGbl = 0;
 
-        if (item.uom === 'GBL') {
-          gblVal = pending;
-          pcsVal = pending * conv;
+        // Determine true ordered PCS vs GBL
+        if (itemGbl > 0 && rawOrdered > itemGbl) {
+          // item.quantity was stored in PCS, item.gbl is the GBL equivalent
+          orderedPcs = rawOrdered;
+          orderedGbl = itemGbl;
+        } else if (rawOrdered >= conv && conv > 1) {
+          // Clearly entered as pieces
+          orderedPcs = rawOrdered;
+          orderedGbl = itemGbl || Math.ceil(rawOrdered / conv);
+        } else if ((item.uom || '').toUpperCase() === 'GBL') {
+          // True GBL quantity
+          orderedGbl = rawOrdered;
+          orderedPcs = rawOrdered * conv;
         } else {
-          pcsVal = pending;
-          gblVal = Math.round((pending / conv) * 10) / 10;
+          orderedPcs = rawOrdered;
+          orderedGbl = itemGbl || (conv > 0 ? Math.ceil(rawOrdered / conv) : rawOrdered);
         }
 
-        totalPendingGbl += gblVal;
-        totalPendingPcs += pcsVal;
+        const dispatchedPcs = Number(item.dispatchedQty) || 0;
+        const dispatchedGbl = Math.floor(dispatchedPcs / conv);
+        const pendingPcs = Math.max(0, orderedPcs - dispatchedPcs);
+        const pendingGbl = Math.max(0, orderedGbl - dispatchedGbl) || (conv > 0 ? Math.ceil(pendingPcs / conv) : pendingPcs);
 
-        const stockOnHand = liveStockMap.get(item.skuCode) || 0;
-        if (stockOnHand >= pending && pending > 0) {
+        totalPendingGbl += pendingGbl;
+        totalPendingPcs += pendingPcs;
+
+        const codeKey = (item.skuCode || '').toLowerCase().trim();
+        const idKey = String((item as any).skuId || '');
+        const nameKey = (item.itemName || '').toLowerCase().trim();
+        const stock = (codeKey && liveStockMap.get(codeKey)) ||
+                      (idKey && liveStockMap.get(idKey)) ||
+                      (nameKey && liveStockMap.get(nameKey)) ||
+                      { pcs: 0, gbl: 0 };
+
+        // Item is available purely dynamically if warehouse stock fulfills requirement in GBL or PCS
+        const hasStock = (stock.gbl >= pendingGbl && pendingGbl > 0) || 
+                         (stock.pcs >= pendingPcs && pendingPcs > 0);
+
+        const isItemAvailable = hasStock;
+
+        if (isItemAvailable) {
           someItemsReady = true;
-        } else if (stockOnHand > 0) {
+        } else if (stock.gbl > 0 || stock.pcs > 0) {
           someItemsReady = true;
           allItemsReady = false;
-        } else {
+        } else if (pendingPcs > 0 || pendingGbl > 0) {
           allItemsReady = false;
         }
 
         return {
           itemName: item.itemName,
           skuCode: item.skuCode,
+          skuId: (item as any).skuId,
           uom: item.uom,
-          orderedQty: ordered,
-          dispatchedQty: dispatched,
-          pendingQty: pending,
-          gbl: gblVal,
-          pcs: pcsVal
+          orderedQty: orderedPcs,
+          dispatchedQty: dispatchedPcs,
+          pendingQty: pendingGbl > 0 ? pendingGbl : pendingPcs,
+          gbl: pendingGbl,
+          pcs: pendingPcs,
+          stockOnHandGbl: stock.gbl,
+          stockOnHandPcs: stock.pcs,
+          isAvailable: isItemAvailable
         };
       });
 
-      let status: 'Ready' | 'Partially Ready' | 'Not Ready' = 'Partially Ready';
+      // Purely dynamic order readiness:
+      // Ready if all items are fully in stock
+      // Partially Ready if some items or partial stock is available
+      // Not Ready if zero required stock is available
+      let status: 'Ready' | 'Partially Ready' | 'Not Ready' = 'Not Ready';
       if (itemsTransformed.length > 0) {
-        if (allItemsReady) status = 'Ready';
-        else if (someItemsReady) status = 'Partially Ready';
-        else status = 'Not Ready';
+        if (allItemsReady) {
+          status = 'Ready';
+        } else if (someItemsReady) {
+          status = 'Partially Ready';
+        } else {
+          status = 'Not Ready';
+        }
       }
 
       let formattedDate = o.orderDate || '';
@@ -598,6 +676,18 @@ export const DispatchModule: React.FC = () => {
     }
     setIsCreateModalOpen(true);
   };
+
+  // Auto-open dispatch if orderId is provided in URL (e.g. from Sales Production View)
+  useEffect(() => {
+    const targetOrderId = searchParams.get('orderId');
+    if (targetOrderId && displayRows.length > 0 && !urlOrderIdHandled.current) {
+      const found = displayRows.find(r => r._id === targetOrderId || r.orderNumber === targetOrderId || (r.rawOrder && r.rawOrder._id === targetOrderId));
+      if (found) {
+        urlOrderIdHandled.current = true;
+        handleOpenDispatch(found);
+      }
+    }
+  }, [searchParams, displayRows]);
 
   // Quick Instant Full Dispatch
   const handleQuickFullDispatch = (orderRow: DispatchRowOrder) => {
@@ -1356,8 +1446,9 @@ export const DispatchModule: React.FC = () => {
                         {/* Ready Status Badge */}
                         <td className="py-4 px-4 text-center whitespace-nowrap">
                           {row.readyStatus === 'Ready' && (
-                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs">
-                              Ready
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              Ready (In Stock)
                             </span>
                           )}
                           {row.readyStatus === 'Partially Ready' && (

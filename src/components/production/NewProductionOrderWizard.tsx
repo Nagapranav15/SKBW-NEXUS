@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { 
   Calendar, ChevronDown, Plus, Trash2, RotateCcw, 
@@ -19,13 +20,19 @@ import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
 import { convertRateToUom, convertUom } from '../../utils/uomConversion';
 import { getItemClassification } from '../../utils/skuClassification';
-interface NewProductionOrderWizardProps {
+export interface NewProductionOrderWizardProps {
   onCancel: () => void;
   onCreated: (order: ProductionOrder) => void;
   companyId?: string;
   initialSkus?: SkuV2[];
   editOrder?: ProductionOrder | null;
   existingOrders?: ProductionOrder[];
+  initialSkuCode?: string;
+  initialSkuName?: string;
+  initialPlannedQty?: number;
+  initialPlannedUom?: string;
+  salesOrderRef?: string;
+  salesOrderId?: string;
 }
 
 export interface DepartmentPreset {
@@ -211,7 +218,13 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   companyId,
   initialSkus = [],
   editOrder = null,
-  existingOrders = []
+  existingOrders = [],
+  initialSkuCode,
+  initialSkuName,
+  initialPlannedQty,
+  initialPlannedUom,
+  salesOrderRef,
+  salesOrderId,
 }) => {
   const [submitting, setSubmitting] = useState<boolean>(false);
 
@@ -1072,22 +1085,26 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   };
 
   // Handle product selection & auto BOM load
-  const handleSelectProduct = (sku: SkuV2) => {
+  const handleSelectProduct = (sku: SkuV2, overrideQty?: number, overrideUom?: string) => {
     setSelectedSkuId(sku._id);
     setProductName(sku.name);
     setProductCode(sku.skuCode);
     setShowProductDropdown(false);
     setProductSearch('');
 
-    const assignedUnit = (sku.unit || 'PCS').toUpperCase().trim();
+    const assignedUnit = (overrideUom || sku.unit || 'PCS').toUpperCase().trim();
     setUom(assignedUnit);
 
     // Compute factor synchronously (not from stale state) so BOM scales correctly
     const newFactor = getSkuPcsPerGbl(sku);
     setConversionFactor(newFactor);
 
+    if (overrideQty !== undefined) {
+      setPlannedQty(overrideQty);
+    }
+
     // Compute actual planned PCS inline using the freshly computed factor
-    const curPlannedQty = Number(plannedQty) || 0;
+    const curPlannedQty = overrideQty !== undefined ? overrideQty : (Number(plannedQty) || 0);
     const actualPlannedPcs = assignedUnit === 'GBL' 
       ? curPlannedQty * (newFactor > 0 ? newFactor : 1) 
       : curPlannedQty;
@@ -1203,6 +1220,45 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       });
     }
   };
+
+  // Auto-fill from props or URL params (e.g. from Sales Pending Orders Shortfall "Produce" button)
+  const [searchParams] = useSearchParams();
+  const hasInitializedFromUrl = useRef(false);
+
+  useEffect(() => {
+    if (editOrder || hasInitializedFromUrl.current || backendSkus.length === 0) return;
+
+    const targetSkuCode = initialSkuCode || searchParams.get('skuCode') || searchParams.get('itemCode') || '';
+    const targetSkuName = initialSkuName || searchParams.get('skuName') || searchParams.get('itemName') || '';
+    const targetQty = initialPlannedQty !== undefined ? String(initialPlannedQty) : (searchParams.get('plannedQty') || searchParams.get('qty') || '');
+    const targetUom = initialPlannedUom || searchParams.get('plannedUom') || searchParams.get('uom') || 'GBL';
+    const targetSoRef = salesOrderRef || searchParams.get('salesOrderRef') || '';
+
+    if (targetSkuCode || targetSkuName) {
+      const matched = backendSkus.find(s => 
+        (targetSkuCode && (
+          s.skuCode?.toLowerCase().trim() === targetSkuCode.toLowerCase().trim() ||
+          s._id === targetSkuCode
+        )) ||
+        (targetSkuName && s.name?.toLowerCase().trim() === targetSkuName.toLowerCase().trim())
+      );
+
+      if (matched) {
+        hasInitializedFromUrl.current = true;
+        const parsedQty = targetQty ? Number(targetQty) : undefined;
+        handleSelectProduct(matched, parsedQty, targetUom);
+
+        // Ensure department preset is selected if empty
+        if (!department && departmentPresets.length > 0) {
+          setDepartment(departmentPresets[0].name);
+        }
+        // Auto set remarks if empty
+        if (!remarks) {
+          setRemarks(targetSoRef ? `Production for Sales Order ${targetSoRef} (${matched.name} - ${parsedQty || 1} ${targetUom})` : `Shortfall production for ${matched.name} (${parsedQty || 1} ${targetUom})`);
+        }
+      }
+    }
+  }, [backendSkus, searchParams, editOrder, department, remarks, departmentPresets, initialSkuCode, initialSkuName, initialPlannedQty, initialPlannedUom, salesOrderRef]);
 
   // Helper to fetch live rate options (Avg purchases vs FIFO) and apply to materials
   const fetchAndApplyMaterialRates = async (mats: MaterialRow[], modeToApply?: BomRateMode) => {
@@ -1906,6 +1962,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         requiredCompletionDate: orderDate,
         priority: editOrder?.priority || 'Normal',
         remarks: remarks.trim(),
+        reference: salesOrderRef || editOrder?.reference || undefined,
+        referenceSalesOrderId: salesOrderId || editOrder?.referenceSalesOrderId || undefined,
+        source: salesOrderRef ? 'Sales Order' : (editOrder?.source || undefined),
         bomType: 'Custom BOM (Production Order Only)',
         bomItems: materials.map(m => {
           const sId = m.skuId ? String(m.skuId) : '';

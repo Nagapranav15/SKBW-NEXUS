@@ -18,6 +18,7 @@ import { createProductionOrder, getProductionOrders, completeProductionOrder } f
 import { createDeliveryChallan, getDeliveryChallans } from '../../api/deliveryChallanApi';
 import { showToast } from '../ui/Toast';
 import { formatDateDDMMYYYY } from '../../utils/dateUtils';
+import { NewProductionOrderWizard } from '../production/NewProductionOrderWizard';
 
 // WhatsApp Icon
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
@@ -51,6 +52,8 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
   const [addressTab, setAddressTab] = useState<'billing' | 'delivery'>('billing');
   const [customerDetails, setCustomerDetails] = useState<any | null>(null);
   const [stockMap, setStockMap] = useState<Map<string, number>>(new Map());
+  const [loadedSkus, setLoadedSkus] = useState<any[]>([]);
+  const [showProdWizard, setShowProdWizard] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
@@ -123,6 +126,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
         const smap = new Map<string, number>();
         const bList = Array.isArray(bals) ? bals : [];
         const sList = Array.isArray(skus) ? skus : [];
+        setLoadedSkus(sList);
 
         bList.forEach((b: any) => {
           const rawId = b.skuId || b.sku?._id;
@@ -572,8 +576,22 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
   };
 
   // Order progress steps dynamic calculations
+  const areAllItemsInStock = Boolean(
+    activeOrder.items && 
+    activeOrder.items.length > 0 && 
+    activeOrder.items.every(it => {
+      const code = (it.skuCode || '').toLowerCase().trim();
+      const sId = String(it.skuId || '');
+      const name = (it.itemName || '').toLowerCase().trim();
+      const stockGbl = stockMap.get(code) ?? stockMap.get(sId) ?? stockMap.get(name) ?? 0;
+      const reqGbl = Number(it.uom === 'GBL' ? it.quantity : (Number(it.quantity) / (Number((it as any).pcsPerGbl || 100) || 100))) || 0;
+      return stockGbl >= reqGbl && reqGbl > 0;
+    })
+  );
+
   const isCreatedDone = activeOrder.status !== 'Draft';
   const isProdCompleted = 
+    areAllItemsInStock ||
     linkedProductionOrder?.status === 'Completed' ||
     ['Ready for Dispatch', 'Partially Dispatched', 'Fully Dispatched', 'Delivered'].includes(activeOrder.fulfillmentStatus || '') ||
     activeOrder.status === 'Delivered' || activeOrder.status === 'Invoiced';
@@ -614,7 +632,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
       active: isProdActive,
       color: isProdCompleted ? 'emerald' : isProdActive ? 'amber' : 'gray',
       actionLabel: isProdCompleted ? undefined : isProdActive ? 'Complete Production' : 'Start Production',
-      onAction: isProdCompleted ? undefined : isProdActive ? handleCompleteProduction : handleProceedProduction,
+      onAction: isProdCompleted ? undefined : isProdActive ? handleCompleteProduction : () => setShowProdWizard(true),
     },
     {
       id: 3,
@@ -851,12 +869,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  onClose();
-                  const firstItem = activeOrder.items?.[0];
-                  const totalQty = activeOrder.items?.reduce((s, i) => s + (Number(i.quantity) || 0), 0) || 100;
-                  navigate(`/production?view=new&salesOrderId=${activeOrder._id}&orderNumber=${encodeURIComponent(activeOrder.orderNumber)}&skuCode=${encodeURIComponent(firstItem?.skuCode || '')}&plannedQty=${totalQty}&plannedUom=${encodeURIComponent(firstItem?.uom || 'GBL')}`);
-                }}
+                onClick={() => setShowProdWizard(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-lg font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
               >
                 <span>Plan Production Order</span>
@@ -1376,6 +1389,69 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
           customer={custObj}
           onPaymentSuccess={handlePaymentSuccess}
         />
+
+        {/* ── PRODUCTION ORDER WIZARD MODAL (In-place inside Sales Order) ── */}
+        {showProdWizard && typeof document !== 'undefined' && createPortal(
+          <div
+            className="fixed inset-0 z-[9000] flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden animate-in fade-in duration-200"
+            style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(6px)',
+              WebkitBackdropFilter: 'blur(6px)',
+              width: '100vw',
+              height: '100vh',
+              maxWidth: '100vw',
+              maxHeight: '100vh',
+            }}
+            onClick={() => setShowProdWizard(false)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 animate-in zoom-in-95 duration-200 overflow-hidden relative"
+              style={{ maxWidth: 1260, height: '94vh', maxHeight: '94vh' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <NewProductionOrderWizard
+                onCancel={() => setShowProdWizard(false)}
+                onCreated={async (newOrder) => {
+                  setProductionOrders(prev => [newOrder, ...prev]);
+                  setShowProdWizard(false);
+
+                  // Update Sales Order fulfillmentStatus to 'In Production'
+                  const updatedOrder: SalesOrderV2 = {
+                    ...activeOrder,
+                    fulfillmentStatus: 'In Production',
+                    updatedAt: new Date().toISOString()
+                  };
+                  const compId = (activeOrder.company as any)?._id || activeOrder.company || selectedCompany?._id;
+                  const isLocalId = !activeOrder._id || activeOrder._id.startsWith('so-mock-') || activeOrder._id.startsWith('so-user-');
+                  if (activeOrder._id && !isLocalId) {
+                    try {
+                      await updateSalesOrderV2Status(activeOrder._id, { fulfillmentStatus: 'In Production' });
+                    } catch (apiErr) {
+                      console.warn('Backend status update note:', apiErr);
+                    }
+                  }
+                  saveCustomSalesOrder(updatedOrder, compId);
+                  setLocalOrder(updatedOrder);
+                  if (onOrderUpdated) onOrderUpdated(updatedOrder);
+                  showToast(`Production Order ${newOrder.orderNumber} created and linked to this Sales Order!`, 'success');
+                }}
+                companyId={(activeOrder.company as any)?._id || activeOrder.company || selectedCompany?._id}
+                initialSkus={loadedSkus}
+                initialSkuCode={activeOrder.items?.[0]?.skuCode}
+                initialSkuName={activeOrder.items?.[0]?.itemName}
+                initialPlannedQty={
+                  activeOrder.items?.[0]?.gbl ||
+                  (activeOrder.items?.[0]?.quantity ? Math.ceil(activeOrder.items[0].quantity / (activeOrder.items[0].pcsPerGbl || 100)) : 100)
+                }
+                initialPlannedUom={activeOrder.items?.[0]?.uom || 'GBL'}
+                salesOrderRef={activeOrder.orderNumber}
+                salesOrderId={activeOrder._id}
+              />
+            </div>
+          </div>,
+          document.body
+        )}
 
       </div>
     </div>,

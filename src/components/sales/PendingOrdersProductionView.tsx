@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Factory, Package, AlertTriangle, CheckCircle2, Clock,
   ChevronDown, ChevronRight, Search, Download, Printer,
   Eye, Play, Layers, Calendar, Filter, ArrowUpDown,
   Building, Phone, ArrowRight, ShieldCheck, Box, Sparkles,
-  TrendingUp, Check, MessageSquare, Tag, Zap, X, FileText
+  TrendingUp, Check, MessageSquare, Tag, Zap, X, FileText, Truck
 } from 'lucide-react';
 import { SalesOrderV2 } from '../../api/salesOrderApiV2';
 import { getBalancesV2, getSkusV2 } from '../../api/mfgApiV2';
@@ -14,6 +15,7 @@ import { showToast } from '../ui/Toast';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import { formatDateDDMMYYYY } from '../../utils/dateUtils';
+import { NewProductionOrderWizard } from '../production/NewProductionOrderWizard';
 
 interface PendingOrdersProductionViewProps {
   orders: SalesOrderV2[];
@@ -107,6 +109,17 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
   const [categoryMap, setCategoryMap] = useState<Map<string, string>>(new Map());
   const [loadingStock, setLoadingStock] = useState(false);
   const [inProductionSkus, setInProductionSkus] = useState<Set<string>>(new Set());
+  const [loadedSkus, setLoadedSkus] = useState<any[]>([]);
+
+  // Production Order Wizard in-modal state (stays inside sales order module)
+  const [productionWizardConfig, setProductionWizardConfig] = useState<{
+    isOpen: boolean;
+    skuCode: string;
+    skuName: string;
+    shortfallGbl: number;
+    orderRef?: string;
+    orderId?: string;
+  } | null>(null);
 
   // Filter only pending sales orders (Not fully dispatched / completed)
   const pendingOrders = useMemo(() => {
@@ -131,6 +144,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
       const catMap = new Map<string, string>();
       const bList = Array.isArray(bals) ? bals : [];
       const sList = Array.isArray(skus) ? skus : [];
+      setLoadedSkus(sList);
 
       const skuPcsMap = new Map<string, number>();
       bList.forEach((b: any) => {
@@ -426,11 +440,16 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
     });
   };
 
-  // Handle Start Production
-  const handleStartProduction = (skuCode: string, skuName: string, shortfallGbl: number) => {
-    setInProductionSkus(prev => new Set(prev).add(skuCode));
-    showToast(`Opening Production Order Wizard for ${skuName} (${shortfallGbl} GBL)...`, 'success');
-    navigate(`/production?view=new&skuCode=${encodeURIComponent(skuCode)}&plannedQty=${encodeURIComponent(String(Math.max(1, shortfallGbl)))}&plannedUom=GBL`);
+  // Handle Start Production: opens wizard modal directly in Sales Orders
+  const handleStartProduction = (skuCode: string, skuName: string, shortfallGbl: number, orderRef?: string, orderId?: string) => {
+    setProductionWizardConfig({
+      isOpen: true,
+      skuCode,
+      skuName,
+      shortfallGbl: Math.max(1, shortfallGbl),
+      orderRef,
+      orderId
+    });
   };
 
   // Helper for report dates (DD-MM-YYYY)
@@ -1647,12 +1666,30 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleStartProduction(req.skuCode, req.skuName, req.shortfallGbl);
+                                  handleStartProduction(
+                                    req.skuCode,
+                                    req.skuName,
+                                    req.shortfallGbl,
+                                    req.orders[0]?.orderNumber,
+                                    req.orders[0]?.orderId
+                                  );
                                 }}
                                 className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors cursor-pointer"
                                 title="Start production batch for this shortfall"
                               >
                                 Produce
+                              </button>
+                            ) : !hasShortfall ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate('/dispatch');
+                                }}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition-colors cursor-pointer flex items-center gap-1"
+                                title="Stock is available — proceed to Dispatch"
+                              >
+                                <Truck className="w-3.5 h-3.5" />
+                                <span>Dispatch</span>
                               </button>
                             ) : null}
 
@@ -1752,15 +1789,43 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                         {o.pendingGbl} GBL <span className="text-[10px] text-amber-600">({o.pendingPcs} pcs)</span>
                                       </td>
                                       <td className="py-2 px-3 text-right" onClick={(e) => e.stopPropagation()}>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            onViewOrder(o.rawOrder);
-                                          }}
-                                          className="px-2 py-0.5 text-blue-600 hover:text-blue-800 text-xs font-semibold cursor-pointer hover:underline"
-                                        >
-                                          View SO
-                                        </button>
+                                        <div className="flex items-center justify-end gap-2">
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              onViewOrder(o.rawOrder);
+                                            }}
+                                            className="px-2 py-0.5 text-blue-600 hover:text-blue-800 text-xs font-semibold cursor-pointer hover:underline"
+                                          >
+                                            View SO
+                                          </button>
+                                          {hasShortfall && (
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleStartProduction(req.skuCode, req.skuName, o.pendingGbl, o.orderNumber, o.orderId);
+                                              }}
+                                              className="px-2 py-0.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-xs font-semibold cursor-pointer transition-colors flex items-center gap-0.5"
+                                              title={`Produce ${o.pendingGbl} GBL for ${o.orderNumber}`}
+                                            >
+                                              <Factory className="w-3 h-3" />
+                                              <span>Produce</span>
+                                            </button>
+                                          )}
+                                          {!hasShortfall && (
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigate(`/dispatch?orderId=${encodeURIComponent(o.orderId)}`);
+                                              }}
+                                              className="px-2 py-0.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded text-xs font-semibold cursor-pointer transition-colors flex items-center gap-0.5"
+                                              title="Dispatch this sales order"
+                                            >
+                                              <Truck className="w-3 h-3" />
+                                              <span>Dispatch</span>
+                                            </button>
+                                          )}
+                                        </div>
                                       </td>
                                     </tr>
                                   ))}
@@ -1914,6 +1979,26 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
 
                                 {/* Cute compact right quantity */}
                                 <div className="flex items-center gap-1.5 shrink-0 font-mono text-right pl-1">
+                                  {!isInStock && pendingGbl > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleStartProduction(
+                                          item.skuCode || '',
+                                          item.itemName || item.skuCode || '',
+                                          pendingGbl,
+                                          order.orderNumber,
+                                          order._id
+                                        );
+                                      }}
+                                      className="px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded text-[10.5px] font-semibold cursor-pointer transition-colors flex items-center gap-0.5 shadow-3xs"
+                                      title={`Produce ${pendingGbl} GBL for ${order.orderNumber}`}
+                                    >
+                                      <Factory className="w-3 h-3 text-blue-600" />
+                                      <span>Produce</span>
+                                    </button>
+                                  )}
                                   <span className="font-bold text-blue-700 bg-white group-hover/item:bg-blue-50 px-1.5 py-0.5 rounded border border-slate-200/90 text-xs shadow-3xs transition-colors">
                                     {pendingGbl} <span className="text-[9.5px] font-semibold text-slate-500">GBL</span>
                                   </span>
@@ -1951,6 +2036,50 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
             </table>
           </div>
         </div>
+      )}
+
+      {/* ── PRODUCTION ORDER WIZARD MODAL (In-place inside Sales Order module) ── */}
+      {productionWizardConfig?.isOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[9000] flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden animate-in fade-in duration-200"
+          style={{
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            width: '100vw',
+            height: '100vh',
+            maxWidth: '100vw',
+            maxHeight: '100vh',
+          }}
+          onClick={() => setProductionWizardConfig(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 animate-in zoom-in-95 duration-200 overflow-hidden relative"
+            style={{ maxWidth: 1260, height: '94vh', maxHeight: '94vh' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <NewProductionOrderWizard
+              onCancel={() => setProductionWizardConfig(null)}
+              onCreated={(order) => {
+                if (productionWizardConfig.skuCode) {
+                  setInProductionSkus(prev => new Set(prev).add(productionWizardConfig.skuCode));
+                }
+                setProductionWizardConfig(null);
+                showToast(`Production Order ${order.orderNumber} created successfully!`, 'success');
+                if (onRefresh) onRefresh();
+              }}
+              companyId={selectedCompany?._id}
+              initialSkus={loadedSkus}
+              initialSkuCode={productionWizardConfig.skuCode}
+              initialSkuName={productionWizardConfig.skuName}
+              initialPlannedQty={Math.max(1, productionWizardConfig.shortfallGbl)}
+              initialPlannedUom="GBL"
+              salesOrderRef={productionWizardConfig.orderRef}
+              salesOrderId={productionWizardConfig.orderId}
+            />
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
