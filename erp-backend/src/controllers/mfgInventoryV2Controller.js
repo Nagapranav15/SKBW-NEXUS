@@ -1442,17 +1442,99 @@ exports.deleteWarehouseLocation = async (req, res, next) => {
       });
     }
 
-    // Check if any of target locations has active stock
-    const stockCount = await InventoryLedger.aggregate([
-      { $match: { locationId: { $in: targetLocationIds }, company: companyObjId, status: { $ne: "Cancelled" } } },
-      { $group: { _id: null, qtyIn: { $sum: { $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", 0] } }, qtyOut: { $sum: { $cond: [{ $eq: ["$direction", "OUT"] }, "$quantity", 0] } } } },
+    // Check if target location or any descendant locations contain active inventory data
+    const stockCountLedger = await InventoryLedger.aggregate([
+      {
+        $match: {
+          company: companyObjId,
+          status: { $ne: "Cancelled" },
+          $or: [
+            { locationId: { $in: targetLocationIds } },
+            { zoneId: { $in: targetLocationIds } },
+            { floorId: { $in: targetLocationIds } },
+            { warehouseId: { $in: targetLocationIds } }
+          ]
+        }
+      },
+      {
+        $group: {
+          _id: "$skuId",
+          qtyIn: { $sum: { $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", 0] } },
+          qtyOut: { $sum: { $cond: [{ $eq: ["$direction", "OUT"] }, "$quantity", 0] } }
+        }
+      },
       { $project: { onHand: { $subtract: ["$qtyIn", "$qtyOut"] } } },
       { $match: { onHand: { $gt: 0.0001 } } }
     ]);
 
-    if (stockCount.length > 0 && stockCount[0].onHand > 0.0001) {
+    const stockCountLedgerV2 = await InventoryLedgerV2.aggregate([
+      {
+        $match: {
+          company: companyObjId,
+          locationId: { $in: targetLocationIds }
+        }
+      },
+      {
+        $group: {
+          _id: "$skuId",
+          qtyIn: { $sum: "$qtyIn" },
+          qtyOut: { $sum: "$qtyOut" }
+        }
+      },
+      { $project: { onHand: { $subtract: ["$qtyIn", "$qtyOut"] } } },
+      { $match: { onHand: { $gt: 0.0001 } } }
+    ]);
+
+    const targetLocationIdsStr = targetLocationIds.map(id => String(id));
+    const targetLocationNames = allCompanyLocations
+      .filter(l => targetLocationIdsStr.includes(String(l._id)))
+      .map(l => l.name);
+
+    const activeSkuDocs = await SkuV2.find({
+      company: companyObjId,
+      isDeleted: { $ne: true },
+      $or: [
+        { initialLocationId: { $in: targetLocationIdsStr } },
+        { "initialLocation._id": { $in: targetLocationIds } },
+        { defaultLocation: { $in: targetLocationNames } }
+      ],
+      $or: [
+        { presentStock: { $gt: 0.0001 } },
+        { openingStock: { $gt: 0.0001 } }
+      ]
+    }).lean();
+
+    const distinctSkuIds = new Set();
+    let totalStockOnHand = 0;
+
+    if (stockCountLedger && stockCountLedger.length > 0) {
+      stockCountLedger.forEach(s => {
+        totalStockOnHand += s.onHand;
+        if (s._id) distinctSkuIds.add(String(s._id));
+      });
+    }
+
+    if (stockCountLedgerV2 && stockCountLedgerV2.length > 0) {
+      stockCountLedgerV2.forEach(s => {
+        totalStockOnHand += s.onHand;
+        if (s._id) distinctSkuIds.add(String(s._id));
+      });
+    }
+
+    if (activeSkuDocs && activeSkuDocs.length > 0) {
+      activeSkuDocs.forEach(sku => {
+        const sStock = Number(sku.presentStock ?? sku.openingStock) || 0;
+        if (sStock > 0 && !distinctSkuIds.has(String(sku._id))) {
+          totalStockOnHand += sStock;
+        }
+        distinctSkuIds.add(String(sku._id));
+      });
+    }
+
+    if (totalStockOnHand > 0.0001 || distinctSkuIds.size > 0) {
+      const levelLabel = loc.level || 'Location';
       return res.status(400).json({
-        msg: `Cannot delete location '${loc.name}' because it (or its sub-locations) currently holds ${stockCount[0].onHand.toFixed(2)} units of stock. Please transfer all stock out first.`
+        msg: `Cannot delete ${levelLabel} '${loc.name}' because it contains active inventory (${totalStockOnHand.toFixed(2)} units across ${distinctSkuIds.size} item(s)). Please transfer or remove all inventory before deleting.`
       });
     }
 

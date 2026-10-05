@@ -7,7 +7,7 @@ import {
   Boxes, ArrowRight, Printer, Download,
   SlidersHorizontal, History, Sparkles,
   FileSpreadsheet, ArrowUpRight, CheckCircle2,
-  Scale, FileText, Info, X
+  Scale, FileText, Info, X, AlertTriangle
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../../context/AuthContext';
@@ -847,17 +847,22 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
       return { rawMatQty: 0, rawMatSkus: 0, semiQty: 0, semiSkus: 0, fgQty: 0, fgSkus: 0, totalSkus: 0 };
     }
 
-    // Collect all descendant IDs for target location (e.g. if target is Zone, collect Zone ID + all its Bins)
+    // Collect all descendant IDs for target location (e.g. if target is Factory/Floor/Zone, collect all nested children)
     const targetLocIds = new Set<string>([String(targetLoc._id)]);
     const targetLocNames = new Set<string>([targetLoc.name.toLowerCase().trim()]);
 
-    const childLocations = locations.filter(l => l.parentId === targetLoc._id);
-    childLocations.forEach(c => {
-      if (c._id) {
-        targetLocIds.add(String(c._id));
-        targetLocNames.add(c.name.toLowerCase().trim());
+    const queue = [String(targetLoc._id)];
+    while (queue.length > 0) {
+      const parentId = queue.shift();
+      const children = locations.filter(l => l.parentId && String(l.parentId) === parentId);
+      for (const child of children) {
+        if (child._id && !targetLocIds.has(String(child._id))) {
+          targetLocIds.add(String(child._id));
+          targetLocNames.add(child.name.toLowerCase().trim());
+          queue.push(String(child._id));
+        }
       }
-    });
+    }
 
     // Also collect parent info for contextual matching
     const parent = targetLoc.parentId ? locations.find(l => l._id === targetLoc.parentId) : null;
@@ -967,6 +972,16 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
       totalSkus
     };
   };
+
+  // Stock and SKU metrics for the location/zone/floor/factory currently selected for deletion
+  const confirmNodeMetrics = useMemo(() => {
+    if (!deleteConfirmNode) return null;
+    return getLocationStockMetrics(deleteConfirmNode);
+  }, [deleteConfirmNode, locations, balances, skus]);
+
+  const confirmNodeTotalQty = confirmNodeMetrics ? (confirmNodeMetrics.rawMatQty + confirmNodeMetrics.semiQty + confirmNodeMetrics.fgQty) : 0;
+  const confirmNodeTotalSkus = confirmNodeMetrics ? confirmNodeMetrics.totalSkus : 0;
+  const confirmNodeHasData = (confirmNodeTotalQty > 0.0001) || (confirmNodeTotalSkus > 0);
 
   // Structured Table Rows for the Selected Floor
   const tableRows = useMemo(() => {
@@ -1177,6 +1192,18 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
 
   const handleDeleteLocation = async () => {
     if (!deleteConfirmNode?._id) return;
+
+    // Strict safeguard: Prevent deletion if contains active stock or SKUs
+    const metrics = getLocationStockMetrics(deleteConfirmNode);
+    const totalQty = metrics.rawMatQty + metrics.semiQty + metrics.fgQty;
+    if (totalQty > 0.0001 || metrics.totalSkus > 0) {
+      showToast(
+        `Cannot delete '${deleteConfirmNode.name}' because it contains active inventory (${totalQty > 0 ? totalQty.toFixed(1) + ' units' : 'stored items'} across ${metrics.totalSkus} item(s)). Please transfer or remove all stock first.`,
+        'error'
+      );
+      return;
+    }
+
     try {
       await deleteWarehouseLocationV2(deleteConfirmNode._id, selectedCompany?._id || '', cascadeDelete);
       showToast(`Deleted '${deleteConfirmNode.name}'`, 'success');
@@ -1480,30 +1507,44 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                   </div>
 
                   {/* Factory Actions: Edit & Delete */}
-                  <div className="flex items-center gap-0.5 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenEditModal(factory);
-                      }}
-                      className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-100/50 rounded transition-colors cursor-pointer"
-                      title="Edit Factory"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteConfirmNode(factory);
-                      }}
-                      className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-100/50 rounded transition-colors cursor-pointer"
-                      title="Delete Factory"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  {(() => {
+                    const fMetrics = getLocationStockMetrics(factory);
+                    const fStock = fMetrics.rawMatQty + fMetrics.semiQty + fMetrics.fgQty;
+                    const fHasData = fStock > 0.0001 || fMetrics.totalSkus > 0;
+
+                    return (
+                      <div className="flex items-center gap-0.5 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditModal(factory);
+                          }}
+                          className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-100/50 rounded transition-colors cursor-pointer"
+                          title="Edit Factory"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteConfirmNode(factory);
+                          }}
+                          className={`p-1 rounded transition-colors cursor-pointer ${
+                            fHasData ? 'text-slate-300 hover:text-rose-500 hover:bg-rose-50' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-100/50'
+                          }`}
+                          title={
+                            fHasData
+                              ? `Contains ${fStock.toLocaleString('en-IN')} units (${fMetrics.totalSkus} SKUs) - cannot be deleted`
+                              : "Delete Factory"
+                          }
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
@@ -1535,32 +1576,44 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                     </button>
 
                     {/* Quick Floor Edit / Delete if active */}
-                    {isSelected && (
-                      <div className="flex items-center gap-0.5 ml-1 border-l border-blue-200 pl-1">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenEditModal(floor);
-                          }}
-                          className="p-0.5 text-blue-500 hover:text-blue-700 hover:bg-blue-100/60 rounded cursor-pointer"
-                          title="Edit Floor"
-                        >
-                          <Edit2 className="w-3 h-3" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteConfirmNode(floor);
-                          }}
-                          className="p-0.5 text-rose-400 hover:text-rose-600 hover:bg-rose-100/60 rounded cursor-pointer"
-                          title="Delete Floor"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    )}
+                    {isSelected && (() => {
+                      const flMetrics = getLocationStockMetrics(floor);
+                      const flStock = flMetrics.rawMatQty + flMetrics.semiQty + flMetrics.fgQty;
+                      const flHasData = flStock > 0.0001 || flMetrics.totalSkus > 0;
+
+                      return (
+                        <div className="flex items-center gap-0.5 ml-1 border-l border-blue-200 pl-1">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEditModal(floor);
+                            }}
+                            className="p-0.5 text-blue-500 hover:text-blue-700 hover:bg-blue-100/60 rounded cursor-pointer"
+                            title="Edit Floor"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteConfirmNode(floor);
+                            }}
+                            className={`p-0.5 rounded cursor-pointer ${
+                              flHasData ? 'text-rose-300 hover:text-rose-500 hover:bg-rose-100/60' : 'text-rose-400 hover:text-rose-600 hover:bg-rose-100/60'
+                            }`}
+                            title={
+                              flHasData
+                                ? `Contains ${flStock.toLocaleString('en-IN')} units (${flMetrics.totalSkus} SKUs) - cannot be deleted`
+                                : "Delete Floor"
+                            }
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
@@ -1760,17 +1813,30 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                             </button>
 
                             {/* Delete */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeleteConfirmNode(row.location);
-                              }}
-                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
-                              title="Delete Location"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {(() => {
+                              const locTotalQty = row.rawMatQty + row.semiQty + row.fgQty;
+                              const locHasData = locTotalQty > 0.0001 || row.totalSkus > 0;
+
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteConfirmNode(row.location);
+                                  }}
+                                  className={`p-1 rounded transition-colors cursor-pointer ${
+                                    locHasData ? 'text-slate-300 hover:text-rose-500 hover:bg-rose-50' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
+                                  }`}
+                                  title={
+                                    locHasData
+                                      ? `Contains ${locTotalQty.toLocaleString('en-IN')} units (${row.totalSkus} SKUs) - cannot be deleted`
+                                      : "Delete Location"
+                                  }
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              );
+                            })()}
                           </div>
                         </td>
                       </tr>
@@ -1909,17 +1975,31 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteConfirmNode(zone);
-                        }}
-                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
-                        title="Delete Zone"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {(() => {
+                        const zoneTotalQty = rawMatQty + semiQty + fgQty;
+                        const zoneTotalSkus = rawMatSkus + semiSkus + fgSkus;
+                        const zoneHasData = zoneTotalQty > 0.0001 || zoneTotalSkus > 0;
+
+                        return (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteConfirmNode(zone);
+                            }}
+                            className={`p-1 rounded transition-colors cursor-pointer ${
+                              zoneHasData ? 'text-slate-300 hover:text-rose-500 hover:bg-rose-50' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
+                            }`}
+                            title={
+                              zoneHasData
+                                ? `Contains ${zoneTotalQty.toLocaleString('en-IN')} units (${zoneTotalSkus} SKUs) - cannot be deleted`
+                                : "Delete Zone"
+                            }
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -2721,32 +2801,73 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
         title={`Delete ${deleteConfirmNode?.level || 'Location'}`}
       >
         <div className="space-y-3.5 text-xs text-left">
-          <p className="text-slate-700 font-medium">
-            Are you sure you want to delete <strong className="text-slate-900">{deleteConfirmNode?.name}</strong> ({deleteConfirmNode?.level})?
-          </p>
+          {confirmNodeHasData ? (
+            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl space-y-2.5">
+              <div className="flex items-center gap-2 text-rose-900 font-bold text-sm">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>Deletion Blocked: Active Data Found</span>
+              </div>
+              <p className="text-xs text-rose-800 leading-relaxed">
+                <strong>{deleteConfirmNode?.name}</strong> ({deleteConfirmNode?.level}) cannot be deleted because it contains active inventory data:
+              </p>
+              <div className="grid grid-cols-3 gap-2 bg-white/90 p-2.5 rounded-lg border border-rose-100 text-xs">
+                <div>
+                  <span className="text-[10px] text-slate-500 block uppercase tracking-wider font-semibold">Total Stock</span>
+                  <span className="font-bold text-rose-700 text-sm">{confirmNodeTotalQty.toLocaleString('en-IN')} units</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 block uppercase tracking-wider font-semibold">Distinct SKUs</span>
+                  <span className="font-bold text-slate-800 text-sm">{confirmNodeTotalSkus} item(s)</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 block uppercase tracking-wider font-semibold">Breakdown</span>
+                  <span className="text-[11px] text-slate-600 font-medium block">
+                    {confirmNodeMetrics?.rawMatQty ? `${confirmNodeMetrics.rawMatQty} RM ` : ''}
+                    {confirmNodeMetrics?.semiQty ? `${confirmNodeMetrics.semiQty} Semi ` : ''}
+                    {confirmNodeMetrics?.fgQty ? `${confirmNodeMetrics.fgQty} FG` : ''}
+                  </span>
+                </div>
+              </div>
+              <p className="text-[11px] text-rose-700 font-medium">
+                Please transfer, consume, or clear all stock and associated items from this {deleteConfirmNode?.level?.toLowerCase() || 'location'} before deleting it.
+              </p>
+            </div>
+          ) : (
+            <>
+              <p className="text-slate-700 font-medium">
+                Are you sure you want to delete <strong className="text-slate-900">{deleteConfirmNode?.name}</strong> ({deleteConfirmNode?.level})?
+              </p>
 
-          <label className="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 font-medium text-xs cursor-pointer">
-            <input
-              type="checkbox"
-              checked={cascadeDelete}
-              onChange={e => setCascadeDelete(e.target.checked)}
-              className="w-4 h-4 text-rose-600 rounded border-gray-300 focus:ring-rose-500"
-            />
-            <span>Also delete all sub-locations (floors, zones, shelves) under this location</span>
-          </label>
+              <label className="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 font-medium text-xs cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={cascadeDelete}
+                  onChange={e => setCascadeDelete(e.target.checked)}
+                  className="w-4 h-4 text-rose-600 rounded border-gray-300 focus:ring-rose-500"
+                />
+                <span>Also delete all sub-locations (floors, zones, shelves) under this location</span>
+              </label>
+            </>
+          )}
 
           <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
             <button
               onClick={() => setDeleteConfirmNode(null)}
               className="px-3.5 py-1.5 border border-slate-200 rounded-lg font-medium text-slate-600 hover:bg-slate-50 cursor-pointer text-xs"
             >
-              Cancel
+              {confirmNodeHasData ? 'Close' : 'Cancel'}
             </button>
             <button
+              disabled={confirmNodeHasData}
               onClick={handleDeleteLocation}
-              className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-semibold shadow-xs cursor-pointer text-xs"
+              className={`px-4 py-1.5 rounded-lg font-semibold shadow-xs text-xs flex items-center gap-1.5 ${
+                confirmNodeHasData
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
+                  : 'bg-rose-600 hover:bg-rose-700 text-white cursor-pointer'
+              }`}
             >
-              Delete
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete</span>
             </button>
           </div>
         </div>
