@@ -53,6 +53,14 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
   const [customerDetails, setCustomerDetails] = useState<any | null>(null);
   const [stockMap, setStockMap] = useState<Map<string, number>>(new Map());
   const [loadedSkus, setLoadedSkus] = useState<any[]>([]);
+  const [stockRefreshKey, setStockRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const handleStockChange = () => setStockRefreshKey(k => k + 1);
+    window.addEventListener('stock_balance_changed', handleStockChange);
+    return () => window.removeEventListener('stock_balance_changed', handleStockChange);
+  }, []);
+
   const [showProdWizard, setShowProdWizard] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -159,7 +167,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
         setStockMap(smap);
       }).catch(() => {});
     }
-  }, [isOpen, activeOrder, selectedCompany?._id]);
+  }, [isOpen, activeOrder, selectedCompany?._id, stockRefreshKey]);
 
   // Fetch linked production orders & delivery challans to make order progress dynamic
   useEffect(() => {

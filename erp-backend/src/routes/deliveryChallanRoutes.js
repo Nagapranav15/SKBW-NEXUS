@@ -4,10 +4,12 @@ const auth = require("../middlewares/authMiddleware");
 const rbac = require("../middlewares/rbacMiddleware");
 const dcController = require("../controllers/deliveryChallanController");
 
-router.get("/", auth, rbac(["MANAGE_DELIVERY", "VIEW_DELIVERY"]), dcController.getDeliveryChallans);
-router.get("/:id", auth, rbac(["MANAGE_DELIVERY", "VIEW_DELIVERY"]), dcController.getDeliveryChallanById);
-router.post("/", auth, rbac("MANAGE_DELIVERY"), dcController.createDeliveryChallan);
-router.put("/:id", auth, rbac("MANAGE_DELIVERY"), dcController.updateDeliveryChallan);
-router.delete("/:id", auth, rbac("MANAGE_DELIVERY"), dcController.deleteDeliveryChallan);
+const DC_PERMS = ["MANAGE_DELIVERY", "CREATE_ORDERS", "MANAGE_ORDERS", "MANAGE_DISPATCH", "VIEW_DELIVERY", "VIEW_ORDERS"];
+
+router.get("/", auth, rbac(DC_PERMS), dcController.getDeliveryChallans);
+router.get("/:id", auth, rbac(DC_PERMS), dcController.getDeliveryChallanById);
+router.post("/", auth, rbac(DC_PERMS), dcController.createDeliveryChallan);
+router.put("/:id", auth, rbac(DC_PERMS), dcController.updateDeliveryChallan);
+router.delete("/:id", auth, rbac(DC_PERMS), dcController.deleteDeliveryChallan);
 
 module.exports = router;

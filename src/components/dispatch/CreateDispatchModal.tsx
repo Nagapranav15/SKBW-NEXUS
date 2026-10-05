@@ -409,6 +409,8 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
       localStorage.setItem(cKey, JSON.stringify([createdChallan, ...stored]));
 
       showToast(`Dispatch ${dcNumber} ${asDraft ? 'saved as draft' : 'created successfully'}!`, 'success');
+      window.dispatchEvent(new CustomEvent('stock_balance_changed'));
+      window.dispatchEvent(new CustomEvent('sales_order_updated'));
       onDispatchCreated(createdChallan);
       onClose();
     } catch (err: any) {

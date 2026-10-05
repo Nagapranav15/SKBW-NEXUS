@@ -108,6 +108,14 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
   const [stockMap, setStockMap] = useState<Map<string, { pcs: number; gbl: number }>>(new Map());
   const [categoryMap, setCategoryMap] = useState<Map<string, string>>(new Map());
   const [loadingStock, setLoadingStock] = useState(false);
+  const [stockRefreshKey, setStockRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const handleStockChange = () => setStockRefreshKey(k => k + 1);
+    window.addEventListener('stock_balance_changed', handleStockChange);
+    return () => window.removeEventListener('stock_balance_changed', handleStockChange);
+  }, []);
+
   const [inProductionSkus, setInProductionSkus] = useState<Set<string>>(new Set());
   const [loadedSkus, setLoadedSkus] = useState<any[]>([]);
 
@@ -193,7 +201,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
     }).finally(() => {
       setLoadingStock(false);
     });
-  }, [selectedCompany?._id]);
+  }, [selectedCompany?._id, stockRefreshKey]);
 
   // Compute Item-wise Production Requirements (Tally Sales Orders Outstanding)
   const itemWiseRequirements = useMemo<SkuProductionRequirement[]>(() => {

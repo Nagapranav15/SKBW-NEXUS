@@ -2,12 +2,22 @@ const mongoose = require("mongoose");
 
 const dcItemSchema = new mongoose.Schema({
   itemId: String,
+  skuId: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
+  },
+  skuCode: {
+    type: String,
+    default: ""
+  },
   itemName: String,
   orderedQty: Number,
   deliveredQty: Number,
+  deliveredPcs: Number,
+  uom: String,
   price: Number,
   total: Number
-}, { _id: true });
+}, { _id: true, strict: false });
 
 const deliveryChallanSchema = new mongoose.Schema({
   dcNumber: {
@@ -15,7 +25,7 @@ const deliveryChallanSchema = new mongoose.Schema({
     required: true
   },
   orderId: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.Mixed,
     ref: "SalesOrder"
   },
   orderNumber: {
@@ -23,7 +33,7 @@ const deliveryChallanSchema = new mongoose.Schema({
     default: ""
   },
   customerId: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.Mixed,
     ref: "Party"
   },
   customerName: {
