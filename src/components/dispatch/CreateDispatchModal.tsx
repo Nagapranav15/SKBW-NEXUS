@@ -125,7 +125,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
   const [dispatchType, setDispatchType] = useState<'full' | 'partial'>('full');
 
   /* ── dispatch details ── */
-  const [dispatchDate, setDispatchDate] = useState('');
+  const [dispatchDate, setDispatchDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [transporter, setTransporter] = useState('');
   const [lrNumber, setLrNumber] = useState('');
   const [lrDate, setLrDate] = useState('');
@@ -353,9 +353,9 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
         dcNumber,
         orderId: activeOrder._id,
         orderNumber: activeOrder.orderNumber,
-        customerName: activeOrder.customerName,
+        customerName: activeOrder.customerName || 'Customer',
         customerId: (activeOrder.customer as any)?._id || (activeOrder as any).customerId,
-        date: dispatchDate,
+        date: dispatchDate || new Date().toISOString().split('T')[0],
         transporterName: transporter.trim(),
         lrNumber: lrNumber.trim(),
         lrDate,

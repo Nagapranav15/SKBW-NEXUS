@@ -420,6 +420,12 @@ exports.createDeliveryChallan = async (req, res) => {
     }
 
     const payload = { ...req.body, dcNumber };
+    if (!payload.date || !String(payload.date).trim()) {
+      payload.date = new Date().toISOString().split("T")[0];
+    }
+    if (!payload.customerName || !String(payload.customerName).trim()) {
+      payload.customerName = "Customer";
+    }
     if (payload.orderId && !mongoose.Types.ObjectId.isValid(String(payload.orderId))) {
       payload.orderNumber = payload.orderNumber || String(payload.orderId);
       payload.orderId = null;

@@ -42,7 +42,7 @@ const deliveryChallanSchema = new mongoose.Schema({
   },
   date: {
     type: String,
-    required: true
+    default: () => new Date().toISOString().split("T")[0]
   },
   transporterName: {
     type: String,
