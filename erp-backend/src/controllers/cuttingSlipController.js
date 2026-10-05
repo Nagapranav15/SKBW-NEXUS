@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const CuttingSlip = require("../models/cuttingSlipModel");
 const InventoryLedger = require("../models/inventoryLedgerModelV2");
+const InventoryLedgerV2 = require("../models/inventoryLedgerV2Model");
 const SkuV2 = require("../models/skuV2Model");
 const WarehouseLocationV2 = require("../models/warehouseLocationV2Model");
 const Sequence = require("../models/sequenceModel");
@@ -112,8 +113,60 @@ exports.getAvailableReels = async (req, res) => {
 
     const reelSkuIds = reelSkus.map(s => s._id);
 
-    // Step B: Query InventoryLedger to find on-hand reels
-    // Reels IN minus Reels OUT
+    // Step B: Query ALL already cut / consumed reels from posted Cutting Slips and InventoryLedger
+    const postedSlips = await CuttingSlip.find({
+      company: companyId,
+      status: "Posted"
+    }).select("sourceSku purchaseBatch selectedReels").lean();
+
+    const cutReelNumbers = new Set();
+    const cutReelKeys = new Set();
+
+    for (const slip of postedSlips) {
+      const skuIdStr = String(slip.sourceSku || '');
+      const batchStr = String(slip.purchaseBatch || '').trim().toLowerCase();
+      for (const r of (slip.selectedReels || [])) {
+        if (r && r.reelNumber) {
+          const num = String(r.reelNumber).trim().toLowerCase();
+          cutReelNumbers.add(num);
+          if (skuIdStr) {
+            cutReelKeys.add(`${skuIdStr}_${num}`);
+            if (batchStr) {
+              cutReelKeys.add(`${skuIdStr}_${batchStr}_${num}`);
+            }
+          }
+          if (batchStr) {
+            cutReelKeys.add(`${batchStr}_${num}`);
+          }
+        }
+      }
+    }
+
+    const ledgerOuts = await InventoryLedger.find({
+      company: companyId,
+      direction: "OUT",
+      status: "Posted",
+      "reels.0": { $exists: true }
+    }).select("skuId batchNumber reels").lean();
+
+    for (const entry of ledgerOuts) {
+      const skuIdStr = String(entry.skuId || '');
+      const batchStr = String(entry.batchNumber || '').trim().toLowerCase();
+      for (const r of (entry.reels || [])) {
+        if (r && r.reelNumber) {
+          const num = String(r.reelNumber).trim().toLowerCase();
+          cutReelNumbers.add(num);
+          if (skuIdStr) {
+            cutReelKeys.add(`${skuIdStr}_${num}`);
+            if (batchStr) {
+              cutReelKeys.add(`${skuIdStr}_${batchStr}_${num}`);
+            }
+          }
+        }
+      }
+    }
+
+    // Step C: Query InventoryLedger to find on-hand reels
     const ledgerAgg = await InventoryLedger.aggregate([
       {
         $match: {
@@ -137,30 +190,11 @@ exports.getAvailableReels = async (req, res) => {
           locationId: "$_id.locationId",
           batchNumber: "$_id.batchNumber",
           onHandQty: { $subtract: ["$qtyIn", "$qtyOut"] },
-          activeReels: {
-            $filter: {
-              input: {
-                $reduce: {
-                  input: "$reelsIn",
-                  initialValue: [],
-                  in: { $concatArrays: ["$$value", "$$this"] }
-                }
-              },
-              as: "r",
-              cond: {
-                $not: {
-                  $in: [
-                    "$$r.reelNumber",
-                    {
-                      $reduce: {
-                        input: "$reelsOut",
-                        initialValue: [],
-                        in: { $concatArrays: ["$$value", "$$this"] }
-                      }
-                    }
-                  ]
-                }
-              }
+          allReelsIn: {
+            $reduce: {
+              input: "$reelsIn",
+              initialValue: [],
+              in: { $concatArrays: ["$$value", "$$this"] }
             }
           }
         }
@@ -189,6 +223,8 @@ exports.getAvailableReels = async (req, res) => {
     });
 
     const result = [];
+    const seenReelIds = new Set();
+
     for (const group of ledgerAgg) {
       const sku = skuMap.get(String(group.skuId));
       const loc = locMap.get(String(group.locationId));
@@ -204,13 +240,31 @@ exports.getAvailableReels = async (req, res) => {
         80
       );
 
-      const activeReels = group.activeReels || [];
+      const allReels = group.allReelsIn || [];
+      // Filter out any reel that has been cut or consumed
+      const activeReels = allReels.filter(r => {
+        if (!r || !r.reelNumber) return false;
+        const cleanNum = String(r.reelNumber).trim().toLowerCase();
+        const skuIdStr = String(group.skuId || '');
+        const batchStr = String(group.batchNumber || '').trim().toLowerCase();
+
+        if (cutReelNumbers.has(cleanNum)) return false;
+        if (cutReelKeys.has(`${skuIdStr}_${cleanNum}`)) return false;
+        if (cutReelKeys.has(`${skuIdStr}_${batchStr}_${cleanNum}`)) return false;
+        if (cutReelKeys.has(`${batchStr}_${cleanNum}`)) return false;
+        return true;
+      });
+
       if (activeReels.length > 0) {
         activeReels.forEach((r, idx) => {
+          const uniqueId = `${group.skuId}_${group.batchNumber || 'batch'}_${r.reelNumber || idx}`;
+          if (seenReelIds.has(uniqueId)) return;
+          seenReelIds.add(uniqueId);
+
           result.push({
-            id: `${group.skuId}_${group.batchNumber}_${r.reelNumber || idx}`,
+            id: uniqueId,
             reelNumber: r.reelNumber || `R-${idx + 1}`,
-            weight: Number(r.weight) || (group.onHandQty / (activeReels.length || 1)),
+            weight: Number(r.weight) || (group.onHandQty / activeReels.length),
             width: Number(r.width) || sku?.width || 0,
             gsm: Number(r.gsm) || sku?.gsm || 0,
             skuId: group.skuId,
@@ -222,22 +276,26 @@ exports.getAvailableReels = async (req, res) => {
             ratePerKg: rate
           });
         });
-      } else {
-        // If specific reel numbers were not logged, expose batch weight as virtual reels
-        result.push({
-          id: `${group.skuId}_${group.batchNumber}_lot`,
-          reelNumber: `LOT-${group.batchNumber || 'STK'}`,
-          weight: group.onHandQty,
-          width: sku?.width || 0,
-          gsm: sku?.gsm || 0,
-          skuId: group.skuId,
-          skuName: sku?.name || "Paper Reel",
-          skuCode: sku?.skuCode || "",
-          locationId: group.locationId,
-          locationName: loc ? `${loc.code || loc.name}` : "Warehouse",
-          purchaseBatch: group.batchNumber || "PB-OPEN",
-          ratePerKg: rate
-        });
+      } else if (allReels.length === 0 && group.onHandQty > 0.1) {
+        // Only if no explicit reels were defined in the batch, expose as lot
+        const uniqueId = `${group.skuId}_${group.batchNumber || 'lot'}_lot`;
+        if (!seenReelIds.has(uniqueId)) {
+          seenReelIds.add(uniqueId);
+          result.push({
+            id: uniqueId,
+            reelNumber: `LOT-${group.batchNumber || 'STK'}`,
+            weight: group.onHandQty,
+            width: sku?.width || 0,
+            gsm: sku?.gsm || 0,
+            skuId: group.skuId,
+            skuName: sku?.name || "Paper Reel",
+            skuCode: sku?.skuCode || "",
+            locationId: group.locationId,
+            locationName: loc ? `${loc.code || loc.name}` : "Warehouse",
+            purchaseBatch: group.batchNumber || "PB-OPEN",
+            ratePerKg: rate
+          });
+        }
       }
     }
 
@@ -356,15 +414,15 @@ exports.createCuttingSlip = async (req, res) => {
       actualReams: Number(actualReams || (actualSheets / (sheetsPerReam || 500))),
       varianceSheets: Number(varianceSheets || 0),
       wastePercentage: Number(wastePercentage || 0),
-      scrapWeightKg: Number(scrapWeightKg || 0),
-      scrapRatePerKg: Number(scrapRatePerKg || 0),
-      coreCount: Number(coreCount || 0),
-      coreRatePerPc: Number(coreRatePerPc || 0),
-      totalScrapCredit: Number(totalScrapCredit || 0),
-      netProductionCost: Number(netProductionCost || 0),
-      effectiveCostPerSheet: Number(effectiveCostPerSheet || 0),
-      effectiveCostPerReam: Number(effectiveCostPerReam || 0),
-      costPer4UpPiece: Number((Number(effectiveCostPerSheet || 0) / 4).toFixed(4)),
+      scrapWeightKg: 0,
+      scrapRatePerKg: 0,
+      coreCount: 0,
+      coreRatePerPc: 0,
+      totalScrapCredit: 0,
+      netProductionCost: Number(totalInputCost || 0),
+      effectiveCostPerSheet: Number(actualSheets) > 0 ? Number(totalInputCost || 0) / Number(actualSheets) : 0,
+      effectiveCostPerReam: Number(actualReams) > 0 ? Number(totalInputCost || 0) / Number(actualReams) : 0,
+      costPer4UpPiece: Number(actualSheets) > 0 ? Number((Number(totalInputCost || 0) / Number(actualSheets) / 4).toFixed(4)) : 0,
       destinationLocationId: toObjectId(destinationLocationId),
       machineName: machineName || "Sheeter 01",
       operatorName: operatorName || "",
@@ -405,6 +463,28 @@ exports.createCuttingSlip = async (req, res) => {
     });
     await ledgerOut.save({ session });
 
+    // Secondary Ledger V2 OUT
+    const ledgerOutV2 = new InventoryLedgerV2({
+      transactionType: "Processing Consumption",
+      referenceId: finalSlipNumber,
+      skuId: toObjectId(sourceSku),
+      locationId: sourceH.locationId,
+      qtyIn: 0,
+      qtyOut: Number(totalInputWeight),
+      balanceAfter: 0,
+      batchNumber: purchaseBatch || finalSlipNumber,
+      reels: (selectedReels || []).map(r => ({
+        reelNumber: r.reelNumber,
+        weight: Number(r.weight),
+        width: Number(r.width || 0),
+        gsm: Number(r.gsm || 0)
+      })),
+      remarks: `Cutting slip ${finalSlipNumber} reel consumption`,
+      company: companyId,
+      userId: toObjectId(req.user?.id)
+    });
+    await ledgerOutV2.save({ session });
+
     // Entry B: IN (Generation of Converted Sheets / Semi-Finished Units)
     const targetUnitNorm = (targetSkuDoc.unit || '').trim().toLowerCase();
     const isTargetUnitReam = targetUnitNorm.includes('ream');
@@ -413,24 +493,20 @@ exports.createCuttingSlip = async (req, res) => {
     const convFactor = Number(targetSkuDoc.altUnitConversion || targetSkuDoc.conv || targetSkuDoc.booksGbl || targetSkuDoc.pcsPerGbl || 400);
 
     let finalOutputQty = Number(actualSheets);
-    let unitRate = Number(effectiveCostPerSheet || 0);
+    let unitRate = Number(actualSheets) > 0 ? Number(totalInputCost || 0) / Number(actualSheets) : 0;
 
     if (isTargetUnitReam) {
       finalOutputQty = Number(actualReams);
-      unitRate = Number(effectiveCostPerReam || (Number(effectiveCostPerSheet) * (sheetsPerReam || 500)));
+      unitRate = Number(actualReams) > 0 ? Number(totalInputCost || 0) / Number(actualReams) : 0;
     } else if (isTargetUnitPcs) {
       // 4-UP: 1 parent sheet yields 4 semi-finished PCS
       finalOutputQty = Number(actualSheets) * 4;
-      unitRate = Math.round((Number(effectiveCostPerSheet) / 4) * 10000) / 10000;
+      unitRate = Math.round((Number(unitRate) / 4) * 10000) / 10000;
     } else if (isTargetUnitGbl) {
       // 4-UP converted to GBL: total PCS / convFactor
       const totalPcs = Number(actualSheets) * 4;
       finalOutputQty = Math.round((totalPcs / (convFactor > 0 ? convFactor : 400)) * 1000) / 1000;
-      unitRate = Math.round(((Number(effectiveCostPerSheet) / 4) * (convFactor > 0 ? convFactor : 400)) * 10000) / 10000;
-    } else {
-      // Default: Parent Sheets
-      finalOutputQty = Number(actualSheets);
-      unitRate = Number(effectiveCostPerSheet || 0);
+      unitRate = Math.round(((Number(unitRate) / 4) * (convFactor > 0 ? convFactor : 400)) * 10000) / 10000;
     }
 
     const txNumIn = await Sequence.getNextSequence("IL", session);
@@ -454,6 +530,40 @@ exports.createCuttingSlip = async (req, res) => {
       status: "Posted"
     });
     await ledgerIn.save({ session });
+
+    // Secondary Ledger V2 IN
+    const ledgerInV2 = new InventoryLedgerV2({
+      transactionType: "Processing Output",
+      referenceId: finalSlipNumber,
+      skuId: toObjectId(targetSku),
+      locationId: destH.locationId,
+      qtyIn: finalOutputQty,
+      qtyOut: 0,
+      balanceAfter: finalOutputQty,
+      batchNumber: finalSlipNumber,
+      remarks: `Cutting slip ${finalSlipNumber} converted sheet output`,
+      company: companyId,
+      userId: toObjectId(req.user?.id)
+    });
+    await ledgerInV2.save({ session });
+
+    // Direct Inventory Quantity Decrement on Source Reel SKU
+    if (sourceSkuDoc.presentStock !== undefined) {
+      sourceSkuDoc.presentStock = Math.max(0, Number(sourceSkuDoc.presentStock || 0) - Number(totalInputWeight));
+    }
+    if (sourceSkuDoc.openingStock !== undefined) {
+      sourceSkuDoc.openingStock = Math.max(0, Number(sourceSkuDoc.openingStock || 0) - Number(totalInputWeight));
+    }
+    await sourceSkuDoc.save({ session });
+
+    // Direct Inventory Quantity Increment on Target Converted Sheet SKU
+    if (targetSkuDoc.presentStock !== undefined) {
+      targetSkuDoc.presentStock = Number(targetSkuDoc.presentStock || 0) + finalOutputQty;
+    }
+    if (targetSkuDoc.openingStock !== undefined) {
+      targetSkuDoc.openingStock = Number(targetSkuDoc.openingStock || 0) + finalOutputQty;
+    }
+    await targetSkuDoc.save({ session });
 
     // Update target SKU's weighted average cost using standard formula:
     // New Avg Cost = (Existing Stock Value + New Production Value) / (Existing Qty + New Qty)
@@ -566,10 +676,40 @@ exports.cancelCuttingSlip = async (req, res) => {
     if (!slip) throw new Error("Cutting slip not found");
     if (slip.status === "Cancelled") throw new Error("Cutting slip is already cancelled");
 
-    // Remove the associated ledger entries
+    // Restore SKU stock
+    const sourceSkuDoc = await SkuV2.findById(slip.sourceSku).session(session);
+    if (sourceSkuDoc) {
+      if (sourceSkuDoc.presentStock !== undefined) {
+        sourceSkuDoc.presentStock = Number(sourceSkuDoc.presentStock || 0) + Number(slip.totalInputWeight);
+      }
+      if (sourceSkuDoc.openingStock !== undefined) {
+        sourceSkuDoc.openingStock = Number(sourceSkuDoc.openingStock || 0) + Number(slip.totalInputWeight);
+      }
+      await sourceSkuDoc.save({ session });
+    }
+
+    const targetSkuDoc = await SkuV2.findById(slip.targetSku).session(session);
+    if (targetSkuDoc) {
+      const isTargetUnitReam = (targetSkuDoc.unit || '').toLowerCase().includes('ream');
+      const finalOut = isTargetUnitReam ? Number(slip.actualReams) : Number(slip.actualSheets);
+      if (targetSkuDoc.presentStock !== undefined) {
+        targetSkuDoc.presentStock = Math.max(0, Number(targetSkuDoc.presentStock || 0) - finalOut);
+      }
+      if (targetSkuDoc.openingStock !== undefined) {
+        targetSkuDoc.openingStock = Math.max(0, Number(targetSkuDoc.openingStock || 0) - finalOut);
+      }
+      await targetSkuDoc.save({ session });
+    }
+
+    // Remove the associated ledger entries from both ledgers
     await InventoryLedger.deleteMany({
       company: companyId,
       referenceType: "CuttingSlip",
+      referenceId: slip.slipNumber
+    }).session(session);
+
+    await InventoryLedgerV2.deleteMany({
+      company: companyId,
       referenceId: slip.slipNumber
     }).session(session);
 

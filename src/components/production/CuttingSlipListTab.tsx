@@ -70,7 +70,7 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
       {/* Metric Cards Banner */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center shrink-0">
             <Scissors className="w-5 h-5" />
           </div>
           <div>
@@ -122,7 +122,7 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
             onChange={e => setSearch(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') fetchSlips(); }}
             placeholder="Search by Slip #, Batch, Operator..."
-            className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-teal-500"
+            className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
 
@@ -138,9 +138,9 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
           <button
             type="button"
             onClick={onOpenNewSlip}
-            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 transition-all cursor-pointer"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-1.5 transition-all cursor-pointer"
           >
-            <Plus className="w-4 h-4 text-teal-400" />
+            <Plus className="w-4 h-4 text-white" />
             <span>New Cutting Slip (Alt + C)</span>
           </button>
         </div>
@@ -182,9 +182,9 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
                     <button
                       type="button"
                       onClick={onOpenNewSlip}
-                      className="mt-3 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5"
+                      className="mt-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-md shadow-blue-500/20"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <Plus className="w-3.5 h-3.5 text-white" />
                       <span>Create First Cutting Slip</span>
                     </button>
                   </td>
@@ -358,7 +358,7 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
             type: 'OUTPUT SHEETS',
             specs: `${slip.sheetWidth} × ${slip.sheetLength}" (${slip.sheetGsm} GSM)`,
             qty: `${slip.actualSheets?.toLocaleString('en-IN')} Sheets (${slip.actualReams} Reams)`,
-            weight: `${((slip.totalInputWeight || 0) - (slip.scrapWeightKg || 0)).toLocaleString('en-IN', { maximumFractionDigits: 2 })} KG`,
+            weight: `${(slip.totalInputWeight || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })} KG`,
             rate: `₹${slip.effectiveCostPerSheet?.toFixed(3) || '—'} / Sheet`,
             total: `₹${slip.netProductionCost?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`
           }
@@ -392,7 +392,7 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
                 { label: 'Cutting Date', value: new Date(slip.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) },
                 { label: 'Cut Dimension', value: `${slip.sheetWidth} × ${slip.sheetLength}" (${slip.sheetGsm} GSM)` },
                 { label: 'Total Cuts / Metres', value: slip.cutsCount ? `${slip.cutsCount} Cuts (${slip.reelsOnStand || 1} on stand)` : '—' },
-                { label: 'Conversion Loss', value: `${slip.wastePercentage}% (${slip.scrapWeightKg || 0} KG)` },
+                { label: 'Variance Sheets', value: `${slip.varianceSheets || 0} Sheets (${slip.wastePercentage || 0}%)` },
               ]
             }}
             columns={columns}
@@ -402,20 +402,19 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
               rows: [
                 { label: 'Total Input Weight', value: `${slip.totalInputWeight?.toLocaleString('en-IN')} KG` },
                 { label: 'Actual Converted Yield', value: `${slip.actualSheets?.toLocaleString('en-IN')} Sheets (${slip.actualReams} Reams)` },
-                { label: 'Wastage / Trim Scrap', value: `${slip.scrapWeightKg || 0} KG (-${slip.wastePercentage}%)` },
-                { label: 'Recovered Core Count', value: `${slip.coreCount || 0} Cores` },
+                { label: 'Variance Sheets', value: `${slip.varianceSheets || 0} Sheets` },
+                { label: 'Effective Landed Rate', value: `₹${slip.effectiveCostPerSheet?.toFixed(3) || '—'} / Sheet` },
               ]
             }}
             summaryRight={{
               rows: [
                 { label: 'Total Input Cost', value: `₹${slip.totalInputCost?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}` },
-                ...(slip.totalScrapCredit ? [{ label: 'Scrap & Core Credit', value: `-₹${slip.totalScrapCredit?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }] : []),
                 { label: 'Net Production Cost', value: `₹${slip.netProductionCost?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`, isGrandTotal: true },
               ]
             }}
             signatures={[
               { title: 'Machine Operator / Slitter', subtitle: 'Conversion & Cuts Log' },
-              { title: 'Plant Supervisor', subtitle: 'Yield & Wastage Authorization' },
+              { title: 'Plant Supervisor', subtitle: 'Yield & Production Authorization' },
               { title: 'Storekeeper / QA', subtitle: 'Finished Goods Receipt' },
             ]}
           />

@@ -83,12 +83,6 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
   const [actualSheetsInput, setActualSheetsInput] = useState<string>('');
   const [actualReamsInput, setActualReamsInput] = useState<string>('');
 
-  // ── 4. SCRAP & BY-PRODUCTS (RECOVERY & LANDED COSTING) ──
-  const [scrapWeightKg, setScrapWeightKg] = useState<string>('');
-  const [scrapRatePerKg, setScrapRatePerKg] = useState<string>('18');
-  const [coreCount, setCoreCount] = useState<string>('');
-  const [coreRatePerPc, setCoreRatePerPc] = useState<string>('15');
-
   // Print Mode State
   const [isPrintMode, setIsPrintMode] = useState(false);
 
@@ -655,20 +649,10 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
     return Math.round((loss / theoreticalSheets) * 1000) / 10;
   }, [theoreticalSheets, numActualSheets]);
 
-  // Scrap credit calculations
-  const numScrapWeight = parseFloat(scrapWeightKg) || 0;
-  const numScrapRate = parseFloat(scrapRatePerKg) || 0;
-  const numCores = parseFloat(coreCount) || 0;
-  const numCoreRate = parseFloat(coreRatePerPc) || 0;
-
-  const totalScrapCredit = useMemo(() => {
-    return (numScrapWeight * numScrapRate) + (numCores * numCoreRate);
-  }, [numScrapWeight, numScrapRate, numCores, numCoreRate]);
-
-  // Landed cost allocation & accurate costing
+  // Landed cost allocation & accurate costing (Net Cost = Total Reel Input Value)
   const netProductionCost = useMemo(() => {
-    return Math.max(0, totalInputCost - totalScrapCredit);
-  }, [totalInputCost, totalScrapCredit]);
+    return totalInputCost;
+  }, [totalInputCost]);
 
   const effectiveCostPerSheet = useMemo(() => {
     if (numActualSheets <= 0) return 0;
@@ -740,11 +724,11 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
         actualReams: numActualReams,
         varianceSheets,
         wastePercentage,
-        scrapWeightKg: numScrapWeight,
-        scrapRatePerKg: numScrapRate,
-        coreCount: numCores,
-        coreRatePerPc: numCoreRate,
-        totalScrapCredit,
+        scrapWeightKg: 0,
+        scrapRatePerKg: 0,
+        coreCount: 0,
+        coreRatePerPc: 0,
+        totalScrapCredit: 0,
         netProductionCost,
         effectiveCostPerSheet,
         effectiveCostPerReam,
@@ -757,6 +741,12 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
 
       const res = await createCuttingSlipV2(payload);
       if (onSaved) onSaved(res.cuttingSlip);
+      try {
+        const reelsRes = await getAvailableReelsV2(companyId);
+        setAvailableReels(reelsRes.availableReels || []);
+      } catch (e) {
+        console.error('Error refreshing available reels:', e);
+      }
       onClose();
     } catch (err: any) {
       console.error('Failed to post cutting slip voucher:', err);
@@ -795,7 +785,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
-                Reel → Sheet Stock Journal with Live Discrepancy & Scrap Reconciliation
+                Reel → Sheet Conversion & Stock Journal
               </p>
             </div>
           </div>
@@ -1697,151 +1687,77 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
               </div>
             </div>
 
-            {/* ── BOTTOM PANE: Scrap Recovery & Landed Costing ── */}
+            {/* ── BOTTOM PANE: Costing Valuation & Landed Absorption ── */}
             <div className="bg-white p-2.5 rounded-xl border border-blue-200 shadow-3xs space-y-2 shrink-0">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-bold text-blue-950 uppercase tracking-wide flex items-center gap-1.5">
                   <Scale className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Costing Valuation, Scrap Salvage & Landed Absorption</span>
+                  <span>Costing & Landed Cost Valuation</span>
                 </span>
                 <span className="text-[10px] text-blue-800 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 font-semibold flex items-center gap-1">
                   <Sparkles className="w-3 h-3 text-blue-600" />
-                  Formula: Net Cost = (Reel Value - Scrap Recovery) ÷ Good Sheets
+                  Formula: Landed Rate = Reel Input Value ÷ Good Sheets Produced
                 </span>
               </div>
 
-              {/* Compact High-Contrast Costing & Scrap Reconciliation Grid */}
-              <div className="space-y-2">
-                {/* Row 1: Scrap Recoveries & Salvage Valuation */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 items-stretch text-xs">
-                  {/* Trimming Waste */}
-                  <div className="lg:col-span-4 bg-slate-50 p-2 rounded-lg border border-slate-200 flex flex-col justify-between">
-                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">
-                      Trimming Waste (kg)
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        step="any"
-                        placeholder="0"
-                        value={scrapWeightKg}
-                        onChange={e => setScrapWeightKg(e.target.value)}
-                        className="w-full h-8 px-2 bg-white border border-slate-200 rounded text-xs font-bold font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs"
-                      />
-                      <span className="text-xs font-mono font-bold text-slate-500 shrink-0">@₹</span>
-                      <input
-                        type="number"
-                        step="any"
-                        value={scrapRatePerKg}
-                        onChange={e => setScrapRatePerKg(e.target.value)}
-                        title="Rate per kg of trim scrap"
-                        className="w-20 h-8 px-1.5 bg-white border border-slate-200 rounded text-xs font-bold font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs text-center shrink-0"
-                      />
-                    </div>
-                    <div className="text-[11px] font-mono text-slate-500 text-right mt-1 font-semibold">
-                      = ₹{(numScrapWeight * numScrapRate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </div>
+              {/* Compact High-Contrast Costing Reconciliation Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 items-center text-xs">
+                {/* Card 1: Total Reel Input Value */}
+                <div className="lg:col-span-3 bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-200 flex flex-col justify-between h-full">
+                  <div>
+                    <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
+                      Total Reel Input Value
+                    </span>
+                    <span className="text-[10px] text-emerald-600 font-mono block mt-0.5">
+                      {totalInputWeight.toLocaleString('en-IN')} kg @ ₹{avgInputRatePerKg.toFixed(2)}/kg
+                    </span>
                   </div>
-
-                  {/* Reel Cores */}
-                  <div className="lg:col-span-4 bg-slate-50 p-2 rounded-lg border border-slate-200 flex flex-col justify-between">
-                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">
-                      Reel Cores (pcs)
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        placeholder="0"
-                        value={coreCount}
-                        onChange={e => setCoreCount(e.target.value)}
-                        className="w-full h-8 px-2 bg-white border border-slate-200 rounded text-xs font-bold font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs"
-                      />
-                      <span className="text-xs font-mono font-bold text-slate-500 shrink-0">@₹</span>
-                      <input
-                        type="number"
-                        step="any"
-                        value={coreRatePerPc}
-                        onChange={e => setCoreRatePerPc(e.target.value)}
-                        title="Salvage rate per empty paper core"
-                        className="w-20 h-8 px-1.5 bg-white border border-slate-200 rounded text-xs font-bold font-mono text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs text-center shrink-0"
-                      />
-                    </div>
-                    <div className="text-[11px] font-mono text-slate-500 text-right mt-1 font-semibold">
-                      = ₹{(numCores * numCoreRate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </div>
-                  </div>
-
-                  {/* Total Scrap Salvage Credit */}
-                  <div className="lg:col-span-4 bg-slate-50 p-2 rounded-lg border border-slate-200 flex flex-col justify-between">
-                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
-                      Total Scrap Salvage
-                    </label>
-                    <div className="font-mono font-bold text-sm sm:text-base text-blue-900 py-0.5">
-                      ₹{totalScrapCredit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-medium">Trim Waste + Cores</span>
+                  <div className="font-mono font-bold text-base text-emerald-700 mt-2">
+                    ₹{totalInputCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
 
-                {/* Row 2: Cost Flow Across Conversion Chain (Net Reel Value → Actual Sheets → Effective Landed Rate → Semi-Finished 4-UP Cost) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 items-center text-xs">
-                  {/* Card 1: Net Reel Value */}
-                  <div className="lg:col-span-3 bg-emerald-50/50 p-2 rounded-lg border border-emerald-200 flex flex-col justify-between h-full">
-                    <div>
-                      <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
-                        Net Reel Value (After Scrap)
-                      </span>
-                      <span className="text-[10px] text-emerald-600 font-mono block mt-0.5">
-                        ₹{totalInputCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })} - ₹{totalScrapCredit.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="font-mono font-bold text-sm sm:text-base text-emerald-700 mt-1">
-                      ₹{netProductionCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </div>
+                {/* Card 2: Actual Good Sheets */}
+                <div className="lg:col-span-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200 flex flex-col justify-between h-full">
+                  <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
+                    Actual Good Sheets (In)
+                  </span>
+                  <div className="font-mono font-bold text-base text-slate-900 mt-2">
+                    {numActualSheets.toLocaleString()} <span className="text-xs text-slate-500 font-normal">Sheets</span>
                   </div>
+                  <span className="text-[10px] text-slate-500 font-medium mt-0.5">
+                    ({numActualReams.toLocaleString()} Reams) • Variance: {varianceSheets >= 0 ? `+${varianceSheets}` : varianceSheets} ({wastePercentage}%)
+                  </span>
+                </div>
 
-                  {/* Card 2: Actual Good Sheets */}
-                  <div className="lg:col-span-3 bg-slate-50 p-2 rounded-lg border border-slate-200 flex flex-col justify-between h-full">
-                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
-                      Actual Good Sheets (In)
-                    </span>
-                    <div className="font-mono font-bold text-sm sm:text-base text-slate-900 mt-1">
-                      {numActualSheets.toLocaleString()} <span className="text-xs text-slate-500 font-normal">Sheets</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-medium mt-0.5">
-                      Sheets ({numActualReams.toLocaleString()} Reams)
-                    </span>
+                {/* Card 3: Effective Landed Rate */}
+                <div className="lg:col-span-3 bg-blue-50/70 p-2.5 rounded-lg border border-blue-200 flex flex-col justify-between h-full">
+                  <span className="text-[10px] font-bold text-blue-900 uppercase tracking-wider block">
+                    Effective Landed Rate
+                  </span>
+                  <div className="font-mono font-bold text-base text-blue-900 mt-2">
+                    ₹{effectiveCostPerSheet.toFixed(3)} <span className="text-[10px] text-blue-700 font-normal">/ sheet</span>
                   </div>
+                  <span className="text-[10px] text-blue-700 font-mono mt-0.5">
+                    (₹{totalInputCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })} ÷ {numActualSheets.toLocaleString()})
+                  </span>
+                </div>
 
-                  {/* Card 3: Effective Landed Rate */}
-                  <div className="lg:col-span-3 bg-blue-50/70 p-2 rounded-lg border border-blue-200 flex flex-col justify-between h-full">
-                    <span className="text-[10px] font-bold text-blue-900 uppercase tracking-wider block">
-                      Effective Landed Rate
+                {/* Card 4: Semi-Finished 4-UP Cost */}
+                <div className="lg:col-span-3 bg-blue-900 text-white p-2.5 rounded-lg border border-blue-800 flex flex-col justify-between h-full shadow-3xs">
+                  <div>
+                    <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider block">
+                      Semi-Finished 4-UP Cost (Book Size PCS)
                     </span>
-                    <div className="font-mono font-bold text-sm sm:text-base text-blue-900 mt-1">
-                      ₹{effectiveCostPerSheet.toFixed(3)} <span className="text-[10px] text-blue-700 font-normal">/ sheet</span>
-                    </div>
-                    <span className="text-[10px] text-blue-700 font-mono mt-0.5">
-                      (₹{netProductionCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })} ÷ {numActualSheets.toLocaleString()})
+                    <span className="text-[9.5px] text-blue-300 block">
+                      4 PCS per parent sheet
                     </span>
                   </div>
-
-                  {/* Card 4: Semi-Finished 4-UP Cost */}
-                  <div className="lg:col-span-3 bg-blue-900 text-white p-2 rounded-lg border border-blue-800 flex flex-col justify-between h-full shadow-3xs">
-                    <div>
-                      <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider block">
-                        Semi-Finished 4-UP Cost (Book Size PCS)
-                      </span>
-                      <span className="text-[9.5px] text-blue-300 block">
-                        4 PCS per parent sheet
-                      </span>
-                    </div>
-                    <div className="text-[10px] font-mono text-blue-200 mt-1">
-                      ₹{effectiveCostPerSheet.toFixed(3)} ÷ 4 = <span className="font-bold text-white">₹{costPer4UpPiece.toFixed(3)} / PCS</span>
-                    </div>
-                    <div className="mt-1 px-2 py-0.5 bg-blue-800/80 rounded border border-blue-700 text-center font-mono font-bold text-xs text-white">
-                      ₹{costPer4UpPiece.toFixed(2)} per PCS (Approx.)
-                    </div>
+                  <div className="text-[10px] font-mono text-blue-200 mt-1">
+                    ₹{effectiveCostPerSheet.toFixed(3)} ÷ 4 = <span className="font-bold text-white">₹{costPer4UpPiece.toFixed(3)} / PCS</span>
+                  </div>
+                  <div className="mt-1 px-2 py-0.5 bg-blue-800/80 rounded border border-blue-700 text-center font-mono font-bold text-xs text-white">
+                    ₹{costPer4UpPiece.toFixed(2)} per PCS (Approx.)
                   </div>
                 </div>
               </div>

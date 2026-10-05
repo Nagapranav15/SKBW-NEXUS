@@ -17,14 +17,13 @@ import { NewProductionOrderWizard } from './NewProductionOrderWizard';
 import { ProductionOrderDetailView } from './ProductionOrderDetailView';
 import { ProductionOrderEntriesView } from './ProductionOrderEntriesView';
 import { ProductionPrintModal } from './ProductionPrintModal';
-import { BulkEditBomModal } from './BulkEditBomModal';
 import { CuttingSlipModal } from './CuttingSlipModal';
 import { CuttingSlipListTab } from './CuttingSlipListTab';
 import { getWarehouseHierarchyV2, getCuttingSlipsV2, WarehouseLocationV2 } from '../../api/mfgApiV2';
 import { showToast } from '../ui/Toast';
 import { 
-  Calendar, Package, FileText, LayoutGrid, History, Scissors,
-  ArrowLeft, Search, Plus, CheckCircle, AlertTriangle, Layers, Loader2, X, Edit3, ExternalLink,
+  Calendar, Package, FileText, History, Scissors,
+  ArrowLeft, Search, Plus, CheckCircle, AlertTriangle, Layers, Loader2, X, ExternalLink,
   ChevronDown, ChevronRight, ChevronLeft, Calculator, Eye, Filter, Check, Clock, TrendingUp, Info,
   Boxes, ArrowUpDown, Download, Printer, Pencil, MoreVertical, RotateCcw, Activity, MessageCircle
 } from 'lucide-react';
@@ -38,7 +37,7 @@ export const ProductionModule: React.FC = () => {
   const [backendSkus, setBackendSkus] = useState<SkuV2[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Active top tab: 'orders' | 'entries' | 'materials' | 'bom' | 'history'
+  // Active top tab: 'orders' | 'cutting' | 'entries' | 'materials' | 'history'
   const [activeTab, setActiveTabState] = useState<string>(() => {
     return searchParams.get('tab') || 'orders';
   });
@@ -106,12 +105,6 @@ export const ProductionModule: React.FC = () => {
   const [matRowsPerPage, setMatRowsPerPage] = useState<number>(10);
   const [showNewRequirementModal, setShowNewRequirementModal] = useState<boolean>(false);
   const [selectedOrderForReq, setSelectedOrderForReq] = useState<string>('');
-
-  // Tab 4: BOM Master state
-  const [bomSearch, setBomSearch] = useState('');
-  const [simulatedBatchSizes, setSimulatedBatchSizes] = useState<Record<string, number>>({});
-  const [editingBomSkuId, setEditingBomSkuId] = useState<string | null>(null);
-  const [showBomModal, setShowBomModal] = useState(false);
 
   // Tab 5: History state
   const [historySearch, setHistorySearch] = useState('');
@@ -814,20 +807,7 @@ export const ProductionModule: React.FC = () => {
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
 
-  // Tab 4: BOM Master
-  const skusWithBom = useMemo(() => {
-    return backendSkus.filter(s => Array.isArray(s.bomItems) && s.bomItems.length > 0);
-  }, [backendSkus]);
 
-  const filteredSkusWithBom = useMemo(() => {
-    if (!bomSearch.trim()) return skusWithBom;
-    const q = bomSearch.toLowerCase();
-    return skusWithBom.filter(s => 
-      s.name.toLowerCase().includes(q) ||
-      s.skuCode.toLowerCase().includes(q) ||
-      (s.category && s.category.toLowerCase().includes(q))
-    );
-  }, [skusWithBom, bomSearch]);
 
   // Tab 5: History Audit Log
   const distinctHistoryDepts = useMemo(() => {
@@ -860,10 +840,9 @@ export const ProductionModule: React.FC = () => {
   // Tab Header Bar Definition & Counts
   const TAB_ITEMS = [
     { id: 'orders', label: 'Production Orders', icon: Calendar },
-    { id: 'cutting', label: 'Paper Cutting (Reel → Sheet)', icon: Scissors },
+    { id: 'cutting', label: 'Paper->Reel', icon: Scissors },
     { id: 'entries', label: 'Production Entries', icon: Package },
     { id: 'materials', label: 'Material Requirements', icon: FileText },
-    { id: 'bom', label: 'BOM', icon: LayoutGrid },
     { id: 'history', label: 'History', icon: History }
   ];
 
@@ -872,7 +851,6 @@ export const ProductionModule: React.FC = () => {
     cutting: cuttingSlipsCount,
     entries: allEntries.length,
     materials: orderRequirementsList.length,
-    bom: skusWithBom.length,
     history: orders.length
   };
 
@@ -2363,274 +2341,7 @@ export const ProductionModule: React.FC = () => {
     );
   }
 
-  // -------------------------------------------------------------
-  // TAB 4: BOM MASTER (Tally Dynamic Recipe & Batch Simulator)
-  // -------------------------------------------------------------
-  if (activeTab === 'bom') {
-    return (
-      <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
-        {/* 1. Header Banner (Matching Sales Orders Header Banner) */}
-        <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
-              <LayoutGrid className="w-6 h-6 stroke-[2.2]" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-                <span>Bill of Materials (BOM) Master</span>
-                <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold transition-all">
-                  {skusWithBom.length} Formulations
-                </span>
-              </h1>
-              <p className="text-xs text-gray-500 font-medium">Standard BOM formulations configured for finished goods in Item Master.</p>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                setEditingBomSkuId(null);
-                setShowBomModal(true);
-              }}
-              className="px-3.5 py-2 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              <span>Bulk Edit BOMs</span>
-            </button>
-            <button
-              onClick={handleOpenNewOrder}
-              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>New Order</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('orders')}
-              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer text-xs"
-            >
-              ← Back to Orders
-            </button>
-          </div>
-        </div>
-
-        {/* 2. Tab Navigation */}
-        {renderTabNavigation()}
-
-        {/* 3. Dynamic KPI Summary Header */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all flex items-center space-x-3.5">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-              <LayoutGrid className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Configured BOM Recipes</p>
-              <h3 className="text-xl font-bold text-gray-900 font-mono">{skusWithBom.length} Formulations</h3>
-            </div>
-          </div>
-
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all flex items-center space-x-3.5">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-              <CheckCircle className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Finished Products</p>
-              <h3 className="text-xl font-bold text-gray-900 font-mono">{backendSkus.length} SKUs in Master</h3>
-            </div>
-          </div>
-
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all flex items-center space-x-3.5">
-            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-              <Calculator className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Dynamic Batch Simulator</p>
-              <span className="text-xs font-bold text-purple-700 font-mono">Active across cards</span>
-            </div>
-          </div>
-        </div>
-
-        {/* 4. Search Bar */}
-        <div className="bg-white border border-gray-200/80 rounded-2xl px-4 py-3 flex items-center justify-between shadow-2xs">
-          <div className="relative w-full max-w-md">
-            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={bomSearch}
-              onChange={e => setBomSearch(e.target.value)}
-              placeholder="Search BOM by finished product name, SKU code, category..."
-              className="w-full pl-8 pr-8 py-1.5 text-xs text-gray-900 placeholder-gray-400 bg-gray-50/70 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-2xs font-medium"
-            />
-              {bomSearch && (
-                <button 
-                  onClick={() => setBomSearch('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-            <span className="text-xs text-gray-500 font-medium hidden sm:inline">
-              Showing <strong>{filteredSkusWithBom.length}</strong> configured BOM formulations
-            </span>
-          </div>
-
-          {/* BOM Cards with Dynamic Batch Calculator */}
-          {filteredSkusWithBom.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
-              <Layers className="w-10 h-10 mx-auto text-gray-300 mb-2" />
-              <p className="font-semibold text-gray-600">
-                {bomSearch ? 'No BOM formulations matching search' : 'No BOMs configured in Item Master'}
-              </p>
-              <p className="text-xs text-gray-400 mt-1">Configure BOM recipes in Item Master to see standard formulations here.</p>
-            </div>
-          ) : (
-            filteredSkusWithBom.map(sku => {
-              const baseYield = Number(sku.recipeYieldQty) || 1;
-              const currentSimSize = simulatedBatchSizes[sku._id] ?? baseYield;
-
-              return (
-                <div key={sku._id} className="bg-white rounded-xl border border-gray-200 shadow-2xs p-5 space-y-4">
-                  {/* Card Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-gray-150 gap-3">
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <h3 className="text-sm font-bold text-gray-900">{sku.name}</h3>
-                        <span className="font-mono text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded font-semibold border border-blue-200">
-                          {sku.skuCode}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Category: <strong className="text-gray-700">{sku.category || 'General'}</strong> • Standard Base Yield: <strong className="text-gray-700">{baseYield} {sku.recipeYieldUnit || sku.unit || 'PCS'}</strong>
-                      </p>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-                        {sku.bomItems?.length || 0} Components
-                      </span>
-                      <button
-                        onClick={() => {
-                          setEditingBomSkuId(sku._id);
-                          setShowBomModal(true);
-                        }}
-                        className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50 border border-blue-200 rounded-lg transition-colors cursor-pointer"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                        <span>Edit Recipe in Item Master</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Tally Dynamic Batch Requirement Estimator */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
-                    <div className="flex items-center space-x-2">
-                      <Calculator className="w-4 h-4 text-blue-600" />
-                      <span className="font-bold text-gray-800">Dynamic Batch Requirement Simulator:</span>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <span className="text-gray-600">Simulate Batch Output:</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={currentSimSize}
-                        onChange={e => {
-                          const val = Math.max(1, Number(e.target.value) || 1);
-                          setSimulatedBatchSizes(prev => ({ ...prev, [sku._id]: val }));
-                        }}
-                        className="w-24 px-2.5 py-1 text-xs font-bold text-gray-900 bg-white border border-gray-300 rounded shadow-2xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                      <span className="font-semibold text-gray-700">{sku.recipeYieldUnit || sku.unit || 'PCS'}</span>
-
-                      {currentSimSize !== baseYield && (
-                        <button
-                          onClick={() => {
-                            setSimulatedBatchSizes(prev => ({ ...prev, [sku._id]: baseYield }));
-                          }}
-                          className="text-[11px] text-blue-600 hover:underline px-1 cursor-pointer"
-                        >
-                          Reset to 1 Batch ({baseYield})
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Component Table with Dynamic Scaling */}
-                  <div className="overflow-x-auto custom-scrollbar">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase">
-                          <th className="py-2 px-3 w-8">#</th>
-                          <th className="py-2 px-3">Component Item</th>
-                          <th className="py-2 px-3">Type</th>
-                          <th className="py-2 px-3 text-right">Standard Qty (per {baseYield} {sku.recipeYieldUnit || 'units'})</th>
-                          <th className="py-2 px-3 text-right font-bold text-blue-600">Scaled for Batch ({currentSimSize})</th>
-                          <th className="py-2 px-3">UOM</th>
-                          <th className="py-2 px-3 text-right">Available Warehouse Stock</th>
-                          <th className="py-2 px-3">Batch Stock Check</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {sku.bomItems?.map((comp: any, cIdx: number) => {
-                          const baseQty = Number(comp.qty || comp.qtyPerBatch || 1);
-                          const scaledQty = baseYield > 0 ? (baseQty / baseYield) * currentSimSize : baseQty;
-                          const inStock = Number(comp.inStock ?? 0);
-                          const hasDeficit = inStock < scaledQty;
-
-                          return (
-                            <tr key={cIdx} className="hover:bg-gray-50/50">
-                              <td className="py-2.5 px-3 text-gray-400">{cIdx + 1}</td>
-                              <td className="py-2.5 px-3 font-semibold text-gray-900">{comp.name || comp.itemName || comp.skuCode}</td>
-                              <td className="py-2.5 px-3">
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-600">
-                                  {comp.type || 'Raw Material'}
-                                </span>
-                              </td>
-                              <td className="py-2.5 px-3 text-gray-600 text-right">{baseQty.toLocaleString()}</td>
-                              <td className="py-2.5 px-3 font-bold text-blue-700 text-right">
-                                {scaledQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                              </td>
-                              <td className="py-2.5 px-3 text-gray-600">{comp.uom || 'PCS'}</td>
-                              <td className="py-2.5 px-3 font-semibold text-gray-700 text-right">{inStock.toLocaleString()}</td>
-                              <td className="py-2.5 px-3">
-                                {hasDeficit ? (
-                                  <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                                    <AlertTriangle className="w-3 h-3" />
-                                    <span>Shortage ({Math.abs(inStock - scaledQty).toLocaleString(undefined, { maximumFractionDigits: 1 })})</span>
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                    <Check className="w-3 h-3" />
-                                    <span>Available</span>
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              );
-            })
-          )}
-
-        {/* Bulk BOM Edit Modal */}
-        {showBomModal && selectedCompany?._id && (
-          <BulkEditBomModal
-            isOpen={showBomModal}
-            onClose={() => setShowBomModal(false)}
-            companyId={selectedCompany._id}
-            initialSelectedSkuId={editingBomSkuId || undefined}
-            onSaved={() => {
-              loadOrders();
-            }}
-          />
-        )}
-      </div>
-    );
-  }
 
   // -------------------------------------------------------------
   // TAB 2.5: PAPER CUTTING & SHEETING (Reel -> Sheet Stock Journal)
@@ -2641,18 +2352,18 @@ export const ProductionModule: React.FC = () => {
         {/* 1. Header Banner */}
         <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-teal-100/80 text-teal-700 rounded-2xl shadow-2xs">
+            <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
               <Scissors className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-gray-900 tracking-tight">Paper Cutting & Sheeting (Reel → Sheet)</h1>
-                <span className="text-[11px] font-bold bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full border border-teal-200">
+                <h1 className="text-xl font-bold text-gray-900 tracking-tight">Paper-&gt;Reel</h1>
+                <span className="text-[11px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
                   Stock Journal Voucher
                 </span>
               </div>
               <p className="text-xs text-gray-500 font-medium">
-                Tally-style Reel-to-Sheet conversion vouchers with live scrap tracking, dual-unit (Sheets ↔ Reams), & zero-discrepancy inventory reconciliation.
+                Tally-style Reel-to-Sheet conversion vouchers with dual-unit (Sheets ↔ Reams) & zero-discrepancy inventory reconciliation.
               </p>
             </div>
           </div>
@@ -2660,9 +2371,9 @@ export const ProductionModule: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowCuttingSlipModal(true)}
-              className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5 text-teal-400" />
+              <Plus className="w-3.5 h-3.5 text-white" />
               <span>New Cutting Slip (Alt + C)</span>
             </button>
             <button

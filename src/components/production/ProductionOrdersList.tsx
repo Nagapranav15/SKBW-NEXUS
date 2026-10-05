@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   Factory, Plus, Search, SlidersHorizontal, ArrowUpDown, Download, 
   RotateCcw, Eye, Pencil, MoreHorizontal, Calendar, Package, 
-  FileText, LayoutGrid, History, Check, ChevronLeft, ChevronRight, 
+  FileText, History, Check, ChevronLeft, ChevronRight, 
   Printer, Trash2, ArrowUp, ArrowDown, Filter, Columns, X, ShoppingBag, Scissors,
   CheckCircle2
 } from 'lucide-react';
@@ -318,10 +318,9 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
         <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full">
           {[
             { id: 'orders', label: 'Production Orders', icon: Calendar, count: orders.length },
-            { id: 'cutting', label: 'Paper Cutting (Reel → Sheet)', icon: Scissors, count: tabCounts?.cutting },
+            { id: 'cutting', label: 'Paper->Reel', icon: Scissors, count: tabCounts?.cutting },
             { id: 'entries', label: 'Production Entries', icon: Package, count: tabCounts?.entries },
             { id: 'materials', label: 'Material Requirements', icon: FileText, count: tabCounts?.materials },
-            { id: 'bom', label: 'BOM', icon: LayoutGrid, count: tabCounts?.bom },
             { id: 'history', label: 'History', icon: History, count: tabCounts?.history }
           ].map(tab => {
             const Icon = tab.icon;
