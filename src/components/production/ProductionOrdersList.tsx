@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Factory, Plus, Search, SlidersHorizontal, ArrowUpDown, Download, 
   RotateCcw, Eye, Pencil, MoreHorizontal, Calendar, Package, 
-  FileText, History, Check, ChevronLeft, ChevronRight, 
+  FileText, History, Check, ChevronLeft, ChevronRight, ChevronDown,
   Printer, Trash2, ArrowUp, ArrowDown, Filter, Columns, X, ShoppingBag, Scissors,
   CheckCircle2
 } from 'lucide-react';
@@ -13,6 +13,372 @@ import autoTable from 'jspdf-autotable';
 import { getActivityLogs } from '../../api/activityLogApi';
 import { showToast } from '../ui/Toast';
 import { formatOrderNo } from './productionUtils';
+import { formatDateDDMMYYYY } from '../../utils/dateUtils';
+
+// -------------------------------------------------------------
+// Interactive Calendar Date Filter Popover Component
+// -------------------------------------------------------------
+interface CalendarDateFilterPopoverProps {
+  preset: string;
+  startDate: string;
+  endDate: string;
+  onApplyRange: (start: string, end: string, presetName: string) => void;
+  onClear: () => void;
+}
+
+const CalendarDateFilterPopover: React.FC<CalendarDateFilterPopoverProps> = ({
+  preset,
+  startDate,
+  endDate,
+  onApplyRange,
+  onClear
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Helper date formatting functions
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const toYMD = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  // Calendar month view state
+  const [viewDate, setViewDate] = useState<Date>(() => {
+    if (startDate) {
+      const d = new Date(startDate);
+      if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth(), 1);
+    }
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
+
+  // Local draft selection while popover is open
+  const [draftStart, setDraftStart] = useState<string>(startDate);
+  const [draftEnd, setDraftEnd] = useState<string>(endDate);
+  const [draftPreset, setDraftPreset] = useState<string>(preset);
+
+  // Sync draft when opened
+  useEffect(() => {
+    if (isOpen) {
+      setDraftStart(startDate);
+      setDraftEnd(endDate);
+      setDraftPreset(preset);
+      if (startDate) {
+        const d = new Date(startDate);
+        if (!isNaN(d.getTime())) setViewDate(new Date(d.getFullYear(), d.getMonth(), 1));
+      }
+    }
+  }, [isOpen, startDate, endDate, preset]);
+
+  // Click outside to close
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  const daysOfWeek = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+  const curYear = viewDate.getFullYear();
+  const curMonth = viewDate.getMonth();
+  const daysInMonth = new Date(curYear, curMonth + 1, 0).getDate();
+  const firstDayOfWeek = new Date(curYear, curMonth, 1).getDay(); // 0 = Sun
+  const todayStr = toYMD(new Date());
+
+  const handlePrevMonth = () => {
+    setViewDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setViewDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  const handleSelectDay = (day: number) => {
+    const clickedYMD = `${curYear}-${pad(curMonth + 1)}-${pad(day)}`;
+    if (!draftStart || (draftStart && draftEnd)) {
+      setDraftStart(clickedYMD);
+      setDraftEnd('');
+      setDraftPreset('Custom');
+    } else if (draftStart && !draftEnd) {
+      if (clickedYMD >= draftStart) {
+        setDraftEnd(clickedYMD);
+        setDraftPreset('Custom');
+      } else {
+        setDraftStart(clickedYMD);
+        setDraftEnd('');
+        setDraftPreset('Custom');
+      }
+    }
+  };
+
+  const applyPreset = (presetName: string) => {
+    const now = new Date();
+    setDraftPreset(presetName);
+    if (presetName === 'All') {
+      setDraftStart('');
+      setDraftEnd('');
+      onClear();
+      setIsOpen(false);
+      return;
+    }
+
+    let start = '';
+    let end = '';
+    if (presetName === 'Today') {
+      start = todayStr;
+      end = todayStr;
+    } else if (presetName === 'Yesterday') {
+      const y = new Date(now);
+      y.setDate(y.getDate() - 1);
+      start = toYMD(y);
+      end = start;
+    } else if (presetName === 'This Week') {
+      const s = new Date(now);
+      const day = now.getDay();
+      const diff = (day === 0 ? -6 : 1) - day;
+      s.setDate(now.getDate() + diff);
+      start = toYMD(s);
+      end = todayStr;
+    } else if (presetName === 'This Month') {
+      start = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+      end = todayStr;
+    } else if (presetName === 'Last 30 Days') {
+      const s = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      start = toYMD(s);
+      end = todayStr;
+    } else if (presetName === 'Last 90 Days') {
+      const s = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      start = toYMD(s);
+      end = todayStr;
+    }
+
+    setDraftStart(start);
+    setDraftEnd(end);
+    if (start) {
+      const d = new Date(start);
+      if (!isNaN(d.getTime())) setViewDate(new Date(d.getFullYear(), d.getMonth(), 1));
+    }
+    onApplyRange(start, end, presetName);
+    setIsOpen(false);
+  };
+
+  const handleApply = () => {
+    const start = draftStart || draftEnd || '';
+    const end = draftEnd || draftStart || '';
+    onApplyRange(start, end, draftPreset || 'Custom');
+    setIsOpen(false);
+  };
+
+  // Button Label Display (Matching screenshot styling)
+  let buttonLabel = 'All Dates';
+  const hasActiveFilter = preset !== 'All' || Boolean(startDate) || Boolean(endDate);
+  if (hasActiveFilter) {
+    if (preset && preset !== 'Custom' && preset !== 'All') {
+      buttonLabel = preset;
+    } else if (startDate && endDate) {
+      if (startDate === endDate) {
+        buttonLabel = formatDateDDMMYYYY(startDate);
+      } else {
+        buttonLabel = `${formatDateDDMMYYYY(startDate)} - ${formatDateDDMMYYYY(endDate)}`;
+      }
+    } else if (startDate) {
+      buttonLabel = formatDateDDMMYYYY(startDate);
+    }
+  }
+
+  return (
+    <div className="relative inline-block" ref={containerRef}>
+      {/* Trigger Button - Matches user's screenshot */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-2xs select-none ${
+          hasActiveFilter
+            ? 'bg-blue-50/90 border-blue-300 text-blue-700 hover:bg-blue-100/80 ring-1 ring-blue-200'
+            : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+        }`}
+        title="Filter by Date Calendar"
+      >
+        <Calendar className={`w-3.5 h-3.5 ${hasActiveFilter ? 'text-blue-600' : 'text-gray-400'}`} />
+        <span>{buttonLabel}</span>
+        {hasActiveFilter && (
+          <span
+            onClick={(e) => {
+              e.stopPropagation();
+              onClear();
+            }}
+            className="p-0.5 hover:bg-blue-200/80 rounded-full text-blue-600 transition-colors cursor-pointer"
+            title="Clear date filter"
+          >
+            <X className="w-3 h-3" />
+          </span>
+        )}
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${isOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
+      </button>
+
+      {/* Interactive Calendar Popover */}
+      {isOpen && (
+        <div className="absolute right-0 top-full mt-2 w-80 sm:w-[340px] bg-white border border-gray-200/90 rounded-2xl shadow-2xl p-4 z-50 text-xs text-gray-800 space-y-3 animate-in fade-in zoom-in-95 duration-150">
+          {/* Quick Preset Buttons */}
+          <div className="flex flex-wrap gap-1 border-b border-gray-100 pb-2.5">
+            {['All', 'Today', 'This Week', 'This Month', 'Last 30 Days'].map(pName => (
+              <button
+                key={pName}
+                type="button"
+                onClick={() => applyPreset(pName)}
+                className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold transition-all cursor-pointer ${
+                  draftPreset === pName
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {pName === 'All' ? 'All Dates' : pName}
+              </button>
+            ))}
+          </div>
+
+          {/* Month Navigation */}
+          <div className="flex items-center justify-between px-1">
+            <button
+              type="button"
+              onClick={handlePrevMonth}
+              className="p-1 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              title="Previous Month"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <div className="font-bold text-gray-900 text-xs">
+              {monthNames[curMonth]} {curYear}
+            </div>
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              className="p-1 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              title="Next Month"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Weekday Row */}
+          <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-gray-400 uppercase">
+            {daysOfWeek.map(d => (
+              <div key={d} className="py-0.5">{d}</div>
+            ))}
+          </div>
+
+          {/* Days Grid */}
+          <div className="grid grid-cols-7 gap-1 text-center">
+            {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+              <div key={`empty-${i}`} className="h-7 w-7" />
+            ))}
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1;
+              const ymd = `${curYear}-${pad(curMonth + 1)}-${pad(day)}`;
+              const isToday = ymd === todayStr;
+              const isStart = ymd === draftStart;
+              const isEnd = ymd === draftEnd;
+              const isSelected = isStart || isEnd;
+              const inRange = Boolean(draftStart && draftEnd && ymd > draftStart && ymd < draftEnd);
+
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => handleSelectDay(day)}
+                  className={`h-7 w-7 mx-auto rounded-lg text-xs font-semibold flex items-center justify-center transition-all cursor-pointer relative ${
+                    isSelected
+                      ? 'bg-blue-600 text-white font-bold shadow-2xs'
+                      : inRange
+                      ? 'bg-blue-50 text-blue-700 font-bold rounded-none'
+                      : isToday
+                      ? 'bg-blue-50/60 text-blue-700 font-bold border border-blue-300'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  {day}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Direct Date Inputs & Action Buttons */}
+          <div className="pt-2.5 border-t border-gray-100 space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block mb-0.5">From</label>
+                <input
+                  type="date"
+                  value={draftStart}
+                  onChange={e => {
+                    setDraftStart(e.target.value);
+                    setDraftPreset('Custom');
+                  }}
+                  className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium bg-gray-50"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block mb-0.5">To</label>
+                <input
+                  type="date"
+                  value={draftEnd}
+                  onChange={e => {
+                    setDraftEnd(e.target.value);
+                    setDraftPreset('Custom');
+                  }}
+                  className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium bg-gray-50"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftStart('');
+                  setDraftEnd('');
+                  setDraftPreset('All');
+                  onClear();
+                  setIsOpen(false);
+                }}
+                className="text-xs font-bold text-gray-500 hover:text-gray-700 px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              >
+                Reset
+              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="px-2.5 py-1 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApply}
+                  className="px-3.5 py-1 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all shadow-2xs cursor-pointer"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 interface ProductionOrdersListProps {
   orders: ProductionOrder[];
@@ -43,6 +409,10 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
 }) => {
   // Period filter
   const [period, setPeriod] = useState<string>('All');
+  // Date filter state
+  const [dateFilterPreset, setDateFilterPreset] = useState<string>('All');
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
   // Type filter
   const [typeFilter, setTypeFilter] = useState<string>('All');
   // Status filter
@@ -89,6 +459,45 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
       if (statusFilter !== 'All' && order.status !== statusFilter) return false;
       // Department
       if (deptFilter !== 'All' && order.department !== deptFilter) return false;
+
+      // Date Filter
+      if (dateFilterPreset !== 'All') {
+        const dStr = order.orderDate || order.plannedStartDate || (order as any).createdAt || order.requiredCompletionDate;
+        if (dStr) {
+          const orderDate = new Date(dStr);
+          if (!isNaN(orderDate.getTime())) {
+            const now = new Date();
+            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+            if (dateFilterPreset === 'Today') {
+              if (orderDate < startOfToday) return false;
+            } else if (dateFilterPreset === 'This Week') {
+              const startOfWeek = new Date(startOfToday);
+              startOfWeek.setDate(startOfToday.getDate() - startOfToday.getDay());
+              if (orderDate < startOfWeek) return false;
+            } else if (dateFilterPreset === 'This Month') {
+              const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+              if (orderDate < startOfMonth) return false;
+            } else if (dateFilterPreset === 'Last 30 Days') {
+              const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+              if (orderDate < thirtyDaysAgo) return false;
+            } else if (dateFilterPreset === 'Last 90 Days') {
+              const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+              if (orderDate < ninetyDaysAgo) return false;
+            } else if (dateFilterPreset === 'Custom') {
+              if (customStartDate) {
+                const sDate = new Date(customStartDate);
+                if (orderDate < sDate) return false;
+              }
+              if (customEndDate) {
+                const eDate = new Date(customEndDate + 'T23:59:59');
+                if (orderDate > eDate) return false;
+              }
+            }
+          }
+        }
+      }
+
       // Search
       if (searchTerm.trim()) {
         const query = searchTerm.toLowerCase();
@@ -110,7 +519,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
         ? String(valA).localeCompare(String(valB), undefined, { numeric: true })
         : String(valB).localeCompare(String(valA), undefined, { numeric: true });
     });
-  }, [orders, typeFilter, statusFilter, deptFilter, searchTerm, sortField, sortAsc]);
+  }, [orders, typeFilter, statusFilter, deptFilter, searchTerm, dateFilterPreset, customStartDate, customEndDate, sortField, sortAsc]);
 
   // Pagination calculation
   const totalOrders = filteredOrders.length;
@@ -628,6 +1037,22 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
             </div>
           </div>
 
+          {/* 7. Refresh Data Icon Button */}
+          <div className="relative group">
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              title="Refresh Data"
+              aria-label="Refresh Data"
+            >
+              <RotateCcw className="w-4 h-4 text-blue-600" />
+            </button>
+            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
+              Refresh Data
+            </div>
+          </div>
+
           {/* 9. Circular + Add Button (Matching screenshot) */}
           <div className="relative group">
             <button
@@ -731,17 +1156,21 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
       </div>
 
       {/* 4. Table Sub-bar: Metadata & Actions */}
-      <div className="flex items-center justify-between pt-1 text-xs">
+      <div className="flex items-center justify-between flex-wrap gap-2 pt-1 text-xs">
         <div className="font-semibold text-gray-600 flex items-center gap-2">
           <span>Showing all {filteredOrders.length} production orders</span>
-          {(searchTerm || period !== 'All' || typeFilter !== 'All' || statusFilter !== 'All' || deptFilter !== 'All') && (
+          {(searchTerm || period !== 'All' || typeFilter !== 'All' || statusFilter !== 'All' || deptFilter !== 'All' || dateFilterPreset !== 'All' || customStartDate || customEndDate) && (
             <button
               onClick={() => {
                 setPeriod('All');
+                setDateFilterPreset('All');
+                setCustomStartDate('');
+                setCustomEndDate('');
                 setTypeFilter('All');
                 setStatusFilter('All');
                 setDeptFilter('All');
                 setSearchTerm('');
+                setCurrentPage(1);
               }}
               className="text-blue-600 hover:text-blue-800 text-[11px] font-bold px-1.5 py-0.5 hover:bg-blue-50 rounded transition-colors cursor-pointer"
             >
@@ -750,48 +1179,70 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center flex-wrap gap-2">
           {/* Global Search Box */}
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
             <input
               type="text"
               value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+              onChange={e => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
               placeholder="Search orders, items, codes..."
-              className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-44 md:w-56 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+              className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-40 md:w-52 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
             />
+            {searchTerm && (
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setCurrentPage(1);
+                }}
+                className="absolute right-2 top-2 text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          {/* Export Excel Button */}
-          <button
-            onClick={handleExportExcel}
-            className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            title="Export to Excel Spreadsheet"
-          >
-            <Download className="w-3.5 h-3.5 text-gray-500" />
-            <span>Excel</span>
-          </button>
+          {/* Interactive Calendar Date Filter Popover */}
+          <CalendarDateFilterPopover
+            preset={dateFilterPreset}
+            startDate={customStartDate}
+            endDate={customEndDate}
+            onApplyRange={(start, end, presetName) => {
+              setCustomStartDate(start);
+              setCustomEndDate(end);
+              setDateFilterPreset(presetName);
+              setCurrentPage(1);
+            }}
+            onClear={() => {
+              setDateFilterPreset('All');
+              setCustomStartDate('');
+              setCustomEndDate('');
+              setCurrentPage(1);
+            }}
+          />
 
-          {/* Export PDF Button */}
-          <button
-            onClick={handleExportPDF}
-            className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            title="Export to PDF Document"
+          {/* Department Filter Dropdown */}
+          <select
+            value={deptFilter}
+            onChange={e => {
+              setDeptFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              deptFilter !== 'All'
+                ? 'bg-blue-50/80 border-blue-300 text-blue-800'
+                : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+            }`}
           >
-            <FileText className="w-3.5 h-3.5 text-rose-500" />
-            <span>PDF</span>
-          </button>
-
-          {/* Refresh Button */}
-          <button
-            onClick={onRefresh}
-            className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            title="Refresh Data"
-          >
-            <RotateCcw className="w-3.5 h-3.5 text-gray-500" />
-            <span>Refresh</span>
-          </button>
+            <option value="All">All Departments</option>
+            {dynamicDepartments.map(d => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
         </div>
       </div>
 
