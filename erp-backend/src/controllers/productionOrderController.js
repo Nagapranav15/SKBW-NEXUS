@@ -967,10 +967,33 @@ exports.recordProductionEntry = async (req, res) => {
       return res.status(404).json({ msg: "Production order not found" });
     }
 
-    const producedQty = Number(req.body.producedQty) || 0;
+    const enteredQty = Number(req.body.producedQty) || 0;
+    const enteredUom = (req.body.producedUom || order.plannedUom || 'PCS').trim().toUpperCase();
+    const orderUom = (order.plannedUom || 'PCS').trim().toUpperCase();
     const conversion = order.conversionFactor || 1;
-    const isGbl = req.body.producedUom === "GBL" || order.plannedUom === "GBL";
-    const producedPcs = isGbl ? producedQty * conversion : producedQty;
+
+    // Normalize to the order's planned UOM for producedQty, and always store PCS in producedPcs.
+    // producedQty must be in the same unit as plannedQty for progress/balance calculations.
+    let producedQty;   // in order's plannedUom (e.g. GBL)
+    let producedPcs;   // always in PCS
+
+    if (enteredUom === 'GBL' && orderUom === 'GBL') {
+      // User entered GBL, order is GBL — direct
+      producedQty = enteredQty;
+      producedPcs = Math.round(enteredQty * conversion);
+    } else if (enteredUom === 'PCS' && orderUom === 'GBL') {
+      // User entered PCS but order is planned in GBL → convert PCS→GBL for producedQty
+      producedQty = Math.round((enteredQty / conversion) * 10000) / 10000;
+      producedPcs = enteredQty;
+    } else if (enteredUom === 'GBL' && orderUom === 'PCS') {
+      // User entered GBL but order is planned in PCS → convert GBL→PCS for producedQty
+      producedQty = Math.round(enteredQty * conversion);
+      producedPcs = Math.round(enteredQty * conversion);
+    } else {
+      // PCS→PCS (or any same-unit case)
+      producedQty = enteredQty;
+      producedPcs = enteredQty;
+    }
 
     const newCumulativeQty = (order.producedQty || 0) + producedQty;
     const newCumulativePcs = (order.producedPcs || 0) + producedPcs;
@@ -987,9 +1010,11 @@ exports.recordProductionEntry = async (req, res) => {
       id: `entry-${Date.now()}`,
       date: dateStr,
       shift: req.body.shift || "Day Shift",
-      producedQty,
-      producedUom: req.body.producedUom || order.plannedUom,
-      producedPcs,
+      producedQty,           // normalized to order's plannedUom
+      producedUom: orderUom, // always stored in order's plannedUom for consistency
+      producedPcs,           // always in PCS
+      enteredQty,            // raw entered value (for display/audit)
+      enteredUom,            // raw entered UOM (for display/audit)
       cumulativeQty: newCumulativeQty,
       cumulativePcs: newCumulativePcs,
       remarks: req.body.remarks || "-",
@@ -1188,11 +1213,16 @@ exports.getMaterialRates = async (req, res) => {
       const itemInput = Array.isArray(items) ? items.find(it => String(it.skuId) === skuIdStr) : null;
       let reqQty = itemInput ? (Number(itemInput.requiredQty) || 0) : 0;
 
-      // Convert reqQty from input UOM to SKU stocking unit if different
-      const isRawMat = (sku.itemType === 'materials') || 
-                       (sku.skuCode && sku.skuCode.toUpperCase().startsWith('RM-')) || 
-                       (sku.category && /sheet|board|paper|reel/i.test(sku.category)) ||
-                       (sku.name && /sheet|board/i.test(sku.name));
+      // A SKU is manufactured if it is semi-finished or finished good (SM- or FG-)
+      const isManufactured = (sku.itemType === 'semi' || sku.itemType === 'products') ||
+                            (sku.skuCode && (sku.skuCode.toUpperCase().startsWith('SM-') || sku.skuCode.toUpperCase().startsWith('FG-')));
+
+      const isRawMat = !isManufactured && (
+        (sku.itemType === 'materials') || 
+        (sku.skuCode && sku.skuCode.toUpperCase().startsWith('RM-')) || 
+        (sku.category && /sheet|paper|reel/i.test(sku.category)) ||
+        (sku.name && /sheet/i.test(sku.name))
+      );
 
       if (reqQty > 0 && itemInput && itemInput.uom && sku.unit) {
         const inUom = itemInput.uom.trim().toLowerCase();
@@ -1412,39 +1442,73 @@ exports.getMaterialRates = async (req, res) => {
 
       const effectiveRate = avgRate > 0 ? avgRate : (productionRate > 0 ? productionRate : (lastProductionRate > 0 ? lastProductionRate : standardRate));
 
-      const reportedUnit = (isRawMat && ((sku.unit || '').toUpperCase() === 'GBL' || !sku.unit)) 
+      const skuStockingUnit = (isRawMat && ((sku.unit || '').toUpperCase() === 'GBL' || !sku.unit)) 
         ? 'PCS' 
         : (sku.unit || 'PCS');
-      const reportedAltUnit = isRawMat ? '' : (sku.altUnit || '');
-      const reportedConv = isRawMat ? 1 : Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 1);
+      const skuAltUnit = isRawMat ? '' : (sku.altUnit || '');
+      const skuConv = isRawMat ? 1 : Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 1);
+
+      // Target UOM present in the BOM (e.g. PCS, GBL, KG, Ream)
+      const targetUom = (itemInput && itemInput.uom) ? itemInput.uom.trim().toUpperCase() : skuStockingUnit.toUpperCase();
+
+      // Convert rate between stocking unit and BOM target UOM
+      const convertRate = (rateVal, fromUom, toUom) => {
+        if (!rateVal || rateVal <= 0 || !fromUom || !toUom) return rateVal || 0;
+        const f = fromUom.trim().toUpperCase();
+        const t = toUom.trim().toUpperCase();
+        if (f === t) return rateVal;
+
+        if (f === 'GBL' && (t === 'PCS' || (skuAltUnit && t === skuAltUnit.toUpperCase()))) {
+          return skuConv > 0 ? Math.round((rateVal / skuConv) * 10000) / 10000 : rateVal;
+        }
+        if ((f === 'PCS' || (skuAltUnit && f === skuAltUnit.toUpperCase())) && t === 'GBL') {
+          return skuConv > 0 ? Math.round((rateVal * skuConv) * 10000) / 10000 : rateVal;
+        }
+        return rateVal;
+      };
+
+      const finalStdRate = convertRate(standardRate || productionRate, skuStockingUnit, targetUom);
+      const finalProdRate = convertRate(productionRate > 0 ? productionRate : 0, skuStockingUnit, targetUom);
+      const finalAvgRate = convertRate(effectiveRate, skuStockingUnit, targetUom);
+      const finalFifoRate = convertRate(fifoRate > 0 ? fifoRate : effectiveRate, skuStockingUnit, targetUom);
+      const finalMajRate = convertRate(fifoResult.majorityRate, skuStockingUnit, targetUom);
+      const finalWeightRate = convertRate(fifoResult.weightedRate, skuStockingUnit, targetUom);
+      const finalLastProdRate = convertRate(lastProductionRate > 0 ? lastProductionRate : 0, skuStockingUnit, targetUom);
 
       rates[skuIdStr] = {
         skuId: skuIdStr,
         skuCode: sku.skuCode,
         skuName: sku.name,
-        unit: reportedUnit,
-        altUnit: reportedAltUnit,
-        altUnitConversion: reportedConv,
+        unit: targetUom,
+        stockingUnit: skuStockingUnit,
+        altUnit: skuAltUnit,
+        altUnitConversion: skuConv,
         altUnitDirection: sku.altUnitDirection || 'PRIMARY_TO_ALT',
-        standardRate: standardRate || productionRate,
-        productionRate: productionRate > 0 ? productionRate : 0,
-        avgRate: effectiveRate,
-        fifoRate: fifoRate > 0 ? fifoRate : effectiveRate,
+        standardRate: finalStdRate,
+        productionRate: finalProdRate,
+        avgRate: finalAvgRate,
+        fifoRate: finalFifoRate,
         majorityBatch: fifoResult.majorityBatch,
-        majorityRate: fifoResult.majorityRate,
+        majorityRate: finalMajRate,
         majorityQty: fifoResult.majorityQty,
-        weightedRate: fifoResult.weightedRate,
-        fifoBatchInfo,
+        weightedRate: finalWeightRate,
+        fifoBatchInfo: fifoBatchInfo ? {
+          ...fifoBatchInfo,
+          rate: convertRate(fifoBatchInfo.rate, skuStockingUnit, targetUom),
+          majorityRate: convertRate(fifoBatchInfo.majorityRate, skuStockingUnit, targetUom),
+          weightedRate: convertRate(fifoBatchInfo.weightedRate, skuStockingUnit, targetUom),
+          summary: `${fifoBatchInfo.majorityBatch || fifoBatchInfo.batchNumber} (@ ₹${convertRate(fifoBatchInfo.rate, skuStockingUnit, targetUom)}/${targetUom})`
+        } : null,
         batchBalances: activeBatches.map(b => ({
           batchNumber: b.batchNumber,
           date: b.date ? new Date(b.date).toLocaleDateString('en-GB') : undefined,
           qtyIn: b.qtyIn,
           qtyOut: b.qtyOut,
           remainingQty: Math.round(b.remainingQty * 100) / 100,
-          rate: b.rate
+          rate: convertRate(b.rate, skuStockingUnit, targetUom)
         })),
         batchCount: activeBatches.length || allPurchasedItems.length,
-        lastProductionRate: lastProductionRate > 0 ? lastProductionRate : 0
+        lastProductionRate: finalLastProdRate
       };
     }
 

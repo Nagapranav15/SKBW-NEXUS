@@ -366,6 +366,11 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
                     = <span className="font-bold text-gray-800">{producedPcs.toLocaleString()} PCS</span> (1 GBL = {conversion} PCS)
                   </p>
                 )}
+                {!isGbl && orderIsGbl && Number(producedQty) > 0 && (
+                  <p className="text-[11px] text-blue-500 mt-1 font-medium">
+                    = <span className="font-bold text-blue-700">{(Math.round((Number(producedQty) / conversion) * 10000) / 10000).toLocaleString()} GBL</span> (÷ {conversion} PCS/GBL)
+                  </p>
+                )}
               </div>
 
               {/* Completed Qty (Till Date) */}
@@ -465,7 +470,14 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
                       </td>
                       <td className="py-2.5 px-3 font-medium text-gray-800 whitespace-nowrap">{entry.date}</td>
                       <td className="py-2.5 px-3 text-gray-700 whitespace-nowrap">{entry.shift || 'Day Shift'}</td>
-                      <td className="py-2.5 px-3 font-bold text-gray-900 whitespace-nowrap font-mono">{entry.producedQty} {order.plannedUom}</td>
+                      <td className="py-2.5 px-3 font-bold text-gray-900 whitespace-nowrap font-mono">
+                        {entry.producedQty} {order.plannedUom}
+                        {(entry as any).enteredUom && (entry as any).enteredUom !== order.plannedUom && (
+                          <span className="block text-[10px] text-gray-400 font-normal">
+                            (entered: {(entry as any).enteredQty?.toLocaleString()} {(entry as any).enteredUom})
+                          </span>
+                        )}
+                      </td>
                       {orderIsGbl && (
                         <td className="py-2.5 px-3 font-semibold text-gray-700 whitespace-nowrap font-mono">
                           {(entry.producedPcs || Math.round(entry.producedQty * conversion)).toLocaleString()} PCS
