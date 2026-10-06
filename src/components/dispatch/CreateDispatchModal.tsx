@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  X, Truck, Package, CheckCircle2, Printer,
-  Edit3, MapPin, Phone, Save, Plus, Trash2, Calendar
+  X, Truck, Package, CheckCircle2, AlertTriangle, AlertCircle, Printer,
+  Edit3, MapPin, Phone, Save, Plus, Trash2, Calendar, Search,
+  ChevronDown, Building, RefreshCw, Check
 } from 'lucide-react';
 import { SalesOrderV2, updateSalesOrderV2 } from '../../api/salesOrderApiV2';
 import { createDeliveryChallan, updateDeliveryChallan } from '../../api/deliveryChallanApi';
@@ -55,9 +56,11 @@ interface ItemRow {
   dispatchPcs: number;
   skuId?: any;
   skuCode?: string;
+  category?: string;
   unitPrice?: number;
   stockOnHandGbl?: number;
   stockOnHandPcs?: number;
+  totalWarehouseStockGbl?: number;
   isAvailable?: boolean;
   locationId?: string;
   locationName?: string;
@@ -89,8 +92,9 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
   const [directCustomerName, setDirectCustomerName] = useState('');
   const [directCustomerPhone, setDirectCustomerPhone] = useState('');
   const [directRegion, setDirectRegion] = useState('');
+  const [selectedPartyId, setSelectedPartyId] = useState('');
 
-  // Parties & Master SKUs for direct creation
+  // Parties & Master SKUs
   const [partyOptions, setPartyOptions] = useState<any[]>([]);
   const [availableSkus, setAvailableSkus] = useState<any[]>([]);
 
@@ -101,7 +105,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     return (selectedOrderId ? (allOrders.find(o => o._id === selectedOrderId) ?? order ?? null) : (order ?? null));
   }, [allOrders, selectedOrderId, order, dispatchMode]);
 
-  // Live stock map for displaying stock availability of order items
+  // Live stock & warehouse locations
   const [modalStockMap, setModalStockMap] = useState<Map<string, { pcs: number; gbl: number }>>(new Map());
   const [warehouseLocations, setWarehouseLocations] = useState<WarehouseLocationV2[]>([]);
   const [allStorageLocations, setAllStorageLocations] = useState<StorageLocationOption[]>([]);
@@ -158,6 +162,43 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     return `DC-${y}-${r}`;
   }, [editingChallan]);
 
+  // Helper to compute stock at a specific location or its descendants
+  const computeLocationStock = (
+    locId: string,
+    stockEntries: SkuLocationStock[]
+  ): { gbl: number; pcs: number } => {
+    if (!locId || !stockEntries || stockEntries.length === 0) return { gbl: 0, pcs: 0 };
+
+    // 1. Exact match
+    const direct = stockEntries.find(s => String(s.locationId) === String(locId));
+    let totalGbl = direct ? direct.onHandGbl : 0;
+    let totalPcs = direct ? direct.onHandPcs : 0;
+
+    // 2. Child locations
+    const childIds = new Set<string>();
+    const collectDescendants = (parentId: string) => {
+      warehouseLocations
+        .filter(w => String(w.parentId) === String(parentId))
+        .forEach(child => {
+          const cId = String(child._id);
+          if (!childIds.has(cId)) {
+            childIds.add(cId);
+            collectDescendants(cId);
+          }
+        });
+    };
+    collectDescendants(locId);
+
+    stockEntries.forEach(se => {
+      if (childIds.has(String(se.locationId))) {
+        totalGbl += se.onHandGbl;
+        totalPcs += se.onHandPcs;
+      }
+    });
+
+    return { gbl: totalGbl, pcs: totalPcs };
+  };
+
   // Load parties, SKUs, balances & warehouse hierarchy when modal opens
   useEffect(() => {
     if (!isOpen) return;
@@ -210,8 +251,9 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
 
         const locId = b.locationId ? String((b.locationId as any)._id || b.locationId) : (b.location?._id ? String(b.location._id) : '');
         const locName = b.location?.name || locMap.get(locId)?.name || 'Storage Location';
+
         if (sId && locId && qty > 0) {
-          const matchedSku = sList.find((s: any) => String(s._id) === sId);
+          const matchedSku = sList.find((s: any) => String(s._id) === sId) || b.sku;
           const pcsPerGbl = Number(matchedSku?.altUnitConversion || matchedSku?.booksGbl || 100) || 100;
           const unit = (matchedSku?.unit || '').toUpperCase().trim();
           const altUnit = (matchedSku?.altUnit || '').toUpperCase().trim();
@@ -234,6 +276,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
           };
 
           const addLoc = (k: string) => {
+            if (!k) return;
             const arr = locStockMap.get(k) || [];
             if (!arr.some(e => e.locationId === locId)) arr.push(stockEntry);
             locStockMap.set(k, arr);
@@ -267,6 +310,28 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
         if (sId) smap.set(sId, val);
         if (code) smap.set(code, val);
         if (name) smap.set(name, val);
+
+        // If this SKU has initial location or default location, register it in locStockMap if absent
+        const defLocId = s.initialLocationId ? String(s.initialLocationId) : (s.defaultLocationId ? String(s.defaultLocationId) : '');
+        if (defLocId && gbl > 0) {
+          const defLocName = s.defaultLocation || locMap.get(defLocId)?.name || 'Default Location';
+          const defaultEntry: SkuLocationStock = {
+            locationId: defLocId,
+            locationName: defLocName,
+            onHand: rawOnHand,
+            onHandGbl: gbl,
+            onHandPcs: pcs
+          };
+          const addDef = (k: string) => {
+            if (!k) return;
+            const arr = locStockMap.get(k) || [];
+            if (!arr.some(e => e.locationId === defLocId)) arr.push(defaultEntry);
+            locStockMap.set(k, arr);
+          };
+          addDef(sId);
+          if (code) addDef(code);
+          if (name) addDef(name);
+        }
       });
 
       setModalStockMap(smap);
@@ -321,7 +386,10 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
             unitPrice: Number(it.price || it.unitPrice || 0),
             stockOnHandGbl: 0,
             stockOnHandPcs: 0,
-            isAvailable: true
+            totalWarehouseStockGbl: 0,
+            isAvailable: true,
+            locationId: it.locationId,
+            locationName: it.locationName || 'Main Storage'
           };
         }));
       }
@@ -331,7 +399,6 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     if (isDirectDispatch || !order) {
       setDispatchMode('direct');
       if (itemRows.length === 0) {
-        // Start with one empty item row in direct mode
         handleAddNewDirectItem();
       }
     } else {
@@ -360,11 +427,13 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
       dispatchPcs: 100,
       skuId: undefined,
       skuCode: '',
+      category: '',
       unitPrice: 0,
       locationId: firstLoc?.id || '',
-      locationName: firstLoc?.name || '',
+      locationName: firstLoc?.name || 'Storage Location',
       stockOnHandGbl: 0,
       stockOnHandPcs: 0,
+      totalWarehouseStockGbl: 0,
       isAvailable: true
     };
     setItemRows(prev => [...prev, newRow]);
@@ -425,18 +494,20 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
       }
 
       const dispatchedPcs = Number(item.dispatchedQty) || 0;
-      const dispatchedGbl = Math.floor(dispatchedPcs / conv);
+      const dispatchedGbl = conv > 0 ? Math.floor(dispatchedPcs / conv) : dispatchedPcs;
       const pendingPcs = Math.max(0, orderedPcs - dispatchedPcs);
       const pendingGbl = Math.max(0, orderedGbl - dispatchedGbl) || (conv > 0 ? Math.ceil(pendingPcs / conv) : pendingPcs);
 
       const isGbl = (item.uom || '').toUpperCase() === 'GBL';
       const codeKey = (item.skuCode || '').toLowerCase().trim();
-      const idKey = String(item.skuId || '');
+      const rawSkuId = (item.skuId as any)?._id || item.skuId;
+      const idKey = rawSkuId ? String(rawSkuId) : '';
       const nameKey = (item.itemName || item.description || '').toLowerCase().trim();
-      const stock = (codeKey && modalStockMap.get(codeKey)) ||
-                    (idKey && modalStockMap.get(idKey)) ||
-                    (nameKey && modalStockMap.get(nameKey)) ||
-                    { pcs: 0, gbl: 0 };
+
+      const totalStock = (idKey && modalStockMap.get(idKey)) ||
+                         (codeKey && modalStockMap.get(codeKey)) ||
+                         (nameKey && modalStockMap.get(nameKey)) ||
+                         { pcs: 0, gbl: 0 };
 
       const stockLocs = (idKey && skuLocationStockMap.get(idKey)) ||
                         (codeKey && skuLocationStockMap.get(codeKey)) ||
@@ -444,29 +515,33 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
 
       let chosenLocId = '';
       let chosenLocName = '';
-      let chosenLocStockGbl = stock.gbl;
-      let chosenLocStockPcs = stock.pcs;
+      let chosenLocStockGbl = 0;
+      let chosenLocStockPcs = 0;
 
       if (stockLocs.length > 0) {
         // Preferred: location with highest on-hand stock
-        const sorted = [...stockLocs].sort((a, b) => b.onHandGbl - a.onHandGbl);
+        const withStock = stockLocs.filter(l => l.onHandGbl > 0);
+        const sorted = (withStock.length > 0 ? withStock : stockLocs).sort((a, b) => b.onHandGbl - a.onHandGbl);
         chosenLocId = sorted[0].locationId;
         chosenLocName = sorted[0].locationName;
-        chosenLocStockGbl = sorted[0].onHandGbl;
-        chosenLocStockPcs = sorted[0].onHandPcs;
+        const calculated = computeLocationStock(chosenLocId, stockLocs);
+        chosenLocStockGbl = calculated.gbl;
+        chosenLocStockPcs = calculated.pcs;
       } else if (allStorageLocations.length > 0) {
         chosenLocId = allStorageLocations[0].id;
         chosenLocName = allStorageLocations[0].name;
+        chosenLocStockGbl = totalStock.gbl;
+        chosenLocStockPcs = totalStock.pcs;
       }
 
-      const hasStock = (chosenLocStockGbl >= pendingGbl && pendingGbl > 0) || 
+      const hasStock = (chosenLocStockGbl >= pendingGbl && pendingGbl > 0) ||
                        (chosenLocStockPcs >= pendingPcs && pendingPcs > 0);
 
       return {
         key: item._id || `item-${idx}`,
         itemCode: item.skuCode || `FG-${String(idx + 1).padStart(3, '0')}`,
         itemName: item.itemName || item.description || '—',
-        uom: item.uom || 'PCS',
+        uom: item.uom || 'GBL',
         pcsPerGbl: conv,
         orderedQty: orderedPcs,
         dispatchedQty: dispatchedPcs,
@@ -476,13 +551,15 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
         selected: true,
         dispatchGbl: pendingGbl,
         dispatchPcs: pendingPcs,
-        skuId: item.skuId,
+        skuId: rawSkuId,
         skuCode: item.skuCode,
+        category: (item as any).category || '',
         unitPrice: Number(item.unitPrice) || 0,
         locationId: (item as any).locationId || chosenLocId,
         locationName: (item as any).locationName || chosenLocName,
         stockOnHandGbl: chosenLocStockGbl,
         stockOnHandPcs: chosenLocStockPcs,
+        totalWarehouseStockGbl: totalStock.gbl,
         isAvailable: hasStock
       };
     });
@@ -554,52 +631,34 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     setItemRows(prev =>
       prev.map(r => {
         if (r.key !== key) return r;
-        const idKey = String((r.skuId as any)?._id || r.skuId || '');
+        const rawSkuId = (r.skuId as any)?._id || r.skuId;
+        const idKey = rawSkuId ? String(rawSkuId) : '';
         const codeKey = (r.skuCode || '').toLowerCase().trim();
         const nameKey = (r.itemName || '').toLowerCase().trim();
         const stockLocs = (idKey && skuLocationStockMap.get(idKey)) ||
                           (codeKey && skuLocationStockMap.get(codeKey)) ||
                           (nameKey && skuLocationStockMap.get(nameKey)) || [];
 
-        const matchedStock = stockLocs.find(l => String(l.locationId) === String(newLocationId));
-        let stockGbl = matchedStock ? matchedStock.onHandGbl : 0;
-        let stockPcs = matchedStock ? matchedStock.onHandPcs : 0;
-
-        if (!matchedStock) {
-          const childIds = new Set<string>();
-          const collectChildIds = (pId: string) => {
-            warehouseLocations.filter(w => String(w.parentId) === String(pId)).forEach(c => {
-              const cId = String(c._id);
-              childIds.add(cId);
-              collectChildIds(cId);
-            });
-          };
-          collectChildIds(newLocationId);
-          stockLocs.forEach(sl => {
-            if (childIds.has(String(sl.locationId))) {
-              stockGbl += sl.onHandGbl;
-              stockPcs += sl.onHandPcs;
-            }
-          });
-        }
-
-        const locObj = allStorageLocations.find(l => l.id === newLocationId) || warehouseLocations.find(l => String(l._id) === String(newLocationId));
+        const calculated = computeLocationStock(newLocationId, stockLocs);
         let locName = customLocName;
         if (!locName) {
-          locName = locObj?.name || matchedStock?.locationName || 'Location';
-        } else if (locName.includes(' › ')) {
-          const parts = locName.split(' › ');
+          const locObj = allStorageLocations.find(l => l.id === newLocationId) ||
+                         warehouseLocations.find(l => String(l._id) === String(newLocationId));
+          locName = locObj?.name || 'Storage Location';
+        } else if (locName.includes(' > ')) {
+          const parts = locName.split(' > ');
           locName = parts[parts.length - 1];
         }
 
-        const hasStock = (stockGbl >= r.dispatchGbl && r.dispatchGbl > 0) || (stockPcs >= r.dispatchPcs && r.dispatchPcs > 0);
+        const hasStock = (calculated.gbl >= r.dispatchGbl && r.dispatchGbl > 0) ||
+                         (calculated.pcs >= r.dispatchPcs && r.dispatchPcs > 0);
 
         return {
           ...r,
           locationId: newLocationId,
           locationName: locName,
-          stockOnHandGbl: stockGbl,
-          stockOnHandPcs: stockPcs,
+          stockOnHandGbl: calculated.gbl,
+          stockOnHandPcs: calculated.pcs,
           isAvailable: hasStock
         };
       })
@@ -607,16 +666,16 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
   };
 
   // Direct item SKU selector change handler
-  const handleDirectSkuChange = (key: string, skuIdOrCode: string) => {
-    const selectedSku = availableSkus.find(s => s._id === skuIdOrCode || s.skuCode === skuIdOrCode);
+  const handleSelectSkuForDirectRow = (key: string, selectedSku: any) => {
     if (!selectedSku) return;
 
     const pcsPerGbl = Number(selectedSku.altUnitConversion || selectedSku.booksGbl || 100) || 100;
-    const price = Number(selectedSku.sellingPrice || selectedSku.rate || 0);
+    const price = Number(selectedSku.sellingPrice || selectedSku.rate || selectedSku.purchasePrice || 0);
     const sId = String(selectedSku._id);
     const cKey = (selectedSku.skuCode || '').toLowerCase().trim();
     const nKey = (selectedSku.name || '').toLowerCase().trim();
     const stockLocs = skuLocationStockMap.get(sId) || skuLocationStockMap.get(cKey) || skuLocationStockMap.get(nKey) || [];
+    const totalStock = modalStockMap.get(sId) || modalStockMap.get(cKey) || modalStockMap.get(nKey) || { pcs: 0, gbl: 0 };
 
     let chosenLocId = '';
     let chosenLocName = '';
@@ -624,25 +683,30 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     let locPcs = 0;
 
     if (stockLocs.length > 0) {
-      const sorted = [...stockLocs].sort((a, b) => b.onHandGbl - a.onHandGbl);
+      const withStock = stockLocs.filter(l => l.onHandGbl > 0);
+      const sorted = (withStock.length > 0 ? withStock : stockLocs).sort((a, b) => b.onHandGbl - a.onHandGbl);
       chosenLocId = sorted[0].locationId;
       chosenLocName = sorted[0].locationName;
-      locGbl = sorted[0].onHandGbl;
-      locPcs = sorted[0].onHandPcs;
+      const calculated = computeLocationStock(chosenLocId, stockLocs);
+      locGbl = calculated.gbl;
+      locPcs = calculated.pcs;
     } else if (allStorageLocations.length > 0) {
       chosenLocId = allStorageLocations[0].id;
       chosenLocName = allStorageLocations[0].name;
+      locGbl = totalStock.gbl;
+      locPcs = totalStock.pcs;
     }
 
     setItemRows(prev =>
       prev.map(r => {
         if (r.key !== key) return r;
-        const gbl = r.dispatchGbl || 1;
+        const gbl = r.dispatchGbl > 0 ? r.dispatchGbl : 1;
         return {
           ...r,
           skuId: selectedSku._id,
-          skuCode: selectedSku.skuCode,
-          itemName: selectedSku.name,
+          skuCode: selectedSku.skuCode || '',
+          itemName: selectedSku.name || '',
+          category: selectedSku.category || '',
           uom: selectedSku.unit || 'GBL',
           pcsPerGbl,
           unitPrice: price,
@@ -650,6 +714,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
           locationName: chosenLocName,
           stockOnHandGbl: locGbl,
           stockOnHandPcs: locPcs,
+          totalWarehouseStockGbl: totalStock.gbl,
           dispatchGbl: gbl,
           dispatchPcs: gbl * pcsPerGbl,
           pendingQty: gbl,
@@ -662,12 +727,14 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
 
   // Direct party select handler
   const handleSelectParty = (partyId: string) => {
+    setSelectedPartyId(partyId);
     const p = partyOptions.find(item => item._id === partyId || item.id === partyId);
     if (p) {
-      setDirectCustomerName(p.name || p.companyName || '');
+      const pName = p.name || p.companyName || '';
+      setDirectCustomerName(pName);
       setDirectCustomerPhone(p.phone || p.mobile || '');
       setDirectRegion(p.state || p.city || '');
-      const addr = p.address || (p.city ? `${p.name}\n${p.city}${p.state ? ', ' + p.state : ''}` : '');
+      const addr = p.address || (p.city ? `${pName}\n${p.city}${p.state ? ', ' + p.state : ''}` : '');
       if (addr) {
         setBillToAddress(addr);
         setShipToAddress(addr);
@@ -687,6 +754,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     const totalAmount = active.reduce((s, r) => s + (r.dispatchGbl * (r.unitPrice || 0)), 0);
 
     return {
+      activeCount: active.length,
       totalDispatchGbl,
       totalDispatchPcs,
       totalPendingGbl,
@@ -698,22 +766,22 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     };
   }, [itemRows, dispatchMode]);
 
-  // Submit Handler: supports direct dispatch, SO dispatch, and editing existing challans
+  // Submit Handler
   const buildAndSubmit = async (asDraft: boolean) => {
     if (dispatchMode === 'direct') {
       if (!directCustomerName.trim()) {
-        showToast('Please enter customer name for direct dispatch', 'error');
+        showToast('Please enter customer/consignee name for direct dispatch', 'error');
         return;
       }
     } else {
       if (!activeOrder) {
-        showToast('Please select a sales order', 'error');
+        showToast('Please select a valid sales order', 'error');
         return;
       }
     }
 
     if (totals.totalDispatchGbl <= 0) {
-      showToast('Please enter dispatch quantity for at least one item', 'error');
+      showToast('Please enter a dispatch quantity greater than 0 for at least one item', 'error');
       return;
     }
 
@@ -721,7 +789,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     try {
       const activeRows = itemRows.filter(r => r.selected && r.dispatchGbl > 0);
       const dcItems = activeRows.map(r => ({
-        itemId: String(r.skuId || r.skuCode || ''),
+        itemId: String((r.skuId as any)?._id || r.skuId || r.skuCode || ''),
         skuId: r.skuId,
         skuCode: r.skuCode,
         itemName: r.itemName,
@@ -744,10 +812,12 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
         orderId: dispatchMode === 'direct' ? null : activeOrder?._id,
         orderNumber: dispatchMode === 'direct' ? 'DIRECT' : (activeOrder?.orderNumber || 'DIRECT'),
         customerName: finalCustomerName,
-        customerId: dispatchMode === 'direct' ? null : ((activeOrder?.customer as any)?._id || (activeOrder as any)?.customerId),
+        customerId: dispatchMode === 'direct'
+          ? (selectedPartyId || null)
+          : ((activeOrder?.customer as any)?._id || (activeOrder as any)?.customerId),
         date: dispatchDate || new Date().toISOString().split('T')[0],
         transporterName: transporter.trim(),
-        vehicleNumber: vehicleNumber.trim(),
+        vehicleNumber: vehicleNumber.trim().toUpperCase(),
         lrNumber: lrNumber.trim(),
         lrDate,
         items: dcItems,
@@ -769,7 +839,6 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
       let resultChallan: any = challanPayload;
 
       if (isEditing && editingChallan?._id) {
-        // UPDATE EXISTING DELIVERY CHALLAN
         try {
           const res = await updateDeliveryChallan(editingChallan._id, challanPayload);
           if (res?.data) resultChallan = res.data;
@@ -777,7 +846,6 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
           console.warn('updateDeliveryChallan API fallback:', apiErr);
         }
       } else {
-        // CREATE NEW DELIVERY CHALLAN
         try {
           const res = await createDeliveryChallan(challanPayload);
           if (res?.data) resultChallan = res.data;
@@ -831,7 +899,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
       onClose();
     } catch (err: any) {
       console.error(err);
-      showToast('Failed to save dispatch', 'error');
+      showToast('Failed to save dispatch: ' + (err?.message || 'Server error'), 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -841,66 +909,81 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4"
-      style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(3px)' }}
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
       onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full flex flex-col overflow-hidden max-w-4xl max-h-[94vh]"
+        className="bg-white rounded-2xl shadow-2xl w-full flex flex-col overflow-hidden max-w-6xl max-h-[94vh] border border-slate-200"
         onMouseDown={e => e.stopPropagation()}
       >
         {/* ── HEADER ── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0 bg-white">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm shadow-blue-500/20">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0 bg-white">
+          <div className="flex items-center gap-3.5">
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-sm text-white ${
+              dispatchMode === 'direct'
+                ? 'bg-gradient-to-tr from-purple-600 to-indigo-600 shadow-purple-500/20'
+                : 'bg-gradient-to-tr from-blue-600 to-cyan-600 shadow-blue-500/20'
+            }`}>
               <Truck className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base font-black text-gray-900 tracking-tight">
-                  {isEditing ? `Edit Dispatch (${dcNumber})` : dispatchMode === 'direct' ? 'Create Direct Dispatch' : 'Create Dispatch from Sales Order'}
+                <h2 className="text-base font-black text-slate-900 tracking-tight">
+                  {isEditing
+                    ? `Edit Delivery Challan (${dcNumber})`
+                    : dispatchMode === 'direct'
+                    ? 'Create Direct Dispatch'
+                    : 'Create Dispatch from Sales Order'}
                 </h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-50 text-blue-700 border border-blue-200">
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono bg-blue-50 text-blue-700 border border-blue-200">
                   {dcNumber}
                 </span>
-                {dispatchMode === 'direct' && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                    Standalone Batch
+                {dispatchMode === 'direct' ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                    Standalone Direct Batch
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                    SO Linked
                   </span>
                 )}
               </div>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5">
                 {isEditing
                   ? 'Update dispatch quantities, vehicle, transporter, and delivery addresses.'
                   : dispatchMode === 'direct'
-                  ? 'Create a delivery challan directly without linking to an existing Sales Order.'
+                  ? 'Generate a delivery challan directly without linking to an existing Sales Order.'
                   : `Dispatch pending items for Sales Order ${activeOrder?.orderNumber || ''}.`}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+            title="Close dialog"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* ── SCROLLABLE BODY ── */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+        <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-slate-50/60 text-xs">
 
-          {/* MODE SELECTOR TOGGLE (If not editing existing challan) */}
+          {/* DISPATCH MODE TOGGLE (If not editing) */}
           {!isEditing && (
-            <div className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-200 gap-2">
-              <span className="text-[11px] font-bold text-gray-600 pl-2">Dispatch Source:</span>
-              <div className="flex items-center gap-1.5">
+            <div className="flex items-center justify-between bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs gap-4 flex-wrap">
+              <div className="flex items-center gap-2 pl-2">
+                <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Dispatch Source:</span>
+                <span className="text-xs text-slate-400 hidden sm:inline">Choose whether to link to an approved Sales Order or dispatch standalone</span>
+              </div>
+              <div className="flex items-center gap-2 bg-slate-100/80 p-1 rounded-xl border border-slate-200">
                 <button
                   type="button"
                   onClick={() => setDispatchMode('order')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
                     dispatchMode === 'order'
-                      ? 'bg-blue-600 text-white shadow-2xs'
-                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                   }`}
                 >
                   <Package className="w-3.5 h-3.5" />
@@ -912,10 +995,10 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                     setDispatchMode('direct');
                     if (itemRows.length === 0) handleAddNewDirectItem();
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
                     dispatchMode === 'direct'
-                      ? 'bg-purple-600 text-white shadow-2xs'
-                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                   }`}
                 >
                   <Truck className="w-3.5 h-3.5" />
@@ -926,154 +1009,192 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
           )}
 
           {/* ① CUSTOMER & ORDER DETAILS */}
-          <Section num={1} label={dispatchMode === 'direct' ? 'Customer & Dispatch Destination' : 'Order & Customer Details'} color="blue">
+          <SectionCard
+            num={1}
+            label={dispatchMode === 'direct' ? 'Customer & Dispatch Destination' : 'Order & Customer Details'}
+            badge={dispatchMode === 'direct' ? 'Consignee Details' : (activeOrder?.orderNumber || 'Sales Order')}
+          >
             {dispatchMode === 'order' ? (
               /* SALES ORDER SOURCE FIELDS */
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <FieldLabel>Sales Order <Required /></FieldLabel>
-                  <select
-                    value={selectedOrderId}
-                    onChange={e => {
-                      setSelectedOrderId(e.target.value);
-                      const m = allOrders.find(o => o._id === e.target.value);
-                      if (m && onOrderChange) onOrderChange(m);
-                    }}
-                    className="w-full h-8 bg-white border border-gray-200 rounded-lg px-2.5 text-xs font-semibold text-gray-800 focus:outline-none focus:border-blue-500 cursor-pointer"
-                  >
-                    <option value="">— Select Sales Order —</option>
-                    {(allOrders.length > 0 ? allOrders : order ? [order] : []).map(o => (
-                      <option key={o._id} value={o._id}>{o.orderNumber} ({o.customerName})</option>
-                    ))}
-                  </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+                <div className="lg:col-span-2">
+                  <FieldLabel>Select Sales Order <Required /></FieldLabel>
+                  <div className="relative">
+                    <select
+                      value={selectedOrderId}
+                      onChange={e => {
+                        setSelectedOrderId(e.target.value);
+                        const m = allOrders.find(o => o._id === e.target.value);
+                        if (m && onOrderChange) onOrderChange(m);
+                      }}
+                      className="w-full h-9 bg-white border border-slate-200 rounded-xl px-3 pr-8 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 cursor-pointer shadow-2xs"
+                    >
+                      <option value="">— Choose Approved Sales Order —</option>
+                      {(allOrders.length > 0 ? allOrders : order ? [order] : []).map(o => (
+                        <option key={o._id} value={o._id}>
+                          {o.orderNumber} • {o.customerName} ({o.items?.length || 0} items)
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                  </div>
                 </div>
+
                 <div>
                   <FieldLabel>Order Date</FieldLabel>
-                  <ReadOnlyField>{activeOrder?.orderDate || '—'}</ReadOnlyField>
+                  <StatDisplay icon={<Calendar className="w-3.5 h-3.5 text-slate-400" />}>
+                    {activeOrder?.orderDate || '—'}
+                  </StatDisplay>
                 </div>
+
                 <div>
                   <FieldLabel>Customer / Party</FieldLabel>
-                  <ReadOnlyField>{activeOrder?.customerName || '—'}</ReadOnlyField>
+                  <StatDisplay icon={<Building className="w-3.5 h-3.5 text-slate-400" />}>
+                    {activeOrder?.customerName || '—'}
+                  </StatDisplay>
                 </div>
+
                 <div>
                   <FieldLabel>Contact Number</FieldLabel>
-                  <ReadOnlyField icon={<Phone className="w-3 h-3 text-gray-400" />}>
+                  <StatDisplay icon={<Phone className="w-3.5 h-3.5 text-slate-400" />}>
                     {activeOrder?.customerPhone || (activeOrder?.customer as any)?.phone || '—'}
-                  </ReadOnlyField>
-                </div>
-                <div>
-                  <FieldLabel>Region</FieldLabel>
-                  <ReadOnlyField icon={<MapPin className="w-3 h-3 text-gray-400" />}>
-                    {activeOrder?.region || '—'}
-                  </ReadOnlyField>
+                  </StatDisplay>
                 </div>
               </div>
             ) : (
-              /* DIRECT STANDALONE DISPATCH FIELDS */
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              /* DIRECT DISPATCH FIELDS */
+              <div className="space-y-3.5">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
                   <div>
-                    <FieldLabel>Select Party / Customer (Optional)</FieldLabel>
-                    <select
-                      onChange={e => handleSelectParty(e.target.value)}
-                      className="w-full h-8 bg-white border border-gray-200 rounded-lg px-2.5 text-xs font-semibold text-gray-800 focus:outline-none focus:border-blue-500 cursor-pointer"
-                    >
-                      <option value="">— Choose from Directory —</option>
-                      {partyOptions.map(p => (
-                        <option key={p._id || p.id} value={p._id || p.id}>{p.name || p.companyName}</option>
-                      ))}
-                    </select>
+                    <FieldLabel>Select Party From Directory (Optional)</FieldLabel>
+                    <div className="relative">
+                      <select
+                        value={selectedPartyId}
+                        onChange={e => handleSelectParty(e.target.value)}
+                        className="w-full h-9 bg-white border border-slate-200 rounded-xl px-3 pr-8 text-xs font-semibold text-slate-800 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 cursor-pointer shadow-2xs"
+                      >
+                        <option value="">— Choose from Party Directory —</option>
+                        {partyOptions.map(p => (
+                          <option key={p._id || p.id} value={p._id || p.id}>
+                            {p.name || p.companyName} {p.city ? `(${p.city})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                    </div>
                   </div>
+
                   <div>
                     <FieldLabel>Customer / Consignee Name <Required /></FieldLabel>
                     <input
                       type="text"
-                      placeholder="e.g. Abbu Stationery"
+                      placeholder="e.g. Abbu Stationery / SRS Books"
                       value={directCustomerName}
                       onChange={e => setDirectCustomerName(e.target.value)}
-                      className="w-full h-8 px-2.5 text-xs border border-gray-200 rounded-lg font-bold text-gray-900 focus:outline-none focus:border-blue-500"
+                      className="w-full h-9 px-3 text-xs border border-slate-200 rounded-xl font-bold text-slate-900 bg-white focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 shadow-2xs"
                     />
                   </div>
+
                   <div>
                     <FieldLabel>Contact Phone</FieldLabel>
-                    <input
-                      type="text"
-                      placeholder="e.g. 9848012345"
-                      value={directCustomerPhone}
-                      onChange={e => setDirectCustomerPhone(e.target.value)}
-                      className="w-full h-8 px-2.5 text-xs border border-gray-200 rounded-lg font-mono focus:outline-none focus:border-blue-500"
-                    />
+                    <div className="relative">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                      <input
+                        type="text"
+                        placeholder="e.g. 9848012345"
+                        value={directCustomerPhone}
+                        onChange={e => setDirectCustomerPhone(e.target.value)}
+                        className="w-full h-9 pl-9 pr-3 text-xs border border-slate-200 rounded-xl font-mono text-slate-800 bg-white focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 shadow-2xs"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
             )}
-          </Section>
+          </SectionCard>
 
           {/* ② DISPATCH TYPE (In Order mode) */}
           {dispatchMode === 'order' && (
-            <Section num={2} label="Dispatch Type" color="blue">
-              <div className="grid grid-cols-2 gap-3">
-                <TypeCard
+            <SectionCard num={2} label="Dispatch Type" badge={dispatchType === 'full' ? 'Full Order' : 'Partial'}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                <DispatchTypeCard
                   id="full"
                   title="Full Dispatch"
-                  desc="Dispatch all pending items and quantities for this order."
+                  desc="Dispatch all remaining pending items and full quantities for this order."
                   active={dispatchType === 'full'}
                   onSelect={() => setDispatchType('full')}
                 />
-                <TypeCard
+                <DispatchTypeCard
                   id="partial"
                   title="Partial Dispatch"
-                  desc="Select items and enter partial quantities to dispatch."
+                  desc="Select specific line items and customize partial quantities to dispatch."
                   active={dispatchType === 'partial'}
                   onSelect={() => setDispatchType('partial')}
                 />
               </div>
-            </Section>
+            </SectionCard>
           )}
 
-          {/* ③ ITEMS TO DISPATCH */}
-          <Section
+          {/* ③ ITEMS TABLE */}
+          <SectionCard
             num={dispatchMode === 'order' ? 3 : 2}
             label={dispatchMode === 'direct' ? 'Items in Direct Dispatch' : 'Items to Dispatch'}
-            color="blue"
+            badge={`${itemRows.length} Line Item${itemRows.length === 1 ? '' : 's'}`}
           >
-            <div className="overflow-x-auto -mx-4 px-4">
-              <table className="w-full text-xs border-collapse min-w-[700px]">
+            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs">
+              <table className="w-full text-xs border-collapse">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-500 uppercase tracking-wider">
+                  <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-wider">
                     {dispatchMode === 'order' && dispatchType === 'partial' && (
-                      <th className="py-2 px-3 w-8 text-center">
+                      <th className="py-2.5 px-3 w-10 text-center">
                         <input
                           ref={checkboxRef}
                           type="checkbox"
                           checked={allSelected}
                           onChange={e => handleToggleAll(e.target.checked)}
-                          className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer"
+                          className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
                         />
                       </th>
                     )}
-                    <th className="py-2 px-3 w-8 text-center">#</th>
-                    <th className="py-2 px-3">Item Name & SKU</th>
-                    <th className="py-2 px-3 min-w-[190px]">Dispatch Location</th>
-                    <th className="py-2 px-3 text-center">Available Stock</th>
-                    <th className="py-2 px-2 text-right">
-                      {dispatchMode === 'direct' ? 'Quantity (GBL)' : 'Pending Qty (GBL)'}
-                    </th>
-                    <th className="py-2 px-2 text-right">
-                      {dispatchMode === 'direct' ? 'Quantity (PCS)' : 'Pending Qty (PCS)'}
-                    </th>
-                    <th className="py-2 px-2 text-right">Dispatch Qty (GBL)</th>
-                    <th className="py-2 px-2 text-right">Rate (₹)</th>
-                    <th className="py-2 px-3 text-right">Total (₹)</th>
-                    {dispatchMode === 'direct' && <th className="py-2 px-2 text-center w-10">Remove</th>}
+                    <th className="py-2.5 px-3 w-10 text-center">#</th>
+                    <th className="py-2.5 px-4 text-left min-w-[260px]">Item Name & SKU</th>
+                    <th className="py-2.5 px-3 text-left min-w-[190px]">Dispatch Location</th>
+                    <th className="py-2.5 px-3 text-center min-w-[130px]">Available Stock</th>
+                    {dispatchMode === 'order' ? (
+                      <>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[90px]">Pending (GBL)</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[90px]">Pending (PCS)</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[120px]">Dispatch Qty (GBL)</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[100px]">Rate (₹)</th>
+                        <th className="py-2.5 px-4 text-right whitespace-nowrap min-w-[110px]">Total (₹)</th>
+                      </>
+                    ) : (
+                      <>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[120px]">Dispatch Qty (GBL)</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[100px]">Total Qty (PCS)</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[100px]">Rate (₹)</th>
+                        <th className="py-2.5 px-4 text-right whitespace-nowrap min-w-[110px]">Total (₹)</th>
+                        <th className="py-2.5 px-2 text-center w-12">Action</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-slate-100">
                   {itemRows.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="py-8 text-center text-gray-400">
-                        <Package className="w-6 h-6 text-gray-300 mx-auto mb-1" />
-                        <p className="text-xs">No items added yet. Click "+ Add Item" below to add items.</p>
+                      <td colSpan={10} className="py-12 text-center text-slate-400">
+                        <Package className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                        <p className="text-xs font-semibold text-slate-500">No items in dispatch batch.</p>
+                        {dispatchMode === 'direct' && (
+                          <button
+                            type="button"
+                            onClick={handleAddNewDirectItem}
+                            className="mt-3 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 cursor-pointer inline-flex items-center gap-1.5"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            Add First Item
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ) : (
@@ -1082,162 +1203,174 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                       return (
                         <tr
                           key={row.key}
-                          className={`transition-colors ${dimmed ? 'opacity-40' : 'hover:bg-blue-50/20'}`}
+                          className={`transition-colors ${
+                            dimmed ? 'opacity-40 bg-slate-50/50' : 'hover:bg-blue-50/25'
+                          }`}
                         >
                           {dispatchMode === 'order' && dispatchType === 'partial' && (
-                            <td className="py-2.5 px-3 text-center">
+                            <td className="py-3 px-3 text-center">
                               <input
                                 type="checkbox"
                                 checked={row.selected}
                                 onChange={() => handleToggleRow(row.key)}
-                                className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer"
+                                className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
                               />
                             </td>
                           )}
-                          <td className="py-2.5 px-3 text-center text-gray-400 font-semibold">{idx + 1}</td>
+                          <td className="py-3 px-3 text-center text-slate-400 font-mono font-semibold">
+                            {idx + 1}
+                          </td>
 
-                          {/* Item Name / SKU selection */}
-                          <td className="py-2.5 px-3">
+                          {/* ── Item Name & SKU Column ── */}
+                          <td className="py-3 px-4">
                             {dispatchMode === 'direct' ? (
-                              <div className="space-y-1">
-                                <select
-                                  value={row.skuId || row.skuCode || ''}
-                                  onChange={e => handleDirectSkuChange(row.key, e.target.value)}
-                                  className="w-full h-7 bg-white border border-gray-300 rounded px-1.5 text-xs font-semibold text-gray-800"
-                                >
-                                  <option value="">— Select SKU Master Item —</option>
-                                  {availableSkus.map(s => (
-                                    <option key={s._id} value={s._id}>
-                                      {s.name} ({s.skuCode}) — Stock: {s.presentStock || 0}
-                                    </option>
-                                  ))}
-                                </select>
-                                <input
-                                  type="text"
-                                  placeholder="Or enter custom item name"
-                                  value={row.itemName}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    setItemRows(prev => prev.map(r => r.key === row.key ? { ...r, itemName: val } : r));
-                                  }}
-                                  className="w-full h-6 px-1.5 border border-gray-200 rounded text-[11px]"
-                                />
-                              </div>
+                              <SearchableSkuSelector
+                                row={row}
+                                availableSkus={availableSkus}
+                                onSelectSku={(sku) => handleSelectSkuForDirectRow(row.key, sku)}
+                                onCustomNameChange={(name) => {
+                                  setItemRows(prev => prev.map(r => r.key === row.key ? { ...r, itemName: name } : r));
+                                }}
+                              />
                             ) : (
-                              <div className="font-semibold text-gray-900 flex items-center gap-1.5 flex-wrap">
-                                <span>{row.itemName}</span>
-                                {row.skuCode && <span className="font-mono text-[10px] text-gray-400">({row.skuCode})</span>}
-                              </div>
-                            )}
-                          </td>
-
-                          {/* Dispatch Location Selection */}
-                          <td className="py-2.5 px-3 min-w-[200px]">
-                            {(() => {
-                              const hasLocation = Boolean(row.locationId && row.locationName);
-                              return (
-                                <button
-                                  type="button"
-                                  onClick={() => setActiveLocModalRowKey(row.key)}
-                                  className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border transition-all text-left group cursor-pointer shadow-2xs ${
-                                    hasLocation
-                                      ? 'bg-blue-50/40 hover:bg-blue-50 border-blue-200 hover:border-blue-400 text-blue-950'
-                                      : 'bg-white hover:bg-gray-50 border-dashed border-gray-300 hover:border-blue-400 text-gray-500'
-                                  }`}
-                                  title="Click to select warehouse storage location and view live stock"
-                                >
-                                  <div className="flex items-center gap-1.5 min-w-0">
-                                    <MapPin className={`w-3.5 h-3.5 shrink-0 transition-transform group-hover:scale-110 ${
-                                      hasLocation ? 'text-blue-600' : 'text-gray-400'
-                                    }`} />
-                                    <span className="text-xs font-bold truncate">
-                                      {row.locationName || 'Select Location'}
+                              <div>
+                                <p className="font-bold text-slate-900 leading-snug">{row.itemName}</p>
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                  {row.skuCode && (
+                                    <span className="font-mono text-[10px] font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                      {row.skuCode}
                                     </span>
-                                  </div>
-                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 transition-colors ${
-                                    hasLocation
-                                      ? 'bg-blue-100/70 text-blue-700 group-hover:bg-blue-600 group-hover:text-white'
-                                      : 'bg-gray-100 text-gray-600 group-hover:bg-blue-600 group-hover:text-white'
-                                  }`}>
-                                    {hasLocation ? 'Change' : 'Choose'}
-                                  </span>
-                                </button>
-                              );
-                            })()}
+                                  )}
+                                  {row.category && (
+                                    <span className="text-[10px] text-slate-400">
+                                      {row.category}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </td>
 
-                          {/* Live Warehouse Stock at Selected Location */}
-                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                            {row.stockOnHandGbl !== undefined && row.stockOnHandGbl > 0 ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-3xs">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                {row.stockOnHandGbl} GBL
+                          {/* ── Dispatch Location Column ── */}
+                          <td className="py-3 px-3">
+                            <button
+                              type="button"
+                              onClick={() => setActiveLocModalRowKey(row.key)}
+                              className="w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-blue-50/50 hover:border-blue-400 transition-all text-left shadow-2xs group cursor-pointer"
+                              title="Click to select warehouse storage location"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                  <MapPin className="w-3.5 h-3.5" />
+                                </div>
+                                <span className="text-xs font-bold text-slate-800 truncate">
+                                  {row.locationName || 'Select Location'}
+                                </span>
+                              </div>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 group-hover:bg-blue-100 group-hover:text-blue-700 shrink-0">
+                                {row.locationName ? 'Change' : 'Choose'}
                               </span>
+                            </button>
+                          </td>
+
+                          {/* ── Live Available Stock Column ── */}
+                          <td className="py-3 px-3 text-center whitespace-nowrap">
+                            {row.stockOnHandGbl !== undefined && row.stockOnHandGbl > 0 ? (
+                              <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>{row.stockOnHandGbl} GBL</span>
+                              </div>
+                            ) : row.totalWarehouseStockGbl !== undefined && row.totalWarehouseStockGbl > 0 ? (
+                              <div
+                                className="inline-flex flex-col items-center px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200"
+                                title={`0 at selected location, but ${row.totalWarehouseStockGbl} GBL available across warehouse`}
+                              >
+                                <span>0 at loc</span>
+                                <span className="text-[9px] text-amber-600 font-medium">({row.totalWarehouseStockGbl} GBL total)</span>
+                              </div>
                             ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                0 at location
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                0 in Stock
                               </span>
                             )}
                           </td>
 
-                          {/* Pending QTY GBL */}
-                          <td className="py-2.5 px-2 text-right font-bold font-mono text-gray-800">
-                            {dispatchMode === 'direct' ? row.dispatchGbl : row.pendingQty}
-                          </td>
+                          {/* ── Order Mode: Pending Columns ── */}
+                          {dispatchMode === 'order' && (
+                            <>
+                              <td className="py-3 px-3 text-right font-bold font-mono text-slate-800">
+                                {row.pendingQty}
+                              </td>
+                              <td className="py-3 px-3 text-right font-mono text-slate-500">
+                                {row.pendingPcs.toLocaleString()}
+                              </td>
+                            </>
+                          )}
 
-                          {/* Pending QTY PCS */}
-                          <td className="py-2.5 px-2 text-right font-mono text-gray-600">
-                            {(dispatchMode === 'direct' ? row.dispatchPcs : row.pendingPcs).toLocaleString()}
-                          </td>
-
-                          {/* Dispatch Qty GBL */}
-                          <td className="py-2.5 px-2 text-right">
+                          {/* ── Dispatch Qty (GBL) Input Column ── */}
+                          <td className="py-3 px-3 text-right">
                             {dispatchMode === 'order' && dispatchType === 'full' ? (
-                              <span className="font-bold font-mono text-blue-700">{row.dispatchGbl}</span>
+                              <span className="inline-block px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 font-bold font-mono text-xs">
+                                {row.dispatchGbl} GBL
+                              </span>
                             ) : (
+                              <div className="inline-flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={dispatchMode === 'order' ? row.pendingQty : 99999}
+                                  step={1}
+                                  value={row.dispatchGbl || ''}
+                                  placeholder="0"
+                                  onChange={e => handleDispatchQtyChange(row.key, Number(e.target.value))}
+                                  className="w-18 h-8 px-2 border border-slate-200 rounded-lg text-right font-mono font-bold text-slate-900 bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 text-xs shadow-2xs"
+                                />
+                                <span className="text-[10px] font-bold text-slate-400">GBL</span>
+                              </div>
+                            )}
+                          </td>
+
+                          {/* ── Direct Mode: PCS column ── */}
+                          {dispatchMode === 'direct' && (
+                            <td className="py-3 px-3 text-right font-mono font-semibold text-slate-600">
+                              {(row.dispatchGbl * (row.pcsPerGbl || 100)).toLocaleString()} PCS
+                            </td>
+                          )}
+
+                          {/* ── Unit Rate Column ── */}
+                          <td className="py-3 px-3 text-right font-mono">
+                            <div className="inline-flex items-center gap-1">
+                              <span className="text-[10px] text-slate-400">₹</span>
                               <input
                                 type="number"
                                 min={0}
                                 step="any"
-                                value={row.dispatchGbl || ''}
+                                value={row.unitPrice || ''}
                                 placeholder="0"
-                                onChange={e => handleDispatchQtyChange(row.key, Number(e.target.value))}
-                                className="w-16 h-7 px-2 border border-gray-300 rounded-md text-right font-mono font-bold text-gray-900 focus:outline-none focus:border-blue-500 text-xs bg-white"
+                                onChange={e => {
+                                  const p = Number(e.target.value);
+                                  setItemRows(prev => prev.map(r => r.key === row.key ? { ...r, unitPrice: p } : r));
+                                }}
+                                className="w-18 h-8 px-2 border border-slate-200 rounded-lg text-right font-mono text-slate-900 bg-white focus:outline-none focus:border-blue-500 text-xs shadow-2xs"
                               />
-                            )}
+                            </div>
                           </td>
 
-                          {/* Unit Rate */}
-                          <td className="py-2.5 px-2 text-right font-mono">
-                            <input
-                              type="number"
-                              min={0}
-                              step="any"
-                              value={row.unitPrice || ''}
-                              placeholder="0"
-                              onChange={e => {
-                                const p = Number(e.target.value);
-                                setItemRows(prev => prev.map(r => r.key === row.key ? { ...r, unitPrice: p } : r));
-                              }}
-                              className="w-16 h-7 px-2 border border-gray-200 rounded-md text-right font-mono text-gray-800 text-xs"
-                            />
+                          {/* ── Total Amount Column ── */}
+                          <td className="py-3 px-4 text-right font-mono font-black text-slate-900 text-xs">
+                            ₹{(row.dispatchGbl * (row.unitPrice || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
 
-                          {/* Total Amount */}
-                          <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-900">
-                            ₹{(row.dispatchGbl * (row.unitPrice || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </td>
-
-                          {/* Remove row button for direct mode */}
+                          {/* ── Remove Row Button (Direct Mode) ── */}
                           {dispatchMode === 'direct' && (
-                            <td className="py-2.5 px-2 text-center">
+                            <td className="py-3 px-2 text-center">
                               <button
                                 type="button"
                                 onClick={() => handleRemoveDirectItem(row.key)}
-                                className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                                 title="Remove item"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-4 h-4" />
                               </button>
                             </td>
                           )}
@@ -1246,26 +1379,38 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                     })
                   )}
 
-                  {/* Totals row */}
+                  {/* ── TOTALS FOOTER ROW ── */}
                   {itemRows.length > 0 && (
-                    <tr className="bg-gray-50 border-t-2 border-gray-200 text-xs font-black">
+                    <tr className="bg-slate-50/90 border-t-2 border-slate-200 text-xs font-black">
                       {dispatchMode === 'order' && dispatchType === 'partial' && <td />}
                       <td />
-                      <td colSpan={3} className="py-2 px-3 text-gray-500 uppercase text-[10px] tracking-wider">Total</td>
-                      <td className="py-2 px-2 text-right font-black font-mono text-gray-900">
-                        {totals.totalPendingGbl}
+                      <td colSpan={2} className="py-3 px-4 text-slate-500 uppercase text-[10px] tracking-wider font-bold">
+                        Batch Total ({totals.activeCount} active items)
                       </td>
-                      <td className="py-2 px-2 text-right font-mono font-bold text-gray-700">
-                        {totals.totalPendingPcs.toLocaleString()}
-                      </td>
-                      <td className="py-2 px-2 text-right font-black font-mono text-blue-700">
-                        {totals.totalDispatchGbl}
-                      </td>
-                      <td className="py-2 px-2 text-right font-mono font-bold text-gray-700">
+                      <td className="text-center font-mono text-slate-500 text-[10px]">
                         —
                       </td>
-                      <td className="py-2 px-3 text-right font-mono font-black text-blue-700">
-                        ₹{totals.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      {dispatchMode === 'order' && (
+                        <>
+                          <td className="py-3 px-3 text-right font-black font-mono text-slate-800">
+                            {totals.totalPendingGbl}
+                          </td>
+                          <td className="py-3 px-3 text-right font-mono font-bold text-slate-600">
+                            {totals.totalPendingPcs.toLocaleString()}
+                          </td>
+                        </>
+                      )}
+                      <td className="py-3 px-3 text-right font-black font-mono text-blue-700">
+                        {totals.totalDispatchGbl} GBL
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono font-bold text-slate-700">
+                        {totals.totalDispatchPcs.toLocaleString()} PCS
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono text-slate-400 font-normal">
+                        —
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono font-black text-blue-700 text-sm">
+                        ₹{totals.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       {dispatchMode === 'direct' && <td />}
                     </tr>
@@ -1280,50 +1425,59 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                 <button
                   type="button"
                   onClick={handleAddNewDirectItem}
-                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5 border border-blue-200"
+                  className="px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-2 border border-purple-200 shadow-2xs hover:shadow-sm"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ Add Item</span>
+                  <Plus className="w-4 h-4" />
+                  <span>+ Add Another Item</span>
                 </button>
               </div>
             )}
-          </Section>
+          </SectionCard>
 
           {/* ④ DISPATCH DETAILS & ADDRESSES */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             {/* Dispatch Logistics Details */}
             <div className="lg:col-span-3">
-              <SectionInner num={dispatchMode === 'order' ? 4 : 3} label="Dispatch & Transport Details" color="blue">
-                <div className="grid grid-cols-2 gap-3">
+              <SectionCard num={dispatchMode === 'order' ? 4 : 3} label="Dispatch & Transport Logistics">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
                     <FieldLabel>Dispatch Date <Required /></FieldLabel>
-                    <input
-                      type="date"
-                      value={dispatchDate}
-                      onChange={e => setDispatchDate(e.target.value)}
-                      className="w-full h-8 px-2.5 text-xs border border-gray-200 rounded-lg font-mono focus:outline-none focus:border-blue-500"
-                    />
+                    <div className="relative">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                      <input
+                        type="date"
+                        value={dispatchDate}
+                        onChange={e => setDispatchDate(e.target.value)}
+                        className="w-full h-9 pl-9 pr-3 text-xs border border-slate-200 rounded-xl font-mono text-slate-800 bg-white focus:outline-none focus:border-blue-500 shadow-2xs"
+                      />
+                    </div>
                   </div>
+
                   <div>
                     <FieldLabel>Transporter Name</FieldLabel>
-                    <input
-                      type="text"
-                      placeholder="e.g. Chennupati Cargo / Self"
-                      value={transporter}
-                      onChange={e => setTransporter(e.target.value)}
-                      className="w-full h-8 px-2.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
-                    />
+                    <div className="relative">
+                      <Truck className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="e.g. Chennupati Cargo / Self Delivery"
+                        value={transporter}
+                        onChange={e => setTransporter(e.target.value)}
+                        className="w-full h-9 pl-9 pr-3 text-xs border border-slate-200 rounded-xl text-slate-800 bg-white focus:outline-none focus:border-blue-500 shadow-2xs"
+                      />
+                    </div>
                   </div>
+
                   <div>
                     <FieldLabel>Vehicle Number</FieldLabel>
                     <input
                       type="text"
-                      placeholder="e.g. TS09UA1234"
+                      placeholder="e.g. TS 09 UA 1234"
                       value={vehicleNumber}
-                      onChange={e => setVehicleNumber(e.target.value)}
-                      className="w-full h-8 px-2.5 text-xs border border-gray-200 rounded-lg font-mono focus:outline-none focus:border-blue-500"
+                      onChange={e => setVehicleNumber(e.target.value.toUpperCase())}
+                      className="w-full h-9 px-3 text-xs border border-slate-200 rounded-xl font-mono font-bold text-slate-900 bg-white focus:outline-none focus:border-blue-500 shadow-2xs uppercase"
                     />
                   </div>
+
                   <div>
                     <FieldLabel>LR / Bilty Number</FieldLabel>
                     <input
@@ -1331,51 +1485,49 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                       placeholder="e.g. LR-987654"
                       value={lrNumber}
                       onChange={e => setLrNumber(e.target.value)}
-                      className="w-full h-8 px-2.5 text-xs border border-gray-200 rounded-lg font-mono focus:outline-none focus:border-blue-500"
+                      className="w-full h-9 px-3 text-xs border border-slate-200 rounded-xl font-mono text-slate-800 bg-white focus:outline-none focus:border-blue-500 shadow-2xs"
                     />
                   </div>
+
                   <div>
                     <FieldLabel>LR Date</FieldLabel>
                     <input
                       type="date"
                       value={lrDate}
                       onChange={e => setLrDate(e.target.value)}
-                      className="w-full h-8 px-2.5 text-xs border border-gray-200 rounded-lg font-mono focus:outline-none focus:border-blue-500"
+                      className="w-full h-9 px-3 text-xs border border-slate-200 rounded-xl font-mono text-slate-800 bg-white focus:outline-none focus:border-blue-500 shadow-2xs"
                     />
                   </div>
+
                   <div>
-                    <FieldLabel>Remarks / Delivery Notes</FieldLabel>
+                    <FieldLabel>Delivery Instructions / Notes</FieldLabel>
                     <input
                       type="text"
                       value={remarks}
                       onChange={e => setRemarks(e.target.value)}
-                      placeholder="Special instructions..."
-                      className="w-full h-8 px-2.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
+                      placeholder="Special instructions or notes..."
+                      className="w-full h-9 px-3 text-xs border border-slate-200 rounded-xl text-slate-800 bg-white focus:outline-none focus:border-blue-500 shadow-2xs"
                     />
                   </div>
                 </div>
-              </SectionInner>
+              </SectionCard>
             </div>
 
             {/* Addresses */}
             <div className="lg:col-span-2">
-              <div className="h-full border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
-                <div className="bg-blue-50/60 px-4 py-2 border-b border-blue-100 flex items-center gap-2">
-                  <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                  <span className="text-[11px] font-black text-gray-800 uppercase tracking-wider">Billing & Delivery Addresses</span>
-                </div>
-                <div className="p-4 space-y-3">
+              <SectionCard num={dispatchMode === 'order' ? 5 : 4} label="Billing & Delivery Addresses">
+                <div className="space-y-3.5">
                   {/* Bill To */}
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase">Bill To (Customer Address)</span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Bill To (Customer Address)</span>
                       <button
                         type="button"
                         onClick={() => setEditBillTo(p => !p)}
-                        className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                        className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
                       >
-                        <Edit3 className="w-2.5 h-2.5" />
-                        {editBillTo ? 'Done' : 'Edit'}
+                        <Edit3 className="w-3 h-3" />
+                        {editBillTo ? 'Save' : 'Edit'}
                       </button>
                     </div>
                     {editBillTo ? (
@@ -1383,17 +1535,20 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                         rows={3}
                         value={billToAddress}
                         onChange={e => setBillToAddress(e.target.value)}
-                        className="w-full text-xs border border-blue-300 rounded-lg p-2 focus:outline-none focus:border-blue-500 font-medium text-gray-800 resize-none"
+                        placeholder="Enter billing address..."
+                        className="w-full text-xs border border-blue-300 rounded-xl p-2.5 focus:outline-none focus:border-blue-500 font-medium text-slate-800 resize-none bg-white"
                       />
                     ) : (
-                      <div className="text-xs text-gray-700 leading-[1.6] bg-gray-50 rounded-lg p-2.5 border border-gray-100 whitespace-pre-line min-h-[52px]">
-                        {billToAddress || '—'}
+                      <div className="text-xs text-slate-700 leading-relaxed bg-slate-50/80 rounded-xl p-2.5 border border-slate-200 whitespace-pre-line min-h-[56px]">
+                        {billToAddress || (
+                          <span className="text-slate-400 italic">No billing address specified yet.</span>
+                        )}
                       </div>
                     )}
                   </div>
 
                   {/* Same as checkbox */}
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <label className="flex items-center gap-2 cursor-pointer select-none py-0.5">
                     <input
                       type="checkbox"
                       checked={sameAsBillTo}
@@ -1401,23 +1556,23 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                         setSameAsBillTo(e.target.checked);
                         if (e.target.checked) setShipToAddress(billToAddress);
                       }}
-                      className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer"
+                      className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
                     />
-                    <span className="text-[11px] font-semibold text-gray-600">Same as Bill To</span>
+                    <span className="text-xs font-semibold text-slate-700">Shipping address same as Bill To</span>
                   </label>
 
                   {/* Ship To */}
                   {!sameAsBillTo && (
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] font-bold text-gray-500 uppercase">Ship To (Delivery Address)</span>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">Ship To (Delivery Site)</span>
                         <button
                           type="button"
                           onClick={() => setEditShipTo(p => !p)}
-                          className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                          className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
                         >
-                          <Edit3 className="w-2.5 h-2.5" />
-                          {editShipTo ? 'Done' : 'Edit'}
+                          <Edit3 className="w-3 h-3" />
+                          {editShipTo ? 'Save' : 'Edit'}
                         </button>
                       </div>
                       {editShipTo ? (
@@ -1425,92 +1580,116 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                           rows={3}
                           value={shipToAddress}
                           onChange={e => setShipToAddress(e.target.value)}
-                          className="w-full text-xs border border-blue-300 rounded-lg p-2 focus:outline-none focus:border-blue-500 font-medium text-gray-800 resize-none"
+                          placeholder="Enter destination delivery address..."
+                          className="w-full text-xs border border-blue-300 rounded-xl p-2.5 focus:outline-none focus:border-blue-500 font-medium text-slate-800 resize-none bg-white"
                         />
                       ) : (
-                        <div className="text-xs text-gray-700 leading-[1.6] bg-gray-50 rounded-lg p-2.5 border border-gray-100 whitespace-pre-line min-h-[52px]">
-                          {shipToAddress || '—'}
+                        <div className="text-xs text-slate-700 leading-relaxed bg-slate-50/80 rounded-xl p-2.5 border border-slate-200 whitespace-pre-line min-h-[56px]">
+                          {shipToAddress || (
+                            <span className="text-slate-400 italic">No shipping address specified yet.</span>
+                          )}
                         </div>
                       )}
                     </div>
                   )}
                 </div>
-              </div>
+              </SectionCard>
             </div>
           </div>
 
-          {/* ⑤ SUMMARY */}
-          <Section num={dispatchMode === 'order' ? 5 : 4} label="Dispatch Summary" color="green">
-            <div className="grid grid-cols-3 gap-4">
+          {/* ⑤ SUMMARY CARDS */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Total Dispatching</p>
-                <p className="text-2xl font-black text-blue-700 font-mono leading-none">
-                  {totals.totalDispatchGbl}
-                  <span className="text-sm font-bold ml-1">GBL</span>
-                </p>
-                <p className="text-xs font-bold text-blue-500 font-mono mt-0.5">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Dispatching</p>
+                <div className="flex items-baseline gap-1.5 mt-1">
+                  <span className="text-2xl font-black text-blue-700 font-mono leading-none">
+                    {totals.totalDispatchGbl}
+                  </span>
+                  <span className="text-xs font-bold text-blue-600">GBL</span>
+                </div>
+                <p className="text-[11px] font-mono text-slate-500 mt-1">
                   ({totals.totalDispatchPcs.toLocaleString()} PCS)
                 </p>
               </div>
-              <div>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Total Valuation</p>
-                <p className="text-2xl font-black text-emerald-700 font-mono leading-none">
-                  ₹{totals.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </p>
-                <p className="text-xs text-gray-500 mt-0.5 font-medium">Estimated Challan Value</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Status</p>
-                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200">
-                  Ready to Dispatch
-                </span>
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Package className="w-5 h-5" />
               </div>
             </div>
-          </Section>
+
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estimated Valuation</p>
+                <p className="text-2xl font-black text-emerald-700 font-mono leading-none mt-1">
+                  ₹{totals.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-1">Total Delivery Challan Value</p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black text-lg">
+                ₹
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fulfillment Status</p>
+                <div className="mt-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Ready for Dispatch</span>
+                  </span>
+                </div>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                <Truck className="w-5 h-5" />
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* ── FOOTER ── */}
-        <div className="px-6 py-3.5 border-t border-gray-200 bg-gray-50/70 flex items-center justify-between shrink-0">
+        {/* ── STICKY FOOTER ── */}
+        <div className="px-6 py-4 border-t border-slate-200 bg-white flex items-center justify-between shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 text-xs font-bold text-gray-600 hover:text-gray-800 bg-white hover:bg-gray-100 border border-gray-200 rounded-xl transition-colors cursor-pointer"
+            className="px-5 py-2.5 text-xs font-bold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
           >
             Cancel
           </button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <button
               type="button"
               disabled={isSubmitting || totals.totalDispatchGbl <= 0}
               onClick={() => buildAndSubmit(true)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition-all ${
-                totals.totalDispatchGbl > 0
-                  ? 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50 cursor-pointer'
-                  : 'text-gray-400 bg-gray-100 border-gray-200 cursor-not-allowed'
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold border flex items-center gap-2 transition-all ${
+                totals.totalDispatchGbl > 0 && !isSubmitting
+                  ? 'text-slate-700 bg-white border-slate-300 hover:bg-slate-50 cursor-pointer shadow-2xs'
+                  : 'text-slate-400 bg-slate-100 border-slate-200 cursor-not-allowed'
               }`}
             >
-              <Save className="w-3.5 h-3.5" />
-              Save as Draft
+              <Save className="w-4 h-4" />
+              <span>Save as Draft</span>
             </button>
+
             <button
               type="button"
               disabled={isSubmitting || totals.totalDispatchGbl <= 0}
               onClick={() => buildAndSubmit(false)}
-              className={`px-5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm ${
-                totals.totalDispatchGbl > 0
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200/60 cursor-pointer'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
+              className={`px-6 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-md ${
+                totals.totalDispatchGbl > 0 && !isSubmitting
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-blue-500/25 cursor-pointer'
+                  : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
               }`}
             >
               {isSubmitting ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Saving...</span>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Saving Dispatch...</span>
                 </>
               ) : (
                 <>
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>{isEditing ? 'Update & Save' : 'Save & Print'}</span>
+                  <Printer className="w-4 h-4" />
+                  <span>{isEditing ? 'Update & Save' : 'Save & Print Challan'}</span>
                 </>
               )}
             </button>
@@ -1541,76 +1720,233 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
   );
 };
 
-/* ─── Small helper components ─── */
-
-function Section({
-  num, label, color, children,
-}: {
-  num: number;
-  label: string;
-  color: 'blue' | 'green';
-  children: React.ReactNode;
-}) {
-  const bg = color === 'green' ? 'bg-emerald-50/60 border-b-emerald-100' : 'bg-blue-50/60 border-b-blue-100';
-  const dot = color === 'green' ? 'bg-emerald-600' : 'bg-blue-600';
-  return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
-      <div className={`${bg} px-4 py-2 border-b flex items-center gap-2`}>
-        <div className={`w-5 h-5 rounded-md ${dot} text-white flex items-center justify-center text-[10px] font-black shrink-0`}>
-          {num}
-        </div>
-        <span className="text-[11px] font-black text-gray-800 uppercase tracking-wider">{label}</span>
-      </div>
-      <div className="p-4">{children}</div>
-    </div>
-  );
+/* ─── Searchable SKU Selector for Direct Dispatch Rows ─── */
+interface SearchableSkuSelectorProps {
+  row: ItemRow;
+  availableSkus: any[];
+  onSelectSku: (sku: any) => void;
+  onCustomNameChange: (name: string) => void;
 }
 
-function SectionInner({
-  num, label, color, children,
+const SearchableSkuSelector: React.FC<SearchableSkuSelectorProps> = ({
+  row,
+  availableSkus,
+  onSelectSku,
+  onCustomNameChange
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [isEditingCustom, setIsEditingCustom] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  // Filter available SKUs based on query (capped at 15 results for instant render)
+  const filteredSkus = useMemo(() => {
+    if (!query.trim()) {
+      return availableSkus.slice(0, 15);
+    }
+    const q = query.toLowerCase().trim();
+    return availableSkus
+      .filter(s =>
+        (s.name && s.name.toLowerCase().includes(q)) ||
+        (s.skuCode && s.skuCode.toLowerCase().includes(q)) ||
+        (s.category && s.category.toLowerCase().includes(q))
+      )
+      .slice(0, 15);
+  }, [availableSkus, query]);
+
+  const hasSelectedSku = Boolean(row.skuId || row.skuCode);
+
+  if (hasSelectedSku && !isEditingCustom) {
+    return (
+      <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl border border-slate-200 bg-slate-50/80 group">
+        <div className="min-w-0">
+          <p className="font-bold text-slate-900 text-xs truncate">{row.itemName}</p>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {row.skuCode && (
+              <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-purple-100/70 text-purple-700">
+                {row.skuCode}
+              </span>
+            )}
+            <span className="text-[10px] text-slate-500 font-medium">
+              {row.pcsPerGbl} pcs/GBL
+            </span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setQuery('');
+            setIsOpen(true);
+          }}
+          className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-purple-700 hover:border-purple-300 transition-colors shrink-0 cursor-pointer shadow-2xs"
+        >
+          Change
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="relative flex items-center">
+        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+        <input
+          type="text"
+          placeholder="Search SKU code or item name..."
+          value={query || row.itemName || ''}
+          onChange={e => {
+            setQuery(e.target.value);
+            onCustomNameChange(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          className="w-full h-8 pl-8 pr-7 text-xs border border-slate-200 rounded-xl font-medium text-slate-900 bg-white focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 shadow-2xs"
+        />
+        {(query || row.itemName) && (
+          <button
+            type="button"
+            onClick={() => {
+              setQuery('');
+              onCustomNameChange('');
+            }}
+            className="absolute right-2 text-slate-400 hover:text-slate-600 cursor-pointer"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+
+      {/* Dropdown Results */}
+      {isOpen && (
+        <div className="absolute left-0 top-full mt-1.5 w-80 max-h-60 overflow-y-auto bg-white rounded-xl shadow-xl border border-slate-200 z-50 divide-y divide-slate-100 animate-in fade-in zoom-in-95 duration-100">
+          <div className="p-2 bg-slate-50 border-b border-slate-100 text-[10px] font-black uppercase text-slate-500 flex justify-between">
+            <span>Matching SKUs</span>
+            <span>{availableSkus.length} in Master</span>
+          </div>
+
+          {filteredSkus.map(sku => (
+            <div
+              key={sku._id}
+              onClick={() => {
+                onSelectSku(sku);
+                setIsOpen(false);
+                setQuery('');
+              }}
+              className="p-2.5 hover:bg-purple-50/60 cursor-pointer transition-colors flex items-center justify-between gap-2"
+            >
+              <div className="min-w-0">
+                <p className="font-bold text-slate-900 text-xs truncate">{sku.name}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700">
+                    {sku.skuCode}
+                  </span>
+                  {sku.category && (
+                    <span className="text-[10px] text-slate-400 truncate">
+                      {sku.category}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="font-mono font-bold text-xs text-purple-700">
+                  ₹{Number(sku.sellingPrice || sku.rate || 0).toLocaleString()}
+                </p>
+                <p className="text-[10px] text-slate-500">
+                  Stock: {sku.presentStock || 0}
+                </p>
+              </div>
+            </div>
+          ))}
+
+          {query.trim() && (
+            <div
+              onClick={() => {
+                onCustomNameChange(query.trim());
+                setIsEditingCustom(true);
+                setIsOpen(false);
+              }}
+              className="p-2.5 bg-slate-50 hover:bg-slate-100 cursor-pointer text-xs font-bold text-purple-700 flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Use custom item: "{query}"</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ─── UI Helper Components ─── */
+
+function SectionCard({
+  num,
+  label,
+  badge,
+  children,
 }: {
   num: number;
   label: string;
-  color: 'blue' | 'green';
+  badge?: string;
   children: React.ReactNode;
 }) {
-  const dot = color === 'green' ? 'bg-emerald-600' : 'bg-blue-600';
   return (
-    <div className="h-full border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
-      <div className="bg-blue-50/60 px-4 py-2 border-b border-blue-100 flex items-center gap-2">
-        <div className={`w-5 h-5 rounded-md ${dot} text-white flex items-center justify-center text-[10px] font-black shrink-0`}>
-          {num}
+    <div className="border border-slate-200/90 rounded-2xl bg-white shadow-2xs overflow-hidden">
+      <div className="bg-slate-50/80 px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-5 h-5 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-black shrink-0 shadow-2xs">
+            {num}
+          </div>
+          <span className="text-xs font-black text-slate-800 uppercase tracking-wider">{label}</span>
         </div>
-        <span className="text-[11px] font-black text-gray-800 uppercase tracking-wider">{label}</span>
+        {badge && (
+          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-200/60 text-slate-700 border border-slate-200">
+            {badge}
+          </span>
+        )}
       </div>
-      <div className="p-4">{children}</div>
+      <div className="p-5">{children}</div>
     </div>
   );
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
       {children}
     </label>
   );
 }
 
 function Required() {
-  return <span className="text-rose-500 ml-0.5">*</span>;
+  return <span className="text-rose-500 ml-0.5 font-bold">*</span>;
 }
 
-function ReadOnlyField({ children, icon }: { children: React.ReactNode; icon?: React.ReactNode }) {
+function StatDisplay({ children, icon }: { children: React.ReactNode; icon?: React.ReactNode }) {
   return (
-    <div className="h-8 bg-gray-50 border border-gray-200 rounded-lg px-2.5 text-xs font-semibold text-gray-700 flex items-center gap-1.5 truncate">
+    <div className="h-9 bg-slate-50/80 border border-slate-200 rounded-xl px-3 text-xs font-semibold text-slate-700 flex items-center gap-2 truncate shadow-2xs">
       {icon}
-      {children}
+      <span className="truncate">{children}</span>
     </div>
   );
 }
 
-function TypeCard({
-  id, title, desc, active, onSelect,
+function DispatchTypeCard({
+  id,
+  title,
+  desc,
+  active,
+  onSelect,
 }: {
   id: string;
   title: string;
@@ -1621,10 +1957,10 @@ function TypeCard({
   return (
     <label
       htmlFor={`dispatch-type-${id}`}
-      className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+      className={`flex items-start gap-3.5 p-4 rounded-xl border-2 cursor-pointer transition-all ${
         active
-          ? 'border-blue-500 bg-blue-50/50'
-          : 'border-gray-200 hover:border-gray-300 bg-white'
+          ? 'border-blue-500 bg-blue-50/40 shadow-xs'
+          : 'border-slate-200 hover:border-slate-300 bg-white'
       }`}
     >
       <input
@@ -1634,11 +1970,11 @@ function TypeCard({
         value={id}
         checked={active}
         onChange={onSelect}
-        className="mt-0.5 accent-blue-600 shrink-0 cursor-pointer"
+        className="mt-0.5 accent-blue-600 shrink-0 cursor-pointer w-4 h-4"
       />
       <div>
-        <p className="text-xs font-black text-gray-900">{title}</p>
-        <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">{desc}</p>
+        <p className="text-xs font-black text-slate-900">{title}</p>
+        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{desc}</p>
       </div>
     </label>
   );
