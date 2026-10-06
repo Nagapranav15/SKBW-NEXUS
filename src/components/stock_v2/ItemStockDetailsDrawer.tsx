@@ -47,7 +47,8 @@ import {
   ShieldAlert,
   ArrowRight,
   Printer,
-  Sparkles
+  Sparkles,
+  Disc
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -61,7 +62,7 @@ import { showToast } from '../ui/Toast';
 import { ManufacturingStepsModal } from './ManufacturingStepsModal';
 import { convertPrimaryToAlt } from '../../utils/uomConversion';
 
-export type ItemDrawerTab = 'overview' | 'locations' | 'batches' | 'movements' | 'reservations';
+export type ItemDrawerTab = 'overview' | 'locations' | 'batches' | 'reels' | 'movements' | 'reservations';
 
 interface ItemStockDetailsDrawerProps {
   isOpen: boolean;
@@ -446,6 +447,97 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
   const batchesList = detailsData?.batches || [];
   const movementsList = (detailsData?.movements && detailsData.movements.length > 0) ? detailsData.movements : SPEC_DEFAULT_MOVEMENTS;
   const reservationsList = detailsData?.reservations || [];
+  const reelsList = detailsData?.reels || [];
+
+  // Reels Tab State & Filters
+  const [reelSearch, setReelSearch] = useState('');
+  const [reelBatchFilter, setReelBatchFilter] = useState('ALL');
+  const [reelStatusFilter, setReelStatusFilter] = useState<'ALL' | 'Available' | 'Consumed'>('ALL');
+  const [reelPage, setReelPage] = useState(1);
+  const [reelPageSize, setReelPageSize] = useState(15);
+
+  const isReelItem = useMemo(() => {
+    if (!sku) return false;
+    const cat = (sku.category || '').toLowerCase();
+    const name = (sku.name || '').toLowerCase();
+    const paperType = (sku.paperType || '').toLowerCase();
+    const code = (sku.skuCode || '').toUpperCase();
+    return paperType.includes('reel') || cat.includes('reel') || name.includes('reel') || code.includes('REEL') || reelsList.length > 0;
+  }, [sku, reelsList.length]);
+
+  const reelBatches = useMemo(() => {
+    const s = new Set<string>();
+    reelsList.forEach(r => { if (r.batchNumber) s.add(r.batchNumber); });
+    return Array.from(s).sort();
+  }, [reelsList]);
+
+  const filteredReels = useMemo(() => {
+    return reelsList.filter(r => {
+      if (reelBatchFilter !== 'ALL' && r.batchNumber !== reelBatchFilter) return false;
+      if (reelStatusFilter !== 'ALL' && r.status !== reelStatusFilter) return false;
+      if (reelSearch.trim()) {
+        const q = reelSearch.toLowerCase().trim();
+        const rNo = (r.reelNumber || '').toLowerCase();
+        const bNo = (r.batchNumber || '').toLowerCase();
+        const loc = (r.locationName || '').toLowerCase();
+        const slip = (r.consumedIn || '').toLowerCase();
+        return rNo.includes(q) || bNo.includes(q) || loc.includes(q) || slip.includes(q);
+      }
+      return true;
+    });
+  }, [reelsList, reelBatchFilter, reelStatusFilter, reelSearch]);
+
+  const totalReelsWeight = useMemo(() => {
+    return reelsList.reduce((acc, r) => acc + (Number(r.weight) || 0), 0);
+  }, [reelsList]);
+
+  const availableReels = useMemo(() => {
+    return reelsList.filter(r => r.status === 'Available');
+  }, [reelsList]);
+
+  const availableReelsWeight = useMemo(() => {
+    return availableReels.reduce((acc, r) => acc + (Number(r.weight) || 0), 0);
+  }, [availableReels]);
+
+  const consumedReels = useMemo(() => {
+    return reelsList.filter(r => r.status === 'Consumed');
+  }, [reelsList]);
+
+  const consumedReelsWeight = useMemo(() => {
+    return consumedReels.reduce((acc, r) => acc + (Number(r.weight) || 0), 0);
+  }, [consumedReels]);
+
+  const paginatedReels = useMemo(() => {
+    const start = (reelPage - 1) * reelPageSize;
+    return filteredReels.slice(start, start + reelPageSize);
+  }, [filteredReels, reelPage, reelPageSize]);
+
+  const totalReelPages = Math.ceil(filteredReels.length / reelPageSize) || 1;
+
+  const exportReelsToExcel = () => {
+    if (filteredReels.length === 0) {
+      showToast('No reels to export', 'info');
+      return;
+    }
+    const data = filteredReels.map((r, i) => ({
+      '#': i + 1,
+      'Reel Number': r.reelNumber,
+      'Batch Number': r.batchNumber,
+      'Weight (kg)': r.weight,
+      'Width (cm)': r.width || sku?.width || '',
+      'GSM': r.gsm || sku?.gsm || '',
+      'Location': r.locationName,
+      'Status': r.status,
+      'Consumed In': r.consumedIn || '—',
+      'Date': r.date ? new Date(r.date).toLocaleDateString('en-IN') : '—',
+      'Rate/Kg': r.ratePerKg || ''
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Reels');
+    XLSX.writeFile(wb, `${sku?.skuCode || 'Item'}_Reels_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    showToast('Reels exported to Excel', 'success');
+  };
 
   // Summary Metrics
   const unit = sku?.unit || 'GBL';
@@ -921,12 +1013,13 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
           </div>
         </div>
 
-        {/* ── 5 TABS NAVIGATION BAR ── */}
+        {/* ── TABS NAVIGATION BAR ── */}
         <div className="flex border-b border-gray-100 bg-white px-4 sm:px-6 shrink-0 overflow-x-auto no-scrollbar">
           {[
             { id: 'overview', label: 'Stock Overview', icon: Package },
             { id: 'locations', label: 'Locations', count: locationsList.length || hierarchyTree.length || 2, icon: MapPin },
             { id: 'batches', label: 'Batches & Costing', count: batchesList.length || 2, icon: Layers },
+            { id: 'reels', label: 'Reels', count: reelsList.length, icon: Disc },
             { id: 'movements', label: 'Movements Ledger', count: movementsList.length || 12, icon: History },
             { id: 'reservations', label: 'Reservations', count: reservationsList.length || 1, icon: Bookmark }
           ].map(tab => {
@@ -2190,6 +2283,315 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
             </div>
           )}
 
+          {/* ── TAB: REELS MASTER LEDGER ── */}
+          {!loading && activeTab === 'reels' && (
+            <div className="space-y-4">
+              {/* Top 4 KPI Metrics */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {/* Metric 1: Total Reels */}
+                <div className="p-3.5 bg-gradient-to-br from-indigo-50/70 to-blue-50/40 border border-indigo-100 rounded-2xl flex items-center gap-3 shadow-2xs">
+                  <div className="p-2.5 rounded-xl bg-indigo-600 text-white shrink-0 shadow-xs">
+                    <Disc className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-bold text-indigo-900/60 uppercase tracking-wider">Total Reels Received</div>
+                    <div className="text-base sm:text-lg font-black text-gray-900 leading-tight">
+                      {reelsList.length} <span className="text-xs font-bold text-indigo-600 font-sans">Reels</span>
+                    </div>
+                    <div className="text-[11px] font-semibold text-gray-500 font-mono truncate">
+                      {totalReelsWeight.toLocaleString('en-IN')} kg total
+                    </div>
+                  </div>
+                </div>
+
+                {/* Metric 2: Available in Stock */}
+                <div className="p-3.5 bg-gradient-to-br from-emerald-50/70 to-teal-50/40 border border-emerald-100 rounded-2xl flex items-center gap-3 shadow-2xs">
+                  <div className="p-2.5 rounded-xl bg-emerald-600 text-white shrink-0 shadow-xs">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-bold text-emerald-900/60 uppercase tracking-wider">Available in Stock</div>
+                    <div className="text-base sm:text-lg font-black text-gray-900 leading-tight">
+                      {availableReels.length} <span className="text-xs font-bold text-emerald-600 font-sans">Reels</span>
+                    </div>
+                    <div className="text-[11px] font-semibold text-emerald-700 font-mono truncate">
+                      {availableReelsWeight.toLocaleString('en-IN')} kg available
+                    </div>
+                  </div>
+                </div>
+
+                {/* Metric 3: Consumed / Cut */}
+                <div className="p-3.5 bg-gradient-to-br from-amber-50/70 to-orange-50/40 border border-amber-100 rounded-2xl flex items-center gap-3 shadow-2xs">
+                  <div className="p-2.5 rounded-xl bg-amber-500 text-white shrink-0 shadow-xs">
+                    <Layers className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-bold text-amber-900/60 uppercase tracking-wider">Consumed / Converted</div>
+                    <div className="text-base sm:text-lg font-black text-gray-900 leading-tight">
+                      {consumedReels.length} <span className="text-xs font-bold text-amber-600 font-sans">Reels</span>
+                    </div>
+                    <div className="text-[11px] font-semibold text-amber-700 font-mono truncate">
+                      {consumedReelsWeight.toLocaleString('en-IN')} kg consumed
+                    </div>
+                  </div>
+                </div>
+
+                {/* Metric 4: Purchase Batches */}
+                <div className="p-3.5 bg-gradient-to-br from-purple-50/70 to-pink-50/40 border border-purple-100 rounded-2xl flex items-center gap-3 shadow-2xs">
+                  <div className="p-2.5 rounded-xl bg-purple-600 text-white shrink-0 shadow-xs">
+                    <Package className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-bold text-purple-900/60 uppercase tracking-wider">Batches Linked</div>
+                    <div className="text-base sm:text-lg font-black text-gray-900 leading-tight">
+                      {reelBatches.length} <span className="text-xs font-bold text-purple-600 font-sans">Batches</span>
+                    </div>
+                    <div className="text-[11px] font-semibold text-gray-500 truncate">
+                      From PO invoices
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Table Card */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
+                {/* Header Toolbar */}
+                <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-gray-50/50">
+                  <div className="flex items-center gap-2">
+                    <Disc className="w-4 h-4 text-blue-600" />
+                    <span className="text-xs font-extrabold text-gray-900 uppercase tracking-wider">Reels Ledger</span>
+                    <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black">
+                      {filteredReels.length} of {reelsList.length}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Status Toggle Pills */}
+                    <div className="flex items-center bg-gray-200/60 p-0.5 rounded-xl text-xs font-bold">
+                      <button
+                        type="button"
+                        onClick={() => { setReelStatusFilter('ALL'); setReelPage(1); }}
+                        className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                          reelStatusFilter === 'ALL'
+                            ? 'bg-white text-gray-900 shadow-2xs'
+                            : 'text-gray-500 hover:text-gray-900'
+                        }`}
+                      >
+                        All ({reelsList.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setReelStatusFilter('Available'); setReelPage(1); }}
+                        className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                          reelStatusFilter === 'Available'
+                            ? 'bg-emerald-600 text-white shadow-2xs'
+                            : 'text-emerald-700 hover:text-emerald-900'
+                        }`}
+                      >
+                        Available ({availableReels.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setReelStatusFilter('Consumed'); setReelPage(1); }}
+                        className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                          reelStatusFilter === 'Consumed'
+                            ? 'bg-gray-700 text-white shadow-2xs'
+                            : 'text-gray-500 hover:text-gray-900'
+                        }`}
+                      >
+                        Consumed ({consumedReels.length})
+                      </button>
+                    </div>
+
+                    {/* Batch Dropdown */}
+                    {reelBatches.length > 0 && (
+                      <select
+                        aria-label="Filter reels by batch"
+                        value={reelBatchFilter}
+                        onChange={(e) => { setReelBatchFilter(e.target.value); setReelPage(1); }}
+                        className="px-2.5 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none cursor-pointer"
+                      >
+                        <option value="ALL">All Batches ({reelBatches.length})</option>
+                        {reelBatches.map(b => (
+                          <option key={b} value={b}>Batch: {b}</option>
+                        ))}
+                      </select>
+                    )}
+
+                    {/* Search Input */}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Search reel #, batch, zone..."
+                        value={reelSearch}
+                        onChange={(e) => { setReelSearch(e.target.value); setReelPage(1); }}
+                        className="pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none w-48 sm:w-56"
+                      />
+                    </div>
+
+                    {/* Refresh */}
+                    <button
+                      type="button"
+                      onClick={fetchStockDetails}
+                      title="Reload Reel Records"
+                      className="p-1.5 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-xl transition-all cursor-pointer"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Export */}
+                    <button
+                      type="button"
+                      onClick={exportReelsToExcel}
+                      className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    >
+                      <Download className="w-3.5 h-3.5 text-gray-500" />
+                      <span>Excel</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-gray-50/80 border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      <tr>
+                        <th className="p-3 text-center w-12">#</th>
+                        <th className="p-3">REEL NUMBER</th>
+                        <th className="p-3">BATCH / INVOICE</th>
+                        <th className="p-3 text-right">WEIGHT (KG)</th>
+                        <th className="p-3">SIZE • GSM</th>
+                        <th className="p-3">LOCATION / GODOWN</th>
+                        <th className="p-3 text-center">STATUS</th>
+                        <th className="p-3">CUTTING SLIP / REF</th>
+                        <th className="p-3">RECEIVED DATE</th>
+                        <th className="p-3 text-right">RATE / KG</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {paginatedReels.map((reel, idx) => {
+                        const isAvailable = reel.status === 'Available';
+                        return (
+                          <tr key={reel.id || `${reel.reelNumber}-${idx}`} className="hover:bg-blue-50/30 transition-colors">
+                            <td className="p-3 text-center font-mono text-gray-400 text-[11px]">
+                              {(reelPage - 1) * reelPageSize + idx + 1}
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center gap-2">
+                                <div className={`p-1.5 rounded-lg shrink-0 ${isAvailable ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
+                                  <Disc className="w-3.5 h-3.5" />
+                                </div>
+                                <span className="font-mono font-black text-gray-900 tracking-tight text-xs sm:text-sm">
+                                  {reel.reelNumber}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="p-3">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 font-mono text-[11px] font-semibold border border-gray-200">
+                                {reel.batchNumber || '-'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right font-mono font-black text-xs sm:text-sm text-gray-900">
+                              {(Number(reel.weight) || 0).toLocaleString('en-IN')} <span className="text-[10px] font-bold text-gray-500 font-sans">KG</span>
+                            </td>
+                            <td className="p-3 text-gray-600 font-medium">
+                              {reel.width ? `${reel.width} cm` : '-'}
+                              {reel.gsm ? ` • ${reel.gsm} GSM` : ''}
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center gap-1.5 text-gray-700 font-medium">
+                                <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                <span>{reel.locationName || 'General Floor'}</span>
+                              </div>
+                            </td>
+                            <td className="p-3 text-center">
+                              {isAvailable ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  Available
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                                  Consumed
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-3 font-mono text-[11px]">
+                              {reel.consumedIn ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 font-bold">
+                                  {reel.consumedIn}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-gray-500 font-medium whitespace-nowrap">
+                              {reel.date ? new Date(reel.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                            </td>
+                            <td className="p-3 text-right font-mono font-semibold text-gray-700">
+                              {reel.ratePerKg ? `₹${Number(reel.ratePerKg).toFixed(2)}` : '-'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+
+                      {filteredReels.length === 0 && (
+                        <tr>
+                          <td colSpan={10} className="p-12 text-center text-gray-400">
+                            <Disc className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                            <div className="font-bold text-gray-600">No reels found</div>
+                            <div className="text-xs text-gray-400 mt-1">
+                              {reelsList.length === 0 ? 'No physical reels have been recorded for this item yet.' : 'Try clearing your filters or search keywords.'}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination Toolbar */}
+                {totalReelPages > 1 && (
+                  <div className="p-3 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between text-xs">
+                    <span className="text-gray-500">
+                      Showing {(reelPage - 1) * reelPageSize + 1} to {Math.min(reelPage * reelPageSize, filteredReels.length)} of {filteredReels.length} reels
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setReelPage(p => Math.max(1, p - 1))}
+                        disabled={reelPage === 1}
+                        className="px-2.5 py-1 rounded-lg border border-gray-200 bg-white text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 cursor-pointer text-xs font-bold"
+                      >
+                        Prev
+                      </button>
+                      <span className="px-2 text-gray-600 font-bold">
+                        {reelPage} / {totalReelPages}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setReelPage(p => Math.min(totalReelPages, p + 1))}
+                        disabled={reelPage === totalReelPages}
+                        className="px-2.5 py-1 rounded-lg border border-gray-200 bg-white text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 cursor-pointer text-xs font-bold"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Info Banner */}
+              <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-2xl flex items-center gap-2.5 text-xs text-blue-900">
+                <AlertCircle className="w-4 h-4 text-blue-600 shrink-0" />
+                <span>
+                  Physical reels are registered during Purchase Inward (GRN) and tracked individually. Consuming reels via Cutting Slips automatically marks them as Consumed and logs the cutting voucher reference.
+                </span>
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* ── FOOTER ACTIONS BAR ── */}
@@ -2211,6 +2613,17 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               >
                 <History className="w-4 h-4" />
                 <span>View Movements</span>
+              </button>
+            )}
+
+            {activeTab === 'reels' && (
+              <button
+                type="button"
+                onClick={exportReelsToExcel}
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>Export Reels (Excel)</span>
               </button>
             )}
 

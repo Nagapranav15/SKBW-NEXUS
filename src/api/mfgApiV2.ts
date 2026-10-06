@@ -402,6 +402,20 @@ export interface SkuStockDetailsResponse {
     dispatchedQty: number;
     status: string;
   }[];
+  reels?: {
+    id: string;
+    reelNumber: string;
+    batchNumber: string;
+    weight: number;
+    width?: number;
+    gsm?: number;
+    locationId?: string;
+    locationName?: string;
+    status: 'Available' | 'Consumed' | 'Reserved';
+    consumedIn?: string;
+    date?: string;
+    ratePerKg?: number;
+  }[];
 }
 
 export interface StockAdjustmentPayload {

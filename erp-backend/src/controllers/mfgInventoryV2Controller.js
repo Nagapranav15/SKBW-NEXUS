@@ -10,6 +10,7 @@ const User = require("../models/userModel");
 const SalesOrderV2 = require("../models/salesOrderV2Model");
 const PurchaseInvoiceV2 = require("../models/purchaseInvoiceV2Model");
 const ProductionOrder = require("../models/productionOrderModel");
+const CuttingSlip = require("../models/cuttingSlipModel");
 const { validateUomConversion } = require("../utils/uomConversion");
 const { broadcast } = require("../utils/realtimeService");
 
@@ -3386,6 +3387,104 @@ exports.getSkuStockDetails = async (req, res, next) => {
       pcsEquivalent = onHandTotal * Number(sku.altUnitConversion);
     }
 
+    // 6. Reels details (for paper reel raw materials & items tracked with reels)
+    const cuttingSlips = await CuttingSlip.find({
+      company: companyObjId,
+      status: { $ne: "Cancelled" }
+    }).select("slipNumber date status selectedReels").lean();
+
+    const consumedReelMap = new Map();
+    cuttingSlips.forEach(cs => {
+      (cs.selectedReels || []).forEach(r => {
+        if (r && r.reelNumber) {
+          consumedReelMap.set(String(r.reelNumber).trim().toLowerCase(), {
+            consumedIn: cs.slipNumber,
+            date: cs.date,
+            status: "Consumed"
+          });
+        }
+      });
+    });
+
+    const invoiceReels = await PurchaseInvoiceV2.find({
+      company: companyObjId,
+      status: { $ne: "Cancelled" },
+      "items.skuId": skuObjId
+    }).select("invoiceNumber invoiceDate partyName items").lean();
+
+    const populatedReels = [];
+    const seenReelKeys = new Set();
+
+    invoiceReels.forEach(inv => {
+      (inv.items || []).forEach(it => {
+        if (String(it.skuId) !== String(skuObjId)) return;
+        (it.reels || []).forEach(r => {
+          if (!r || !r.reelNumber) return;
+          const cleanNo = String(r.reelNumber).trim();
+          const lowerNo = cleanNo.toLowerCase();
+          if (seenReelKeys.has(lowerNo)) return;
+          seenReelKeys.add(lowerNo);
+
+          const isConsumed = consumedReelMap.has(lowerNo);
+          const consInfo = consumedReelMap.get(lowerNo);
+          const locDoc = allCompanyLocations.find(l => String(l._id) === String(r.locationId || it.locationId));
+
+          populatedReels.push({
+            id: `reel-${cleanNo}`,
+            reelNumber: cleanNo,
+            batchNumber: it.lotNumber || inv.invoiceNumber,
+            weight: Number(r.weight) || 0,
+            width: Number(r.width) || Number(sku.width) || 0,
+            gsm: Number(r.gsm) || Number(sku.gsm) || 0,
+            locationId: r.locationId || it.locationId,
+            locationName: locDoc ? `${locDoc.name} (${locDoc.level || 'Godown'})` : 'Main Storage',
+            status: isConsumed ? 'Consumed' : (Number(r.weight) > 0 ? 'Available' : 'Consumed'),
+            consumedIn: consInfo?.consumedIn,
+            date: inv.invoiceDate || inv.createdAt,
+            ratePerKg: Number(it.ratePerKg || it.purchasePrice || sku.costPrice || 80)
+          });
+        });
+      });
+    });
+
+    // Also include any reels recorded in InventoryLedger not captured in invoices
+    rawMovements.forEach(m => {
+      if (m.direction === "IN" && Array.isArray(m.reels)) {
+        m.reels.forEach(r => {
+          if (!r) return;
+          const cleanNo = String(r.reelNumber || (typeof r === 'string' ? r : '')).trim();
+          if (!cleanNo) return;
+          const lowerNo = cleanNo.toLowerCase();
+          if (seenReelKeys.has(lowerNo)) return;
+          seenReelKeys.add(lowerNo);
+
+          const isConsumed = consumedReelMap.has(lowerNo);
+          const consInfo = consumedReelMap.get(lowerNo);
+          populatedReels.push({
+            id: `reel-led-${cleanNo}`,
+            reelNumber: cleanNo,
+            batchNumber: m.batchNumber || 'PB-OPEN',
+            weight: Number(r.weight) || Number(m.quantity) || 0,
+            width: Number(r.width) || Number(sku.width) || 0,
+            gsm: Number(r.gsm) || Number(sku.gsm) || 0,
+            locationId: m.locationId?._id || m.locationId,
+            locationName: m.locationId?.name || 'Main Storage',
+            status: isConsumed ? 'Consumed' : 'Available',
+            consumedIn: consInfo?.consumedIn,
+            date: m.createdAt,
+            ratePerKg: Number(sku.costPrice || sku.rate || 80)
+          });
+        });
+      }
+    });
+
+    // Sort reels: Available first, then by batch number desc, then reel number asc
+    populatedReels.sort((a, b) => {
+      if (a.status !== b.status) return a.status === 'Available' ? -1 : 1;
+      if (a.batchNumber !== b.batchNumber) return (b.batchNumber || '').localeCompare(a.batchNumber || '');
+      return (a.reelNumber || '').localeCompare(b.reelNumber || '');
+    });
+
     res.json({
       sku,
       summary: {
@@ -3404,7 +3503,8 @@ exports.getSkuStockDetails = async (req, res, next) => {
       hierarchyTree: rootLocations,
       batches: batchesWithCosting,
       movements: movementsWithBalance,
-      reservations
+      reservations,
+      reels: populatedReels
     });
   } catch (err) {
     next(err);

@@ -405,8 +405,43 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
   // Reels for the selected item (empty if no item chosen)
   const reelsForSelectedItem = useMemo(() => {
     if (!selectedReelItemKey) return [];
-    return availableReels.filter(r => (r.skuId || r.skuCode || r.skuName) === selectedReelItemKey || r.skuId === selectedReelItemKey);
-  }, [availableReels, selectedReelItemKey]);
+    const targetKey = String(selectedReelItemKey).trim().toLowerCase();
+    const targetDoc = skus.find(s => 
+      String(s._id).toLowerCase() === targetKey || 
+      (s.skuCode && s.skuCode.toLowerCase() === targetKey) ||
+      (s.name && s.name.toLowerCase() === targetKey)
+    );
+    const targetId = targetDoc?._id ? String(targetDoc._id).toLowerCase() : targetKey;
+    const targetCode = targetDoc?.skuCode ? targetDoc.skuCode.toLowerCase() : '';
+    const targetName = targetDoc?.name ? targetDoc.name.toLowerCase() : '';
+
+    return availableReels.filter(r => {
+      const rId = String((r.skuId as any)?._id || r.skuId || '').toLowerCase();
+      const rCode = String(r.skuCode || '').toLowerCase();
+      const rName = String(r.skuName || '').toLowerCase();
+
+      return rId === targetId || 
+             rId === targetKey || 
+             (targetCode && rCode === targetCode) || 
+             (targetName && rName === targetName) || 
+             rCode === targetKey || 
+             rName === targetKey;
+    });
+  }, [availableReels, selectedReelItemKey, skus]);
+
+  // Manually refresh available reels from server
+  const handleRefreshReels = async () => {
+    if (!companyId) return;
+    try {
+      setLoading(true);
+      const res = await getAvailableReelsV2(companyId);
+      setAvailableReels(res.availableReels || []);
+    } catch (err) {
+      console.error('Failed to refresh available reels:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Helper to safely get the actual rate per KG for a reel (with fallback to matched SKU rate or default)
   const getReelRate = (r: { ratePerKg?: number; skuId?: string; skuCode?: string }) => {
@@ -946,6 +981,16 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                 <div className="bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg shadow-3xs text-blue-900 font-bold">
                   Paper Items: <span className="font-mono">{reelItemsWithStock.length} SKUs</span>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleRefreshReels}
+                  disabled={loading}
+                  className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 hover:text-blue-700 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-3xs"
+                  title="Refresh Available Reels from server"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-blue-600 ${loading ? 'animate-spin' : ''}`} />
+                  <span>Refresh</span>
+                </button>
               </div>
             </div>
 
