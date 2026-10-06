@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Building2,
   Layers, 
@@ -25,6 +26,7 @@ interface LocationSelectModalProps {
   locationStockMap?: Record<string, { qty: number; batches?: number }>;
   companyId?: string;
   skuId?: string;
+  zIndex?: number;
 }
 
 export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
@@ -37,7 +39,8 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
   unit: unitProp,
   locationStockMap: externalStockMap,
   companyId,
-  skuId
+  skuId,
+  zIndex = 10050
 }) => {
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [tempSelectedId, setTempSelectedId] = useState<string>(selectedLocationId);
@@ -308,9 +311,10 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
 
   const rootFactories = hierarchyToUse.filter(l => l.level === 'Factory' || (!l.parentId && !l.level));
 
-  return (
+  const modalContent = (
     <div 
-      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/[0.06] animate-fadeIn font-sans"
+      className="fixed inset-0 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-[2px] animate-fadeIn font-sans"
+      style={{ zIndex }}
       onClick={onClose}
     >
       <div 
@@ -702,4 +706,6 @@ export const LocationSelectModal: React.FC<LocationSelectModalProps> = ({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
 };

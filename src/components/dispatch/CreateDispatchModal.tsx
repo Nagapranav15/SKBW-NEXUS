@@ -11,6 +11,7 @@ import { getBalancesV2, getSkusV2, getWarehouseHierarchyV2, WarehouseLocationV2 
 import { getParties } from '../../api/partyApi';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../ui/Toast';
+import { LocationSelectModal } from '../inventory_v2/LocationSelectModal';
 
 export interface StorageLocationOption {
   id: string;
@@ -127,6 +128,27 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
   // Items
   const [itemRows, setItemRows] = useState<ItemRow[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Active item row for Location Selection Modal
+  const [activeLocModalRowKey, setActiveLocModalRowKey] = useState<string | null>(null);
+
+  const activeLocModalRow = useMemo(() => {
+    return itemRows.find(r => r.key === activeLocModalRowKey) || null;
+  }, [itemRows, activeLocModalRowKey]);
+
+  const activeLocModalSkuId = useMemo(() => {
+    if (!activeLocModalRow) return '';
+    if (activeLocModalRow.skuId) {
+      return String((activeLocModalRow.skuId as any)._id || activeLocModalRow.skuId);
+    }
+    const code = (activeLocModalRow.skuCode || '').toLowerCase().trim();
+    const name = (activeLocModalRow.itemName || '').toLowerCase().trim();
+    const matched = availableSkus.find(s =>
+      (code && s.skuCode?.toLowerCase().trim() === code) ||
+      (name && s.name?.toLowerCase().trim() === name)
+    );
+    return matched ? String(matched._id) : '';
+  }, [activeLocModalRow, availableSkus]);
 
   // DC Number
   const dcNumber = useMemo(() => {
@@ -528,22 +550,48 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
   };
 
   // Change location for an individual item row
-  const handleItemLocationChange = (key: string, newLocationId: string) => {
+  const handleItemLocationChange = (key: string, newLocationId: string, customLocName?: string) => {
     setItemRows(prev =>
       prev.map(r => {
         if (r.key !== key) return r;
-        const idKey = String(r.skuId || '');
+        const idKey = String((r.skuId as any)?._id || r.skuId || '');
         const codeKey = (r.skuCode || '').toLowerCase().trim();
         const nameKey = (r.itemName || '').toLowerCase().trim();
         const stockLocs = (idKey && skuLocationStockMap.get(idKey)) ||
                           (codeKey && skuLocationStockMap.get(codeKey)) ||
                           (nameKey && skuLocationStockMap.get(nameKey)) || [];
-        const matchedStock = stockLocs.find(l => l.locationId === newLocationId);
-        const locObj = allStorageLocations.find(l => l.id === newLocationId) || warehouseLocations.find(l => l._id === newLocationId);
-        const locName = locObj?.name || matchedStock?.locationName || 'Location';
 
-        const stockGbl = matchedStock ? matchedStock.onHandGbl : 0;
-        const stockPcs = matchedStock ? matchedStock.onHandPcs : 0;
+        const matchedStock = stockLocs.find(l => String(l.locationId) === String(newLocationId));
+        let stockGbl = matchedStock ? matchedStock.onHandGbl : 0;
+        let stockPcs = matchedStock ? matchedStock.onHandPcs : 0;
+
+        if (!matchedStock) {
+          const childIds = new Set<string>();
+          const collectChildIds = (pId: string) => {
+            warehouseLocations.filter(w => String(w.parentId) === String(pId)).forEach(c => {
+              const cId = String(c._id);
+              childIds.add(cId);
+              collectChildIds(cId);
+            });
+          };
+          collectChildIds(newLocationId);
+          stockLocs.forEach(sl => {
+            if (childIds.has(String(sl.locationId))) {
+              stockGbl += sl.onHandGbl;
+              stockPcs += sl.onHandPcs;
+            }
+          });
+        }
+
+        const locObj = allStorageLocations.find(l => l.id === newLocationId) || warehouseLocations.find(l => String(l._id) === String(newLocationId));
+        let locName = customLocName;
+        if (!locName) {
+          locName = locObj?.name || matchedStock?.locationName || 'Location';
+        } else if (locName.includes(' › ')) {
+          const parts = locName.split(' › ');
+          locName = parts[parts.length - 1];
+        }
+
         const hasStock = (stockGbl >= r.dispatchGbl && r.dispatchGbl > 0) || (stockPcs >= r.dispatchPcs && r.dispatchPcs > 0);
 
         return {
@@ -1084,43 +1132,36 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                           </td>
 
                           {/* Dispatch Location Selection */}
-                          <td className="py-2.5 px-3 min-w-[190px]">
+                          <td className="py-2.5 px-3 min-w-[200px]">
                             {(() => {
-                              const idKey = String(row.skuId || '');
-                              const codeKey = (row.skuCode || '').toLowerCase().trim();
-                              const nameKey = (row.itemName || '').toLowerCase().trim();
-                              const stockLocs = (idKey && skuLocationStockMap.get(idKey)) ||
-                                                (codeKey && skuLocationStockMap.get(codeKey)) ||
-                                                (nameKey && skuLocationStockMap.get(nameKey)) || [];
-
+                              const hasLocation = Boolean(row.locationId && row.locationName);
                               return (
-                                <div className="flex items-center gap-1.5 bg-white border border-gray-300 hover:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 rounded-lg px-2 py-1 shadow-2xs transition-all">
-                                  <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                                  <select
-                                    value={row.locationId || ''}
-                                    onChange={e => handleItemLocationChange(row.key, e.target.value)}
-                                    className="w-full bg-transparent text-xs font-bold text-gray-800 outline-none cursor-pointer truncate"
-                                    title="Select storage location where this item is stored"
-                                  >
-                                    <option value="">— Select Location —</option>
-                                    {stockLocs.length > 0 && (
-                                      <optgroup label="Locations With Available Stock">
-                                        {stockLocs.map(loc => (
-                                          <option key={`stock-${loc.locationId}`} value={loc.locationId}>
-                                            ✓ {loc.locationName} ({loc.onHandGbl} GBL in stock)
-                                          </option>
-                                        ))}
-                                      </optgroup>
-                                    )}
-                                    <optgroup label="All Storage Locations">
-                                      {allStorageLocations.map(loc => (
-                                        <option key={`all-${loc.id}`} value={loc.id}>
-                                          {loc.fullPath}
-                                        </option>
-                                      ))}
-                                    </optgroup>
-                                  </select>
-                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveLocModalRowKey(row.key)}
+                                  className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border transition-all text-left group cursor-pointer shadow-2xs ${
+                                    hasLocation
+                                      ? 'bg-blue-50/40 hover:bg-blue-50 border-blue-200 hover:border-blue-400 text-blue-950'
+                                      : 'bg-white hover:bg-gray-50 border-dashed border-gray-300 hover:border-blue-400 text-gray-500'
+                                  }`}
+                                  title="Click to select warehouse storage location and view live stock"
+                                >
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <MapPin className={`w-3.5 h-3.5 shrink-0 transition-transform group-hover:scale-110 ${
+                                      hasLocation ? 'text-blue-600' : 'text-gray-400'
+                                    }`} />
+                                    <span className="text-xs font-bold truncate">
+                                      {row.locationName || 'Select Location'}
+                                    </span>
+                                  </div>
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 transition-colors ${
+                                    hasLocation
+                                      ? 'bg-blue-100/70 text-blue-700 group-hover:bg-blue-600 group-hover:text-white'
+                                      : 'bg-gray-100 text-gray-600 group-hover:bg-blue-600 group-hover:text-white'
+                                  }`}>
+                                    {hasLocation ? 'Change' : 'Choose'}
+                                  </span>
+                                </button>
                               );
                             })()}
                           </td>
@@ -1476,6 +1517,25 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Location Selection Modal for Dispatch Items */}
+      {activeLocModalRow && (
+        <LocationSelectModal
+          isOpen={Boolean(activeLocModalRowKey)}
+          onClose={() => setActiveLocModalRowKey(null)}
+          rawHierarchy={warehouseLocations}
+          selectedLocationId={activeLocModalRow.locationId}
+          companyId={selectedCompany?._id}
+          skuId={activeLocModalSkuId}
+          unit={activeLocModalRow.uom || 'GBL'}
+          title={`Select Storage Location for ${activeLocModalRow.itemName || 'Item'}`}
+          zIndex={10050}
+          onSelectLocation={(locId, locPath) => {
+            handleItemLocationChange(activeLocModalRow.key, locId, locPath);
+            setActiveLocModalRowKey(null);
+          }}
+        />
+      )}
     </div>,
     document.body
   );
