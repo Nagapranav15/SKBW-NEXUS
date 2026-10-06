@@ -1138,11 +1138,16 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
         // Determine UOM: raw materials (especially sheets/boards) must ALWAYS use their actual UOM (PCS).
         // Never inherit GBL from an output item or an accidental GBL tag.
-        const isRawItem = (matchedSku && getItemClassification(matchedSku) === 'materials') ||
+        const isSemiOrProduct = (matchedSku && (getItemClassification(matchedSku) === 'semi' || getItemClassification(matchedSku) === 'products')) ||
+                                (raw.skuCode && (raw.skuCode.toUpperCase().startsWith('SM-') || raw.skuCode.toUpperCase().startsWith('FG-'))) ||
+                                (raw.code && (raw.code.toUpperCase().startsWith('SM-') || raw.code.toUpperCase().startsWith('FG-')));
+
+        const isRawItem = !isSemiOrProduct && (
+                          (matchedSku && getItemClassification(matchedSku) === 'materials') ||
                           (raw.skuCode && raw.skuCode.toUpperCase().startsWith('RM-')) ||
                           (raw.code && raw.code.toUpperCase().startsWith('RM-')) ||
-                          (matchedSku?.category && /sheet|board|paper|reel/i.test(matchedSku.category)) ||
-                          (raw.name && /sheet|board/i.test(raw.name));
+                          (matchedSku?.category && /sheet|paper|reel/i.test(matchedSku.category)) ||
+                          (raw.name && /reel/i.test(raw.name)));
 
         let resolvedUom = raw.uom || matchedSku?.unit || raw.unit || 'PCS';
         if (isRawItem && (resolvedUom.toUpperCase() === 'GBL' || !resolvedUom)) {
@@ -1351,10 +1356,15 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         const rawFifoRate = Number(rateInfo.fifoRate) || 0;
         const rawStandardRate = Number(rateInfo.standardRate) || 0;
 
-        const isRawItem = (matchedSku && getItemClassification(matchedSku) === 'materials') ||
+        const isSemiOrProduct = (matchedSku && (getItemClassification(matchedSku) === 'semi' || getItemClassification(matchedSku) === 'products')) ||
+                                (m.code && (m.code.toUpperCase().startsWith('SM-') || m.code.toUpperCase().startsWith('FG-'))) ||
+                                (matchedSku?.skuCode && (matchedSku.skuCode.toUpperCase().startsWith('SM-') || matchedSku.skuCode.toUpperCase().startsWith('FG-')));
+
+        const isRawItem = !isSemiOrProduct && (
+                          (matchedSku && getItemClassification(matchedSku) === 'materials') ||
                           (m.code && m.code.toUpperCase().startsWith('RM-')) ||
-                          (matchedSku?.category && /sheet|board|paper|reel/i.test(matchedSku.category)) ||
-                          (m.component && /sheet|board/i.test(m.component));
+                          (matchedSku?.category && /sheet|paper|reel/i.test(matchedSku.category)) ||
+                          (m.component && /reel/i.test(m.component)));
 
         // For raw materials, purchase rates are natively per actual unit (PCS/sheet/KG) and NEVER per GBL.
         // Never convert or divide a raw material's purchase rate using GBL conversion!

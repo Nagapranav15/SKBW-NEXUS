@@ -1324,17 +1324,18 @@ exports.getMaterialRates = async (req, res) => {
               const isReam = skuUnitNorm.includes('ream');
               const isPcs = skuUnitNorm === 'pcs' || skuUnitNorm === 'piece' || skuUnitNorm === 'pieces';
               const isGbl = skuUnitNorm === 'gbl';
-              const convFactor = Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 400);
+              const convFactor = Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 2500);
 
-              let csRate = csSlip.effectiveCostPerSheet;
+              const post4UpCost = Number(csSlip.costPer4UpPiece || (csSlip.effectiveCostPerSheet > 0 ? csSlip.effectiveCostPerSheet / 4 : 0));
+              let csRate = post4UpCost;
               if (isReam) {
                 csRate = csSlip.effectiveCostPerReam || (csSlip.effectiveCostPerSheet * (csSlip.sheetsPerReam || 500));
               } else if (isPcs) {
                 // 4-UP PCS cost: Parent sheet cost / 4
-                csRate = csSlip.effectiveCostPerSheet / 4;
+                csRate = post4UpCost;
               } else if (isGbl) {
                 // Rate in GBL: (Parent sheet cost / 4) * convFactor
-                csRate = (csSlip.effectiveCostPerSheet / 4) * (convFactor > 0 ? convFactor : 400);
+                csRate = post4UpCost * (convFactor > 0 ? convFactor : 2500);
               }
               if (csRate > 0) {
                 b.rate = Math.round(csRate * 10000) / 10000;
@@ -1352,23 +1353,24 @@ exports.getMaterialRates = async (req, res) => {
           targetSku: sku._id,
           status: "Posted"
         }).sort({ createdAt: -1 }).lean();
-        if (lastSlip && lastSlip.effectiveCostPerSheet > 0) {
+        if (lastSlip && (lastSlip.effectiveCostPerSheet > 0 || lastSlip.costPer4UpPiece > 0)) {
           const skuUnitNorm = (sku.unit || '').trim().toLowerCase();
           const isReam = skuUnitNorm.includes('ream');
           const isPcs = skuUnitNorm === 'pcs' || skuUnitNorm === 'piece' || skuUnitNorm === 'pieces';
           const isGbl = skuUnitNorm === 'gbl';
-          const convFactor = Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 400);
+          const convFactor = Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 2500);
+          const post4UpPieceCost = Number(lastSlip.costPer4UpPiece || (lastSlip.effectiveCostPerSheet > 0 ? lastSlip.effectiveCostPerSheet / 4 : 0));
 
           if (isReam) {
             cuttingSlipRate = lastSlip.effectiveCostPerReam || (lastSlip.effectiveCostPerSheet * (lastSlip.sheetsPerReam || 500));
           } else if (isPcs) {
             // 4-UP PCS cost: Parent sheet cost / 4
-            cuttingSlipRate = Math.round((lastSlip.effectiveCostPerSheet / 4) * 10000) / 10000;
+            cuttingSlipRate = Math.round(post4UpPieceCost * 10000) / 10000;
           } else if (isGbl) {
             // Rate in GBL: (Parent sheet cost / 4) * convFactor
-            cuttingSlipRate = Math.round(((lastSlip.effectiveCostPerSheet / 4) * (convFactor > 0 ? convFactor : 400)) * 10000) / 10000;
+            cuttingSlipRate = Math.round((post4UpPieceCost * (convFactor > 0 ? convFactor : 2500)) * 10000) / 10000;
           } else {
-            cuttingSlipRate = lastSlip.effectiveCostPerSheet;
+            cuttingSlipRate = post4UpPieceCost;
           }
         }
       } catch (e) {
@@ -1376,11 +1378,11 @@ exports.getMaterialRates = async (req, res) => {
       }
 
       const standardRate = Number(
+        cuttingSlipRate ||
         sku.avgCost || 
         sku.costPrice || 
         sku.standardCost || 
         productionRate || 
-        cuttingSlipRate || 
         sku.purchasePrice || 
         sku.rate || 
         0
@@ -1420,11 +1422,11 @@ exports.getMaterialRates = async (req, res) => {
             totalBatchValue += (b.remainingQty * bRate);
           }
         });
-        avgRate = totalBatchQty > 0 ? Math.round((totalBatchValue / totalBatchQty) * 100) / 100 : (standardRate || productionRate);
+        avgRate = totalBatchQty > 0 ? Math.round((totalBatchValue / totalBatchQty) * 10000) / 10000 : (standardRate || productionRate);
       } else if (allPurchasedItems.length > 0) {
         const sumQty = allPurchasedItems.reduce((s, it) => s + it.quantity, 0);
         const sumVal = allPurchasedItems.reduce((s, it) => s + (it.quantity * it.price), 0);
-        avgRate = sumQty > 0 ? Math.round((sumVal / sumQty) * 100) / 100 : (standardRate || productionRate);
+        avgRate = sumQty > 0 ? Math.round((sumVal / sumQty) * 10000) / 10000 : (standardRate || productionRate);
       } else {
         avgRate = standardRate || productionRate;
       }

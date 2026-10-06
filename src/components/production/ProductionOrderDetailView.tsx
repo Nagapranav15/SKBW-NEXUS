@@ -164,6 +164,8 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
         dynamicRate = costing.rate;
       } else {
         const skuMasterRate = Number(
+          (costing.sku as any)?.costPerPiece ||
+          (costing.sku as any)?.avgCost ||
           costing.sku?.valuationRate ||
           (costing.sku as any)?.purchasePrice ||
           (costing.sku as any)?.avgRate ||

@@ -722,14 +722,24 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
     return (targetSkuDoc?.unit || '').trim().toUpperCase();
   }, [targetSkuDoc]);
 
+  const isSemiFinished = useMemo(() => {
+    return targetSkuDoc?.itemType === 'semi' ||
+           (targetSkuDoc?.skuCode && targetSkuDoc.skuCode.toUpperCase().startsWith('SM-')) ||
+           (targetSkuDoc?.name && /sr|ur|index|board/i.test(targetSkuDoc.name));
+  }, [targetSkuDoc]);
+
   const convertedTargetQty = useMemo(() => {
     if (numActualSheets <= 0) return 0;
     if (targetUnit.includes('REAM')) return numActualReams;
+    
+    // For semi-finished goods (SR/UR/Index/Board), 1 parent sheet produces 4 book-size pieces (4-UP)
+    const totalPcs = isSemiFinished ? numActualSheets * 4 : numActualSheets;
+
     if (targetConvFactor > 0 && (targetUnit === 'GBL' || targetUnit.includes('BUNDLE') || targetUnit.includes('BOX') || targetUnit.includes('CARTON'))) {
-      return Math.round((numActualSheets / targetConvFactor) * 10000) / 10000;
+      return Math.round((totalPcs / targetConvFactor) * 10000) / 10000;
     }
-    return numActualSheets;
-  }, [numActualSheets, numActualReams, targetUnit, targetConvFactor]);
+    return totalPcs;
+  }, [numActualSheets, numActualReams, targetUnit, targetConvFactor, isSemiFinished]);
 
   const costPerTargetUnit = useMemo(() => {
     if (convertedTargetQty <= 0) return 0;
@@ -1883,21 +1893,47 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                           Converted Yield ({targetUnit})
                         </span>
                         <span className="text-[9.5px] text-blue-300 block truncate">
-                          1 {targetUnit} = {targetConvFactor} {targetSkuDoc?.altUnit || 'Sheets'}
+                          {isSemiFinished ? '4-UP Pcs: 1 Sheet = 4 Pcs' : `1 ${targetUnit} = ${targetConvFactor} ${targetSkuDoc?.altUnit || 'Sheets'}`}
                         </span>
                       </div>
                       <div className="text-[10px] font-mono text-blue-200 mt-1">
-                        {numActualSheets.toLocaleString()} ÷ {targetConvFactor} = <span className="font-bold text-white">{convertedTargetQty} {targetUnit}</span>
+                        {isSemiFinished ? (
+                          <>{(numActualSheets * 4).toLocaleString()} pcs ÷ {targetConvFactor} = <span className="font-bold text-white">{convertedTargetQty} {targetUnit}</span></>
+                        ) : (
+                          <>{numActualSheets.toLocaleString()} ÷ {targetConvFactor} = <span className="font-bold text-white">{convertedTargetQty} {targetUnit}</span></>
+                        )}
                       </div>
                       <div className="mt-1 px-2 py-0.5 bg-blue-800/80 rounded border border-blue-700 text-center font-mono font-bold text-xs text-white">
                         ₹{costPerTargetUnit.toFixed(2)} / {targetUnit}
+                        {costPer4UpPiece > 0 && (
+                          <span className="block text-[9.5px] text-blue-200 font-normal mt-0.5">
+                            (₹{costPer4UpPiece.toFixed(4)} / PCS)
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  ) : isSemiFinished ? (
+                    <>
+                      <div>
+                        <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider block">
+                          Semi-Finished 4-UP ({targetUnit || 'PCS'})
+                        </span>
+                        <span className="text-[9.5px] text-blue-300 block">
+                          1 Parent Sheet = 4 Book PCS
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-mono text-blue-200 mt-1">
+                        Yield: <span className="font-bold text-white">{(numActualSheets * 4).toLocaleString()} PCS</span>
+                      </div>
+                      <div className="mt-1 px-2 py-0.5 bg-blue-800/80 rounded border border-blue-700 text-center font-mono font-bold text-xs text-white">
+                        ₹{costPer4UpPiece.toFixed(4)} / PCS
                       </div>
                     </>
                   ) : (
                     <>
                       <div>
                         <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider block">
-                          Semi-Finished Cost ({targetUnit || 'PCS'})
+                          Sheet Yield ({targetUnit || 'Sheets'})
                         </span>
                         <span className="text-[9.5px] text-blue-300 block">
                           Per sheet / piece yield

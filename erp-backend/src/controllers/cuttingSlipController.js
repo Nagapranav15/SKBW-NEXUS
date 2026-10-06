@@ -517,6 +517,7 @@ exports.createCuttingSlip = async (req, res) => {
     const targetUnitNorm = (targetSkuDoc.unit || '').trim().toLowerCase();
     const isTargetUnitReam = targetUnitNorm.includes('ream');
     const isTargetUnitGbl = targetUnitNorm === 'gbl' || targetUnitNorm.includes('bundle') || targetUnitNorm.includes('box') || targetUnitNorm.includes('carton');
+    const isTargetUnitPcs = targetUnitNorm === 'pcs' || targetUnitNorm === 'piece' || targetUnitNorm === 'pieces' || targetUnitNorm === 'sheets' || targetUnitNorm === 'sheet';
     const convFactor = Number(
       targetSkuDoc.altUnitConversion ||
       targetSkuDoc.conv ||
@@ -525,22 +526,27 @@ exports.createCuttingSlip = async (req, res) => {
       0
     );
 
-    let finalOutputQty = Number(actualSheets);
-    let unitRate = Number(actualSheets) > 0 ? Number(totalInputCost || 0) / Number(actualSheets) : 0;
+    // In Cutting Slip, one parent sheet is converted into 4 book-size PCS (4-UP layout)
+    const actualBookPcs = Number(validActualSheets) * 4;
+    const pieceCost = Number(costPer4UpPiece) || (validActualSheets > 0 ? (Number(totalInputCost || 0) / (validActualSheets * 4)) : 0);
+
+    let finalOutputQty = actualBookPcs;
+    let unitRate = pieceCost;
 
     if (isTargetUnitReam) {
-      finalOutputQty = Number(actualReams);
+      finalOutputQty = Number(resolvedActualReams) || (resolvedSheetsPerReam > 0 ? Number((validActualSheets / resolvedSheetsPerReam).toFixed(2)) : 0);
       unitRate = finalOutputQty > 0 ? Math.round((Number(totalInputCost || 0) / finalOutputQty) * 10000) / 10000 : 0;
     } else if (isTargetUnitGbl && convFactor > 0) {
-      // Conversion according to the conversion rate of that particular item in item master (e.g. 10172 / 2500 = 4.0688)
-      finalOutputQty = Math.round((Number(actualSheets) / convFactor) * 10000) / 10000;
+      // 1 GBL contains convFactor book-size PCS (e.g. 2,500 PCS / GBL)
+      finalOutputQty = Math.round((actualBookPcs / convFactor) * 10000) / 10000;
       unitRate = finalOutputQty > 0 ? Math.round((Number(totalInputCost || 0) / finalOutputQty) * 10000) / 10000 : 0;
-    } else if (targetSkuDoc.altUnit && convFactor > 0) {
-      finalOutputQty = convertAltToPrimary(Number(actualSheets), targetSkuDoc);
+    } else if (targetSkuDoc.altUnit && convFactor > 0 && !isTargetUnitPcs) {
+      finalOutputQty = convertAltToPrimary(Number(actualBookPcs), targetSkuDoc);
       unitRate = finalOutputQty > 0 ? Math.round((Number(totalInputCost || 0) / finalOutputQty) * 10000) / 10000 : 0;
     } else {
-      finalOutputQty = Number(actualSheets);
-      unitRate = Number(actualSheets) > 0 ? Number(totalInputCost || 0) / Number(actualSheets) : 0;
+      // Standard book-size PCS of semi-finished goods (post-4-UP)
+      finalOutputQty = actualBookPcs;
+      unitRate = pieceCost;
     }
 
     const txNumIn = await Sequence.getNextSequence("IL", session);
@@ -637,6 +643,7 @@ exports.createCuttingSlip = async (req, res) => {
       targetSkuDoc.standardCost = roundedAvg;
       targetSkuDoc.avgRate = roundedAvg;
       targetSkuDoc.rate = roundedAvg;
+      targetSkuDoc.costPerPiece = Math.round(pieceCost * 10000) / 10000;
       await targetSkuDoc.save({ session });
     } catch (costErr) {
       console.error("Non-critical: Failed to update target SKU weighted average cost on cutting slip:", costErr);

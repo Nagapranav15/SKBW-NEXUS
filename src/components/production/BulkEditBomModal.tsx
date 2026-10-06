@@ -295,10 +295,15 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
       let effectiveRate = rawRate;
       const skuUnit = matchedSku?.unit || '';
       const itemUom = item.uom || '';
-      const isRaw = (matchedSku && getItemClassification(matchedSku) === 'materials') ||
+      const isSemiOrProduct = (matchedSku && (getItemClassification(matchedSku) === 'semi' || getItemClassification(matchedSku) === 'products')) ||
+                            (item.skuCode && (item.skuCode.toUpperCase().startsWith('SM-') || item.skuCode.toUpperCase().startsWith('FG-'))) ||
+                            (matchedSku?.skuCode && (matchedSku.skuCode.toUpperCase().startsWith('SM-') || matchedSku.skuCode.toUpperCase().startsWith('FG-')));
+
+      const isRaw = !isSemiOrProduct && (
+                    (matchedSku && getItemClassification(matchedSku) === 'materials') ||
                     (item.skuCode && item.skuCode.toUpperCase().startsWith('RM-')) ||
-                    (matchedSku?.category && /sheet|board|paper|reel/i.test(matchedSku.category)) ||
-                    (item.name && /sheet|board/i.test(item.name));
+                    (matchedSku?.category && /sheet|paper|reel/i.test(matchedSku.category)) ||
+                    (item.name && /reel/i.test(item.name)));
 
       const shouldBypassGbl = isRaw && (
         skuUnit.toUpperCase() === 'GBL' ||

@@ -52,6 +52,8 @@ export const fetchStockCostings = async (companyId: string): Promise<StockCostin
 
       // Check SKU Master base rates
       const skuRate = Number(
+        (s as any).costPerPiece ||
+        (s as any).avgCost ||
         (s as any).purchasePrice ||
         (s as any).ratePerKg ||
         (s as any).avgRate ||
