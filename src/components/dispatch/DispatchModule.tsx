@@ -1,53 +1,21 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Truck, FileText, Package, CheckCircle2, Clock, AlertCircle,
-  Search, Filter, RefreshCw, SlidersHorizontal, ChevronDown,
-  Phone, MapPin, Download, Check, Eye, Plus, ArrowUpDown, ChevronLeft, ChevronRight,
-  Printer, X, ArrowUp, ArrowDown, ExternalLink, Calendar, CheckSquare, Square,
-  Building, Factory, Layers
+  Truck, Package, CheckCircle2, Clock, AlertCircle,
+  Search, Filter, RefreshCw, ChevronDown,
+  Phone, MapPin, Download, Eye, Plus, ArrowUpDown, ChevronLeft, ChevronRight,
+  Printer, X, ArrowUp, ArrowDown
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../../context/AuthContext';
-import { getSalesOrdersV2, SalesOrderV2, updateSalesOrderV2 } from '../../api/salesOrderApiV2';
-import { getCustomSalesOrders, saveCustomSalesOrder } from '../../utils/salesOrderStorage';
+import { getSalesOrdersV2, SalesOrderV2 } from '../../api/salesOrderApiV2';
+import { getCustomSalesOrders } from '../../utils/salesOrderStorage';
 import { getBalancesV2, getSkusV2 } from '../../api/mfgApiV2';
-import { getDeliveryChallans, createDeliveryChallan } from '../../api/deliveryChallanApi';
+import { getDeliveryChallans } from '../../api/deliveryChallanApi';
 import { CreateDispatchModal } from './CreateDispatchModal';
 import { ViewDeliveryChallanModal } from './ViewDeliveryChallanModal';
 import { DispatchOrderDetailModal } from './DispatchOrderDetailModal';
 import { showToast } from '../ui/Toast';
-
-// Formatted Item Requirement Model for Production View (Item-wise)
-export interface DispatchItemRequirement {
-  skuCode: string;
-  skuName: string;
-  uom: string;
-  totalOrderedPcs: number;
-  totalDispatchedPcs: number;
-  balancePendingPcs: number;
-  balancePendingGbl: number;
-  stockOnHandGbl: number;
-  stockOnHandPcs: number;
-  shortfallGbl: number;
-  shortfallPcs: number;
-  status: 'Ready' | 'Partial' | 'Shortfall';
-  orders: Array<{
-    orderId: string;
-    orderNumber: string;
-    orderDate: string;
-    customerName: string;
-    customerPhone?: string;
-    city?: string;
-    orderedQty: number;
-    dispatchedQty: number;
-    pendingGbl: number;
-    pendingPcs: number;
-    isAvailable?: boolean;
-    rawOrder: SalesOrderV2;
-    parentRow: DispatchRowOrder;
-  }>;
-}
 
 // Formatted Order Model for Dispatch View
 export interface DispatchRowOrder {
@@ -80,7 +48,7 @@ export interface DispatchRowOrder {
   rawOrder: SalesOrderV2;
 }
 
-// Fallback seed orders matching user's reference screenshot perfectly
+// Fallback seed orders matching user's reference screenshot
 const FALLBACK_SEED_ORDERS: DispatchRowOrder[] = [
   {
     _id: 'seed-so-0001',
@@ -269,12 +237,8 @@ export const DispatchModule: React.FC = () => {
   // Top Tabs: 'all' | 'ready' | 'partial' | 'not_ready' | 'history'
   const [activeTab, setActiveTab] = useState<'all' | 'ready' | 'partial' | 'not_ready' | 'history'>('all');
 
-  // View Mode: 'orders' (SO view with all items) | 'item_wise' (Production view aggregating by SKU)
-  const [viewMode, setViewMode] = useState<'orders' | 'item_wise'>('orders');
-
-  // Accordion Expand Sets
+  // Accordion Expand Set for Orders
   const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string>>(new Set());
-  const [expandedSkuKeys, setExpandedSkuKeys] = useState<Set<string>>(new Set());
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState('');
@@ -282,12 +246,12 @@ export const DispatchModule: React.FC = () => {
   const [selectedRegion, setSelectedRegion] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
 
-  // Date Filter Popover State
-  const [showDateFilter, setShowDateFilter] = useState(false);
+  // Filter Popover Menu State
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [datePreset, setDatePreset] = useState<string>('All');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
-  const dateFilterRef = useRef<HTMLDivElement>(null);
+  const filterMenuRef = useRef<HTMLDivElement>(null);
 
   // Sorting
   const [sortField, setSortField] = useState<'orderNumber' | 'rawDate' | 'pendingGbl' | 'customerName'>('orderNumber');
@@ -316,13 +280,12 @@ export const DispatchModule: React.FC = () => {
   // Close menus on outside click
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
-      if (dateFilterRef.current && !dateFilterRef.current.contains(e.target as Node)) {
-        setShowDateFilter(false);
+      if (filterMenuRef.current && !filterMenuRef.current.contains(e.target as Node)) {
+        setShowFilterMenu(false);
       }
       if (sortMenuRef.current && !sortMenuRef.current.contains(e.target as Node)) {
         setShowSortMenu(false);
       }
-      // Close row actions
       setOpenActionDropdownId(null);
     };
     document.addEventListener('click', handleOutsideClick);
@@ -478,15 +441,12 @@ export const DispatchModule: React.FC = () => {
 
         // Determine true ordered PCS vs GBL
         if (itemGbl > 0 && rawOrdered > itemGbl) {
-          // item.quantity was stored in PCS, item.gbl is the GBL equivalent
           orderedPcs = rawOrdered;
           orderedGbl = itemGbl;
         } else if (rawOrdered >= conv && conv > 1) {
-          // Clearly entered as pieces
           orderedPcs = rawOrdered;
           orderedGbl = itemGbl || Math.ceil(rawOrdered / conv);
         } else if ((item.uom || '').toUpperCase() === 'GBL') {
-          // True GBL quantity
           orderedGbl = rawOrdered;
           orderedPcs = rawOrdered * conv;
         } else {
@@ -510,7 +470,6 @@ export const DispatchModule: React.FC = () => {
                       (nameKey && liveStockMap.get(nameKey)) ||
                       { pcs: 0, gbl: 0 };
 
-        // Item is available purely dynamically if warehouse stock fulfills requirement in GBL or PCS
         const hasStock = (stock.gbl >= pendingGbl && pendingGbl > 0) || 
                          (stock.pcs >= pendingPcs && pendingPcs > 0);
 
@@ -541,10 +500,6 @@ export const DispatchModule: React.FC = () => {
         };
       });
 
-      // Purely dynamic order readiness:
-      // Ready if all items are fully in stock
-      // Partially Ready if some items or partial stock is available
-      // Not Ready if zero required stock is available
       let status: 'Ready' | 'Partially Ready' | 'Not Ready' = 'Not Ready';
       if (itemsTransformed.length > 0) {
         if (allItemsReady) {
@@ -685,117 +640,6 @@ export const DispatchModule: React.FC = () => {
     return filteredRows.slice(start, start + pageSize);
   }, [filteredRows, currentPage, pageSize]);
 
-  // Item-wise Production Requirements (Group items across pending orders by SKU)
-  const itemWiseRequirements = useMemo<DispatchItemRequirement[]>(() => {
-    const map = new Map<string, DispatchItemRequirement>();
-
-    displayRows.forEach(row => {
-      (row.items || []).forEach(it => {
-        const code = (it.skuCode || '').toUpperCase().trim();
-        const name = it.itemName || code || 'Item';
-        const key = code || name;
-        const stockGbl = it.stockOnHandGbl ?? 0;
-        const stockPcs = it.stockOnHandPcs ?? 0;
-
-        if (!map.has(key)) {
-          map.set(key, {
-            skuCode: it.skuCode || '',
-            skuName: name,
-            uom: it.uom || 'PCS',
-            totalOrderedPcs: 0,
-            totalDispatchedPcs: 0,
-            balancePendingPcs: 0,
-            balancePendingGbl: 0,
-            stockOnHandGbl: stockGbl,
-            stockOnHandPcs: stockPcs,
-            shortfallGbl: 0,
-            shortfallPcs: 0,
-            status: 'Shortfall',
-            orders: []
-          });
-        }
-
-        const entry = map.get(key)!;
-        entry.totalOrderedPcs += it.orderedQty;
-        entry.totalDispatchedPcs += it.dispatchedQty;
-        entry.balancePendingPcs += it.pcs;
-        entry.balancePendingGbl += it.gbl;
-        entry.orders.push({
-          orderId: row._id,
-          orderNumber: row.orderNumber,
-          orderDate: row.orderDate,
-          customerName: row.customerName,
-          customerPhone: row.customerPhone,
-          city: row.city,
-          orderedQty: it.orderedQty,
-          dispatchedQty: it.dispatchedQty,
-          pendingGbl: it.gbl,
-          pendingPcs: it.pcs,
-          isAvailable: it.isAvailable,
-          rawOrder: row.rawOrder,
-          parentRow: row
-        });
-      });
-    });
-
-    return Array.from(map.values()).map(item => {
-      const shortfallGbl = Math.max(0, item.balancePendingGbl - item.stockOnHandGbl);
-      const shortfallPcs = Math.max(0, item.balancePendingPcs - item.stockOnHandPcs);
-      let status: 'Ready' | 'Partial' | 'Shortfall' = 'Shortfall';
-      if (shortfallGbl === 0 && item.stockOnHandGbl >= item.balancePendingGbl && item.balancePendingGbl > 0) {
-        status = 'Ready';
-      } else if (item.stockOnHandGbl > 0 || item.stockOnHandPcs > 0) {
-        status = 'Partial';
-      } else {
-        status = 'Shortfall';
-      }
-
-      return {
-        ...item,
-        shortfallGbl,
-        shortfallPcs,
-        status
-      };
-    });
-  }, [displayRows]);
-
-  // Filtered Item-wise Requirements
-  const filteredItemWiseRequirements = useMemo(() => {
-    return itemWiseRequirements.filter(req => {
-      // Tab filter
-      if (activeTab === 'ready' && req.status !== 'Ready') return false;
-      if (activeTab === 'partial' && req.status !== 'Partial') return false;
-      if (activeTab === 'not_ready' && req.status !== 'Shortfall') return false;
-
-      // Dropdown status filter
-      if (selectedStatus === 'Ready' && req.status !== 'Ready') return false;
-      if (selectedStatus === 'Partially Ready' && req.status !== 'Partial') return false;
-      if (selectedStatus === 'Not Ready' && req.status !== 'Shortfall') return false;
-
-      // Search query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchCode = (req.skuCode || '').toLowerCase().includes(q);
-        const matchName = req.skuName.toLowerCase().includes(q);
-        const matchOrder = req.orders.some(o => 
-          o.orderNumber.toLowerCase().includes(q) ||
-          o.customerName.toLowerCase().includes(q) ||
-          (o.city || '').toLowerCase().includes(q)
-        );
-        if (!matchCode && !matchName && !matchOrder) return false;
-      }
-
-      return true;
-    });
-  }, [itemWiseRequirements, activeTab, selectedStatus, searchQuery]);
-
-  // Paginated Item-wise
-  const totalItemPages = Math.max(1, Math.ceil(filteredItemWiseRequirements.length / pageSize));
-  const paginatedItemWise = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredItemWiseRequirements.slice(start, start + pageSize);
-  }, [filteredItemWiseRequirements, currentPage, pageSize]);
-
   // Accordion Expand Handlers
   const toggleOrderExpand = (id: string) => {
     setExpandedOrderIds(prev => {
@@ -806,32 +650,13 @@ export const DispatchModule: React.FC = () => {
     });
   };
 
-  const toggleSkuExpand = (key: string) => {
-    setExpandedSkuKeys(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
-  const isAllExpanded = viewMode === 'orders'
-    ? (expandedOrderIds.size === paginatedRows.length && paginatedRows.length > 0)
-    : (expandedSkuKeys.size === paginatedItemWise.length && paginatedItemWise.length > 0);
+  const isAllExpanded = expandedOrderIds.size === paginatedRows.length && paginatedRows.length > 0;
 
   const toggleAllDetails = () => {
-    if (viewMode === 'orders') {
-      if (isAllExpanded) {
-        setExpandedOrderIds(new Set());
-      } else {
-        setExpandedOrderIds(new Set(paginatedRows.map(r => r._id)));
-      }
+    if (isAllExpanded) {
+      setExpandedOrderIds(new Set());
     } else {
-      if (isAllExpanded) {
-        setExpandedSkuKeys(new Set());
-      } else {
-        setExpandedSkuKeys(new Set(paginatedItemWise.map(i => i.skuCode || i.skuName)));
-      }
+      setExpandedOrderIds(new Set(paginatedRows.map(r => r._id)));
     }
   };
 
@@ -854,6 +679,16 @@ export const DispatchModule: React.FC = () => {
     setSelectedOrderIds(next);
   };
 
+  // Sort Handler
+  const handleSort = (field: 'orderNumber' | 'rawDate' | 'pendingGbl' | 'customerName') => {
+    if (sortField === field) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortField(field);
+      setSortAsc(true);
+    }
+  };
+
   // Open Dispatch Modal
   const handleOpenDispatch = (orderRow?: DispatchRowOrder) => {
     if (orderRow) {
@@ -866,7 +701,7 @@ export const DispatchModule: React.FC = () => {
     setIsCreateModalOpen(true);
   };
 
-  // Auto-open dispatch if orderId is provided in URL (e.g. from Sales Production View)
+  // Auto-open dispatch if orderId is provided in URL
   useEffect(() => {
     const targetOrderId = searchParams.get('orderId');
     if (targetOrderId && displayRows.length > 0 && !urlOrderIdHandled.current) {
@@ -896,30 +731,6 @@ export const DispatchModule: React.FC = () => {
   // Export Excel
   const handleExportExcel = (targetRows = filteredRows) => {
     try {
-      if (viewMode === 'item_wise') {
-        const exportData = filteredItemWiseRequirements.map(item => ({
-          'SKU Code': item.skuCode,
-          'Item Name': item.skuName,
-          'UOM': item.uom,
-          'Total Ordered (PCS)': item.totalOrderedPcs,
-          'Total Dispatched (PCS)': item.totalDispatchedPcs,
-          'Pending GBL': item.balancePendingGbl,
-          'Pending PCS': item.balancePendingPcs,
-          'Stock In Hand (GBL)': item.stockOnHandGbl,
-          'Stock In Hand (PCS)': item.stockOnHandPcs,
-          'Shortfall (GBL)': item.shortfallGbl,
-          'Shortfall (PCS)': item.shortfallPcs,
-          'Status': item.status,
-          'Awaiting Orders': item.orders.length
-        }));
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Item Requirements');
-        XLSX.writeFile(wb, `Dispatch_Item_Requirements_${new Date().toISOString().split('T')[0]}.xlsx`);
-        showToast('Exported item requirements to Excel', 'success');
-        return;
-      }
-
       const exportData = targetRows.map(row => ({
         'SO Number': row.orderNumber,
         'Order Date': row.orderDate,
@@ -970,46 +781,43 @@ export const DispatchModule: React.FC = () => {
       setStartDate(toYMD(first));
       setEndDate(toYMD(last));
     }
-    setShowDateFilter(false);
     setCurrentPage(1);
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-200">
-      {/* ── HEADER ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0 shadow-2xs">
+    <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+      {/* ── 1. HEADER BANNER (Matching Production Module Style) ── */}
+      <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
+        <div className="flex items-center gap-3.5">
+          <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
             <Truck className="w-6 h-6 stroke-[2.2]" />
           </div>
           <div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-black text-gray-900 tracking-tight">
-                Pending Orders for Dispatch
-              </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-600 border border-blue-200/80">
+            <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+              <span>Pending Orders for Dispatch</span>
+              <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold transition-all">
                 {metrics.pendingOrders} Orders
               </span>
-            </div>
-            <p className="text-xs text-gray-500 mt-1 font-medium">
+            </h1>
+            <p className="text-xs text-gray-500 font-medium">
               Select a pending sales order and create a dispatch. You can dispatch full or partial quantities.
             </p>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-3 self-end sm:self-auto">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={() => handleExportExcel()}
-            className="px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-xl border border-gray-200/90 text-xs font-bold flex items-center gap-2 shadow-2xs transition-colors cursor-pointer"
+            className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-xl border border-gray-200 text-xs font-bold flex items-center gap-2 shadow-2xs transition-colors cursor-pointer"
           >
             <Download className="w-4 h-4 text-gray-500" />
-            <span>Export Excel</span>
+            <span className="hidden sm:inline">Export Excel</span>
           </button>
 
           <button
             onClick={() => handleOpenDispatch()}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm shadow-blue-500/25 transition-all cursor-pointer active:scale-98"
+            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm shadow-blue-500/25 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>+ Create Dispatch</span>
@@ -1017,98 +825,191 @@ export const DispatchModule: React.FC = () => {
         </div>
       </div>
 
-      {/* ── TABS & FILTER BAR ── */}
-      <div className="space-y-3.5">
-        {/* Top Control Bar: View Switcher (Orders View vs Production View) + Search & Filter */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-gray-200/80 pb-3">
-          {/* Left: View Mode Toggle & Detailed View Expand */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+      {/* ── 2. TOP NAVIGATION TABS & ACTION BAR (Matching Production Module Style) ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-4 rounded-2xl shadow-2xs relative">
+        {/* Navigation Tabs */}
+        <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full">
+          {[
+            { id: 'all', label: 'All Pending', count: metrics.pendingOrders },
+            { id: 'ready', label: 'Ready to Dispatch', count: metrics.readyOrders },
+            { id: 'partial', label: 'Partially Ready', count: metrics.partiallyReadyOrders },
+            { id: 'not_ready', label: 'Not Ready', count: metrics.notReadyOrders },
+            ...(deliveryChallansList.length > 0 ? [{ id: 'history', label: 'Challans History', count: deliveryChallansList.length }] : [])
+          ].map(tab => {
+            const active = activeTab === tab.id;
+            return (
               <button
-                onClick={() => { setViewMode('orders'); setCurrentPage(1); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  viewMode === 'orders'
-                    ? 'bg-white text-gray-900 shadow-2xs'
-                    : 'text-gray-600 hover:text-gray-900'
+                key={tab.id}
+                onClick={() => { setActiveTab(tab.id as any); setCurrentPage(1); }}
+                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                  active 
+                    ? 'border-blue-600 text-blue-700 bg-transparent'
+                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
                 }`}
               >
-                <Building className="w-3.5 h-3.5 text-blue-600" />
-                <span>Orders View</span>
-                <span className="text-[10px] text-gray-400 font-mono">({filteredRows.length})</span>
+                <span>{tab.label}</span>
+                {tab.count !== undefined && (
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                    active ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-700'
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
               </button>
+            );
+          })}
+        </div>
 
-              <button
-                onClick={() => { setViewMode('item_wise'); setCurrentPage(1); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  viewMode === 'item_wise'
-                    ? 'bg-white text-gray-900 shadow-2xs'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
+        {/* Right Action Bar */}
+        <div className="py-2 flex items-center gap-1.5 flex-wrap shrink-0 relative z-40">
+          {/* Global Search Box */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+              placeholder="Search orders, items..."
+              className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-36 md:w-48 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+            />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-2 text-gray-400 hover:text-gray-600 cursor-pointer"
               >
-                <Package className="w-3.5 h-3.5 text-purple-600" />
-                <span>Production View (Item-Wise)</span>
-                <span className="text-[10px] text-gray-400 font-mono">({filteredItemWiseRequirements.length})</span>
+                <X className="w-3.5 h-3.5" />
               </button>
-            </div>
-
-            <button
-              onClick={toggleAllDetails}
-              className="px-3 py-1.5 text-xs text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-xl border border-gray-200/90 bg-white transition-colors cursor-pointer flex items-center gap-1.5 font-bold shadow-2xs"
-              title="Expand/Collapse all items breakdown"
-            >
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isAllExpanded ? 'rotate-180' : ''}`} />
-              <span>{isAllExpanded ? 'Collapse All Items' : 'Detailed View'}</span>
-            </button>
+            )}
           </div>
 
-          {/* Right: Search and Action Bar */}
-          <div className="flex items-center gap-2 relative flex-wrap sm:flex-nowrap">
-            <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder={viewMode === 'orders' ? "Search order no., customer, item..." : "Search SKU code, item name, order..."}
-                value={searchQuery}
-                onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                className="w-full pl-9 pr-3 py-1.5 bg-white border border-gray-200/90 rounded-xl text-xs font-medium text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-2xs"
-              />
-            </div>
+          {/* Detailed View / Collapse All */}
+          <button
+            type="button"
+            onClick={toggleAllDetails}
+            className={`px-2.5 py-1.5 text-xs rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 font-bold shadow-2xs ${
+              isAllExpanded
+                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
+            }`}
+            title={isAllExpanded ? "Collapse All Items" : "Expand All Items"}
+          >
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isAllExpanded ? 'rotate-180' : ''}`} />
+            <span className="hidden sm:inline">{isAllExpanded ? 'Collapse All' : 'Detailed View'}</span>
+          </button>
 
-            {/* Date Filter Popover Button */}
-            <div className="relative" ref={dateFilterRef}>
-              <button
-                title="Date Filter"
-                onClick={(e) => { e.stopPropagation(); setShowDateFilter(p => !p); }}
-                className={`p-2 bg-white hover:bg-gray-50 border rounded-xl shadow-2xs cursor-pointer transition-colors ${
-                  datePreset !== 'All' ? 'border-blue-500 text-blue-600 bg-blue-50/40' : 'border-gray-200/90 text-gray-600'
-                }`}
+          {/* Filter Popover Icon Button */}
+          <div className="relative" ref={filterMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setShowFilterMenu(!showFilterMenu);
+                setShowSortMenu(false);
+              }}
+              className={`p-2 rounded-xl border transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+                (selectedCustomer !== 'ALL' || selectedRegion !== 'ALL' || selectedStatus !== 'ALL' || datePreset !== 'All')
+                  ? 'bg-blue-50 border-blue-300 text-blue-700 ring-2 ring-blue-100'
+                  : 'bg-white hover:bg-blue-50/60 border-gray-200 hover:border-blue-200 text-blue-600'
+              }`}
+              title="Filter Orders"
+            >
+              <Filter className="w-4 h-4 text-blue-600" />
+            </button>
+
+            {showFilterMenu && (
+              <div 
+                className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-xs text-left animate-in fade-in zoom-in-95 duration-100"
+                onClick={e => e.stopPropagation()}
               >
-                <Filter className="w-4 h-4" />
-              </button>
+                <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
+                  <span className="font-bold text-gray-800 text-xs">Filter Orders</span>
+                  {(selectedCustomer !== 'ALL' || selectedRegion !== 'ALL' || selectedStatus !== 'ALL' || datePreset !== 'All') && (
+                    <button
+                      onClick={() => {
+                        setSelectedCustomer('ALL');
+                        setSelectedRegion('ALL');
+                        setSelectedStatus('ALL');
+                        setDatePreset('All');
+                        setStartDate('');
+                        setEndDate('');
+                      }}
+                      className="text-blue-600 hover:text-blue-800 text-[11px] font-bold cursor-pointer"
+                    >
+                      Reset All
+                    </button>
+                  )}
+                </div>
 
-              {showDateFilter && (
-                <div 
-                  className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 p-3 z-50 animate-in fade-in zoom-in-95 duration-150"
-                  onClick={e => e.stopPropagation()}
-                >
-                  <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block mb-2">Filter by Order Date</span>
-                  <div className="grid grid-cols-2 gap-1.5 mb-3">
-                    {['All', 'Today', 'This Week', 'This Month'].map(preset => (
+                {/* Period Preset */}
+                <div>
+                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Period</label>
+                  <div className="grid grid-cols-4 gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200">
+                    {['All', 'Today', 'This Week', 'This Month'].map(p => (
                       <button
-                        key={preset}
-                        onClick={() => applyDatePreset(preset)}
-                        className={`px-2 py-1.5 text-xs font-bold rounded-lg text-center transition-colors cursor-pointer ${
-                          datePreset === preset ? 'bg-blue-600 text-white' : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
+                        key={p}
+                        onClick={() => applyDatePreset(p)}
+                        className={`text-xs font-semibold py-1 rounded-lg transition-all text-center cursor-pointer ${
+                          datePreset === p
+                            ? 'bg-blue-600 text-white shadow-2xs'
+                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                         }`}
                       >
-                        {preset}
+                        {p}
                       </button>
                     ))}
                   </div>
+                </div>
 
-                  <div className="space-y-1.5 pt-2 border-t border-gray-100 text-xs">
+                {/* Customer Filter */}
+                <div>
+                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Customer / Party</label>
+                  <select
+                    value={selectedCustomer}
+                    onChange={e => { setSelectedCustomer(e.target.value); setCurrentPage(1); }}
+                    className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                  >
+                    <option value="ALL">All Customers ({customerOptions.length})</option>
+                    {customerOptions.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Region Filter */}
+                <div>
+                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Region</label>
+                  <select
+                    value={selectedRegion}
+                    onChange={e => { setSelectedRegion(e.target.value); setCurrentPage(1); }}
+                    className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                  >
+                    <option value="ALL">All Regions ({regionOptions.length})</option>
+                    {regionOptions.map(r => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Readiness Status */}
+                <div>
+                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Readiness Status</label>
+                  <select
+                    value={selectedStatus}
+                    onChange={e => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
+                    className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                  >
+                    <option value="ALL">All Status</option>
+                    <option value="Ready">Ready (In Stock)</option>
+                    <option value="Partially Ready">Partially Ready</option>
+                    <option value="Not Ready">Not Ready</option>
+                  </select>
+                </div>
+
+                {/* Custom Date Range */}
+                <div className="pt-2 border-t border-gray-100">
+                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Custom Date Range</label>
+                  <div className="grid grid-cols-2 gap-1.5">
                     <div>
-                      <label className="text-[10px] font-bold text-gray-500 block mb-0.5">From Date</label>
+                      <span className="text-[10px] text-gray-400 block mb-0.5">From</span>
                       <input
                         type="date"
                         value={startDate}
@@ -1117,7 +1018,7 @@ export const DispatchModule: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold text-gray-500 block mb-0.5">To Date</label>
+                      <span className="text-[10px] text-gray-400 block mb-0.5">To</span>
                       <input
                         type="date"
                         value={endDate}
@@ -1127,265 +1028,82 @@ export const DispatchModule: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
-
-            {/* Refresh Button */}
-            <button
-              title="Refresh"
-              onClick={() => { fetchData(false); showToast('Refreshed dispatch data', 'info'); }}
-              disabled={refreshing}
-              className="p-2 bg-white hover:bg-gray-50 border border-gray-200/90 rounded-xl text-gray-600 shadow-2xs cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-blue-600' : ''}`} />
-            </button>
-
-            {/* Sort Popover Button */}
-            <div className="relative" ref={sortMenuRef}>
-              <button
-                title="Sort & Columns"
-                onClick={(e) => { e.stopPropagation(); setShowSortMenu(p => !p); }}
-                className="p-2 bg-white hover:bg-gray-50 border border-gray-200/90 rounded-xl text-gray-600 shadow-2xs cursor-pointer"
-              >
-                <SlidersHorizontal className="w-4 h-4" />
-              </button>
-
-              {showSortMenu && (
-                <div 
-                  className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 p-2 z-50 text-xs"
-                  onClick={e => e.stopPropagation()}
-                >
-                  <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block px-2 py-1 mb-1">Sort Orders</span>
-                  <button
-                    onClick={() => { setSortField('orderNumber'); setSortAsc(p => !p); setShowSortMenu(false); }}
-                    className="w-full px-2 py-1.5 text-left rounded-lg hover:bg-gray-50 flex items-center justify-between font-medium text-gray-700"
-                  >
-                    <span>SO Number</span>
-                    {sortField === 'orderNumber' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
-                  </button>
-                  <button
-                    onClick={() => { setSortField('rawDate'); setSortAsc(p => !p); setShowSortMenu(false); }}
-                    className="w-full px-2 py-1.5 text-left rounded-lg hover:bg-gray-50 flex items-center justify-between font-medium text-gray-700"
-                  >
-                    <span>Order Date</span>
-                    {sortField === 'rawDate' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
-                  </button>
-                  <button
-                    onClick={() => { setSortField('pendingGbl'); setSortAsc(p => !p); setShowSortMenu(false); }}
-                    className="w-full px-2 py-1.5 text-left rounded-lg hover:bg-gray-50 flex items-center justify-between font-medium text-gray-700"
-                  >
-                    <span>Pending Quantity</span>
-                    {sortField === 'pendingGbl' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
-                  </button>
-                  <button
-                    onClick={() => { setSortField('customerName'); setSortAsc(p => !p); setShowSortMenu(false); }}
-                    className="w-full px-2 py-1.5 text-left rounded-lg hover:bg-gray-50 flex items-center justify-between font-medium text-gray-700"
-                  >
-                    <span>Customer Name</span>
-                    {sortField === 'customerName' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Lower Row: Status Tabs on Left, Dropdowns on Right */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          {/* Tabs */}
-          <div className="flex items-center gap-6 overflow-x-auto no-scrollbar">
-            <button
-              onClick={() => { setActiveTab('all'); setCurrentPage(1); }}
-              className={`flex items-center gap-2 pb-2 text-sm font-bold transition-all relative cursor-pointer whitespace-nowrap ${
-                activeTab === 'all'
-                  ? 'text-blue-600'
-                  : 'text-gray-500 hover:text-gray-900'
-              }`}
-            >
-              <span>All Pending</span>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
-                activeTab === 'all'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-gray-100 text-gray-600'
-              }`}>
-                {viewMode === 'orders' ? metrics.pendingOrders : itemWiseRequirements.length}
-              </span>
-              {activeTab === 'all' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />
-              )}
-            </button>
-
-            <button
-              onClick={() => { setActiveTab('ready'); setCurrentPage(1); }}
-              className={`flex items-center gap-2 pb-2 text-sm font-bold transition-all relative cursor-pointer whitespace-nowrap ${
-                activeTab === 'ready'
-                  ? 'text-emerald-700'
-                  : 'text-gray-500 hover:text-gray-900'
-              }`}
-            >
-              <span>Ready to Dispatch</span>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
-                activeTab === 'ready'
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-emerald-50 text-emerald-600'
-              }`}>
-                {viewMode === 'orders' ? metrics.readyOrders : itemWiseRequirements.filter(r => r.status === 'Ready').length}
-              </span>
-              {activeTab === 'ready' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600 rounded-full" />
-              )}
-            </button>
-
-            <button
-              onClick={() => { setActiveTab('partial'); setCurrentPage(1); }}
-              className={`flex items-center gap-2 pb-2 text-sm font-bold transition-all relative cursor-pointer whitespace-nowrap ${
-                activeTab === 'partial'
-                  ? 'text-amber-700'
-                  : 'text-gray-500 hover:text-gray-900'
-              }`}
-            >
-              <span>Partially Ready</span>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
-                activeTab === 'partial'
-                  ? 'bg-amber-100 text-amber-700'
-                  : 'bg-amber-50 text-amber-600'
-              }`}>
-                {viewMode === 'orders' ? metrics.partiallyReadyOrders : itemWiseRequirements.filter(r => r.status === 'Partial').length}
-              </span>
-              {activeTab === 'partial' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500 rounded-full" />
-              )}
-            </button>
-
-            <button
-              onClick={() => { setActiveTab('not_ready'); setCurrentPage(1); }}
-              className={`flex items-center gap-2 pb-2 text-sm font-bold transition-all relative cursor-pointer whitespace-nowrap ${
-                activeTab === 'not_ready'
-                  ? 'text-rose-700'
-                  : 'text-gray-500 hover:text-gray-900'
-              }`}
-            >
-              <span>Not Ready</span>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
-                activeTab === 'not_ready'
-                  ? 'bg-rose-100 text-rose-700'
-                  : 'bg-rose-50 text-rose-600'
-              }`}>
-                {viewMode === 'orders' ? metrics.notReadyOrders : itemWiseRequirements.filter(r => r.status === 'Shortfall').length}
-              </span>
-              {activeTab === 'not_ready' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-rose-600 rounded-full" />
-              )}
-            </button>
-
-            {/* Delivery Challans History Tab */}
-            {deliveryChallansList.length > 0 && (
-              <button
-                onClick={() => { setActiveTab('history'); setCurrentPage(1); }}
-                className={`flex items-center gap-2 pb-2 text-sm font-bold transition-all relative cursor-pointer whitespace-nowrap ${
-                  activeTab === 'history'
-                    ? 'text-blue-600'
-                    : 'text-gray-500 hover:text-gray-900'
-                }`}
-              >
-                <span>Challans History</span>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-black ${
-                  activeTab === 'history'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-gray-100 text-gray-600'
-                }`}>
-                  {deliveryChallansList.length}
-                </span>
-                {activeTab === 'history' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />
-                )}
-              </button>
+              </div>
             )}
           </div>
 
-          {/* Filter Dropdowns */}
-          {activeTab !== 'history' && (
-            <div className="flex items-center gap-3 flex-wrap">
-              {/* Customers */}
-              {viewMode === 'orders' && (
-                <div className="relative">
-                  <select
-                    value={selectedCustomer}
-                    onChange={e => { setSelectedCustomer(e.target.value); setCurrentPage(1); }}
-                    className="appearance-none bg-white border border-gray-200/90 rounded-xl px-3 py-1.5 pr-8 text-xs font-semibold text-gray-700 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-2xs cursor-pointer"
-                  >
-                    <option value="ALL">All Customers</option>
-                    {customerOptions.map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-              )}
+          {/* Sort Popover Icon Button */}
+          <div className="relative" ref={sortMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setShowSortMenu(!showSortMenu);
+                setShowFilterMenu(false);
+              }}
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              title="Sort Orders"
+            >
+              <ArrowUpDown className="w-4 h-4 text-blue-600" />
+            </button>
 
-              {/* Regions */}
-              {viewMode === 'orders' && (
-                <div className="relative">
-                  <select
-                    value={selectedRegion}
-                    onChange={e => { setSelectedRegion(e.target.value); setCurrentPage(1); }}
-                    className="appearance-none bg-white border border-gray-200/90 rounded-xl px-3 py-1.5 pr-8 text-xs font-semibold text-gray-700 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-2xs cursor-pointer"
-                  >
-                    <option value="ALL">All Regions</option>
-                    {regionOptions.map(r => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-              )}
-
-              {/* Status */}
-              <div className="relative">
-                <select
-                  value={selectedStatus}
-                  onChange={e => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
-                  className="appearance-none bg-white border border-gray-200/90 rounded-xl px-3 py-1.5 pr-8 text-xs font-semibold text-gray-700 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-2xs cursor-pointer"
-                >
-                  <option value="ALL">All Status</option>
-                  <option value="Ready">Ready</option>
-                  <option value="Partially Ready">Partially Ready</option>
-                  <option value="Not Ready">Not Ready</option>
-                </select>
-                <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
-
-              {/* Reset Filters button if any active */}
-              {(selectedCustomer !== 'ALL' || selectedRegion !== 'ALL' || selectedStatus !== 'ALL' || datePreset !== 'All' || searchQuery) && (
+            {showSortMenu && (
+              <div 
+                className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs text-left animate-in fade-in zoom-in-95 duration-100"
+                onClick={e => e.stopPropagation()}
+              >
+                <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block px-2 py-1">Sort Orders</span>
                 <button
-                  onClick={() => {
-                    setSelectedCustomer('ALL');
-                    setSelectedRegion('ALL');
-                    setSelectedStatus('ALL');
-                    setDatePreset('All');
-                    setStartDate('');
-                    setEndDate('');
-                    setSearchQuery('');
-                    setCurrentPage(1);
-                  }}
-                  className="text-xs font-bold text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer"
+                  onClick={() => { setSortField('orderNumber'); setSortAsc(p => !p); setShowSortMenu(false); }}
+                  className="w-full px-2.5 py-1.5 text-left rounded-xl hover:bg-gray-50 flex items-center justify-between font-semibold text-gray-700"
                 >
-                  Clear Filters
+                  <span>SO Number</span>
+                  {sortField === 'orderNumber' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
                 </button>
-              )}
-            </div>
-          )}
+                <button
+                  onClick={() => { setSortField('rawDate'); setSortAsc(p => !p); setShowSortMenu(false); }}
+                  className="w-full px-2.5 py-1.5 text-left rounded-xl hover:bg-gray-50 flex items-center justify-between font-semibold text-gray-700"
+                >
+                  <span>Order Date</span>
+                  {sortField === 'rawDate' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
+                </button>
+                <button
+                  onClick={() => { setSortField('pendingGbl'); setSortAsc(p => !p); setShowSortMenu(false); }}
+                  className="w-full px-2.5 py-1.5 text-left rounded-xl hover:bg-gray-50 flex items-center justify-between font-semibold text-gray-700"
+                >
+                  <span>Pending Quantity</span>
+                  {sortField === 'pendingGbl' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
+                </button>
+                <button
+                  onClick={() => { setSortField('customerName'); setSortAsc(p => !p); setShowSortMenu(false); }}
+                  className="w-full px-2.5 py-1.5 text-left rounded-xl hover:bg-gray-50 flex items-center justify-between font-semibold text-gray-700"
+                >
+                  <span>Customer Name</span>
+                  {sortField === 'customerName' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Refresh Icon Button */}
+          <button
+            onClick={() => { fetchData(false); showToast('Refreshed dispatch data', 'info'); }}
+            disabled={refreshing}
+            className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs disabled:opacity-50"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
         </div>
       </div>
 
-      {/* ── TABLE VIEW ── */}
+      {/* ── 3. TABLE VIEW ── */}
       {activeTab === 'history' ? (
-        /* History View of Created Challans */
-        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden">
+        /* History View of Created Delivery Challans */
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/70 text-[11px] font-black uppercase tracking-wider text-gray-500">
+                <tr className="border-b border-gray-200 bg-gray-50/80 text-[11px] font-bold uppercase tracking-wider text-gray-500">
                   <th className="py-3 px-4">DC NUMBER</th>
                   <th className="py-3 px-4">DATE</th>
                   <th className="py-3 px-4">SO REF</th>
@@ -1396,33 +1114,33 @@ export const DispatchModule: React.FC = () => {
                   <th className="py-3 px-4 text-right">ACTION</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-gray-100">
                 {deliveryChallansList.map((ch, idx) => (
                   <tr key={ch._id || idx} className="hover:bg-gray-50/60 transition-colors">
-                    <td className="py-3 px-4 font-mono font-bold text-blue-600">
+                    <td className="py-3.5 px-4 font-mono font-bold text-blue-600">
                       {ch.dcNumber || `DC-${idx + 1}`}
                     </td>
-                    <td className="py-3 px-4 font-medium text-gray-700 whitespace-nowrap">
+                    <td className="py-3.5 px-4 font-medium text-gray-700 whitespace-nowrap">
                       {ch.date || '—'}
                     </td>
-                    <td className="py-3 px-4 font-mono font-bold text-gray-800">
+                    <td className="py-3.5 px-4 font-mono font-bold text-gray-800">
                       {ch.orderNumber || '—'}
                     </td>
-                    <td className="py-3 px-4 font-bold text-gray-900">
+                    <td className="py-3.5 px-4 font-bold text-gray-900">
                       {ch.customerName || '—'}
                     </td>
-                    <td className="py-3 px-4 text-gray-700">
+                    <td className="py-3.5 px-4 text-gray-700">
                       {ch.transporterName || 'Direct / Self'}
                     </td>
-                    <td className="py-3 px-4 font-mono text-gray-700">
+                    <td className="py-3.5 px-4 font-mono text-gray-700">
                       {ch.vehicleNumber || '—'}
                     </td>
-                    <td className="py-3 px-4 text-center">
-                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700">
+                    <td className="py-3.5 px-4 text-center">
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700">
                         {ch.items?.length || 0} items
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-right">
+                    <td className="py-3.5 px-4 text-right">
                       <button
                         onClick={() => {
                           setActiveChallan(ch);
@@ -1440,285 +1158,69 @@ export const DispatchModule: React.FC = () => {
             </table>
           </div>
         </div>
-      ) : viewMode === 'item_wise' ? (
-        /* ═════════════════════════════════════════════════════════════════
-           ITEM-WISE PRODUCTION VIEW (AGGREGATED DEMAND ACROSS ALL SOs)
-        ═════════════════════════════════════════════════════════════════ */
-        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/70 text-[11px] font-extrabold uppercase tracking-wider text-gray-500 select-none">
-                  <th className="py-3.5 px-3 w-10 text-center"></th>
-                  <th className="py-3.5 px-4 text-left min-w-[220px]">SKU / ITEM DESCRIPTION</th>
-                  <th className="py-3.5 px-3 text-center w-24">UOM</th>
-                  <th className="py-3.5 px-3 text-right w-28">ORDERED</th>
-                  <th className="py-3.5 px-3 text-right w-28">DISPATCHED</th>
-                  <th className="py-3.5 px-4 text-right w-36 text-blue-700">BALANCE PENDING</th>
-                  <th className="py-3.5 px-4 text-right w-36 text-slate-800">WAREHOUSE STOCK</th>
-                  <th className="py-3.5 px-3 text-right w-28 text-rose-700">SHORTFALL</th>
-                  <th className="py-3.5 px-3 text-center w-32">STOCK STATUS</th>
-                  <th className="py-3.5 px-4 text-right w-36">ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50 text-xs">
-                {paginatedItemWise.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="py-12 text-center text-gray-400">
-                      <div className="flex flex-col items-center justify-center gap-2">
-                        <Package className="w-8 h-8 text-gray-300 stroke-[1.5]" />
-                        <span className="font-semibold text-sm">No items matching current filters</span>
-                        <span className="text-xs text-gray-400">Try adjusting your search terms or filters</span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedItemWise.map(req => {
-                    const reqKey = req.skuCode || req.skuName;
-                    const isExpanded = expandedSkuKeys.has(reqKey);
-
-                    return (
-                      <React.Fragment key={reqKey}>
-                        <tr className="hover:bg-gray-50/70 transition-colors">
-                          <td className="py-4 px-3 text-center whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={() => toggleSkuExpand(reqKey)}
-                              className="p-1 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
-                              title={isExpanded ? 'Hide orders' : 'View awaiting orders'}
-                            >
-                              <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-90 text-blue-600' : ''}`} />
-                            </button>
-                          </td>
-
-                          <td className="py-4 px-4">
-                            <span className="font-bold text-gray-900 text-xs block">{req.skuName}</span>
-                            {req.skuCode && (
-                              <span className="text-[11px] font-mono text-gray-400 block mt-0.5">{req.skuCode}</span>
-                            )}
-                          </td>
-
-                          <td className="py-4 px-3 text-center font-bold text-gray-500 whitespace-nowrap">
-                            {req.uom}
-                          </td>
-
-                          <td className="py-4 px-3 text-right font-mono text-gray-600 whitespace-nowrap">
-                            {req.totalOrderedPcs.toLocaleString()}
-                          </td>
-
-                          <td className="py-4 px-3 text-right font-mono text-gray-500 whitespace-nowrap">
-                            {req.totalDispatchedPcs.toLocaleString()}
-                          </td>
-
-                          <td className="py-4 px-4 text-right font-mono font-bold text-blue-700 whitespace-nowrap">
-                            {req.balancePendingGbl} <span className="text-[10px] font-medium text-blue-600">GBL</span>
-                            <span className="text-[10px] text-gray-400 font-normal ml-1">
-                              ({req.balancePendingPcs.toLocaleString()} pcs)
-                            </span>
-                          </td>
-
-                          <td className="py-4 px-4 text-right font-mono font-semibold text-slate-800 whitespace-nowrap">
-                            {req.stockOnHandGbl > 0 ? (
-                              <span className="text-emerald-700">
-                                {req.stockOnHandGbl} <span className="text-[10px] font-medium text-emerald-600">GBL</span>
-                                <span className="text-[10px] text-gray-400 font-normal ml-1">
-                                  ({req.stockOnHandPcs.toLocaleString()} pcs)
-                                </span>
-                              </span>
-                            ) : (
-                              <span className="text-rose-600 font-bold">0 GBL</span>
-                            )}
-                          </td>
-
-                          <td className="py-4 px-3 text-right font-mono whitespace-nowrap">
-                            {req.shortfallGbl > 0 ? (
-                              <span className="font-bold text-rose-600">
-                                {req.shortfallGbl} GBL
-                              </span>
-                            ) : (
-                              <span className="text-emerald-600 font-semibold text-[11px]">None</span>
-                            )}
-                          </td>
-
-                          <td className="py-4 px-3 text-center whitespace-nowrap">
-                            {req.status === 'Ready' && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                In Stock (Ready)
-                              </span>
-                            )}
-                            {req.status === 'Partial' && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                <Clock className="w-3 h-3 text-amber-600" />
-                                Partial Stock
-                              </span>
-                            )}
-                            {req.status === 'Shortfall' && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                                <AlertCircle className="w-3 h-3 text-rose-600" />
-                                Needs Production
-                              </span>
-                            )}
-                          </td>
-
-                          <td className="py-4 px-4 text-right whitespace-nowrap">
-                            <button
-                              onClick={() => toggleSkuExpand(reqKey)}
-                              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                            >
-                              <span>{req.orders.length} orders</span>
-                              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
-                            </button>
-                          </td>
-                        </tr>
-
-                        {/* Sub-table: Orders requiring this item */}
-                        {isExpanded && (
-                          <tr className="bg-slate-50/70 border-b border-gray-200 animate-in fade-in duration-150">
-                            <td colSpan={10} className="p-3 pl-10 pr-4">
-                              <div className="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden">
-                                <div className="px-4 py-2.5 bg-gray-50/90 border-b border-gray-200 flex items-center justify-between text-xs font-semibold text-gray-700">
-                                  <span className="flex items-center gap-2">
-                                    <Building className="w-4 h-4 text-blue-600" />
-                                    <span>Customer Orders Awaiting <strong className="text-gray-900">{req.skuName}</strong> ({req.orders.length})</span>
-                                  </span>
-                                  <span className="text-[11px] font-mono text-gray-500">
-                                    Total Pending: {req.balancePendingGbl} GBL ({req.balancePendingPcs.toLocaleString()} PCS)
-                                  </span>
-                                </div>
-
-                                <table className="w-full text-left text-xs divide-y divide-gray-150">
-                                  <thead className="bg-gray-50/70 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
-                                    <tr>
-                                      <th className="py-2.5 px-3">SO Number</th>
-                                      <th className="py-2.5 px-3">Order Date</th>
-                                      <th className="py-2.5 px-3">Customer Name</th>
-                                      <th className="py-2.5 px-3">City / Phone</th>
-                                      <th className="py-2.5 px-3 text-right">Ordered</th>
-                                      <th className="py-2.5 px-3 text-right">Dispatched</th>
-                                      <th className="py-2.5 px-3 text-right font-bold text-blue-700">Pending</th>
-                                      <th className="py-2.5 px-3 text-right">Action</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-gray-100 font-medium">
-                                    {req.orders.map((o, oIdx) => (
-                                      <tr key={o.orderId || oIdx} className="hover:bg-blue-50/40 transition-colors">
-                                        <td className="py-2.5 px-3">
-                                          <button
-                                            onClick={() => setSelectedOrderDetailRow(o.parentRow)}
-                                            className="font-bold text-blue-700 hover:text-blue-900 font-mono text-xs hover:underline cursor-pointer"
-                                          >
-                                            {o.orderNumber}
-                                          </button>
-                                        </td>
-                                        <td className="py-2.5 px-3 font-mono text-gray-600">
-                                          {o.orderDate}
-                                        </td>
-                                        <td className="py-2.5 px-3 font-semibold text-gray-900">
-                                          {o.customerName}
-                                        </td>
-                                        <td className="py-2.5 px-3 text-gray-500">
-                                          <span>{o.city || '—'}</span>
-                                          {o.customerPhone && (
-                                            <span className="ml-1.5 font-mono text-[11px] text-gray-400">({o.customerPhone})</span>
-                                          )}
-                                        </td>
-                                        <td className="py-2.5 px-3 text-right font-mono text-gray-700">
-                                          {o.orderedQty.toLocaleString()}
-                                        </td>
-                                        <td className="py-2.5 px-3 text-right font-mono text-gray-500">
-                                          {o.dispatchedQty.toLocaleString()}
-                                        </td>
-                                        <td className="py-2.5 px-3 text-right font-mono font-bold text-blue-700">
-                                          {o.pendingGbl} GBL <span className="text-[10px] text-gray-400 font-normal">({o.pendingPcs.toLocaleString()} pcs)</span>
-                                        </td>
-                                        <td className="py-2.5 px-3 text-right">
-                                          <button
-                                            onClick={() => handleOpenDispatch(o.parentRow)}
-                                            className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold cursor-pointer transition-colors inline-flex items-center gap-1 shadow-2xs"
-                                          >
-                                            <Truck className="w-3 h-3" />
-                                            <span>Dispatch</span>
-                                          </button>
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
       ) : (
-        /* ═════════════════════════════════════════════════════════════════
-           ORDERS VIEW: DETAILED SALES ORDERS WITH INLINE ITEMS & STOCK
-        ═════════════════════════════════════════════════════════════════ */
-        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden">
+        /* Orders Master Table with Expandable Items Accordion Dropdown */
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-gray-150 bg-gray-50/70 text-[11px] font-extrabold uppercase tracking-wider text-gray-500 select-none">
-                  <th className="py-3.5 px-3 w-14 text-center">
+                <tr className="border-b border-gray-200 bg-gray-50/80 text-[11px] font-bold text-gray-500 uppercase tracking-wider select-none">
+                  <th className="py-3 px-3 w-12 text-center">
                     <input
                       type="checkbox"
                       checked={isAllSelected}
                       onChange={toggleSelectAll}
-                      className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
+                      className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     />
                   </th>
-                  <th className="py-3.5 px-3 text-left w-28 cursor-pointer hover:text-gray-700" onClick={() => handleSort('orderNumber')}>
-                    <div className="flex items-center gap-1">
+                  <th className="py-3 px-2 w-10 text-center font-bold">#</th>
+                  <th 
+                    onClick={() => handleSort('orderNumber')}
+                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-800 whitespace-nowrap"
+                  >
+                    <div className="flex items-center space-x-1">
                       <span>SO NO.</span>
-                      {sortField === 'orderNumber' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
+                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
                     </div>
                   </th>
-                  <th className="py-3.5 px-3 text-left w-24 cursor-pointer hover:text-gray-700" onClick={() => handleSort('rawDate')}>
-                    <div className="flex items-center gap-1">
+                  <th 
+                    onClick={() => handleSort('rawDate')}
+                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-800 whitespace-nowrap"
+                  >
+                    <div className="flex items-center space-x-1">
                       <span>DATE</span>
-                      {sortField === 'rawDate' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
+                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
                     </div>
                   </th>
-                  <th className="py-3.5 px-4 text-left min-w-[190px] cursor-pointer hover:text-gray-700" onClick={() => handleSort('customerName')}>
-                    <div className="flex items-center gap-1">
+                  <th 
+                    onClick={() => handleSort('customerName')}
+                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-800 min-w-[200px]"
+                  >
+                    <div className="flex items-center space-x-1">
                       <span>CUSTOMER / PARTY</span>
-                      {sortField === 'customerName' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
+                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
                     </div>
                   </th>
-                  <th className="py-3.5 px-3 text-left w-24">
-                    REGION
-                  </th>
-                  <th className="py-3.5 px-4 text-left min-w-[340px]">
-                    ITEMS IN SO & STOCK BALANCE
-                  </th>
-                  <th className="py-3.5 px-3 text-right w-24 cursor-pointer hover:text-gray-700" onClick={() => handleSort('pendingGbl')}>
-                    <div className="flex items-center justify-end gap-1">
+                  <th className="py-3 px-3 font-bold whitespace-nowrap">REGION</th>
+                  <th className="py-3 px-3 font-bold text-center whitespace-nowrap w-32">ITEMS</th>
+                  <th 
+                    onClick={() => handleSort('pendingGbl')}
+                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-800 text-right whitespace-nowrap"
+                  >
+                    <div className="flex items-center justify-end space-x-1">
                       <span>PENDING (GBL)</span>
-                      {sortField === 'pendingGbl' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
+                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
                     </div>
                   </th>
-                  <th className="py-3.5 px-3 text-right w-24">
-                    PENDING (PCS)
-                  </th>
-                  <th className="py-3.5 px-3 text-center w-36">
-                    READY STATUS
-                  </th>
-                  <th className="py-3.5 px-4 text-right w-36">
-                    ACTIONS
-                  </th>
+                  <th className="py-3 px-3 font-bold text-right whitespace-nowrap">PENDING (PCS)</th>
+                  <th className="py-3 px-3 font-bold text-center whitespace-nowrap min-w-[140px]">READY STATUS</th>
+                  <th className="py-3 px-3 text-center font-bold w-28 whitespace-nowrap">ACTIONS</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50 text-xs">
+              <tbody className="divide-y divide-gray-100 text-xs">
                 {paginatedRows.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="py-12 text-center text-gray-400">
+                    <td colSpan={11} className="py-12 text-center text-gray-400">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <Truck className="w-8 h-8 text-gray-300 stroke-[1.5]" />
                         <span className="font-semibold text-sm">No pending orders matching filters</span>
@@ -1727,7 +1229,8 @@ export const DispatchModule: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  paginatedRows.map(row => {
+                  paginatedRows.map((row, idx) => {
+                    const rowNumber = (currentPage - 1) * pageSize + idx + 1;
                     const isChecked = selectedOrderIds.has(row._id);
                     const isExpanded = expandedOrderIds.has(row._id);
                     const isMenuOpen = openActionDropdownId === row._id;
@@ -1735,138 +1238,85 @@ export const DispatchModule: React.FC = () => {
                     return (
                       <React.Fragment key={row._id}>
                         <tr
-                          className={`hover:bg-gray-50/70 transition-colors ${
-                            isChecked ? 'bg-blue-50/30' : isExpanded ? 'bg-slate-50/50' : ''
+                          onClick={() => toggleOrderExpand(row._id)}
+                          className={`hover:bg-blue-50/40 transition-colors group cursor-pointer ${
+                            isChecked ? 'bg-blue-50/60' : isExpanded ? 'bg-blue-50/20' : ''
                           }`}
                         >
-                          {/* Checkbox + Expand Accordion Toggle */}
-                          <td className="py-3.5 px-3 text-center whitespace-nowrap">
-                            <div className="flex items-center justify-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleOrderExpand(row._id);
-                                }}
-                                className="p-1 hover:bg-gray-200/70 rounded-lg text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
-                                title={isExpanded ? 'Collapse items' : 'Expand all items in SO'}
-                              >
-                                <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-90 text-blue-600' : ''}`} />
-                              </button>
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => toggleSelectRow(row._id)}
-                                className="w-4 h-4 rounded text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
-                              />
-                            </div>
+                          {/* Checkbox */}
+                          <td className="py-3.5 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleSelectRow(row._id)}
+                              className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                            />
+                          </td>
+
+                          {/* Index # */}
+                          <td className="py-3.5 px-2 text-center font-semibold text-gray-500">
+                            {rowNumber}
                           </td>
 
                           {/* SO Number - Clickable */}
-                          <td className="py-3.5 px-3 font-bold whitespace-nowrap">
+                          <td className="py-3.5 px-3 font-bold whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => setSelectedOrderDetailRow(row)}
-                              className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-bold tracking-tight text-xs font-mono"
+                              className="hover:text-blue-600 hover:underline transition-colors text-left font-bold cursor-pointer font-mono text-xs block text-blue-700"
                             >
                               {row.orderNumber}
                             </button>
                           </td>
 
                           {/* Order Date */}
-                          <td className="py-3.5 px-3 font-medium text-gray-600 whitespace-nowrap font-mono text-[11px]">
+                          <td className="py-3.5 px-3 text-gray-600 font-mono text-xs whitespace-nowrap">
                             {row.orderDate}
                           </td>
 
-                          {/* Customer Block with Phone & Location */}
-                          <td className="py-3.5 px-4 min-w-[190px]">
-                            <div className="font-bold text-gray-900 text-xs tracking-tight">
-                              {row.customerName}
-                            </div>
-                            <div className="flex items-center gap-2.5 text-[11px] text-gray-500 mt-0.5 font-medium flex-wrap">
+                          {/* Customer Block */}
+                          <td className="py-3.5 px-3 min-w-[200px]">
+                            <div className="font-bold text-gray-900 leading-snug">{row.customerName}</div>
+                            <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-0.5">
                               {row.customerPhone && (
-                                <div className="flex items-center gap-1 font-mono text-gray-400">
-                                  <Phone className="w-3 h-3 text-gray-400" />
-                                  <span>{row.customerPhone}</span>
-                                </div>
+                                <span className="font-mono flex items-center gap-1">
+                                  <Phone className="w-2.5 h-2.5 text-gray-400" />
+                                  {row.customerPhone}
+                                </span>
                               )}
                               {row.city && (
-                                <div className="flex items-center gap-1 text-gray-400">
-                                  <MapPin className="w-3 h-3 text-gray-400" />
-                                  <span>{row.city}</span>
-                                </div>
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="w-2.5 h-2.5 text-gray-400" />
+                                  {row.city}
+                                </span>
                               )}
                             </div>
                           </td>
 
                           {/* Region */}
-                          <td className="py-3.5 px-3 font-medium text-gray-700 whitespace-nowrap">
+                          <td className="py-3.5 px-3 text-gray-700 font-medium whitespace-nowrap">
                             {row.region}
                           </td>
 
-                          {/* Items in SO & Stock Balance Display (Production View Style) */}
-                          <td className="py-3 px-4 min-w-[340px]">
-                            <div className="space-y-1.5 max-h-[190px] overflow-y-auto pr-1">
-                              {row.items.map((item, iIdx) => {
-                                const isInStock = item.isAvailable;
-                                const stockGbl = item.stockOnHandGbl ?? 0;
-
-                                return (
-                                  <div
-                                    key={item.skuCode || iIdx}
-                                    className="group/item flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-slate-50/90 hover:bg-blue-50/60 border border-slate-200/70 hover:border-blue-300/80 shadow-3xs transition-all duration-150"
-                                    title={`${item.itemName} | SKU: ${item.skuCode || '—'} | Live Stock: ${stockGbl} GBL | Pending: ${item.gbl} GBL (${item.pcs.toLocaleString()} pcs)`}
-                                  >
-                                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                                      {/* Live pulse status dot */}
-                                      <span className="relative flex h-2 w-2 shrink-0">
-                                        <span
-                                          className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-60 ${
-                                            isInStock ? 'bg-emerald-400' : stockGbl > 0 ? 'bg-amber-400' : 'bg-rose-400'
-                                          }`}
-                                        />
-                                        <span
-                                          className={`relative inline-flex rounded-full h-2 w-2 ${
-                                            isInStock ? 'bg-emerald-500' : stockGbl > 0 ? 'bg-amber-500' : 'bg-rose-500'
-                                          }`}
-                                        />
-                                      </span>
-
-                                      <div className="min-w-0 flex-1">
-                                        <span className="font-semibold text-slate-800 group-hover/item:text-blue-900 text-[11.5px] leading-tight block truncate">
-                                          {item.itemName}
-                                        </span>
-                                        <div className="flex items-center gap-2 text-[10px] text-gray-500 font-mono mt-0.5">
-                                          {item.skuCode && <span className="text-gray-400">{item.skuCode}</span>}
-                                          {stockGbl > 0 ? (
-                                            <span className="text-emerald-700 bg-emerald-50 px-1 rounded font-semibold">
-                                              Stock: {stockGbl} GBL
-                                            </span>
-                                          ) : (
-                                            <span className="text-rose-600 bg-rose-50 px-1 rounded font-semibold">
-                                              0 Stock
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Right quantity badge */}
-                                    <div className="flex items-center gap-1.5 shrink-0 font-mono text-right pl-1">
-                                      <span className="font-bold text-blue-700 bg-white group-hover/item:bg-blue-50 px-1.5 py-0.5 rounded border border-slate-200/90 text-xs shadow-3xs">
-                                        {item.gbl} <span className="text-[9.5px] font-semibold text-slate-500">GBL</span>
-                                      </span>
-                                      <span className="text-[10px] text-slate-400 font-medium">
-                                        ({item.pcs.toLocaleString()} pcs)
-                                      </span>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                          {/* ITEMS: Only shows number of items badge when unopened; click toggles dropdown */}
+                          <td className="py-3.5 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={() => toggleOrderExpand(row._id)}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer shadow-3xs ${
+                                isExpanded
+                                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                  : 'bg-blue-50/80 hover:bg-blue-100 text-blue-700 border-blue-200/80 hover:border-blue-300'
+                              }`}
+                              title={isExpanded ? 'Collapse items' : 'View order items'}
+                            >
+                              <Package className={`w-3.5 h-3.5 ${isExpanded ? 'text-white' : 'text-blue-600'}`} />
+                              <span>{row.itemCount} {row.itemCount === 1 ? 'Item' : 'Items'}</span>
+                              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180 text-white' : 'text-blue-500'}`} />
+                            </button>
                           </td>
 
                           {/* Pending QTY: GBL */}
-                          <td className="py-3.5 px-3 text-right font-black text-gray-900 font-mono text-xs whitespace-nowrap">
+                          <td className="py-3.5 px-3 text-right font-bold text-gray-900 font-mono text-xs whitespace-nowrap">
                             {row.pendingGbl.toLocaleString()}
                           </td>
 
@@ -1878,25 +1328,25 @@ export const DispatchModule: React.FC = () => {
                           {/* Ready Status Badge */}
                           <td className="py-3.5 px-3 text-center whitespace-nowrap">
                             {row.readyStatus === 'Ready' && (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                                 Ready (In Stock)
                               </span>
                             )}
                             {row.readyStatus === 'Partially Ready' && (
-                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200/80 shadow-2xs">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80">
                                 Partially Ready
                               </span>
                             )}
                             {row.readyStatus === 'Not Ready' && (
-                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200/80 shadow-2xs">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/80">
                                 Not Ready
                               </span>
                             )}
                           </td>
 
                           {/* Action Split Dropdown Button */}
-                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                          <td className="py-3.5 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                             <div className="relative inline-flex items-center shadow-2xs rounded-xl overflow-visible">
                               <button
                                 onClick={() => handleOpenDispatch(row)}
@@ -1957,10 +1407,10 @@ export const DispatchModule: React.FC = () => {
                           </td>
                         </tr>
 
-                        {/* ── EXPANDED DETAILED ITEMS SUB-TABLE (ACCORDION VIEW) ── */}
+                        {/* ── EXPANDED DETAILED ITEMS SUB-TABLE (ACCORDION DROPDOWN) ── */}
                         {isExpanded && (
-                          <tr className="bg-slate-50/70 border-b border-gray-200 animate-in fade-in duration-150">
-                            <td colSpan={10} className="p-3 pl-12 pr-4">
+                          <tr className="bg-slate-50/80 border-b border-gray-200 animate-in fade-in duration-150">
+                            <td colSpan={11} className="p-3 pl-8 pr-4">
                               <div className="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden">
                                 <div className="px-4 py-2.5 bg-gray-50/90 border-b border-gray-200 flex items-center justify-between text-xs font-semibold text-gray-700">
                                   <span className="flex items-center gap-2">
@@ -2064,7 +1514,7 @@ export const DispatchModule: React.FC = () => {
             </table>
           </div>
 
-          {/* ── FOOTER PAGINATION ── */}
+          {/* ── FOOTER PAGINATION (Matching Production Module Style) ── */}
           <div className="px-6 py-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-medium text-gray-600 bg-white">
             <div>
               Showing <span className="font-bold text-gray-900">{filteredRows.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</span> - <span className="font-bold text-gray-900">{Math.min(currentPage * pageSize, filteredRows.length)}</span> of <span className="font-bold text-gray-900">{filteredRows.length}</span> orders
