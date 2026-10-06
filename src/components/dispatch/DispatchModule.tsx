@@ -870,46 +870,6 @@ export const DispatchModule: React.FC = () => {
     }
   };
 
-  // Edit dispatch for a sales order row
-  const handleEditOrderDispatch = (row: DispatchRowOrder) => {
-    const rowChallans = orderChallansMap.get(row._id) || orderChallansMap.get(row.orderNumber) || [];
-    if (rowChallans.length > 0) {
-      handleEditChallan(rowChallans[0]);
-    } else {
-      // If no challan created yet, open dispatch modal for configuring/editing dispatch for this order
-      handleOpenDispatch(row);
-    }
-  };
-
-  // Delete or reset dispatch for a sales order row
-  const handleDeleteOrderDispatch = async (row: DispatchRowOrder) => {
-    const rowChallans = orderChallansMap.get(row._id) || orderChallansMap.get(row.orderNumber) || [];
-    if (rowChallans.length > 0) {
-      handleDeleteChallan(rowChallans[0]);
-      return;
-    }
-
-    const hasDispatched = row.items.some(i => (i.dispatchedQty || 0) > 0);
-    if (hasDispatched) {
-      if (!window.confirm(`Are you sure you want to reset all dispatched quantities for order ${row.orderNumber}?`)) return;
-      const updatedItems = (row.rawOrder.items || []).map(i => ({ ...i, dispatchedQty: 0 }));
-      const updatedOrder: SalesOrderV2 = {
-        ...row.rawOrder,
-        items: updatedItems,
-        fulfillmentStatus: 'Unfulfilled',
-        status: 'Confirmed'
-      };
-      saveCustomSalesOrder(updatedOrder, selectedCompany?._id);
-      if (row.rawOrder._id && !row.rawOrder._id.startsWith('seed-')) {
-        updateSalesOrderV2(row.rawOrder._id, updatedOrder).catch(() => {});
-      }
-      fetchData(false);
-      showToast(`Dispatched quantities reset for ${row.orderNumber}`, 'success');
-    } else {
-      showToast(`No dispatched records to delete for ${row.orderNumber}`, 'info');
-    }
-  };
-
   // Quick Instant Full Dispatch
   const handleQuickFullDispatch = (orderRow: DispatchRowOrder) => {
     setEditingChallan(null);
@@ -1477,22 +1437,13 @@ export const DispatchModule: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1.5">
-                          {/* Edit Dispatch */}
+                          {/* Edit Dispatch - accessible in Challan History only */}
                           <button
                             onClick={() => handleEditChallan(ch)}
                             className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 rounded-lg transition-all flex items-center justify-center cursor-pointer border border-amber-200/80 shadow-2xs hover:scale-105 active:scale-95"
-                            title="Edit Dispatch"
+                            title="Edit Delivery Challan"
                           >
                             <Edit3 className="w-4 h-4 text-amber-600" />
-                          </button>
-
-                          {/* Delete Dispatch */}
-                          <button
-                            onClick={() => handleDeleteChallan(ch)}
-                            className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 rounded-lg transition-all flex items-center justify-center cursor-pointer border border-rose-200/80 shadow-2xs hover:scale-105 active:scale-95"
-                            title="Delete Dispatch"
-                          >
-                            <Trash2 className="w-4 h-4 text-rose-600" />
                           </button>
 
                           {/* Print DC */}
@@ -1796,25 +1747,7 @@ export const DispatchModule: React.FC = () => {
                                 <Truck className="w-4 h-4" />
                               </button>
 
-                              {/* 2. Edit Dispatch Icon Button */}
-                              <button
-                                onClick={() => handleEditOrderDispatch(row)}
-                                className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 border border-amber-200/80 rounded-lg transition-all flex items-center justify-center cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
-                                title={rowChallans.length > 0 ? `Edit Dispatch (${rowChallans[0].dcNumber})` : `Edit / Configure Dispatch for ${row.orderNumber}`}
-                              >
-                                <Edit3 className="w-4 h-4 text-amber-600" />
-                              </button>
-
-                              {/* 3. Delete Dispatch Icon Button */}
-                              <button
-                                onClick={() => handleDeleteOrderDispatch(row)}
-                                className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200/80 rounded-lg transition-all flex items-center justify-center cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
-                                title={rowChallans.length > 0 ? `Delete Dispatch (${rowChallans[0].dcNumber})` : `Delete / Reset Dispatched Quantities for ${row.orderNumber}`}
-                              >
-                                <Trash2 className="w-4 h-4 text-rose-600" />
-                              </button>
-
-                              {/* 4. More Options Dropdown Toggle */}
+                              {/* 2. More Options Dropdown Toggle */}
                               <div className="relative inline-flex items-center overflow-visible">
                                 <button
                                   onClick={(e) => {
@@ -1865,7 +1798,7 @@ export const DispatchModule: React.FC = () => {
                                     <span>View Order Details</span>
                                   </button>
 
-                                  {/* 2. Existing Dispatches for this order (Edit & Delete options) */}
+                                  {/* 2. Existing Dispatches for this order (Print / View Only) */}
                                   {rowChallans.length > 0 && (
                                     <>
                                       <div className="border-t border-gray-100 my-1 px-3 py-1 bg-gray-50/80 text-[10px] font-black uppercase tracking-wider text-gray-500">
@@ -1876,28 +1809,6 @@ export const DispatchModule: React.FC = () => {
                                           <div className="flex items-center justify-between px-2 py-1 text-[11px] font-bold text-blue-700 bg-blue-50/50 rounded-lg">
                                             <span className="font-mono">{ch.dcNumber}</span>
                                             <div className="flex items-center gap-1">
-                                              {/* Edit Dispatch */}
-                                              <button
-                                                onClick={() => {
-                                                  setOpenActionDropdownId(null);
-                                                  handleEditChallan(ch);
-                                                }}
-                                                className="p-1 text-gray-600 hover:text-blue-700 hover:bg-white rounded transition-colors"
-                                                title="Edit Dispatch"
-                                              >
-                                                <Edit3 className="w-3 h-3" />
-                                              </button>
-                                              {/* Delete Dispatch */}
-                                              <button
-                                                onClick={() => {
-                                                  setOpenActionDropdownId(null);
-                                                  handleDeleteChallan(ch);
-                                                }}
-                                                className="p-1 text-gray-600 hover:text-rose-600 hover:bg-white rounded transition-colors"
-                                                title="Delete Dispatch"
-                                              >
-                                                <Trash2 className="w-3 h-3" />
-                                              </button>
                                               {/* Print DC */}
                                               <button
                                                 onClick={() => {
@@ -1908,7 +1819,7 @@ export const DispatchModule: React.FC = () => {
                                                 className="p-1 text-gray-600 hover:text-blue-700 hover:bg-white rounded transition-colors"
                                                 title="Print Delivery Challan"
                                               >
-                                                <Printer className="w-3 h-3" />
+                                                <Printer className="w-3.5 h-3.5" />
                                               </button>
                                             </div>
                                           </div>
