@@ -166,6 +166,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
   const selectedTargetSkuDoc = useMemo(() => {
     return skus.find(s => s._id === targetSkuId) || null;
   }, [skus, targetSkuId]);
+  const targetSkuDoc = selectedTargetSkuDoc;
 
   // Spec badge helper
   const getSkuSpecOrConversion = (sku: SkuV2) => {

@@ -20,6 +20,7 @@ const activityLogRoutes = require("./routes/activityLogRoutes");
 const dataManagerRoutes = require("./routes/dataManagerRoutes");
 const productionOrderRoutes = require("./routes/productionOrderRoutes");
 const realtimeRoutes = require("./routes/realtimeRoutes");
+const salesInvoiceRoutes = require("./routes/salesInvoiceRoutes");
 
 const app = express();
 
@@ -59,6 +60,8 @@ app.use("/api/data-manager", dataManagerRoutes);
 app.use("/api/production-orders", productionOrderRoutes);
 app.use("/api/realtime", realtimeRoutes);
 app.use("/api/v2/realtime", realtimeRoutes);
+app.use("/api/invoices", salesInvoiceRoutes);
+app.use("/api/sales-invoices", salesInvoiceRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => {
