@@ -104,7 +104,15 @@ export const ViewDeliveryChallanModal: React.FC<ViewDeliveryChallanModalProps> =
                     <td className="py-2.5 px-3 text-gray-400 font-mono">{idx + 1}</td>
                     <td className="py-2.5 px-3">
                       <span className="font-bold text-gray-800">{it.itemName}</span>
-                      {it.skuCode && <span className="block text-[10px] font-mono text-gray-400">{it.skuCode}</span>}
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {it.skuCode && <span className="text-[10px] font-mono text-gray-400">{it.skuCode}</span>}
+                        {it.locationName && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] text-blue-600 font-semibold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
+                            <MapPin className="w-2.5 h-2.5" />
+                            {it.locationName}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-2.5 px-3 text-right font-bold font-mono text-gray-900">
                       {it.deliveredQty || it.quantity || 0} {it.uom || 'Pcs'}

@@ -148,63 +148,76 @@ async function postDispatchInventory(challan, userId) {
     });
 
     if (!existingMovement) {
-      // Find locations with positive stock for this SKU to deduct from actual stock locations
-      const stockLocs = await InventoryLedger.aggregate([
-        {
-          $match: {
-            company: companyObjId,
-            skuId: sku._id,
-            status: { $ne: "Cancelled" }
-          }
-        },
-        {
-          $group: {
-            _id: {
-              locationId: "$locationId",
-              warehouseId: "$warehouseId",
-              floorId: "$floorId",
-              zoneId: "$zoneId"
-            },
-            onHand: {
-              $sum: {
-                $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", { $multiply: ["$quantity", -1] }]
-              }
-            }
-          }
-        },
-        { $match: { onHand: { $gt: 0 } } },
-        { $sort: { onHand: -1 } }
-      ]);
-
       let remainingToDeduct = finalQty;
       const deductionBatches = [];
 
-      if (stockLocs && stockLocs.length > 0) {
-        for (const loc of stockLocs) {
-          if (remainingToDeduct <= 0) break;
-          const deductFromThisLoc = Math.min(loc.onHand, remainingToDeduct);
-          deductionBatches.push({
-            warehouseId: loc._id.warehouseId,
-            floorId: loc._id.floorId,
-            zoneId: loc._id.zoneId,
-            locationId: loc._id.locationId,
-            quantity: deductFromThisLoc
-          });
-          remainingToDeduct -= deductFromThisLoc;
-        }
-      }
-
-      // If stock across existing locations was less than finalQty or no existing locations, deduct remainder from default hierarchy
-      if (remainingToDeduct > 0 || deductionBatches.length === 0) {
-        const preferredLoc = sku.initialLocationId || sku.defaultLocation;
-        const h = await getDefaultLocationHierarchy(companyObjId, preferredLoc);
+      // 1. If user explicitly specified a storage location for this item
+      if (item.locationId && (mongoose.Types.ObjectId.isValid(String(item.locationId)) || typeof item.locationId === 'string')) {
+        const h = await getDefaultLocationHierarchy(companyObjId, item.locationId);
         deductionBatches.push({
           warehouseId: h.warehouseId,
           floorId: h.floorId,
           zoneId: h.zoneId,
           locationId: h.locationId,
-          quantity: remainingToDeduct > 0 ? remainingToDeduct : finalQty
+          quantity: finalQty
         });
+        remainingToDeduct = 0;
+      } else {
+        // 2. Otherwise find locations with positive stock for this SKU to deduct from actual stock locations
+        const stockLocs = await InventoryLedger.aggregate([
+          {
+            $match: {
+              company: companyObjId,
+              skuId: sku._id,
+              status: { $ne: "Cancelled" }
+            }
+          },
+          {
+            $group: {
+              _id: {
+                locationId: "$locationId",
+                warehouseId: "$warehouseId",
+                floorId: "$floorId",
+                zoneId: "$zoneId"
+              },
+              onHand: {
+                $sum: {
+                  $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", { $multiply: ["$quantity", -1] }]
+                }
+              }
+            }
+          },
+          { $match: { onHand: { $gt: 0 } } },
+          { $sort: { onHand: -1 } }
+        ]);
+
+        if (stockLocs && stockLocs.length > 0) {
+          for (const loc of stockLocs) {
+            if (remainingToDeduct <= 0) break;
+            const deductFromThisLoc = Math.min(loc.onHand, remainingToDeduct);
+            deductionBatches.push({
+              warehouseId: loc._id.warehouseId,
+              floorId: loc._id.floorId,
+              zoneId: loc._id.zoneId,
+              locationId: loc._id.locationId,
+              quantity: deductFromThisLoc
+            });
+            remainingToDeduct -= deductFromThisLoc;
+          }
+        }
+
+        // If stock across existing locations was less than finalQty or no existing locations, deduct remainder from default hierarchy
+        if (remainingToDeduct > 0 || deductionBatches.length === 0) {
+          const preferredLoc = sku.initialLocationId || sku.defaultLocation;
+          const h = await getDefaultLocationHierarchy(companyObjId, preferredLoc);
+          deductionBatches.push({
+            warehouseId: h.warehouseId,
+            floorId: h.floorId,
+            zoneId: h.zoneId,
+            locationId: h.locationId,
+            quantity: remainingToDeduct > 0 ? remainingToDeduct : finalQty
+          });
+        }
       }
 
       for (const batch of deductionBatches) {

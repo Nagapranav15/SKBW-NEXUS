@@ -7,10 +7,25 @@ import {
 import { SalesOrderV2, updateSalesOrderV2 } from '../../api/salesOrderApiV2';
 import { createDeliveryChallan, updateDeliveryChallan } from '../../api/deliveryChallanApi';
 import { saveCustomSalesOrder } from '../../utils/salesOrderStorage';
-import { getBalancesV2, getSkusV2 } from '../../api/mfgApiV2';
+import { getBalancesV2, getSkusV2, getWarehouseHierarchyV2, WarehouseLocationV2 } from '../../api/mfgApiV2';
 import { getParties } from '../../api/partyApi';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../ui/Toast';
+
+export interface StorageLocationOption {
+  id: string;
+  name: string;
+  fullPath: string;
+  level: string;
+}
+
+export interface SkuLocationStock {
+  locationId: string;
+  locationName: string;
+  onHand: number;
+  onHandGbl: number;
+  onHandPcs: number;
+}
 
 export interface CreateDispatchModalProps {
   isOpen: boolean;
@@ -43,6 +58,8 @@ interface ItemRow {
   stockOnHandGbl?: number;
   stockOnHandPcs?: number;
   isAvailable?: boolean;
+  locationId?: string;
+  locationName?: string;
 }
 
 export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
@@ -85,6 +102,9 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
 
   // Live stock map for displaying stock availability of order items
   const [modalStockMap, setModalStockMap] = useState<Map<string, { pcs: number; gbl: number }>>(new Map());
+  const [warehouseLocations, setWarehouseLocations] = useState<WarehouseLocationV2[]>([]);
+  const [allStorageLocations, setAllStorageLocations] = useState<StorageLocationOption[]>([]);
+  const [skuLocationStockMap, setSkuLocationStockMap] = useState<Map<string, SkuLocationStock[]>>(new Map());
 
   // Dispatch type
   const [dispatchType, setDispatchType] = useState<'full' | 'partial'>('full');
@@ -116,20 +136,47 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     return `DC-${y}-${r}`;
   }, [editingChallan]);
 
-  // Load parties & SKUs when modal opens
+  // Load parties, SKUs, balances & warehouse hierarchy when modal opens
   useEffect(() => {
     if (!isOpen) return;
     const compId = selectedCompany?._id;
     if (!compId) return;
 
-    // Load SKUs & balances
     Promise.all([
       getBalancesV2(compId).catch(() => []),
       getSkusV2(compId).catch(() => []),
+      getWarehouseHierarchyV2(compId).catch(() => []),
       getParties({ company: compId, limit: 1000, light: true }).catch(() => ({ data: [] }))
-    ]).then(([balances, skus, partiesRes]) => {
+    ]).then(([balances, skus, locationsRes, partiesRes]) => {
+      const locList = Array.isArray(locationsRes) ? locationsRes : [];
+      setWarehouseLocations(locList);
+
+      const locMap = new Map<string, WarehouseLocationV2>();
+      locList.forEach((l: any) => { if (l._id) locMap.set(String(l._id), l); });
+
+      const buildPath = (leaf: WarehouseLocationV2): string => {
+        const parts = [leaf.name];
+        let curr = leaf;
+        while (curr.parentId) {
+          const parent = locMap.get(String(curr.parentId));
+          if (!parent) break;
+          parts.unshift(parent.name);
+          curr = parent;
+        }
+        return parts.join(' > ');
+      };
+
+      const storageOptions: StorageLocationOption[] = locList.map((l: any) => ({
+        id: String(l._id),
+        name: l.name,
+        fullPath: buildPath(l),
+        level: l.level
+      }));
+      setAllStorageLocations(storageOptions);
+
       const smap = new Map<string, { pcs: number; gbl: number }>();
       const skuPcsMap = new Map<string, number>();
+      const locStockMap = new Map<string, SkuLocationStock[]>();
       const bList = Array.isArray(balances) ? balances : [];
       const sList = Array.isArray(skus) ? skus : [];
 
@@ -138,6 +185,41 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
         const sId = rawId ? String((rawId as any)._id || rawId) : '';
         const qty = Number(b.onHand) || Number(b.quantity) || 0;
         if (sId) skuPcsMap.set(sId, (skuPcsMap.get(sId) || 0) + qty);
+
+        const locId = b.locationId ? String((b.locationId as any)._id || b.locationId) : (b.location?._id ? String(b.location._id) : '');
+        const locName = b.location?.name || locMap.get(locId)?.name || 'Storage Location';
+        if (sId && locId && qty > 0) {
+          const matchedSku = sList.find((s: any) => String(s._id) === sId);
+          const pcsPerGbl = Number(matchedSku?.altUnitConversion || matchedSku?.booksGbl || 100) || 100;
+          const unit = (matchedSku?.unit || '').toUpperCase().trim();
+          const altUnit = (matchedSku?.altUnit || '').toUpperCase().trim();
+          let gbl: number;
+          let pcs: number;
+          if (unit === 'GBL' || (altUnit && altUnit !== 'GBL' && unit.includes('GBL'))) {
+            gbl = qty;
+            pcs = qty * pcsPerGbl;
+          } else {
+            pcs = qty;
+            gbl = pcsPerGbl > 0 ? Math.floor(qty / pcsPerGbl) : qty;
+          }
+
+          const stockEntry: SkuLocationStock = {
+            locationId: locId,
+            locationName: locName,
+            onHand: qty,
+            onHandGbl: gbl,
+            onHandPcs: pcs
+          };
+
+          const addLoc = (k: string) => {
+            const arr = locStockMap.get(k) || [];
+            if (!arr.some(e => e.locationId === locId)) arr.push(stockEntry);
+            locStockMap.set(k, arr);
+          };
+          addLoc(sId);
+          if (matchedSku?.skuCode) addLoc(matchedSku.skuCode.toLowerCase().trim());
+          if (matchedSku?.name) addLoc(matchedSku.name.toLowerCase().trim());
+        }
       });
 
       sList.forEach((s: any) => {
@@ -166,6 +248,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
       });
 
       setModalStockMap(smap);
+      setSkuLocationStockMap(locStockMap);
       setAvailableSkus(sList);
 
       const pList = Array.isArray(partiesRes) ? partiesRes : (partiesRes?.data || partiesRes?.parties || []);
@@ -238,6 +321,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
   // Handle adding a new item row in Direct Dispatch mode
   const handleAddNewDirectItem = () => {
     const newKey = `direct-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const firstLoc = allStorageLocations[0];
     const newRow: ItemRow = {
       key: newKey,
       itemCode: '',
@@ -255,6 +339,8 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
       skuId: undefined,
       skuCode: '',
       unitPrice: 0,
+      locationId: firstLoc?.id || '',
+      locationName: firstLoc?.name || '',
       stockOnHandGbl: 0,
       stockOnHandPcs: 0,
       isAvailable: true
@@ -330,8 +416,29 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                     (nameKey && modalStockMap.get(nameKey)) ||
                     { pcs: 0, gbl: 0 };
 
-      const hasStock = (stock.gbl >= pendingGbl && pendingGbl > 0) || 
-                       (stock.pcs >= pendingPcs && pendingPcs > 0);
+      const stockLocs = (idKey && skuLocationStockMap.get(idKey)) ||
+                        (codeKey && skuLocationStockMap.get(codeKey)) ||
+                        (nameKey && skuLocationStockMap.get(nameKey)) || [];
+
+      let chosenLocId = '';
+      let chosenLocName = '';
+      let chosenLocStockGbl = stock.gbl;
+      let chosenLocStockPcs = stock.pcs;
+
+      if (stockLocs.length > 0) {
+        // Preferred: location with highest on-hand stock
+        const sorted = [...stockLocs].sort((a, b) => b.onHandGbl - a.onHandGbl);
+        chosenLocId = sorted[0].locationId;
+        chosenLocName = sorted[0].locationName;
+        chosenLocStockGbl = sorted[0].onHandGbl;
+        chosenLocStockPcs = sorted[0].onHandPcs;
+      } else if (allStorageLocations.length > 0) {
+        chosenLocId = allStorageLocations[0].id;
+        chosenLocName = allStorageLocations[0].name;
+      }
+
+      const hasStock = (chosenLocStockGbl >= pendingGbl && pendingGbl > 0) || 
+                       (chosenLocStockPcs >= pendingPcs && pendingPcs > 0);
 
       return {
         key: item._id || `item-${idx}`,
@@ -350,14 +457,16 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
         skuId: item.skuId,
         skuCode: item.skuCode,
         unitPrice: Number(item.unitPrice) || 0,
-        stockOnHandGbl: stock.gbl,
-        stockOnHandPcs: stock.pcs,
+        locationId: (item as any).locationId || chosenLocId,
+        locationName: (item as any).locationName || chosenLocName,
+        stockOnHandGbl: chosenLocStockGbl,
+        stockOnHandPcs: chosenLocStockPcs,
         isAvailable: hasStock
       };
     });
 
     setItemRows(rows);
-  }, [activeOrder, modalStockMap, dispatchMode, isEditing]);
+  }, [activeOrder, modalStockMap, skuLocationStockMap, allStorageLocations, dispatchMode, isEditing]);
 
   // Sync dispatch qty when type changes in order mode
   useEffect(() => {
@@ -418,14 +527,64 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     );
   };
 
+  // Change location for an individual item row
+  const handleItemLocationChange = (key: string, newLocationId: string) => {
+    setItemRows(prev =>
+      prev.map(r => {
+        if (r.key !== key) return r;
+        const idKey = String(r.skuId || '');
+        const codeKey = (r.skuCode || '').toLowerCase().trim();
+        const nameKey = (r.itemName || '').toLowerCase().trim();
+        const stockLocs = (idKey && skuLocationStockMap.get(idKey)) ||
+                          (codeKey && skuLocationStockMap.get(codeKey)) ||
+                          (nameKey && skuLocationStockMap.get(nameKey)) || [];
+        const matchedStock = stockLocs.find(l => l.locationId === newLocationId);
+        const locObj = allStorageLocations.find(l => l.id === newLocationId) || warehouseLocations.find(l => l._id === newLocationId);
+        const locName = locObj?.name || matchedStock?.locationName || 'Location';
+
+        const stockGbl = matchedStock ? matchedStock.onHandGbl : 0;
+        const stockPcs = matchedStock ? matchedStock.onHandPcs : 0;
+        const hasStock = (stockGbl >= r.dispatchGbl && r.dispatchGbl > 0) || (stockPcs >= r.dispatchPcs && r.dispatchPcs > 0);
+
+        return {
+          ...r,
+          locationId: newLocationId,
+          locationName: locName,
+          stockOnHandGbl: stockGbl,
+          stockOnHandPcs: stockPcs,
+          isAvailable: hasStock
+        };
+      })
+    );
+  };
+
   // Direct item SKU selector change handler
   const handleDirectSkuChange = (key: string, skuIdOrCode: string) => {
     const selectedSku = availableSkus.find(s => s._id === skuIdOrCode || s.skuCode === skuIdOrCode);
     if (!selectedSku) return;
 
     const pcsPerGbl = Number(selectedSku.altUnitConversion || selectedSku.booksGbl || 100) || 100;
-    const stock = modalStockMap.get(String(selectedSku._id)) || modalStockMap.get((selectedSku.skuCode || '').toLowerCase()) || { pcs: 0, gbl: 0 };
     const price = Number(selectedSku.sellingPrice || selectedSku.rate || 0);
+    const sId = String(selectedSku._id);
+    const cKey = (selectedSku.skuCode || '').toLowerCase().trim();
+    const nKey = (selectedSku.name || '').toLowerCase().trim();
+    const stockLocs = skuLocationStockMap.get(sId) || skuLocationStockMap.get(cKey) || skuLocationStockMap.get(nKey) || [];
+
+    let chosenLocId = '';
+    let chosenLocName = '';
+    let locGbl = 0;
+    let locPcs = 0;
+
+    if (stockLocs.length > 0) {
+      const sorted = [...stockLocs].sort((a, b) => b.onHandGbl - a.onHandGbl);
+      chosenLocId = sorted[0].locationId;
+      chosenLocName = sorted[0].locationName;
+      locGbl = sorted[0].onHandGbl;
+      locPcs = sorted[0].onHandPcs;
+    } else if (allStorageLocations.length > 0) {
+      chosenLocId = allStorageLocations[0].id;
+      chosenLocName = allStorageLocations[0].name;
+    }
 
     setItemRows(prev =>
       prev.map(r => {
@@ -439,13 +598,15 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
           uom: selectedSku.unit || 'GBL',
           pcsPerGbl,
           unitPrice: price,
-          stockOnHandGbl: stock.gbl,
-          stockOnHandPcs: stock.pcs,
+          locationId: chosenLocId,
+          locationName: chosenLocName,
+          stockOnHandGbl: locGbl,
+          stockOnHandPcs: locPcs,
           dispatchGbl: gbl,
           dispatchPcs: gbl * pcsPerGbl,
           pendingQty: gbl,
           pendingPcs: gbl * pcsPerGbl,
-          isAvailable: stock.gbl >= gbl
+          isAvailable: locGbl >= gbl
         };
       })
     );
@@ -522,6 +683,8 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
         uom: r.uom,
         price: r.unitPrice,
         total: r.dispatchGbl * (r.unitPrice || 0),
+        locationId: r.locationId || undefined,
+        locationName: r.locationName || undefined,
       }));
 
       const finalCustomerName = dispatchMode === 'direct'
@@ -843,6 +1006,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                     )}
                     <th className="py-2 px-3 w-8 text-center">#</th>
                     <th className="py-2 px-3">Item Name & SKU</th>
+                    <th className="py-2 px-3 min-w-[190px]">Dispatch Location</th>
                     <th className="py-2 px-3 text-center">Available Stock</th>
                     <th className="py-2 px-2 text-right">
                       {dispatchMode === 'direct' ? 'Quantity (GBL)' : 'Pending Qty (GBL)'}
@@ -859,7 +1023,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                 <tbody className="divide-y divide-gray-100">
                   {itemRows.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="py-8 text-center text-gray-400">
+                      <td colSpan={11} className="py-8 text-center text-gray-400">
                         <Package className="w-6 h-6 text-gray-300 mx-auto mb-1" />
                         <p className="text-xs">No items added yet. Click "+ Add Item" below to add items.</p>
                       </td>
@@ -919,16 +1083,58 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                             )}
                           </td>
 
-                          {/* Live Warehouse Stock */}
-                          <td className="py-2.5 px-3 text-center">
+                          {/* Dispatch Location Selection */}
+                          <td className="py-2.5 px-3 min-w-[190px]">
+                            {(() => {
+                              const idKey = String(row.skuId || '');
+                              const codeKey = (row.skuCode || '').toLowerCase().trim();
+                              const nameKey = (row.itemName || '').toLowerCase().trim();
+                              const stockLocs = (idKey && skuLocationStockMap.get(idKey)) ||
+                                                (codeKey && skuLocationStockMap.get(codeKey)) ||
+                                                (nameKey && skuLocationStockMap.get(nameKey)) || [];
+
+                              return (
+                                <div className="flex items-center gap-1.5 bg-white border border-gray-300 hover:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 rounded-lg px-2 py-1 shadow-2xs transition-all">
+                                  <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                  <select
+                                    value={row.locationId || ''}
+                                    onChange={e => handleItemLocationChange(row.key, e.target.value)}
+                                    className="w-full bg-transparent text-xs font-bold text-gray-800 outline-none cursor-pointer truncate"
+                                    title="Select storage location where this item is stored"
+                                  >
+                                    <option value="">— Select Location —</option>
+                                    {stockLocs.length > 0 && (
+                                      <optgroup label="Locations With Available Stock">
+                                        {stockLocs.map(loc => (
+                                          <option key={`stock-${loc.locationId}`} value={loc.locationId}>
+                                            ✓ {loc.locationName} ({loc.onHandGbl} GBL in stock)
+                                          </option>
+                                        ))}
+                                      </optgroup>
+                                    )}
+                                    <optgroup label="All Storage Locations">
+                                      {allStorageLocations.map(loc => (
+                                        <option key={`all-${loc.id}`} value={loc.id}>
+                                          {loc.fullPath}
+                                        </option>
+                                      ))}
+                                    </optgroup>
+                                  </select>
+                                </div>
+                              );
+                            })()}
+                          </td>
+
+                          {/* Live Warehouse Stock at Selected Location */}
+                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
                             {row.stockOnHandGbl !== undefined && row.stockOnHandGbl > 0 ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-3xs">
                                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                                 {row.stockOnHandGbl} GBL
                               </span>
                             ) : (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                0 Stock
+                                0 at location
                               </span>
                             )}
                           </td>
@@ -1004,7 +1210,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                     <tr className="bg-gray-50 border-t-2 border-gray-200 text-xs font-black">
                       {dispatchMode === 'order' && dispatchType === 'partial' && <td />}
                       <td />
-                      <td colSpan={2} className="py-2 px-3 text-gray-500 uppercase text-[10px] tracking-wider">Total</td>
+                      <td colSpan={3} className="py-2 px-3 text-gray-500 uppercase text-[10px] tracking-wider">Total</td>
                       <td className="py-2 px-2 text-right font-black font-mono text-gray-900">
                         {totals.totalPendingGbl}
                       </td>

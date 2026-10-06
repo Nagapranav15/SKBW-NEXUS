@@ -1475,26 +1475,24 @@ export const DispatchModule: React.FC = () => {
                           {ch.status || 'dispatched'}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                      <td className="py-3 px-4 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1.5">
                           {/* Edit Dispatch */}
                           <button
                             onClick={() => handleEditChallan(ch)}
-                            className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border border-amber-200/80 shadow-2xs"
+                            className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 rounded-lg transition-all flex items-center justify-center cursor-pointer border border-amber-200/80 shadow-2xs hover:scale-105 active:scale-95"
                             title="Edit Dispatch"
                           >
-                            <Edit3 className="w-3.5 h-3.5 text-amber-600" />
-                            <span>Edit</span>
+                            <Edit3 className="w-4 h-4 text-amber-600" />
                           </button>
 
                           {/* Delete Dispatch */}
                           <button
                             onClick={() => handleDeleteChallan(ch)}
-                            className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border border-rose-200/80 shadow-2xs"
+                            className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 rounded-lg transition-all flex items-center justify-center cursor-pointer border border-rose-200/80 shadow-2xs hover:scale-105 active:scale-95"
                             title="Delete Dispatch"
                           >
-                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                            <span>Delete</span>
+                            <Trash2 className="w-4 h-4 text-rose-600" />
                           </button>
 
                           {/* Print DC */}
@@ -1503,11 +1501,10 @@ export const DispatchModule: React.FC = () => {
                               setActiveChallan(ch);
                               setIsChallanModalOpen(true);
                             }}
-                            className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border border-blue-200/80 shadow-2xs"
+                            className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 rounded-lg transition-all flex items-center justify-center cursor-pointer border border-blue-200/80 shadow-2xs hover:scale-105 active:scale-95"
                             title="Print Delivery Challan"
                           >
-                            <Printer className="w-3.5 h-3.5 text-blue-600" />
-                            <span>Print</span>
+                            <Printer className="w-4 h-4 text-blue-600" />
                           </button>
                         </div>
                       </td>
@@ -1655,7 +1652,7 @@ export const DispatchModule: React.FC = () => {
                     </div>
                   </th>
 
-                  <th className="py-3 px-3 text-center font-bold min-w-[260px] whitespace-nowrap">ACTIONS</th>
+                  <th className="py-3 px-3 text-center font-bold whitespace-nowrap">ACTIONS</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-xs">
@@ -1787,37 +1784,34 @@ export const DispatchModule: React.FC = () => {
                             )}
                           </td>
 
-                          {/* Actions Column: Dispatch, Edit, Delete, More */}
-                          <td className="py-3.5 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          {/* Actions Column: Dispatch, Edit, Delete, More (Icon-only buttons) */}
+                          <td className="py-3 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                             <div className="inline-flex items-center gap-1.5">
-                              {/* 1. Dispatch Button */}
+                              {/* 1. Dispatch Icon Button */}
                               <button
                                 onClick={() => handleOpenDispatch(row)}
-                                className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-2xs cursor-pointer"
+                                className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all flex items-center justify-center shadow-2xs cursor-pointer hover:scale-105 active:scale-95"
                                 title="Create Dispatch for this order"
                               >
-                                <Truck className="w-3.5 h-3.5" />
-                                <span>Dispatch</span>
+                                <Truck className="w-4 h-4" />
                               </button>
 
-                              {/* 2. Edit Dispatch Button */}
+                              {/* 2. Edit Dispatch Icon Button */}
                               <button
                                 onClick={() => handleEditOrderDispatch(row)}
-                                className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 border border-amber-200/80 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                                className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 border border-amber-200/80 rounded-lg transition-all flex items-center justify-center cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
                                 title={rowChallans.length > 0 ? `Edit Dispatch (${rowChallans[0].dcNumber})` : `Edit / Configure Dispatch for ${row.orderNumber}`}
                               >
-                                <Edit3 className="w-3.5 h-3.5 text-amber-600" />
-                                <span>Edit</span>
+                                <Edit3 className="w-4 h-4 text-amber-600" />
                               </button>
 
-                              {/* 3. Delete Dispatch Button */}
+                              {/* 3. Delete Dispatch Icon Button */}
                               <button
                                 onClick={() => handleDeleteOrderDispatch(row)}
-                                className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200/80 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                                className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200/80 rounded-lg transition-all flex items-center justify-center cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
                                 title={rowChallans.length > 0 ? `Delete Dispatch (${rowChallans[0].dcNumber})` : `Delete / Reset Dispatched Quantities for ${row.orderNumber}`}
                               >
-                                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                                <span>Delete</span>
+                                <Trash2 className="w-4 h-4 text-rose-600" />
                               </button>
 
                               {/* 4. More Options Dropdown Toggle */}
@@ -1827,10 +1821,10 @@ export const DispatchModule: React.FC = () => {
                                     e.stopPropagation();
                                     setOpenActionDropdownId(isMenuOpen ? null : row._id);
                                   }}
-                                  className="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg text-xs transition-colors cursor-pointer"
+                                  className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg transition-colors cursor-pointer hover:scale-105 active:scale-95"
                                   title="More actions"
                                 >
-                                  <ChevronDown className="w-3.5 h-3.5" />
+                                  <ChevronDown className="w-4 h-4" />
                                 </button>
 
                               {/* Dropdown Options */}
