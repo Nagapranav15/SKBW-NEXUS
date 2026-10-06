@@ -870,6 +870,46 @@ export const DispatchModule: React.FC = () => {
     }
   };
 
+  // Edit dispatch for a sales order row
+  const handleEditOrderDispatch = (row: DispatchRowOrder) => {
+    const rowChallans = orderChallansMap.get(row._id) || orderChallansMap.get(row.orderNumber) || [];
+    if (rowChallans.length > 0) {
+      handleEditChallan(rowChallans[0]);
+    } else {
+      // If no challan created yet, open dispatch modal for configuring/editing dispatch for this order
+      handleOpenDispatch(row);
+    }
+  };
+
+  // Delete or reset dispatch for a sales order row
+  const handleDeleteOrderDispatch = async (row: DispatchRowOrder) => {
+    const rowChallans = orderChallansMap.get(row._id) || orderChallansMap.get(row.orderNumber) || [];
+    if (rowChallans.length > 0) {
+      handleDeleteChallan(rowChallans[0]);
+      return;
+    }
+
+    const hasDispatched = row.items.some(i => (i.dispatchedQty || 0) > 0);
+    if (hasDispatched) {
+      if (!window.confirm(`Are you sure you want to reset all dispatched quantities for order ${row.orderNumber}?`)) return;
+      const updatedItems = (row.rawOrder.items || []).map(i => ({ ...i, dispatchedQty: 0 }));
+      const updatedOrder: SalesOrderV2 = {
+        ...row.rawOrder,
+        items: updatedItems,
+        fulfillmentStatus: 'Unfulfilled',
+        status: 'Confirmed'
+      };
+      saveCustomSalesOrder(updatedOrder, selectedCompany?._id);
+      if (row.rawOrder._id && !row.rawOrder._id.startsWith('seed-')) {
+        updateSalesOrderV2(row.rawOrder._id, updatedOrder).catch(() => {});
+      }
+      fetchData(false);
+      showToast(`Dispatched quantities reset for ${row.orderNumber}`, 'success');
+    } else {
+      showToast(`No dispatched records to delete for ${row.orderNumber}`, 'info');
+    }
+  };
+
   // Quick Instant Full Dispatch
   const handleQuickFullDispatch = (orderRow: DispatchRowOrder) => {
     setEditingChallan(null);
@@ -1382,7 +1422,7 @@ export const DispatchModule: React.FC = () => {
                       {challanSortField === 'status' ? (challanSortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-gray-400" />}
                     </div>
                   </th>
-                  <th className="py-3 px-4 text-right">ACTIONS</th>
+                  <th className="py-3 px-4 text-center min-w-[220px]">ACTIONS</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -1435,24 +1475,26 @@ export const DispatchModule: React.FC = () => {
                           {ch.status || 'dispatched'}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-1.5">
                           {/* Edit Dispatch */}
                           <button
                             onClick={() => handleEditChallan(ch)}
-                            className="p-1.5 bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-blue-700 rounded-lg text-xs font-bold transition-colors cursor-pointer border border-slate-200"
+                            className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border border-amber-200/80 shadow-2xs"
                             title="Edit Dispatch"
                           >
-                            <Edit3 className="w-3.5 h-3.5" />
+                            <Edit3 className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Edit</span>
                           </button>
 
                           {/* Delete Dispatch */}
                           <button
                             onClick={() => handleDeleteChallan(ch)}
-                            className="p-1.5 bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-lg text-xs font-bold transition-colors cursor-pointer border border-slate-200"
+                            className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border border-rose-200/80 shadow-2xs"
                             title="Delete Dispatch"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Delete</span>
                           </button>
 
                           {/* Print DC */}
@@ -1461,10 +1503,10 @@ export const DispatchModule: React.FC = () => {
                               setActiveChallan(ch);
                               setIsChallanModalOpen(true);
                             }}
-                            className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg text-xs transition-colors cursor-pointer inline-flex items-center gap-1"
+                            className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border border-blue-200/80 shadow-2xs"
                             title="Print Delivery Challan"
                           >
-                            <Printer className="w-3.5 h-3.5" />
+                            <Printer className="w-3.5 h-3.5 text-blue-600" />
                             <span>Print</span>
                           </button>
                         </div>
@@ -1613,7 +1655,7 @@ export const DispatchModule: React.FC = () => {
                     </div>
                   </th>
 
-                  <th className="py-3 px-3 text-center font-bold w-28 whitespace-nowrap">ACTIONS</th>
+                  <th className="py-3 px-3 text-center font-bold min-w-[260px] whitespace-nowrap">ACTIONS</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-xs">
@@ -1745,24 +1787,51 @@ export const DispatchModule: React.FC = () => {
                             )}
                           </td>
 
-                          {/* Action Split Dropdown Button */}
+                          {/* Actions Column: Dispatch, Edit, Delete, More */}
                           <td className="py-3.5 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                            <div className="relative inline-flex items-center shadow-2xs rounded-xl overflow-visible">
+                            <div className="inline-flex items-center gap-1.5">
+                              {/* 1. Dispatch Button */}
                               <button
                                 onClick={() => handleOpenDispatch(row)}
-                                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-l-xl text-xs font-bold transition-all cursor-pointer"
+                                className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-2xs cursor-pointer"
+                                title="Create Dispatch for this order"
                               >
-                                Dispatch
+                                <Truck className="w-3.5 h-3.5" />
+                                <span>Dispatch</span>
                               </button>
+
+                              {/* 2. Edit Dispatch Button */}
                               <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenActionDropdownId(isMenuOpen ? null : row._id);
-                                }}
-                                className="px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-r-xl border-l border-blue-500 text-xs font-bold transition-all cursor-pointer"
+                                onClick={() => handleEditOrderDispatch(row)}
+                                className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 border border-amber-200/80 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                                title={rowChallans.length > 0 ? `Edit Dispatch (${rowChallans[0].dcNumber})` : `Edit / Configure Dispatch for ${row.orderNumber}`}
                               >
-                                <ChevronDown className="w-3.5 h-3.5" />
+                                <Edit3 className="w-3.5 h-3.5 text-amber-600" />
+                                <span>Edit</span>
                               </button>
+
+                              {/* 3. Delete Dispatch Button */}
+                              <button
+                                onClick={() => handleDeleteOrderDispatch(row)}
+                                className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200/80 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                                title={rowChallans.length > 0 ? `Delete Dispatch (${rowChallans[0].dcNumber})` : `Delete / Reset Dispatched Quantities for ${row.orderNumber}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                                <span>Delete</span>
+                              </button>
+
+                              {/* 4. More Options Dropdown Toggle */}
+                              <div className="relative inline-flex items-center overflow-visible">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenActionDropdownId(isMenuOpen ? null : row._id);
+                                  }}
+                                  className="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg text-xs transition-colors cursor-pointer"
+                                  title="More actions"
+                                >
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                </button>
 
                               {/* Dropdown Options */}
                               {isMenuOpen && (
@@ -1855,6 +1924,7 @@ export const DispatchModule: React.FC = () => {
                                   )}
                                 </div>
                               )}
+                              </div>
                             </div>
                           </td>
                         </tr>
