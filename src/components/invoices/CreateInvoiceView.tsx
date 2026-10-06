@@ -2,14 +2,15 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   FileText, Truck, Calendar, MapPin, Package, Plus, Trash2, Edit3,
   Printer, Eye, Save, ArrowLeft, Settings, ChevronDown, ChevronRight,
-  Search, Check, AlertCircle, Building2, Phone
+  Search, Check, AlertCircle, Building2, Phone, RefreshCw
 } from 'lucide-react';
 import { SalesInvoice, InvoiceItem, AdditionalCharge, createInvoice, updateInvoice, getNextInvoiceNumber } from '../../api/invoiceApi';
+import { getWarehouseHierarchyV2, WarehouseLocationV2 } from '../../api/mfgApiV2';
+import { updateDeliveryChallan } from '../../api/deliveryChallanApi';
 import { DispatchDeliveryRecord } from './invoiceSampleData';
 import { showToast } from '../ui/Toast';
 import { useAuth } from '../../context/AuthContext';
 
-// Default Location tree options matching Screenshot 2
 interface LocationNode {
   id: string;
   name: string;
@@ -17,80 +18,10 @@ interface LocationNode {
   children?: LocationNode[];
 }
 
-const DEFAULT_LOCATION_TREE: LocationNode[] = [
-  {
-    id: 'f1',
-    name: 'Factory-1',
-    fullPath: 'Factory-1',
-    children: [
-      {
-        id: 'f1-fl1',
-        name: 'Floor 1',
-        fullPath: 'Factory-1 > Floor 1',
-        children: [
-          { id: 'f1-fl1-a1', name: 'A1', fullPath: 'Factory-1 > Floor 1 > A1' },
-          { id: 'f1-fl1-a2', name: 'A2', fullPath: 'Factory-1 > Floor 1 > A2' },
-          { id: 'f1-fl1-a3', name: 'A3', fullPath: 'Factory-1 > Floor 1 > A3' },
-        ]
-      },
-      {
-        id: 'f1-fl2',
-        name: 'Floor 2',
-        fullPath: 'Factory-1 > Floor 2',
-        children: [
-          { id: 'f1-fl2-b1', name: 'B1', fullPath: 'Factory-1 > Floor 2 > B1' },
-          { id: 'f1-fl2-b2', name: 'B2', fullPath: 'Factory-1 > Floor 2 > B2' },
-        ]
-      },
-      {
-        id: 'f1-fl3',
-        name: 'Floor 3',
-        fullPath: 'Factory-1 > Floor 3',
-        children: [
-          { id: 'f1-fl3-c1', name: 'C1', fullPath: 'Factory-1 > Floor 3 > C1' }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'f2',
-    name: 'Factory-2',
-    fullPath: 'Factory-2',
-    children: [
-      {
-        id: 'f2-mfg',
-        name: 'A - Manufacturing',
-        fullPath: 'Factory-2 > A - Manufacturing',
-        children: [
-          { id: 'f2-mfg-a1', name: 'A1', fullPath: 'Factory-2 > A - Manufacturing > A1' }
-        ]
-      },
-      {
-        id: 'f2-prt',
-        name: 'B - Printing',
-        fullPath: 'Factory-2 > B - Printing',
-        children: [
-          { id: 'f2-prt-b1', name: 'B1', fullPath: 'Factory-2 > B - Printing > B1' }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'outdoor',
-    name: 'Outdoor',
-    fullPath: 'Outdoor',
-    children: [
-      { id: 'out-a1', name: 'A1', fullPath: 'Outdoor > A1' },
-      { id: 'out-a2', name: 'A2', fullPath: 'Outdoor > A2' },
-      { id: 'out-a3', name: 'A3', fullPath: 'Outdoor > A3' },
-      { id: 'out-b1', name: 'B1', fullPath: 'Outdoor > B1' }
-    ]
-  }
-];
-
 export interface CreateInvoiceViewProps {
   initialDispatch?: DispatchDeliveryRecord | null;
   existingInvoice?: SalesInvoice | null;
+  allDeliveries?: DispatchDeliveryRecord[];
   onBack: () => void;
   onSuccess: (savedInvoice: SalesInvoice) => void;
   onPreview: (previewInvoice: SalesInvoice) => void;
@@ -99,48 +30,87 @@ export interface CreateInvoiceViewProps {
 export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
   initialDispatch,
   existingInvoice,
+  allDeliveries = [],
   onBack,
   onSuccess,
   onPreview
 }) => {
   const { selectedCompany } = useAuth();
 
-  // Top details
-  const [dispatchNo, setDispatchNo] = useState(existingInvoice?.dispatchNumber || initialDispatch?.dispatchNo || 'DSP-0003');
-  const [dispatchDate, setDispatchDate] = useState(existingInvoice?.dispatchDate || initialDispatch?.dispatchDate || '28/09/2026');
-  const [salesOrderNo, setSalesOrderNo] = useState(existingInvoice?.orderNumber || initialDispatch?.orderNumber || 'SO-0003');
-  const [customerName, setCustomerName] = useState(existingInvoice?.customerName || initialDispatch?.customerName || 'Chaitanya Book Centre');
-  const [phone, setPhone] = useState(existingInvoice?.customerPhone || initialDispatch?.customerPhone || '9988776655');
-  const [region, setRegion] = useState(existingInvoice?.region || initialDispatch?.region || 'Andhra Pradesh');
-  const [city, setCity] = useState(existingInvoice?.city || initialDispatch?.city || 'Nellore');
-  const [transporter, setTransporter] = useState(existingInvoice?.transporterName || initialDispatch?.transporterName || 'Sri Sai Transport');
-  const [lrNumber, setLrNumber] = useState(existingInvoice?.lrNumber || initialDispatch?.lrNumber || 'LR1234567');
-  const [lrDate, setLrDate] = useState(existingInvoice?.lrDate || initialDispatch?.lrDate || '28/09/2026');
-  const [packagesCount, setPackagesCount] = useState<number>(existingInvoice?.numberOfPackages || initialDispatch?.packagesCount || 8);
+  // Selected delivery record (either passed via prop or picked from dropdown)
+  const [selectedDispatch, setSelectedDispatch] = useState<DispatchDeliveryRecord | null>(
+    initialDispatch || null
+  );
+
+  // Top details - 100% dynamic
+  const [dispatchNo, setDispatchNo] = useState(
+    existingInvoice?.dispatchNumber || initialDispatch?.dispatchNo || ''
+  );
+  const [dispatchDate, setDispatchDate] = useState(
+    existingInvoice?.dispatchDate || initialDispatch?.dispatchDate || ''
+  );
+  const [salesOrderNo, setSalesOrderNo] = useState(
+    existingInvoice?.orderNumber || initialDispatch?.orderNumber || ''
+  );
+  const [customerName, setCustomerName] = useState(
+    existingInvoice?.customerName || initialDispatch?.customerName || ''
+  );
+  const [phone, setPhone] = useState(
+    existingInvoice?.customerPhone || initialDispatch?.customerPhone || ''
+  );
+  const [region, setRegion] = useState(
+    existingInvoice?.region || initialDispatch?.region || ''
+  );
+  const [city, setCity] = useState(
+    existingInvoice?.city || initialDispatch?.city || ''
+  );
+  const [transporter, setTransporter] = useState(
+    existingInvoice?.transporterName || initialDispatch?.transporterName || ''
+  );
+  const [lrNumber, setLrNumber] = useState(
+    existingInvoice?.lrNumber || initialDispatch?.lrNumber || ''
+  );
+  const [lrDate, setLrDate] = useState(
+    existingInvoice?.lrDate || initialDispatch?.lrDate || ''
+  );
+  const [packagesCount, setPackagesCount] = useState<number>(
+    existingInvoice?.numberOfPackages || initialDispatch?.packagesCount || 1
+  );
+
+  // Today's formatted date
+  const todayFormatted = useMemo(() => {
+    const now = new Date();
+    const d = String(now.getDate()).padStart(2, '0');
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const y = now.getFullYear();
+    return `${d}/${m}/${y}`;
+  }, []);
 
   // Invoice Details
-  const [invoiceNo, setInvoiceNo] = useState(existingInvoice?.invoiceNumber || 'INV-260899');
-  const [invoiceDate, setInvoiceDate] = useState(existingInvoice?.invoiceDate || '28/09/2026');
+  const [invoiceNo, setInvoiceNo] = useState(existingInvoice?.invoiceNumber || '');
+  const [invoiceDate, setInvoiceDate] = useState(existingInvoice?.invoiceDate || todayFormatted);
   const [paymentTerms, setPaymentTerms] = useState(existingInvoice?.paymentTerms || '30 Days');
-  const [dueDate, setDueDate] = useState(existingInvoice?.dueDate || '28/10/2026');
+  const [dueDate, setDueDate] = useState(existingInvoice?.dueDate || '');
 
   // Address
   const [billToAddress, setBillToAddress] = useState(
-    existingInvoice?.billTo || {
-      name: 'A T C Marketing (Akshara)',
+    existingInvoice?.billTo || initialDispatch?.billToAddress || {
+      name: customerName,
       firmName: customerName,
-      address: 'Main Road',
-      city: 'Mahabubnagar',
-      state: 'Telangana',
-      pincode: '509001',
-      phone: '9966529313'
+      address: '',
+      city: city,
+      state: region,
+      pincode: '',
+      phone: phone
     }
   );
   const [sameAsBillTo, setSameAsBillTo] = useState(existingInvoice?.sameAsBillTo ?? true);
-  const [shipToAddress, setShipToAddress] = useState(existingInvoice?.shipTo || { ...billToAddress });
+  const [shipToAddress, setShipToAddress] = useState(
+    existingInvoice?.shipTo || initialDispatch?.shipToAddress || { ...billToAddress }
+  );
   const [isEditingAddress, setIsEditingAddress] = useState<'billTo' | 'shipTo' | null>(null);
 
-  // Items from dispatch
+  // Items - 100% dynamic from dispatch or empty
   const [items, setItems] = useState<Array<InvoiceItem & { selected?: boolean }>>(() => {
     if (existingInvoice?.items && existingInvoice.items.length > 0) {
       return existingInvoice.items.map(it => ({ ...it, selected: true }));
@@ -148,28 +118,22 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
     if (initialDispatch?.items && initialDispatch.items.length > 0) {
       return initialDispatch.items.map((it, idx) => ({
         itemId: `item-${idx + 1}`,
-        itemCode: it.itemCode,
+        itemCode: it.itemCode || `FG-${idx + 1}`,
         itemName: it.itemName,
         uom: it.uom || 'GBL',
-        pcsPerGbl: Math.round(it.dispatchedPcs / (it.dispatchedGbl || 1)) || 246,
+        pcsPerGbl: Math.round(it.dispatchedPcs / (it.dispatchedGbl || 1)) || 100,
         dispatchedGbl: it.dispatchedGbl,
         dispatchedPcs: it.dispatchedPcs,
         invoiceQtyGbl: it.dispatchedGbl,
         invoiceQtyPcs: it.dispatchedPcs,
-        locationName: it.locationName || 'Factory-1 / A1',
-        locationPath: it.locationName || 'Factory-1 > Floor 1 > A1',
-        rate: it.rate,
-        amount: it.amount,
+        locationName: it.locationName || 'Main Storage',
+        locationPath: it.locationName || 'Main Storage',
+        rate: it.rate || 0,
+        amount: it.amount || 0,
         selected: true
       }));
     }
-    // Default 4 exact items matching Screenshot 2
-    return [
-      { itemId: '1', itemCode: 'FG-002', itemName: '100P BEST FRIEND (SR)', uom: 'GBL', pcsPerGbl: 300, dispatchedGbl: 2, dispatchedPcs: 600, invoiceQtyGbl: 2, invoiceQtyPcs: 600, locationName: 'Factory-1 / A1', locationPath: 'Factory-1 > Floor 1 > A1', rate: 6200, amount: 12400, selected: true },
-      { itemId: '2', itemCode: 'FG-532', itemName: 'SP Loose Books', uom: 'GBL', pcsPerGbl: 150, dispatchedGbl: 1, dispatchedPcs: 150, invoiceQtyGbl: 1, invoiceQtyPcs: 150, locationName: 'Factory-1 / A2', locationPath: 'Factory-1 > Floor 1 > A2', rate: 5800, amount: 5800, selected: true },
-      { itemId: '3', itemCode: 'FG-005', itemName: '100P BEST FRIEND (UR)', uom: 'GBL', pcsPerGbl: 300, dispatchedGbl: 1, dispatchedPcs: 300, invoiceQtyGbl: 1, invoiceQtyPcs: 300, locationName: 'Factory-1 / B1', locationPath: 'Factory-1 > Floor 1 > B1', rate: 6100, amount: 6100, selected: true },
-      { itemId: '4', itemCode: 'FG-001', itemName: '172P BEST FRIEND (SR)', uom: 'GBL', pcsPerGbl: 180, dispatchedGbl: 1, dispatchedPcs: 180, invoiceQtyGbl: 1, invoiceQtyPcs: 180, locationName: 'Factory-2 / A1', locationPath: 'Factory-2 > A - Manufacturing > A1', rate: 8200, amount: 8200, selected: true },
-    ];
+    return [];
   });
 
   // Additional Charges
@@ -177,22 +141,114 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
     if (existingInvoice?.additionalCharges && existingInvoice.additionalCharges.length > 0) {
       return existingInvoice.additionalCharges;
     }
-    return [{ description: 'Transport Charge', type: 'Fixed', amount: 500 }];
+    return [];
   });
 
   // Remarks
-  const [remarks, setRemarks] = useState(existingInvoice?.remarks || `Invoice for dispatch ${dispatchNo}`);
+  const [remarks, setRemarks] = useState(existingInvoice?.remarks || '');
 
-  // Location selector popover state
+  // Warehouse Location Hierarchy - Dynamically loaded
+  const [locationTree, setLocationTree] = useState<LocationNode[]>([]);
   const [activeLocRowIndex, setActiveLocRowIndex] = useState<number | null>(null);
   const [locSearchText, setLocSearchText] = useState('');
-  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
-    'f1': true,
-    'f1-fl1': true,
-    'f2': false,
-    'outdoor': true
-  });
+  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const locDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fetch real sequence number on mount
+  useEffect(() => {
+    if (!existingInvoice?.invoiceNumber && selectedCompany?._id) {
+      getNextInvoiceNumber(selectedCompany._id).then(seq => {
+        if (seq) setInvoiceNo(seq);
+      }).catch(err => {
+        console.warn('getNextInvoiceNumber error:', err);
+      });
+    }
+  }, [existingInvoice, selectedCompany?._id]);
+
+  // Load real warehouse locations for item location selector
+  useEffect(() => {
+    if (!selectedCompany?._id) return;
+    getWarehouseHierarchyV2(selectedCompany._id).then(locs => {
+      if (!Array.isArray(locs) || locs.length === 0) return;
+
+      const locMap = new Map<string, WarehouseLocationV2>();
+      locs.forEach((l: any) => { if (l._id) locMap.set(String(l._id), l); });
+
+      const buildTree = (parentId: string | null): LocationNode[] => {
+        return locs
+          .filter((l: any) => String(l.parentId || '') === String(parentId || ''))
+          .map((l: any) => ({
+            id: String(l._id),
+            name: l.name,
+            fullPath: l.name,
+            children: buildTree(String(l._id))
+          }));
+      };
+
+      const roots = buildTree(null);
+      if (roots.length > 0) {
+        setLocationTree(roots);
+        const exp: Record<string, boolean> = {};
+        roots.forEach(r => { exp[r.id] = true; });
+        setExpandedNodes(exp);
+      }
+    }).catch(err => {
+      console.warn('Failed to load warehouse hierarchy:', err);
+    });
+  }, [selectedCompany?._id]);
+
+  // Handle switching or selecting delivery record
+  const handleSelectDispatchRecord = (rec: DispatchDeliveryRecord) => {
+    setSelectedDispatch(rec);
+    setDispatchNo(rec.dispatchNo);
+    setDispatchDate(rec.dispatchDate);
+    setSalesOrderNo(rec.orderNumber);
+    setCustomerName(rec.customerName);
+    setPhone(rec.customerPhone || '');
+    setRegion(rec.region || '');
+    setCity(rec.city || '');
+    setTransporter(rec.transporterName || '');
+    setLrNumber(rec.lrNumber || '');
+    setLrDate(rec.lrDate || '');
+    setPackagesCount(rec.packagesCount || rec.items?.length || 1);
+
+    if (rec.billToAddress) {
+      setBillToAddress(rec.billToAddress);
+      setShipToAddress(rec.shipToAddress || rec.billToAddress);
+    } else {
+      const built = {
+        name: rec.customerName,
+        firmName: rec.customerName,
+        address: '',
+        city: rec.city,
+        state: rec.region,
+        pincode: '',
+        phone: rec.customerPhone || ''
+      };
+      setBillToAddress(built);
+      setShipToAddress(built);
+    }
+
+    if (rec.items && rec.items.length > 0) {
+      setItems(rec.items.map((it, idx) => ({
+        itemId: `item-${idx + 1}`,
+        itemCode: it.itemCode || `FG-${idx + 1}`,
+        itemName: it.itemName,
+        uom: it.uom || 'GBL',
+        pcsPerGbl: Math.round(it.dispatchedPcs / (it.dispatchedGbl || 1)) || 100,
+        dispatchedGbl: it.dispatchedGbl,
+        dispatchedPcs: it.dispatchedPcs,
+        invoiceQtyGbl: it.dispatchedGbl,
+        invoiceQtyPcs: it.dispatchedPcs,
+        locationName: it.locationName || 'Main Storage',
+        locationPath: it.locationName || 'Main Storage',
+        rate: it.rate || 0,
+        amount: it.amount || 0,
+        selected: true
+      })));
+    }
+    setRemarks(`Invoice for dispatch ${rec.dispatchNo}`);
+  };
 
   // Close location dropdown when clicked outside
   useEffect(() => {
@@ -225,11 +281,13 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
     } catch (_) {}
   }, [invoiceDate, paymentTerms]);
 
-  // Generate sequence if invoiceNo is blank or user clicks gear
+  // Generate sequence if invoiceNo is blank or user clicks refresh
   const handleRegenerateSequence = async () => {
     const nextSeq = await getNextInvoiceNumber(selectedCompany?._id);
-    setInvoiceNo(nextSeq);
-    showToast(`Invoice number refreshed: ${nextSeq}`, 'info');
+    if (nextSeq) {
+      setInvoiceNo(nextSeq);
+      showToast(`Invoice number refreshed: ${nextSeq}`, 'info');
+    }
   };
 
   // Item quantity and rate change handlers
@@ -240,11 +298,11 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
 
       if (field === 'invoiceQtyGbl') {
         const gbl = parseFloat(value) || 0;
-        item.invoiceQtyPcs = gbl * (item.pcsPerGbl || 246);
+        item.invoiceQtyPcs = gbl * (item.pcsPerGbl || 100);
         item.amount = Math.round(gbl * (item.rate || 0));
       } else if (field === 'invoiceQtyPcs') {
         const pcs = parseFloat(value) || 0;
-        item.amount = Math.round((pcs / (item.pcsPerGbl || 246)) * (item.rate || 0));
+        item.amount = Math.round((pcs / (item.pcsPerGbl || 100)) * (item.rate || 0));
       } else if (field === 'rate') {
         const rate = parseFloat(value) || 0;
         item.amount = Math.round((item.invoiceQtyGbl || 0) * rate);
@@ -275,17 +333,17 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
     const newItem: InvoiceItem & { selected: boolean } = {
       itemId: `item-${Date.now()}`,
       itemCode: `FG-${Math.floor(100 + Math.random() * 900)}`,
-      itemName: 'New Standard Note Book',
+      itemName: 'Item Description',
       uom: 'GBL',
-      pcsPerGbl: 240,
+      pcsPerGbl: 100,
       dispatchedGbl: 1,
-      dispatchedPcs: 240,
+      dispatchedPcs: 100,
       invoiceQtyGbl: 1,
-      invoiceQtyPcs: 240,
-      locationName: 'Factory-1 / A1',
-      locationPath: 'Factory-1 > Floor 1 > A1',
-      rate: 6000,
-      amount: 6000,
+      invoiceQtyPcs: 100,
+      locationName: 'Main Storage',
+      locationPath: 'Main Storage',
+      rate: 0,
+      amount: 0,
       selected: true
     };
     setItems(prev => [...prev, newItem]);
@@ -293,7 +351,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
 
   // Additional charges handlers
   const handleAddCharge = () => {
-    setAdditionalCharges(prev => [...prev, { description: 'Handling / Freight', type: 'Fixed', amount: 500 }]);
+    setAdditionalCharges(prev => [...prev, { description: 'Freight / Transport Charge', type: 'Fixed', amount: 0 }]);
   };
 
   const handleChargeChange = (index: number, field: keyof AdditionalCharge, value: any) => {
@@ -308,7 +366,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
     setAdditionalCharges(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Calculations matching Screenshot 2
+  // Calculations
   const selectedItems = useMemo(() => items.filter(it => it.selected !== false), [items]);
   const totalDispatchedGbl = useMemo(() => items.reduce((sum, it) => sum + (Number(it.dispatchedGbl) || 0), 0), [items]);
   const totalDispatchedPcs = useMemo(() => items.reduce((sum, it) => sum + (Number(it.dispatchedPcs) || 0), 0), [items]);
@@ -326,11 +384,12 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
       _id: existingInvoice?._id,
       invoiceNumber: invoiceNo.trim(),
       invoiceDate,
-      dispatchNumber: dispatchNo,
+      dispatchId: selectedDispatch?.id || undefined,
+      dispatchNumber: dispatchNo.trim(),
       dispatchDate,
-      orderNumber: salesOrderNo,
-      customerName,
-      customerPhone: phone,
+      orderNumber: salesOrderNo.trim(),
+      customerName: customerName.trim(),
+      customerPhone: phone.trim(),
       region,
       city,
       transporterName: transporter,
@@ -368,6 +427,10 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
       showToast('Please specify an invoice number', 'error');
       return;
     }
+    if (!customerName.trim()) {
+      showToast('Please specify a customer name', 'error');
+      return;
+    }
     if (selectedItems.length === 0) {
       showToast('Please select at least one item to invoice', 'error');
       return;
@@ -381,11 +444,25 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
       } else {
         saved = await createInvoice(payload);
       }
-      showToast(asDraft ? `Invoice ${saved.invoiceNumber} saved as draft` : `Invoice ${saved.invoiceNumber} generated!`, 'success');
+
+      // If tied to a delivery challan, update challan's status in backend and localStorage
+      if (selectedDispatch?.id) {
+        try {
+          await updateDeliveryChallan(selectedDispatch.id, {
+            invoiceStatus: 'Invoiced',
+            invoiceNumber: saved.invoiceNumber
+          });
+        } catch (_) {}
+      }
+
+      showToast(
+        asDraft ? `Invoice ${saved.invoiceNumber} saved as draft` : `Invoice ${saved.invoiceNumber} generated!`,
+        'success'
+      );
       onSuccess(saved);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      showToast('Failed to save invoice', 'error');
+      showToast('Failed to save invoice: ' + (err?.message || 'Server error'), 'error');
     }
   };
 
@@ -396,42 +473,71 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
 
   return (
     <div className="space-y-4 max-w-7xl mx-auto pb-12">
-      {/* Top Header & Breadcrumbs matching Screenshot 2 */}
+      {/* Top Header & Breadcrumbs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-gray-150 shadow-2xs">
         <div>
-          {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-xs font-medium text-gray-500 mb-1">
-            <button onClick={onBack} className="hover:text-blue-600 transition-colors cursor-pointer">Sales</button>
+            <button
+              onClick={onBack}
+              className="hover:text-blue-600 transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back to Invoices</span>
+            </button>
             <span>&gt;</span>
-            <button onClick={onBack} className="hover:text-blue-600 transition-colors cursor-pointer">Invoices</button>
-            <span>&gt;</span>
-            <span className="text-gray-900 font-semibold">Create Invoice</span>
+            <span className="text-gray-900 font-semibold">
+              {existingInvoice ? `Edit Invoice (${existingInvoice.invoiceNumber})` : 'Create Invoice'}
+            </span>
           </div>
 
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200/80 flex items-center justify-center text-blue-600 shadow-2xs">
-              <FileText className="w-5 h-5 text-blue-600" />
+              <FileText className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight">Create Invoice</h1>
-              <p className="text-xs text-gray-500">
-                Create invoice from dispatch <span className="font-semibold text-blue-600">{dispatchNo}</span> or modify details if needed.
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl font-bold text-gray-900 tracking-tight">
+                  {existingInvoice ? `Edit Invoice` : `Generate Sales Invoice`}
+                </h1>
+                {invoiceNo && (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                    {invoiceNo}
+                  </span>
+                )}
+                {dispatchNo && (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                    Challan: {dispatchNo}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Review line items, pricing, transport details, and billing information before finalizing.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Top Right Action Buttons */}
-        <div className="flex items-center gap-2.5">
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2.5 flex-wrap">
           <button
-            onClick={handleTriggerPreview}
-            className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+            type="button"
+            onClick={onBack}
+            className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
           >
-            <Eye className="w-4 h-4 text-gray-500" />
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            onClick={handleTriggerPreview}
+            className="px-3.5 py-2 bg-white hover:bg-gray-50 text-blue-600 border border-blue-200 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+          >
+            <Eye className="w-4 h-4" />
             Preview
           </button>
 
           <button
+            type="button"
             onClick={() => handleSaveInvoice(true)}
             className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
           >
@@ -440,195 +546,199 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
           </button>
 
           <button
+            type="button"
             onClick={() => handleSaveInvoice(false)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
           >
             <Printer className="w-4 h-4" />
-            Save & Print Invoice
+            Generate &amp; Print
           </button>
         </div>
       </div>
 
-      {/* Main Form Cards Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Card 1 (Left): Dispatch & Customer Details */}
-        <div className="lg:col-span-8 bg-white border border-gray-150 rounded-2xl p-5 shadow-2xs">
-          <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100">
+      {/* Select Delivery Challan Picker (If not preselected) */}
+      {!initialDispatch && allDeliveries.length > 0 && (
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
             <Truck className="w-4 h-4 text-blue-600" />
-            <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Dispatch & Customer Details</h2>
+            <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+              Link Delivery Challan:
+            </span>
+            <span className="text-xs text-slate-500 hidden sm:inline">
+              Choose an approved delivery challan to auto-fill items and customer details
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
-            <div>
-              <label className="block text-gray-500 font-medium mb-1">Dispatch No.</label>
-              <input
-                type="text"
-                value={dispatchNo}
-                onChange={e => setDispatchNo(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl font-mono font-medium text-gray-800 focus:bg-white focus:outline-blue-500"
-              />
-            </div>
+          <div className="min-w-[300px]">
+            <select
+              value={selectedDispatch?.dispatchNo || ''}
+              onChange={e => {
+                const found = allDeliveries.find(d => d.dispatchNo === e.target.value);
+                if (found) handleSelectDispatchRecord(found);
+              }}
+              className="w-full h-8.5 px-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
+            >
+              <option value="">— Select Delivery Challan (Optional) —</option>
+              {allDeliveries.map(d => (
+                <option key={d.id} value={d.dispatchNo}>
+                  {d.dispatchNo} • {d.customerName} ({d.items?.length || 0} items, {d.dispatchDate})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
 
-            <div>
-              <label className="block text-gray-500 font-medium mb-1">Dispatch Date</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={dispatchDate}
-                  onChange={e => setDispatchDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-800 focus:outline-blue-500"
-                />
-                <Calendar className="w-4 h-4 text-gray-400 absolute right-3 top-2.5 pointer-events-none" />
-              </div>
-            </div>
+      {/* 2-Column Top Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Card 1: Dispatch & Delivery Details */}
+        <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-2xs space-y-3.5">
+          <div className="flex items-center gap-2 pb-2.5 border-b border-gray-100">
+            <Truck className="w-4 h-4 text-blue-600" />
+            <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+              Dispatch &amp; Delivery Details
+            </h2>
+          </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             <div>
-              <label className="block text-gray-500 font-medium mb-1">Sales Order No.</label>
-              <input
-                type="text"
-                value={salesOrderNo}
-                onChange={e => setSalesOrderNo(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl font-medium text-blue-600 focus:outline-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-gray-500 font-medium mb-1">
-                Customer <span className="text-rose-500">*</span>
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                Dispatch No.
               </label>
               <input
                 type="text"
+                placeholder="e.g. DC-2026-6467"
+                value={dispatchNo}
+                onChange={e => setDispatchNo(e.target.value)}
+                className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl font-mono font-bold text-gray-900 focus:outline-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                Dispatch Date
+              </label>
+              <input
+                type="text"
+                placeholder="DD/MM/YYYY"
+                value={dispatchDate}
+                onChange={e => setDispatchDate(e.target.value)}
+                className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl font-mono text-gray-800 focus:outline-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                Sales Order No.
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. SO-0001 or DIRECT"
+                value={salesOrderNo}
+                onChange={e => setSalesOrderNo(e.target.value)}
+                className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl font-mono text-gray-800 focus:outline-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                Customer Name <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Customer / Consignee"
                 value={customerName}
                 onChange={e => setCustomerName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl font-semibold text-gray-900 focus:outline-blue-500"
+                className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl font-bold text-gray-900 focus:outline-blue-500"
               />
             </div>
 
             <div>
-              <label className="block text-gray-500 font-medium mb-1">Phone</label>
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                Transporter Name
+              </label>
               <input
                 type="text"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl font-mono text-gray-800 focus:outline-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-gray-500 font-medium mb-1">Region</label>
-              <input
-                type="text"
-                value={region}
-                onChange={e => setRegion(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-800 focus:outline-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-gray-500 font-medium mb-1">City</label>
-              <input
-                type="text"
-                value={city}
-                onChange={e => setCity(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-800 focus:outline-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-gray-500 font-medium mb-1">Transporter</label>
-              <input
-                type="text"
+                placeholder="e.g. Self / Chennupati Cargo"
                 value={transporter}
                 onChange={e => setTransporter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-800 focus:outline-blue-500"
+                className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-gray-800 focus:outline-blue-500"
               />
             </div>
 
             <div>
-              <label className="block text-gray-500 font-medium mb-1">LR/RR No.</label>
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                LR / Bilty No.
+              </label>
               <input
                 type="text"
+                placeholder="LR Number"
                 value={lrNumber}
                 onChange={e => setLrNumber(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl font-mono text-gray-800 focus:outline-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-gray-500 font-medium mb-1">LR/RR Date</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={lrDate}
-                  onChange={e => setLrDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-800 focus:outline-blue-500"
-                />
-                <Calendar className="w-4 h-4 text-gray-400 absolute right-3 top-2.5 pointer-events-none" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-gray-500 font-medium mb-1">No. of Packages</label>
-              <input
-                type="number"
-                value={packagesCount}
-                onChange={e => setPackagesCount(parseInt(e.target.value, 10) || 0)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl font-semibold text-gray-900 focus:outline-blue-500"
+                className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl font-mono text-gray-800 focus:outline-blue-500"
               />
             </div>
           </div>
         </div>
 
-        {/* Card 2 (Right): Invoice Details */}
-        <div className="lg:col-span-4 bg-white border border-gray-150 rounded-2xl p-5 shadow-2xs">
-          <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100">
-            <FileText className="w-4 h-4 text-blue-600" />
-            <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Invoice Details</h2>
+        {/* Card 2: Invoice Setup & Timeline */}
+        <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-2xs space-y-3.5">
+          <div className="flex items-center justify-between pb-2.5 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-blue-600" />
+              <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                Invoice Setup &amp; Terms
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={handleRegenerateSequence}
+              className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Refresh Next Seq
+            </button>
           </div>
 
-          <div className="space-y-3 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-gray-500 font-medium">Invoice No.</label>
-                <button
-                  type="button"
-                  onClick={handleRegenerateSequence}
-                  className="text-blue-600 hover:text-blue-800 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
-                  title="Configure Sequence / Next Number"
-                >
-                  <Settings className="w-3.5 h-3.5" />
-                  Auto
-                </button>
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                Invoice Number <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={invoiceNo}
+                  onChange={e => setInvoiceNo(e.target.value)}
+                  placeholder="e.g. INV-260001"
+                  className="w-full px-3 py-1.5 border border-blue-300 bg-blue-50/20 rounded-xl font-mono font-bold text-blue-900 focus:outline-blue-500"
+                />
               </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                Invoice Date
+              </label>
               <input
                 type="text"
-                value={invoiceNo}
-                onChange={e => setInvoiceNo(e.target.value)}
-                className="w-full px-3 py-2 border border-blue-200 bg-blue-50/30 rounded-xl font-mono font-bold text-blue-700 focus:outline-blue-500"
+                value={invoiceDate}
+                onChange={e => setInvoiceDate(e.target.value)}
+                placeholder="DD/MM/YYYY"
+                className="w-full px-3 py-1.5 border border-gray-200 rounded-xl font-mono text-gray-800 focus:outline-blue-500"
               />
             </div>
 
             <div>
-              <label className="block text-gray-500 font-medium mb-1">Invoice Date</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={invoiceDate}
-                  onChange={e => setInvoiceDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-800 focus:outline-blue-500"
-                />
-                <Calendar className="w-4 h-4 text-gray-400 absolute right-3 top-2.5 pointer-events-none" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-gray-500 font-medium mb-1">Payment Terms</label>
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                Payment Terms
+              </label>
               <select
                 value={paymentTerms}
                 onChange={e => setPaymentTerms(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-800 bg-white focus:outline-blue-500"
+                className="w-full px-3 py-1.5 border border-gray-200 rounded-xl text-gray-800 bg-white focus:outline-blue-500 cursor-pointer"
               >
-                <option value="Immediate / COD">Immediate / COD</option>
+                <option value="Immediate">Immediate / Advance</option>
                 <option value="7 Days">7 Days</option>
                 <option value="15 Days">15 Days</option>
                 <option value="30 Days">30 Days</option>
@@ -638,314 +748,310 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
             </div>
 
             <div>
-              <label className="block text-gray-500 font-medium mb-1">Due Date</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={dueDate}
-                  onChange={e => setDueDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-800 focus:outline-blue-500"
-                />
-                <Calendar className="w-4 h-4 text-gray-400 absolute right-3 top-2.5 pointer-events-none" />
-              </div>
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                Due Date
+              </label>
+              <input
+                type="text"
+                value={dueDate}
+                onChange={e => setDueDate(e.target.value)}
+                placeholder="DD/MM/YYYY"
+                className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl font-mono text-gray-700"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                Number of Packages
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={packagesCount}
+                onChange={e => setPackagesCount(parseInt(e.target.value, 10) || 1)}
+                className="w-full px-3 py-1.5 border border-gray-200 rounded-xl font-mono text-gray-800 focus:outline-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                Region / State
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Telangana / AP"
+                value={region}
+                onChange={e => setRegion(e.target.value)}
+                className="w-full px-3 py-1.5 border border-gray-200 rounded-xl text-gray-800 focus:outline-blue-500"
+              />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Middle Grid: Items from Dispatch & Billing Address */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Main Items Table (approx 8.5 cols) */}
-        <div className="lg:col-span-8 bg-white border border-gray-150 rounded-2xl p-5 shadow-2xs overflow-hidden">
-          <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
-            <div className="flex items-center gap-2">
-              <Package className="w-4 h-4 text-blue-600" />
-              <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                Items from Dispatch ({dispatchNo})
-              </h2>
-            </div>
-            <button
-              onClick={handleAddItem}
-              className="px-3 py-1.5 text-blue-600 hover:bg-blue-50 border border-blue-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Item
-            </button>
+      {/* Card 3: Billing & Shipping Addresses */}
+      <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-2xs space-y-3.5">
+        <div className="flex items-center justify-between pb-2.5 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-blue-600" />
+            <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+              Billing &amp; Delivery Addresses
+            </h2>
           </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-gray-50/80 text-gray-600 font-semibold border-b border-gray-200 text-[11px] uppercase">
-                  <th className="py-2.5 px-2 text-center w-8">
-                    <input
-                      type="checkbox"
-                      checked={allItemsChecked}
-                      onChange={e => handleToggleAllItems(e.target.checked)}
-                      className="w-3.5 h-3.5 rounded text-blue-600 border-gray-300"
-                    />
-                  </th>
-                  <th className="py-2.5 px-2 text-center w-8">#</th>
-                  <th className="py-2.5 px-2">Item Code</th>
-                  <th className="py-2.5 px-2">Item Name</th>
-                  <th className="py-2.5 px-2 text-right">Dispatched (GBL)</th>
-                  <th className="py-2.5 px-2 text-right">Dispatched (PCS)</th>
-                  <th className="py-2.5 px-2 text-right">Invoice Qty (GBL)</th>
-                  <th className="py-2.5 px-2 text-right">Invoice Qty (PCS)</th>
-                  <th className="py-2.5 px-2">From Location *</th>
-                  <th className="py-2.5 px-2 text-right">Rate (₹/GBL)</th>
-                  <th className="py-2.5 px-2 text-right">Amount (₹)</th>
-                  <th className="py-2.5 px-2 text-center w-8"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 text-xs">
-                {items.map((item, idx) => (
-                  <tr key={item.itemId || idx} className={`hover:bg-blue-50/30 ${item.selected === false ? 'opacity-50' : ''}`}>
-                    <td className="py-2.5 px-2 text-center">
-                      <input
-                        type="checkbox"
-                        checked={item.selected !== false}
-                        onChange={() => handleToggleItemSelect(idx)}
-                        className="w-3.5 h-3.5 rounded text-blue-600 border-gray-300"
-                      />
-                    </td>
-                    <td className="py-2.5 px-2 text-center text-gray-400 font-mono">{idx + 1}</td>
-                    <td className="py-2.5 px-2 font-mono font-medium text-gray-900">{item.itemCode}</td>
-                    <td className="py-2.5 px-2 font-medium text-gray-900 min-w-[160px]">{item.itemName}</td>
-                    <td className="py-2.5 px-2 text-right text-gray-600">{item.dispatchedGbl}</td>
-                    <td className="py-2.5 px-2 text-right text-gray-600 font-mono">{(item.dispatchedPcs || 0).toLocaleString('en-IN')}</td>
-                    <td className="py-2.5 px-2 text-right">
-                      <input
-                        type="number"
-                        min="0"
-                        value={item.invoiceQtyGbl}
-                        onChange={e => handleItemFieldChange(idx, 'invoiceQtyGbl', e.target.value)}
-                        className="w-16 px-2 py-1 text-right border border-gray-200 rounded-lg font-semibold text-gray-900 focus:outline-blue-500"
-                      />
-                    </td>
-                    <td className="py-2.5 px-2 text-right">
-                      <input
-                        type="number"
-                        min="0"
-                        value={item.invoiceQtyPcs}
-                        onChange={e => handleItemFieldChange(idx, 'invoiceQtyPcs', e.target.value)}
-                        className="w-20 px-2 py-1 text-right border border-gray-200 rounded-lg text-gray-700 font-mono focus:outline-blue-500"
-                      />
-                    </td>
-                    <td className="py-2.5 px-2 relative">
-                      <button
-                        type="button"
-                        onClick={() => setActiveLocRowIndex(activeLocRowIndex === idx ? null : idx)}
-                        className="px-2.5 py-1 bg-white border border-gray-200 hover:border-blue-400 rounded-lg text-xs font-medium text-gray-800 flex items-center justify-between gap-1 min-w-[110px] cursor-pointer"
-                      >
-                        <span className="truncate">{item.locationName || 'Factory-1 v'}</span>
-                        <ChevronDown className="w-3 h-3 text-gray-400 shrink-0" />
-                      </button>
-
-                      {/* Interactive hierarchical dropdown matching Screenshot 2 */}
-                      {activeLocRowIndex === idx && (
-                        <div
-                          ref={locDropdownRef}
-                          className="absolute left-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50 p-2.5 text-xs animate-in fade-in zoom-in-95 duration-100"
-                        >
-                          {/* Search Input */}
-                          <div className="relative mb-2">
-                            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2" />
-                            <input
-                              type="text"
-                              value={locSearchText}
-                              onChange={e => setLocSearchText(e.target.value)}
-                              placeholder="Search location..."
-                              className="w-full pl-8 pr-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:bg-white focus:outline-blue-500"
-                            />
-                          </div>
-
-                          {/* Location Tree */}
-                          <div className="max-h-56 overflow-y-auto space-y-1">
-                            {DEFAULT_LOCATION_TREE.map(node => (
-                              <div key={node.id} className="space-y-0.5">
-                                <div
-                                  onClick={() => setExpandedNodes(prev => ({ ...prev, [node.id]: !prev[node.id] }))}
-                                  className="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-gray-100 font-semibold text-gray-800 cursor-pointer text-[11.5px]"
-                                >
-                                  {node.children && node.children.length > 0 ? (
-                                    expandedNodes[node.id] ? <ChevronDown className="w-3.5 h-3.5 text-gray-500" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-                                  ) : <span className="w-3.5" />}
-                                  <span>{node.name}</span>
-                                </div>
-
-                                {expandedNodes[node.id] && node.children && (
-                                  <div className="pl-4 space-y-0.5">
-                                    {node.children.map(sub => (
-                                      <div key={sub.id} className="space-y-0.5">
-                                        <div
-                                          onClick={() => setExpandedNodes(prev => ({ ...prev, [sub.id]: !prev[sub.id] }))}
-                                          className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-gray-100 font-medium text-gray-700 cursor-pointer text-[11px]"
-                                        >
-                                          {sub.children && sub.children.length > 0 ? (
-                                            expandedNodes[sub.id] ? <ChevronDown className="w-3 h-3 text-gray-400" /> : <ChevronRight className="w-3 h-3 text-gray-400" />
-                                          ) : <span className="w-3" />}
-                                          <span>{sub.name}</span>
-                                        </div>
-
-                                        {expandedNodes[sub.id] && sub.children && (
-                                          <div className="pl-4 space-y-0.5">
-                                            {sub.children.map(leaf => (
-                                              <div
-                                                key={leaf.id}
-                                                onClick={() => {
-                                                  handleItemFieldChange(idx, 'locationName', `${node.name} / ${leaf.name}`);
-                                                  handleItemFieldChange(idx, 'locationPath', leaf.fullPath);
-                                                  setActiveLocRowIndex(null);
-                                                }}
-                                                className={`px-2 py-1 rounded cursor-pointer text-[11px] font-mono flex items-center justify-between ${
-                                                  item.locationPath === leaf.fullPath || item.locationName?.includes(leaf.name)
-                                                    ? 'bg-blue-100 text-blue-700 font-bold'
-                                                    : 'text-gray-700 hover:bg-gray-100'
-                                                }`}
-                                              >
-                                                <span>{leaf.name}</span>
-                                                {(item.locationPath === leaf.fullPath || item.locationName?.includes(leaf.name)) && (
-                                                  <Check className="w-3 h-3 text-blue-600" />
-                                                )}
-                                              </div>
-                                            ))}
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-2 text-right">
-                      <input
-                        type="number"
-                        min="0"
-                        value={item.rate}
-                        onChange={e => handleItemFieldChange(idx, 'rate', e.target.value)}
-                        className="w-20 px-2 py-1 text-right border border-gray-200 rounded-lg font-mono text-gray-900 focus:outline-blue-500"
-                      />
-                    </td>
-                    <td className="py-2.5 px-2 text-right font-mono font-bold text-gray-900">
-                      {(item.amount || 0).toLocaleString('en-IN')}
-                    </td>
-                    <td className="py-2.5 px-2 text-center">
-                      <button
-                        onClick={() => handleRemoveItem(idx)}
-                        className="p-1 text-gray-400 hover:text-rose-600 rounded transition-colors"
-                        title="Delete Item"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="bg-gray-50/90 font-bold text-gray-900 border-t-2 border-gray-200 text-xs">
-                  <td colSpan={4} className="py-3 px-2 text-right uppercase text-gray-700">Total</td>
-                  <td className="py-3 px-2 text-right">{totalDispatchedGbl}</td>
-                  <td className="py-3 px-2 text-right font-mono">{totalDispatchedPcs.toLocaleString('en-IN')}</td>
-                  <td className="py-3 px-2 text-right">{totalInvoiceGbl}</td>
-                  <td className="py-3 px-2 text-right font-mono">{totalInvoicePcs.toLocaleString('en-IN')}</td>
-                  <td></td>
-                  <td></td>
-                  <td className="py-3 px-2 text-right font-mono text-sm text-blue-700">
-                    {subtotalAmount.toLocaleString('en-IN')}
-                  </td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <label className="flex items-center gap-2 text-xs font-medium text-gray-600 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={sameAsBillTo}
+              onChange={e => {
+                setSameAsBillTo(e.target.checked);
+                if (e.target.checked) setShipToAddress(billToAddress);
+              }}
+              className="w-3.5 h-3.5 rounded text-blue-600 border-gray-300"
+            />
+            <span>Ship to address same as Bill to</span>
+          </label>
         </div>
 
-        {/* Billing & Delivery Address (approx 3.5 cols) */}
-        <div className="lg:col-span-4 bg-white border border-gray-150 rounded-2xl p-5 shadow-2xs">
-          <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100">
-            <MapPin className="w-4 h-4 text-blue-600" />
-            <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Billing & Delivery Address</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          {/* Bill To */}
+          <div className="p-3.5 rounded-xl border border-gray-150 bg-gray-50/60 relative group">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-bold text-gray-700 uppercase text-[10px] tracking-wider">
+                Bill To (Customer)
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsEditingAddress('billTo')}
+                className="text-blue-600 hover:text-blue-800 text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <Edit3 className="w-3 h-3" />
+                Edit
+              </button>
+            </div>
+            <p className="font-bold text-gray-900">{billToAddress?.name || customerName || 'Customer'}</p>
+            <p className="text-gray-600 mt-0.5">{billToAddress?.address || 'Street / Location'}</p>
+            <p className="text-gray-600">
+              {billToAddress?.city || city}{billToAddress?.state ? `, ${billToAddress.state}` : ''}{billToAddress?.pincode ? ` - ${billToAddress.pincode}` : ''}
+            </p>
+            {billToAddress?.phone && (
+              <p className="text-gray-500 font-mono text-[11px] mt-1">Ph: {billToAddress.phone}</p>
+            )}
           </div>
 
-          <div className="space-y-4 text-xs">
-            {/* Bill To Card */}
-            <div className="p-3 bg-gray-50/70 border border-gray-200 rounded-xl relative">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] font-bold text-gray-700">Bill To (Customer Address)</span>
+          {/* Ship To */}
+          <div className="p-3.5 rounded-xl border border-gray-150 bg-gray-50/60 relative group">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-bold text-gray-700 uppercase text-[10px] tracking-wider">
+                Ship To (Delivery Site)
+              </span>
+              {!sameAsBillTo && (
                 <button
                   type="button"
-                  onClick={() => setIsEditingAddress('billTo')}
-                  className="text-blue-600 hover:text-blue-800 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                  onClick={() => setIsEditingAddress('shipTo')}
+                  className="text-blue-600 hover:text-blue-800 text-[10px] font-bold flex items-center gap-1 cursor-pointer"
                 >
                   <Edit3 className="w-3 h-3" />
                   Edit
                 </button>
-              </div>
-              <p className="font-bold text-gray-900">{billToAddress.name || billToAddress.firmName}</p>
-              <p className="text-gray-600">{billToAddress.address || 'Main Road'}</p>
-              <p className="text-gray-600">{billToAddress.city || city}, {billToAddress.state || region} - {billToAddress.pincode || '509001'}</p>
-              <p className="text-gray-600 font-mono mt-0.5">Phone: {billToAddress.phone || phone}</p>
+              )}
             </div>
-
-            {/* Same As Bill To Checkbox */}
-            <label className="flex items-center gap-2 cursor-pointer font-medium text-gray-800 select-none">
-              <input
-                type="checkbox"
-                checked={sameAsBillTo}
-                onChange={e => setSameAsBillTo(e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-              />
-              <span>Same as Bill To</span>
-            </label>
-
-            {/* Ship To Card */}
-            {!sameAsBillTo ? (
-              <div className="p-3 bg-gray-50/70 border border-gray-200 rounded-xl relative">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[11px] font-bold text-gray-700">Ship To (Delivery Address)</span>
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingAddress('shipTo')}
-                    className="text-blue-600 hover:text-blue-800 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
-                  >
-                    <Edit3 className="w-3 h-3" />
-                    Edit
-                  </button>
-                </div>
-                <p className="font-bold text-gray-900">{shipToAddress.name || shipToAddress.firmName}</p>
-                <p className="text-gray-600">{shipToAddress.address}</p>
-                <p className="text-gray-600">{shipToAddress.city}, {shipToAddress.state} - {shipToAddress.pincode}</p>
-                <p className="text-gray-600 font-mono mt-0.5">Phone: {shipToAddress.phone}</p>
-              </div>
+            {sameAsBillTo ? (
+              <div className="text-gray-500 italic py-2">Same as billing address</div>
             ) : (
-              <div className="p-3 bg-blue-50/30 border border-blue-100 rounded-xl text-gray-600">
-                <span className="text-[11px] font-semibold text-gray-700 block mb-0.5">Ship To (Delivery Address)</span>
-                <p className="italic text-gray-500">Matches Bill To address above</p>
-              </div>
+              <>
+                <p className="font-bold text-gray-900">{shipToAddress?.name || customerName || 'Customer'}</p>
+                <p className="text-gray-600 mt-0.5">{shipToAddress?.address || 'Street / Location'}</p>
+                <p className="text-gray-600">
+                  {shipToAddress?.city || city}{shipToAddress?.state ? `, ${shipToAddress.state}` : ''}{shipToAddress?.pincode ? ` - ${shipToAddress.pincode}` : ''}
+                </p>
+                {shipToAddress?.phone && (
+                  <p className="text-gray-500 font-mono text-[11px] mt-1">Ph: {shipToAddress.phone}</p>
+                )}
+              </>
             )}
           </div>
         </div>
       </div>
 
-      {/* Bottom Row: Additional Charges, Remarks, and Summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Additional Charges (Card 5) */}
-        <div className="lg:col-span-4 bg-white border border-gray-150 rounded-2xl p-5 shadow-2xs">
-          <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
+      {/* Card 4: Line Items Table */}
+      <div className="bg-white border border-gray-150 rounded-2xl shadow-2xs overflow-hidden">
+        <div className="p-4 sm:p-5 pb-3 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Package className="w-4 h-4 text-blue-600" />
             <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-              Additional Charges (Optional)
+              Dispatched Line Items ({items.length})
             </h2>
           </div>
+          <button
+            type="button"
+            onClick={handleAddItem}
+            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-colors cursor-pointer inline-flex items-center gap-1 border border-blue-200"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add Item
+          </button>
+        </div>
 
-          <div className="space-y-2 mb-3">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="bg-gray-50 text-gray-500 font-bold border-b border-gray-200 text-[10px] uppercase tracking-wider">
+                <th className="py-2.5 px-3 text-center w-8">
+                  <input
+                    type="checkbox"
+                    checked={allItemsChecked}
+                    onChange={e => handleToggleAllItems(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded text-blue-600 border-gray-300"
+                  />
+                </th>
+                <th className="py-2.5 px-2 text-center w-8 text-gray-400">#</th>
+                <th className="py-2.5 px-3">Item Code</th>
+                <th className="py-2.5 px-3">Item Description</th>
+                <th className="py-2.5 px-2 text-center">UOM</th>
+                <th className="py-2.5 px-3 text-right">Dispatched Qty (GBL)</th>
+                <th className="py-2.5 px-3 text-right">Dispatched Qty (PCS)</th>
+                <th className="py-2.5 px-3 text-right">Invoice Qty (GBL)</th>
+                <th className="py-2.5 px-3 text-right">Invoice Qty (PCS)</th>
+                <th className="py-2.5 px-3">Location</th>
+                <th className="py-2.5 px-3 text-right">Rate (₹)</th>
+                <th className="py-2.5 px-3 text-right">Amount (₹)</th>
+                <th className="py-2.5 px-2 text-center w-8"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 text-xs">
+              {items.length === 0 ? (
+                <tr>
+                  <td colSpan={13} className="py-12 text-center text-gray-400">
+                    <Package className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-xs font-semibold text-gray-600">No line items in this invoice yet.</p>
+                    <button
+                      type="button"
+                      onClick={handleAddItem}
+                      className="mt-2 text-xs font-bold text-blue-600 hover:text-blue-800"
+                    >
+                      + Add Item Manually
+                    </button>
+                  </td>
+                </tr>
+              ) : (
+                items.map((row, idx) => {
+                  const isChecked = row.selected !== false;
+                  return (
+                    <tr
+                      key={row.itemId || idx}
+                      className={`hover:bg-blue-50/20 transition-colors ${
+                        !isChecked ? 'opacity-40 bg-gray-50/40' : ''
+                      }`}
+                    >
+                      <td className="py-2.5 px-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleItemSelect(idx)}
+                          className="w-3.5 h-3.5 rounded text-blue-600 border-gray-300 cursor-pointer"
+                        />
+                      </td>
+
+                      <td className="py-2.5 px-2 text-center text-gray-400 font-mono">
+                        {idx + 1}
+                      </td>
+
+                      <td className="py-2.5 px-3 font-mono font-semibold text-gray-800">
+                        <input
+                          type="text"
+                          value={row.itemCode}
+                          onChange={e => handleItemFieldChange(idx, 'itemCode', e.target.value)}
+                          className="w-20 px-1.5 py-1 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded text-xs font-mono font-bold"
+                        />
+                      </td>
+
+                      <td className="py-2.5 px-3">
+                        <input
+                          type="text"
+                          value={row.itemName}
+                          onChange={e => handleItemFieldChange(idx, 'itemName', e.target.value)}
+                          className="w-full px-1.5 py-1 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded text-xs font-semibold text-gray-900"
+                        />
+                      </td>
+
+                      <td className="py-2.5 px-2 text-center text-gray-500 font-mono">
+                        {row.uom || 'GBL'}
+                      </td>
+
+                      <td className="py-2.5 px-3 text-right font-mono text-gray-700">
+                        {row.dispatchedGbl}
+                      </td>
+
+                      <td className="py-2.5 px-3 text-right font-mono text-gray-500">
+                        {row.dispatchedPcs?.toLocaleString('en-IN')}
+                      </td>
+
+                      <td className="py-2.5 px-3 text-right">
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={row.invoiceQtyGbl}
+                          onChange={e => handleItemFieldChange(idx, 'invoiceQtyGbl', e.target.value)}
+                          className="w-20 px-2 py-1 text-right border border-gray-200 rounded-lg font-mono font-bold text-gray-900 focus:outline-blue-500 bg-white"
+                        />
+                      </td>
+
+                      <td className="py-2.5 px-3 text-right font-mono font-medium text-gray-700">
+                        {row.invoiceQtyPcs?.toLocaleString('en-IN')}
+                      </td>
+
+                      <td className="py-2.5 px-3 text-gray-600 text-[11px] truncate max-w-[150px]">
+                        {row.locationName || 'Main Storage'}
+                      </td>
+
+                      <td className="py-2.5 px-3 text-right">
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={row.rate}
+                          onChange={e => handleItemFieldChange(idx, 'rate', e.target.value)}
+                          className="w-20 px-2 py-1 text-right border border-gray-200 rounded-lg font-mono text-gray-900 focus:outline-blue-500 bg-white"
+                        />
+                      </td>
+
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-900">
+                        ₹{row.amount?.toLocaleString('en-IN')}
+                      </td>
+
+                      <td className="py-2.5 px-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItem(idx)}
+                          className="p-1 text-gray-400 hover:text-rose-600 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Bottom Cards: Additional Charges, Remarks & Summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* Additional Charges Card (Card 5) */}
+        <div className="lg:col-span-4 bg-white border border-gray-150 rounded-2xl p-5 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+            <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+              Additional Charges
+            </h2>
+            <span className="text-[10px] text-gray-400">Freight, Packing, etc.</span>
+          </div>
+
+          <div className="space-y-2">
             {additionalCharges.map((ch, idx) => (
               <div key={idx} className="flex items-center gap-2 text-xs">
-                <span className="text-gray-400 font-mono w-4">{idx + 1}</span>
                 <input
                   type="text"
                   value={ch.description}
@@ -970,7 +1076,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
                 <button
                   type="button"
                   onClick={() => handleRemoveCharge(idx)}
-                  className="p-1 text-gray-400 hover:text-rose-600"
+                  className="p-1 text-gray-400 hover:text-rose-600 cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -1004,7 +1110,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
           />
         </div>
 
-        {/* Invoice Summary Card (Card 7) matching Screenshot 2 */}
+        {/* Invoice Summary Card (Card 7) */}
         <div className="lg:col-span-4 bg-white border border-gray-150 rounded-2xl p-5 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
@@ -1023,11 +1129,11 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
               </div>
               <div className="flex justify-between text-gray-600">
                 <span>Total Amount</span>
-                <span className="font-mono font-bold text-gray-900">₹ {subtotalAmount.toLocaleString('en-IN')}</span>
+                <span className="font-mono font-bold text-gray-900">₹{subtotalAmount.toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between text-gray-600">
                 <span>Additional Charges</span>
-                <span className="font-mono font-bold text-gray-900">₹ {totalChargesAmount.toLocaleString('en-IN')}</span>
+                <span className="font-mono font-bold text-gray-900">₹{totalChargesAmount.toLocaleString('en-IN')}</span>
               </div>
             </div>
           </div>
@@ -1035,7 +1141,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
           <div className="pt-3 border-t-2 border-gray-150 mt-4 flex items-baseline justify-between">
             <span className="text-sm font-bold text-gray-900">Grand Total</span>
             <span className="text-xl font-black text-emerald-600 font-mono">
-              ₹ {grandTotal.toLocaleString('en-IN')}
+              ₹{grandTotal.toLocaleString('en-IN')}
             </span>
           </div>
         </div>
@@ -1134,7 +1240,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsEditingAddress(null)}
-                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs"
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer"
               >
                 Done
               </button>
@@ -1145,3 +1251,5 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
     </div>
   );
 };
+
+export default CreateInvoiceView;
