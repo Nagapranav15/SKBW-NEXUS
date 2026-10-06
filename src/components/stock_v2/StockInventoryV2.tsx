@@ -72,6 +72,7 @@ import StockTransferModal from './StockTransferModal';
 import StockAdjustmentModal from './StockAdjustmentModal';
 import { ManufacturingStepsModal } from './ManufacturingStepsModal';
 import UniversalPrintVoucherModal from '../ui/UniversalPrintVoucherModal';
+import { convertRateToUom, convertUom } from '../../utils/uomConversion';
 
 export type StockTabType = 'overview' | 'products' | 'materials' | 'semi' | 'batches' | 'transfers' | 'adjustments' | 'warehouse';
 
@@ -900,6 +901,7 @@ export const StockInventoryV2: React.FC = () => {
     let semiPcs = 0;
     let lowStockCount = 0;
     let outOfStockCount = 0;
+    let negativeStockCount = 0;
 
     allSkus.forEach(sku => {
       const group = getSkuCategoryGroup(sku);
@@ -920,9 +922,13 @@ export const StockInventoryV2: React.FC = () => {
       }
 
       const reorder = Number(sku.reorderLevel) || 10;
+      const hasNegLoc = (sku as any).locationBreakdown?.some((b: any) => (Number(b.onHand) || 0) < 0);
+      if (stock < 0 || hasNegLoc) {
+        negativeStockCount++;
+      }
       if (stock === 0) {
         outOfStockCount++;
-      } else if (stock <= reorder) {
+      } else if (stock > 0 && stock <= reorder) {
         lowStockCount++;
       }
     });
@@ -938,7 +944,8 @@ export const StockInventoryV2: React.FC = () => {
       semiPcs,
       lowStockCount,
       outOfStockCount,
-      totalAlerts: lowStockCount + outOfStockCount
+      negativeStockCount,
+      totalAlerts: lowStockCount + outOfStockCount + negativeStockCount
     };
   }, [allSkus]);
 
@@ -978,9 +985,13 @@ export const StockInventoryV2: React.FC = () => {
       // Stock Status Filter
       const stock = Number(sku.presentStock ?? sku.openingStock) || 0;
       const reorder = Number(sku.reorderLevel) || 10;
-      if (statusFilter === 'IN_STOCK' && stock <= 0) return false;
+      const hasNegLoc = (sku as any).locationBreakdown?.some((b: any) => (Number(b.onHand) || 0) < 0);
+
+      // In Stock filter shows positive and negative stock (all non-zero active balances)
+      if (statusFilter === 'IN_STOCK' && stock === 0 && !hasNegLoc) return false;
+      if (statusFilter === 'NEGATIVE_STOCK' && stock >= 0 && !hasNegLoc) return false;
       if (statusFilter === 'LOW_STOCK' && (stock <= 0 || stock > reorder)) return false;
-      if (statusFilter === 'OUT_OF_STOCK' && stock > 0) return false;
+      if (statusFilter === 'OUT_OF_STOCK' && (stock !== 0 || hasNegLoc)) return false;
 
       // Search Query
       if (debouncedSearch.trim()) {
@@ -1460,6 +1471,7 @@ export const StockInventoryV2: React.FC = () => {
                           {[
                             { id: 'ALL', label: 'All Items' },
                             { id: 'IN_STOCK', label: 'In Stock' },
+                            { id: 'NEGATIVE_STOCK', label: metrics.negativeStockCount > 0 ? `Negative Stock (${metrics.negativeStockCount})` : 'Negative Stock' },
                             { id: 'LOW_STOCK', label: 'Low Stock' },
                             { id: 'OUT_OF_STOCK', label: 'Out of Stock' }
                           ].map(pill => (
@@ -2181,7 +2193,7 @@ export const StockInventoryV2: React.FC = () => {
                                         className="group cursor-pointer flex flex-col text-left py-0.5"
                                         title={breakdown.map(b => `${b.leafName} (${b.hierarchyPath || 'Storage'}): ${b.onHand} ${sku.unit}`).join('\n')}
                                       >
-                                        <div className="flex items-center gap-1.5">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
                                           <div className="flex items-center gap-1 text-xs font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
                                             <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0 group-hover:scale-110 transition-transform" />
                                             <span className="truncate max-w-[120px]">{locInfo.leafName}</span>
@@ -2190,6 +2202,11 @@ export const StockInventoryV2: React.FC = () => {
                                             +{breakdown.length - 1} more
                                           </span>
                                         </div>
+                                        {breakdown.some(b => (Number(b.onHand) || 0) < 0) && (
+                                          <span className="text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-300 px-1.5 py-0.2 rounded-md shrink-0 shadow-2xs mt-0.5 inline-block" title={`Negative stock in: ${breakdown.filter(b => (Number(b.onHand) || 0) < 0).map(nl => `${nl.leafName}: ${nl.onHand} ${sku.unit}`).join(', ')}`}>
+                                            ⚠️ {breakdown.find(b => (Number(b.onHand) || 0) < 0)?.onHand} {sku.unit} in {breakdown.find(b => (Number(b.onHand) || 0) < 0)?.leafName}
+                                          </span>
+                                        )}
                                         <span className="text-[10px] text-gray-400 font-medium pl-5 truncate max-w-[150px]">
                                           Across {breakdown.length} storage spots
                                         </span>
@@ -2227,9 +2244,16 @@ export const StockInventoryV2: React.FC = () => {
                                   const availStock = Number((sku as any).availableStock ?? onHand ?? 0);
                                   const isNegative = availStock < 0;
                                   return (
-                                    <div className={`font-mono font-bold text-sm ${isNegative ? 'text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded inline-block' : 'text-gray-900'}`}>
-                                      {isNegative ? `-${Math.abs(availStock).toLocaleString('en-IN')}` : availStock.toLocaleString('en-IN')}
-                                    </div>
+                                    <>
+                                      <div className={`font-mono font-black text-sm ${isNegative ? 'text-rose-600 bg-rose-50 border border-rose-300 px-2 py-0.5 rounded-md inline-block shadow-2xs' : 'text-gray-900'}`}>
+                                        {isNegative ? `-${Math.abs(availStock).toLocaleString('en-IN')}` : availStock.toLocaleString('en-IN')}
+                                      </div>
+                                      {sku.altUnit && sku.altUnitConversion && Number(sku.altUnitConversion) > 0 && (
+                                        <div className={`text-[10px] font-mono mt-0.5 ${isNegative ? 'text-rose-500 font-semibold' : 'text-gray-400'}`}>
+                                          ≈ {convertUom(availStock, sku.unit || 'PCS', sku.altUnit, sku).toLocaleString('en-IN')} {sku.altUnit}
+                                        </div>
+                                      )}
+                                    </>
                                   );
                                 })()}
                                 <div className="flex items-center justify-end gap-1 mt-0.5">
@@ -2274,8 +2298,12 @@ export const StockInventoryV2: React.FC = () => {
                             {/* 9. Status */}
                             {columnsConfig.find(c => c.id === 'status')?.visible !== false && (
                               <td className="px-4 py-3 text-center whitespace-nowrap">
-                                {isOutOfStock ? (
-                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                {onHand < 0 ? (
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
+                                    Negative Stock
+                                  </span>
+                                ) : isOutOfStock ? (
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
                                     Out of Stock
                                   </span>
                                 ) : isLowStock ? (
@@ -2283,9 +2311,16 @@ export const StockInventoryV2: React.FC = () => {
                                     Low Stock
                                   </span>
                                 ) : (
-                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                    In Stock
-                                  </span>
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                      In Stock
+                                    </span>
+                                    {((sku as any).locationBreakdown || []).some((b: any) => (Number(b.onHand) || 0) < 0) && (
+                                      <span className="px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-rose-50 text-rose-700 border border-rose-300" title="Contains storage spot with negative balance">
+                                        Neg. Spot
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                               </td>
                             )}
@@ -2295,22 +2330,39 @@ export const StockInventoryV2: React.FC = () => {
                                 <div className="font-mono font-bold text-blue-700 text-xs">
                                   {formatCurrency(totalVal)}
                                 </div>
-                                <div 
-                                  className="text-[10px] font-mono text-gray-400" 
-                                  title={(sku as any).costSource === 'slitting'
-                                    ? `Dynamic unit costing from Reel Slitting: ₹${avgPrice.toFixed(2)}/${sku.unit || 'Unit'}`
-                                    : (sku as any).costSource === 'production' 
-                                    ? `Dynamic unit costing from Production Orders: ₹${avgPrice.toFixed(2)}/${sku.unit || 'Unit'}`
-                                    : (sku as any).costSource === 'purchase'
-                                    ? `Average purchase cost across batch entries: ₹${avgPrice.toFixed(2)}/${sku.unit || 'Unit'}`
-                                    : `Master item unit cost: ₹${avgPrice.toFixed(2)}/${sku.unit || 'Unit'}`}
-                                >
-                                  {(sku as any).costSource === 'slitting'
+                                {(() => {
+                                  const altRate = (sku.altUnit && sku.altUnit.toUpperCase() !== (sku.unit || '').toUpperCase())
+                                    ? convertRateToUom(avgPrice, sku.unit || 'Unit', sku.altUnit, sku)
+                                    : 0;
+                                  const costLabel = (sku as any).costSource === 'slitting'
                                     ? 'Slitting '
                                     : (sku as any).costSource === 'production' 
                                     ? 'Prod ' 
-                                    : 'Avg '}₹{avgPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{sku.unit || 'Unit'}
-                                </div>
+                                    : 'Avg ';
+
+                                  return (
+                                    <div 
+                                      className="text-[10px] font-mono text-gray-500 mt-0.5 flex flex-col items-end"
+                                      title={(sku as any).costSource === 'slitting'
+                                        ? `Dynamic unit costing from Reel Slitting: ₹${avgPrice.toFixed(4)}/${sku.unit || 'Unit'}`
+                                        : (sku as any).costSource === 'production' 
+                                        ? `Dynamic unit costing from Production Orders: ₹${avgPrice.toFixed(4)}/${sku.unit || 'Unit'}`
+                                        : (sku as any).costSource === 'purchase'
+                                        ? `Average purchase cost across batch entries: ₹${avgPrice.toFixed(4)}/${sku.unit || 'Unit'}`
+                                        : `Master item unit cost: ₹${avgPrice.toFixed(4)}/${sku.unit || 'Unit'}`}
+                                    >
+                                      <span>
+                                        <span className="text-gray-400 font-sans">{costLabel}</span>
+                                        ₹{avgPrice < 1 && avgPrice > 0 ? avgPrice.toFixed(4) : avgPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{sku.unit || 'Unit'}
+                                      </span>
+                                      {altRate > 0 && (
+                                        <span className="text-indigo-600 font-semibold text-[9.5px]">
+                                          (₹{altRate < 1 ? altRate.toFixed(4) : altRate.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{sku.altUnit})
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                               </td>
                             )}
                             {/* 11. Actions */}

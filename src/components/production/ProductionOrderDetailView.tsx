@@ -211,7 +211,10 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
         reservedQty,
         shortageQty,
         status,
-        costingSource: costing.source
+        costingSource: costing.source,
+        costingSku: costing.sku,
+        skuUnit,
+        skuAltUnit
       };
     });
   }, [order.bomItems, stockCostings, customRates]);
@@ -1518,6 +1521,22 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
                                 }}
                                 className="w-20 px-2 py-1 text-right font-mono font-semibold text-xs border border-gray-200 rounded focus:outline-blue-500 bg-white"
                               />
+                              {(() => {
+                                const cSku = (item as any).costingSku;
+                                if (!cSku || !item.dynamicRate || item.dynamicRate <= 0) return null;
+                                const curUom = (item.uom || cSku.unit || 'PCS').toUpperCase().trim();
+                                const altUom = (cSku.altUnit || '').toUpperCase().trim();
+                                const primUom = (cSku.unit || '').toUpperCase().trim();
+                                const targetAuom = (altUom && altUom !== curUom) ? altUom : (primUom && primUom !== curUom ? primUom : null);
+                                if (!targetAuom) return null;
+                                const converted = convertRateToUom(item.dynamicRate, item.uom || primUom, targetAuom, cSku);
+                                if (!converted || converted <= 0) return null;
+                                return (
+                                  <span className="text-[9.5px] text-indigo-700 font-bold font-mono text-right block mt-0.5" title={`Rate in ${targetAuom}: ₹${converted.toFixed(4)}`}>
+                                    ≈ ₹{converted < 1 ? converted.toFixed(4) : converted.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{targetAuom}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className="py-2 px-2.5 font-mono font-bold text-gray-900 text-right">
                               {item.dynamicAmount > 0 
@@ -1776,7 +1795,25 @@ export const ProductionOrderDetailView: React.FC<ProductionOrderDetailViewProps>
                   <td className="py-2 px-2.5 text-gray-600">{item.type}</td>
                   <td className="py-2 px-2.5 font-mono font-bold text-gray-900">{item.totalRequired.toLocaleString()}</td>
                   <td className="py-2 px-2.5 text-gray-600">{item.uom}</td>
-                  <td className="py-2 px-2.5 font-mono font-semibold text-gray-800 text-right">₹{item.dynamicRate.toFixed(2)}</td>
+                  <td className="py-2 px-2.5 font-mono font-semibold text-gray-800 text-right">
+                    <div>₹{item.dynamicRate < 1 && item.dynamicRate > 0 ? item.dynamicRate.toFixed(4) : item.dynamicRate.toFixed(2)}</div>
+                    {(() => {
+                      const cSku = (item as any).costingSku;
+                      if (!cSku || !item.dynamicRate || item.dynamicRate <= 0) return null;
+                      const curUom = (item.uom || cSku.unit || 'PCS').toUpperCase().trim();
+                      const altUom = (cSku.altUnit || '').toUpperCase().trim();
+                      const primUom = (cSku.unit || '').toUpperCase().trim();
+                      const targetAuom = (altUom && altUom !== curUom) ? altUom : (primUom && primUom !== curUom ? primUom : null);
+                      if (!targetAuom) return null;
+                      const converted = convertRateToUom(item.dynamicRate, item.uom || primUom, targetAuom, cSku);
+                      if (!converted || converted <= 0) return null;
+                      return (
+                        <div className="text-[9.5px] text-indigo-700 font-medium">
+                          (₹{converted < 1 ? converted.toFixed(4) : converted.toFixed(2)}/{targetAuom})
+                        </div>
+                      );
+                    })()}
+                  </td>
                 </tr>
               ))}
             </tbody>

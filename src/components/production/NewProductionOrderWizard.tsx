@@ -3164,6 +3164,23 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                 }
                               />
                             </div>
+                            {/* AUOM dual rate display */}
+                            {(() => {
+                              const matSku = backendSkus.find(s => s._id === row.skuId || s.skuCode === row.code || s.name === row.component);
+                              if (!matSku || !row.rate || row.rate <= 0) return null;
+                              const curUom = (row.uom || matSku.unit || 'PCS').toUpperCase().trim();
+                              const altUom = (matSku.altUnit || '').toUpperCase().trim();
+                              const primUom = (matSku.unit || '').toUpperCase().trim();
+                              const targetAuom = (altUom && altUom !== curUom) ? altUom : (primUom && primUom !== curUom ? primUom : null);
+                              if (!targetAuom) return null;
+                              const converted = convertRateToUom(row.rate, row.uom || primUom, targetAuom, matSku);
+                              if (!converted || converted <= 0) return null;
+                              return (
+                                <span className="text-[9.5px] text-indigo-700 font-bold font-mono text-right block mt-0.5" title={`Rate in ${targetAuom}: ₹${converted.toFixed(4)}`}>
+                                  ≈ ₹{converted < 1 ? converted.toFixed(4) : converted.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{targetAuom}
+                                </span>
+                              );
+                            })()}
                             {/* FIFO Allocation & Majority Batch Badge */}
                             {row.rateMode === 'fifo' && row.fifoBatchInfo && (
                               <span

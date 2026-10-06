@@ -278,8 +278,9 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
       let rawRate = Number((item as any)?.rate || 0);
       if (rawRate <= 0 && matchedSku) {
         rawRate = Number(
-          (matchedSku as any)?.costPrice ||
+          (matchedSku as any)?.costPerPiece ||
           (matchedSku as any)?.avgCost ||
+          (matchedSku as any)?.costPrice ||
           (matchedSku as any)?.standardCost ||
           (matchedSku as any)?.purchasePrice ||
           (matchedSku as any)?.ratePerKg ||

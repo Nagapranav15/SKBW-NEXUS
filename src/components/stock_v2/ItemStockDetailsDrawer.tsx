@@ -60,7 +60,7 @@ import {
 import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
 import { ManufacturingStepsModal } from './ManufacturingStepsModal';
-import { convertPrimaryToAlt } from '../../utils/uomConversion';
+import { convertPrimaryToAlt, convertRateToUom } from '../../utils/uomConversion';
 
 export type ItemDrawerTab = 'overview' | 'locations' | 'batches' | 'reels' | 'movements' | 'reservations';
 
@@ -954,11 +954,12 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               </div>
               <div className="min-w-0">
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">ON HAND</div>
-                <div className="text-base sm:text-lg font-black text-gray-900 leading-tight">
-                  {totalStock.toLocaleString('en-IN')} <span className="text-xs font-bold text-blue-600 font-sans">{unit}</span>
+                <div className={`text-base sm:text-lg font-black leading-tight ${totalStock < 0 ? 'text-rose-600' : 'text-gray-900'}`}>
+                  {totalStock < 0 ? `-${Math.abs(totalStock).toLocaleString('en-IN')}` : totalStock.toLocaleString('en-IN')}{' '}
+                  <span className={`text-xs font-bold font-sans ${totalStock < 0 ? 'text-rose-600' : 'text-blue-600'}`}>{unit}</span>
                 </div>
-                <div className="text-[11px] font-medium text-gray-400 font-mono truncate">
-                  ≈ {(totalStock * conversionFactor).toLocaleString('en-IN')} {altUnit}
+                <div className={`text-[11px] font-medium font-mono truncate ${totalStock < 0 ? 'text-rose-500 font-semibold' : 'text-gray-400'}`}>
+                  ≈ {totalStock < 0 ? `-${Math.abs(totalStock * conversionFactor).toLocaleString('en-IN')}` : (totalStock * conversionFactor).toLocaleString('en-IN')} {altUnit}
                 </div>
               </div>
             </div>
@@ -986,11 +987,12 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               </div>
               <div className="min-w-0">
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">AVAILABLE</div>
-                <div className="text-base sm:text-lg font-black text-gray-900 leading-tight">
-                  {availableStock.toLocaleString('en-IN')} <span className="text-xs font-bold text-emerald-600 font-sans">{unit}</span>
+                <div className={`text-base sm:text-lg font-black leading-tight ${availableStock < 0 ? 'text-rose-600' : 'text-gray-900'}`}>
+                  {availableStock < 0 ? `-${Math.abs(availableStock).toLocaleString('en-IN')}` : availableStock.toLocaleString('en-IN')}{' '}
+                  <span className={`text-xs font-bold font-sans ${availableStock < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{unit}</span>
                 </div>
-                <div className="text-[11px] font-medium text-gray-400 font-mono truncate">
-                  ≈ {availablePcs.toLocaleString('en-IN')} {altUnit}
+                <div className={`text-[11px] font-medium font-mono truncate ${availableStock < 0 ? 'text-rose-500 font-semibold' : 'text-gray-400'}`}>
+                  ≈ {availableStock < 0 ? `-${Math.abs(availablePcs).toLocaleString('en-IN')}` : availablePcs.toLocaleString('en-IN')} {altUnit}
                 </div>
               </div>
             </div>
@@ -1199,10 +1201,23 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     <div>
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">STOCKING UNIT (UOM)</span>
                       <span className="font-black text-gray-900 font-mono text-sm">{unit}</span>
+                      {avgRate > 0 && (
+                        <span className="text-[11px] font-bold text-blue-700 block mt-0.5 font-mono">
+                          ₹{avgRate < 1 ? avgRate.toFixed(4) : avgRate.toLocaleString('en-IN', { maximumFractionDigits: 2 })} / {unit}
+                        </span>
+                      )}
                     </div>
                     <div>
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">ALTERNATE UNIT (AUOM)</span>
                       <span className="font-black text-gray-900 font-mono text-sm">{altUnit || '—'}</span>
+                      {altUnit && avgRate > 0 && (
+                        <span className="text-[11px] font-bold text-indigo-700 block mt-0.5 font-mono">
+                          {(() => {
+                            const auomRate = convertRateToUom(avgRate, unit, altUnit, sku);
+                            return `₹${auomRate < 1 ? auomRate.toFixed(4) : auomRate.toLocaleString('en-IN', { maximumFractionDigits: 2 })} / ${altUnit}`;
+                          })()}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1583,8 +1598,16 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                   <span className="text-base font-black text-gray-900">{formatCurrency(totalBatchValue)}</span>
                 </div>
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-3 shadow-2xs">
-                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">AVERAGE RATE (INFO ONLY)</span>
+                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">AVERAGE RATE</span>
                   <span className="text-base font-black text-gray-900 font-mono">₹{avgBatchRate} / {unit}</span>
+                  {altUnit && avgBatchRate > 0 && (
+                    <span className="text-[10.5px] text-indigo-700 font-mono font-bold block mt-0.5">
+                      ≈ ₹{(() => {
+                        const r = convertRateToUom(avgBatchRate, unit, altUnit, sku);
+                        return r < 1 ? r.toFixed(4) : r.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+                      })()} / {altUnit}
+                    </span>
+                  )}
                 </div>
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-3 shadow-2xs">
                   <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">OLDEST BATCH</span>
@@ -1649,7 +1672,17 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                             </td>
                             <td className="p-3 text-right font-mono font-bold text-gray-900">{b.remainingQty}</td>
                             <td className="p-3 text-right font-mono text-gray-500">{(b.remainingQty * conversionFactor).toLocaleString('en-IN')}</td>
-                            <td className="p-3 text-right font-mono text-gray-900">₹{b.rate}</td>
+                            <td className="p-3 text-right font-mono text-gray-900">
+                              <span className="font-bold">₹{b.rate}</span>
+                              {altUnit && b.rate > 0 && (
+                                <span className="text-[9.5px] text-indigo-600 block">
+                                  {(() => {
+                                    const r = convertRateToUom(b.rate, unit, altUnit, sku);
+                                    return `(₹${r < 1 ? r.toFixed(4) : r.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/${altUnit})`;
+                                  })()}
+                                </span>
+                              )}
+                            </td>
                             <td className="p-3 text-right font-mono font-bold text-gray-900">{formatCurrency(b.value)}</td>
                             <td className="p-3 text-center">
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
