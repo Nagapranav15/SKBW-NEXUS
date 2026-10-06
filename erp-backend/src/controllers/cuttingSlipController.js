@@ -635,6 +635,8 @@ exports.createCuttingSlip = async (req, res) => {
       targetSkuDoc.avgCost = roundedAvg;
       targetSkuDoc.costPrice = roundedAvg;
       targetSkuDoc.standardCost = roundedAvg;
+      targetSkuDoc.avgRate = roundedAvg;
+      targetSkuDoc.rate = roundedAvg;
       await targetSkuDoc.save({ session });
     } catch (costErr) {
       console.error("Non-critical: Failed to update target SKU weighted average cost on cutting slip:", costErr);

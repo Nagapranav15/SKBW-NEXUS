@@ -2940,8 +2940,8 @@ exports.getSkuStockDetails = async (req, res, next) => {
           onHand: lb.onHand,
           reserved: 0,
           available: lb.onHand,
-          unitCost: Number(sku.costPrice || sku.rate || 0),
-          stockValue: lb.onHand * Number(sku.costPrice || sku.rate || 0)
+          unitCost: Number(sku.avgCost || sku.costPrice || sku.standardCost || sku.avgRate || sku.rate || 0),
+          stockValue: lb.onHand * Number(sku.avgCost || sku.costPrice || sku.standardCost || sku.avgRate || sku.rate || 0)
         };
       })
     );
@@ -3023,12 +3023,13 @@ exports.getSkuStockDetails = async (req, res, next) => {
     const batchesWithCosting = await Promise.all(
       batchBalances.map(async (b, idx) => {
         let supplier = 'Direct Stock / Opening';
-        let rate = Number(sku.costPrice || sku.rate || 0);
+        let rate = Number(sku.avgCost || sku.costPrice || sku.standardCost || sku.avgRate || sku.rate || 0);
         let purchaseDate = b.firstInDate || new Date();
         let receivedQty = b.onHand;
         let reference = b.referenceId || `LOT-${idx + 1}`;
 
         let isFromProduction = b.referenceType === 'ProductionOrder' || b.referenceType === 'Production' || (b.referenceId && /^(?:PO|PR)-/i.test(b.referenceId));
+        let isFromCuttingSlip = b.referenceType === 'CuttingSlip' || (b.referenceId && /^CS-/i.test(b.referenceId)) || (b.batchNumber && /^CS-/i.test(b.batchNumber));
 
         if (isFromProduction) {
           const po = await ProductionOrder.findOne({
@@ -3054,6 +3055,49 @@ exports.getSkuStockDetails = async (req, res, next) => {
             }
             if (prodRate > 0) {
               rate = Math.round(prodRate * 100) / 100;
+            }
+          }
+        } else if (isFromCuttingSlip) {
+          const csDoc = await CuttingSlip.findOne({
+            company: companyObjId,
+            $or: [
+              { slipNumber: b.referenceId },
+              { slipNumber: b.batchNumber }
+            ]
+          }).lean();
+
+          if (csDoc) {
+            supplier = `Reel Slitting (${csDoc.slipNumber})`;
+            reference = csDoc.slipNumber;
+            purchaseDate = csDoc.date || csDoc.createdAt || purchaseDate;
+
+            const targetUnitNorm = (sku.unit || '').trim().toLowerCase();
+            const isReam = targetUnitNorm.includes('ream');
+            const isGbl = targetUnitNorm === 'gbl' || targetUnitNorm.includes('bundle') || targetUnitNorm.includes('box') || targetUnitNorm.includes('carton');
+            const convFactor = Number(
+              sku.altUnitConversion ||
+              sku.conv ||
+              sku.booksGbl ||
+              sku.pcsPerGbl ||
+              0
+            );
+
+            const netCost = Number(csDoc.netProductionCost || csDoc.totalInputCost || 0);
+            let outQty = Number(csDoc.actualSheets || 0);
+            if (isReam && Number(csDoc.actualReams) > 0) {
+              outQty = Number(csDoc.actualReams);
+            } else if (isGbl && convFactor > 0) {
+              outQty = outQty / convFactor;
+            } else if (sku.altUnit && convFactor > 0) {
+              outQty = outQty / convFactor;
+            }
+
+            if (netCost > 0 && outQty > 0) {
+              rate = Math.round((netCost / outQty) * 10000) / 10000;
+            } else if (csDoc.effectiveCostPerSheet && !isReam && !isGbl) {
+              rate = Number(csDoc.effectiveCostPerSheet);
+            } else if (csDoc.effectiveCostPerReam && isReam) {
+              rate = Number(csDoc.effectiveCostPerReam);
             }
           }
         } else if (b.batchNumber && b.batchNumber !== 'UNKNOWN') {
@@ -3103,6 +3147,48 @@ exports.getSkuStockDetails = async (req, res, next) => {
               if (prodRate > 0) {
                 rate = Math.round(prodRate * 100) / 100;
               }
+            } else {
+              // Also check if batchNumber matches a Cutting Slip
+              const csDoc = await CuttingSlip.findOne({
+                company: companyObjId,
+                slipNumber: b.batchNumber
+              }).lean();
+
+              if (csDoc) {
+                isFromCuttingSlip = true;
+                supplier = `Reel Slitting (${csDoc.slipNumber})`;
+                reference = csDoc.slipNumber;
+                purchaseDate = csDoc.date || csDoc.createdAt || purchaseDate;
+
+                const targetUnitNorm = (sku.unit || '').trim().toLowerCase();
+                const isReam = targetUnitNorm.includes('ream');
+                const isGbl = targetUnitNorm === 'gbl' || targetUnitNorm.includes('bundle') || targetUnitNorm.includes('box') || targetUnitNorm.includes('carton');
+                const convFactor = Number(
+                  sku.altUnitConversion ||
+                  sku.conv ||
+                  sku.booksGbl ||
+                  sku.pcsPerGbl ||
+                  0
+                );
+
+                const netCost = Number(csDoc.netProductionCost || csDoc.totalInputCost || 0);
+                let outQty = Number(csDoc.actualSheets || 0);
+                if (isReam && Number(csDoc.actualReams) > 0) {
+                  outQty = Number(csDoc.actualReams);
+                } else if (isGbl && convFactor > 0) {
+                  outQty = outQty / convFactor;
+                } else if (sku.altUnit && convFactor > 0) {
+                  outQty = outQty / convFactor;
+                }
+
+                if (netCost > 0 && outQty > 0) {
+                  rate = Math.round((netCost / outQty) * 10000) / 10000;
+                } else if (csDoc.effectiveCostPerSheet && !isReam && !isGbl) {
+                  rate = Number(csDoc.effectiveCostPerSheet);
+                } else if (csDoc.effectiveCostPerReam && isReam) {
+                  rate = Number(csDoc.effectiveCostPerReam);
+                }
+              }
             }
           }
         }
@@ -3121,6 +3207,9 @@ exports.getSkuStockDetails = async (req, res, next) => {
         }
         const shortLocPath = [warehouse?.name, floor?.name, zone?.name, locDoc?.name].filter(Boolean).join(' > ');
 
+        const fallbackRate = Number(sku.avgCost || sku.costPrice || sku.standardCost || sku.avgRate || sku.rate || 0);
+        const resolvedRate = rate > 0 ? rate : fallbackRate;
+
         return {
           id: `batch-${b.batchNumber || idx}`,
           batchNumber: b.batchNumber || `FG-${new Date().toISOString().slice(2,10).replace(/-/g,'')}-${idx + 1}`,
@@ -3130,10 +3219,10 @@ exports.getSkuStockDetails = async (req, res, next) => {
           shortLocPath: shortLocPath || (locDoc ? locDoc.name : 'Main Storage'),
           receivedQty,
           remainingQty: b.onHand,
-          rate: rate > 0 ? rate : Number(sku.costPrice || sku.rate || 250),
-          value: b.onHand * (rate > 0 ? rate : Number(sku.costPrice || sku.rate || 250)),
+          rate: resolvedRate,
+          value: b.onHand * resolvedRate,
           supplier: supplier,
-          source: (isFromProduction || supplier.startsWith('Production')) ? (supplier || `Production ${b.referenceId}`) : supplier,
+          source: (isFromProduction || isFromCuttingSlip || supplier.startsWith('Production') || supplier.startsWith('Reel Slitting')) ? supplier : supplier,
           date: purchaseDate,
           status: 'Active'
         };
@@ -3378,7 +3467,10 @@ exports.getSkuStockDetails = async (req, res, next) => {
       : populatedLocations.reduce((sum, l) => sum + (l.onHand || 0), 0);
     const availableTotal = onHandTotal - totalReserved;
     const totalBatchesVal = batchesWithCosting.reduce((sum, b) => sum + (b.value || 0), 0);
-    const unitPrice = Number(sku.costPrice || sku.rate || (batchesWithCosting.length > 0 ? totalBatchesVal / onHandTotal : 0) || 0);
+    const masterCost = Number(sku.avgCost || sku.costPrice || sku.standardCost || sku.avgRate || sku.rate || 0);
+    const unitPrice = (totalBatchesVal > 0 && onHandTotal > 0)
+      ? Math.round((totalBatchesVal / onHandTotal) * 10000) / 10000
+      : (masterCost > 0 ? masterCost : 0);
     const stockValue = totalBatchesVal > 0 ? totalBatchesVal : (onHandTotal * unitPrice);
     const avgRate = onHandTotal > 0 ? (stockValue / onHandTotal) : unitPrice;
 

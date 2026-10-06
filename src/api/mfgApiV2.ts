@@ -39,6 +39,12 @@ export interface SkuV2 {
   processSteps?: any[];
   preferredVendor?: string;
   company?: string | any;
+  costPrice?: number;
+  avgCost?: number;
+  standardCost?: number;
+  avgRate?: number;
+  purchasePrice?: number;
+  costSource?: 'slitting' | 'production' | 'purchase' | 'master';
   initialLocationId?: string;
   initialLocation?: any;
   defaultLocation?: string;

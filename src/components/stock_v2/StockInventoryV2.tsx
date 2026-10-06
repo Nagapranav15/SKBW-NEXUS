@@ -58,6 +58,7 @@ import {
   createWarehouseLocationV2,
   updateWarehouseLocationV2,
   deleteWarehouseLocationV2,
+  getCuttingSlipsV2,
   SkuV2, 
   LedgerEntryV2, 
   WarehouseLocationV2 
@@ -583,12 +584,13 @@ export const StockInventoryV2: React.FC = () => {
         .catch(() => {});
 
       // Parallel core data fetch with light payloads
-      const [skusRes, locsRes, balancesRes, purchasesRes, prodOrdersRes] = await Promise.all([
+      const [skusRes, locsRes, balancesRes, purchasesRes, prodOrdersRes, cuttingSlipsRes] = await Promise.all([
         getSkusV2(selectedCompany._id).catch(() => []),
         getWarehouseHierarchyV2(selectedCompany._id).catch(() => []),
         getBalancesV2(selectedCompany._id).catch(() => []),
         getPurchaseInvoicesV2({ companyId: selectedCompany._id, limit: 100, light: true }).catch(() => ({ invoices: [] })),
-        getProductionOrders({ companyId: selectedCompany._id, light: true }).catch(() => [])
+        getProductionOrders({ companyId: selectedCompany._id, light: true }).catch(() => []),
+        getCuttingSlipsV2(selectedCompany._id, { limit: 150 }).catch(() => ({ cuttingSlips: [] }))
       ]);
 
       setAllLocations(locsRes || []);
@@ -719,27 +721,107 @@ export const StockInventoryV2: React.FC = () => {
         }
       });
 
+      // 4. Dynamic Costing from Reel Slitting Process (Cutting Slips)
+      const slittingCostMap = new Map<string, { totalSpend: number; totalQty: number; avgRate: number }>();
+      const rawSlips = (cuttingSlipsRes as any)?.cuttingSlips || (Array.isArray(cuttingSlipsRes) ? cuttingSlipsRes : []);
+
+      rawSlips.forEach((cs: any) => {
+        if (cs.status === 'Cancelled') return;
+
+        const targetSkuObj = cs.targetSku;
+        const sId = targetSkuObj?._id ? String(targetSkuObj._id) : (typeof targetSkuObj === 'string' ? targetSkuObj : '');
+        const sCode = (targetSkuObj?.skuCode || '').trim().toLowerCase();
+        const sName = (targetSkuObj?.name || '').trim().toLowerCase();
+
+        // Cross-reference with skusRes for reliable units & conversion factors
+        const matchedSkuDoc = (skusRes || []).find((s: any) => 
+          (sId && String(s._id) === sId) || 
+          (sCode && (s.skuCode || '').trim().toLowerCase() === sCode) ||
+          (sName && (s.name || '').trim().toLowerCase() === sName)
+        );
+
+        const skuUnit = (targetSkuObj?.unit || matchedSkuDoc?.unit || '').trim().toLowerCase();
+        const isReam = skuUnit.includes('ream');
+        const isGbl = skuUnit === 'gbl' || skuUnit.includes('bundle') || skuUnit.includes('box') || skuUnit.includes('carton');
+        const convFactor = Number(
+          targetSkuObj?.altUnitConversion ||
+          matchedSkuDoc?.altUnitConversion ||
+          targetSkuObj?.booksGbl ||
+          matchedSkuDoc?.booksGbl ||
+          targetSkuObj?.pcsPerGbl ||
+          matchedSkuDoc?.pcsPerGbl ||
+          0
+        );
+
+        const actualSheets = Number(cs.actualSheets) || 0;
+        const actualReams = Number(cs.actualReams) || 0;
+        const totalNetCost = Number(cs.netProductionCost || cs.totalInputCost || 0);
+
+        let outQty = actualSheets;
+        if (isReam && actualReams > 0) {
+          outQty = actualReams;
+        } else if (isGbl && convFactor > 0) {
+          outQty = actualSheets / convFactor;
+        } else if ((targetSkuObj?.altUnit || matchedSkuDoc?.altUnit) && convFactor > 0) {
+          outQty = actualSheets / convFactor;
+        }
+
+        let unitRate = 0;
+        if (totalNetCost > 0 && outQty > 0) {
+          unitRate = totalNetCost / outQty;
+        } else if (cs.effectiveCostPerSheet && !isReam && !isGbl) {
+          unitRate = Number(cs.effectiveCostPerSheet);
+        } else if (cs.effectiveCostPerReam && isReam) {
+          unitRate = Number(cs.effectiveCostPerReam);
+        }
+
+        if (unitRate > 0 && outQty > 0) {
+          const targetKeys = [
+            sId,
+            sCode,
+            sName,
+            matchedSkuDoc ? String(matchedSkuDoc._id) : '',
+            matchedSkuDoc?.skuCode ? matchedSkuDoc.skuCode.trim().toLowerCase() : ''
+          ].filter(Boolean);
+
+          targetKeys.forEach(k => {
+            const cur = slittingCostMap.get(k) || { totalSpend: 0, totalQty: 0, avgRate: 0 };
+            const newSpend = cur.totalSpend + totalNetCost;
+            const newQty = cur.totalQty + outQty;
+            slittingCostMap.set(k, {
+              totalSpend: newSpend,
+              totalQty: newQty,
+              avgRate: newQty > 0 ? (newSpend / newQty) : unitRate
+            });
+          });
+        }
+      });
+
       const formattedSkus: SkuV2[] = (skusRes || []).map((s: SkuV2) => {
         const sId = String(s._id);
         const sCode = (s.skuCode || '').trim().toLowerCase();
         const sName = (s.name || '').trim().toLowerCase();
 
         const liveOnHand = balanceMap.get(sId) || 0;
-        const avgStats = avgPriceMap.get(sId);
+        const slittingStats = slittingCostMap.get(sId) || slittingCostMap.get(sCode) || slittingCostMap.get(sName);
         const prodStats = prodCostMap.get(sId) || prodCostMap.get(sCode) || prodCostMap.get(sName);
+        const avgStats = avgPriceMap.get(sId);
 
-        // Production costing is prioritized for manufactured items (finished & semi goods)
+        // Costing priority: Reel Slitting -> Production Orders -> Purchase Invoices -> Master SKU cost
         let calculatedAvg = 0;
-        let costSource: 'production' | 'purchase' | 'master' = 'master';
+        let costSource: 'slitting' | 'production' | 'purchase' | 'master' = 'master';
 
-        if (prodStats && prodStats.avgRate > 0) {
+        if (slittingStats && slittingStats.avgRate > 0) {
+          calculatedAvg = Math.round(slittingStats.avgRate * 100) / 100;
+          costSource = 'slitting';
+        } else if (prodStats && prodStats.avgRate > 0) {
           calculatedAvg = Math.round(prodStats.avgRate * 100) / 100;
           costSource = 'production';
         } else if (avgStats && avgStats.avgPrice > 0) {
           calculatedAvg = Math.round(avgStats.avgPrice * 100) / 100;
           costSource = 'purchase';
         } else {
-          calculatedAvg = Number((s as any).purchasePrice || (s as any).ratePerKg || (s as any).rate || (s as any).avgRate || 0);
+          calculatedAvg = Number((s as any).avgCost || (s as any).costPrice || (s as any).standardCost || (s as any).avgRate || (s as any).purchasePrice || (s as any).ratePerKg || (s as any).rate || 0);
           costSource = 'master';
         }
 
@@ -822,7 +904,7 @@ export const StockInventoryV2: React.FC = () => {
     allSkus.forEach(sku => {
       const group = getSkuCategoryGroup(sku);
       const stock = Number(sku.presentStock) || 0;
-      const rate = Number((sku as any)?.avgRate || (sku as any)?.purchasePrice || (sku as any)?.ratePerKg || (sku as any)?.rate || 0);
+      const rate = Number((sku as any)?.avgRate || (sku as any)?.avgCost || (sku as any)?.costPrice || (sku as any)?.standardCost || (sku as any)?.purchasePrice || (sku as any)?.ratePerKg || (sku as any)?.rate || 0);
       const val = stock * rate;
       totalStockVal += val;
 
@@ -1038,7 +1120,7 @@ export const StockInventoryV2: React.FC = () => {
       const stock = Number(s.presentStock) || 0;
       const reorder = Number(s.reorderLevel) || 10;
       const statusLabel = stock === 0 ? 'Out of Stock' : stock <= reorder ? 'Low Stock' : 'In Stock';
-      const avgRate = Number((s as any).avgRate || (s as any).purchasePrice || (s as any).ratePerKg || (s as any).rate || 0);
+      const avgRate = Number((s as any).avgRate || (s as any).avgCost || (s as any).costPrice || (s as any).standardCost || (s as any).purchasePrice || (s as any).ratePerKg || (s as any).rate || 0);
 
       return {
         'SKU Code': s.skuCode,
@@ -1999,7 +2081,7 @@ export const StockInventoryV2: React.FC = () => {
                       filteredSkus.map((sku, index) => {
                         const onHand = Number(sku.presentStock) || 0;
                         const reorder = Number(sku.reorderLevel) || 10;
-                        const avgPrice = Number((sku as any)?.avgRate || (sku as any)?.purchasePrice || (sku as any)?.ratePerKg || (sku as any)?.rate || 0);
+                        const avgPrice = Number((sku as any)?.avgRate || (sku as any)?.avgCost || (sku as any)?.costPrice || (sku as any)?.standardCost || (sku as any)?.purchasePrice || (sku as any)?.ratePerKg || (sku as any)?.rate || 0);
                         const totalVal = onHand * avgPrice;
                         const isSelected = selectedIds.includes(sku._id);
 
@@ -2215,11 +2297,19 @@ export const StockInventoryV2: React.FC = () => {
                                 </div>
                                 <div 
                                   className="text-[10px] font-mono text-gray-400" 
-                                  title={(sku as any).costSource === 'production' 
+                                  title={(sku as any).costSource === 'slitting'
+                                    ? `Dynamic unit costing from Reel Slitting: ₹${avgPrice.toFixed(2)}/${sku.unit || 'Unit'}`
+                                    : (sku as any).costSource === 'production' 
                                     ? `Dynamic unit costing from Production Orders: ₹${avgPrice.toFixed(2)}/${sku.unit || 'Unit'}`
-                                    : `Average purchase cost across batch entries: ₹${avgPrice.toFixed(2)}/${sku.unit || 'Unit'}`}
+                                    : (sku as any).costSource === 'purchase'
+                                    ? `Average purchase cost across batch entries: ₹${avgPrice.toFixed(2)}/${sku.unit || 'Unit'}`
+                                    : `Master item unit cost: ₹${avgPrice.toFixed(2)}/${sku.unit || 'Unit'}`}
                                 >
-                                  {(sku as any).costSource === 'production' ? 'Prod ' : 'Avg '}₹{avgPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{sku.unit || 'Unit'}
+                                  {(sku as any).costSource === 'slitting'
+                                    ? 'Slitting '
+                                    : (sku as any).costSource === 'production' 
+                                    ? 'Prod ' 
+                                    : 'Avg '}₹{avgPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{sku.unit || 'Unit'}
                                 </div>
                               </td>
                             )}
