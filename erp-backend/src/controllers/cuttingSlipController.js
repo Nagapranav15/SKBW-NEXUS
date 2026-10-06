@@ -313,8 +313,6 @@ exports.createCuttingSlip = async (req, res) => {
       coreRatePerPc,
       totalScrapCredit,
       netProductionCost,
-      effectiveCostPerSheet,
-      effectiveCostPerReam,
       destinationLocationId,
       machineName,
       operatorName,
