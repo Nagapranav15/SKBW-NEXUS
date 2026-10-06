@@ -327,6 +327,29 @@ exports.createCuttingSlip = async (req, res) => {
     if (!totalInputWeight || totalInputWeight <= 0) throw new Error("Total input weight must be greater than zero");
     if (actualSheets === undefined || actualSheets < 0) throw new Error("Actual sheets produced cannot be negative");
 
+    // Theoretical maximum yield validation from physics/mass conservation
+    // Formula: Theoretical Sheets = (Weight in KG * 10,000,000) / (Width_cm * Length_cm * GSM)
+    const w = Number(sheetWidth);
+    const l = Number(sheetLength);
+    const gsm = Number(sheetGsm);
+    const weight = Number(totalInputWeight);
+    const validActualSheets = Number(actualSheets);
+
+    let maxTheoSheets = 0;
+    if (weight > 0 && w > 0 && l > 0 && gsm > 0) {
+      maxTheoSheets = Math.round((weight * 10000000) / (w * l * gsm));
+    }
+
+    if (maxTheoSheets > 0) {
+      // Allow at most 0.5% float tolerance (e.g. edge millimeter rounding), strictly reject impossible outputs (e.g. 11,200 vs 9,129)
+      const maxAllowed = Math.ceil(maxTheoSheets * 1.005);
+      if (validActualSheets > maxAllowed) {
+        throw new Error(
+          `Actual good sheets (${validActualSheets.toLocaleString()}) cannot exceed theoretical maximum yield (${maxTheoSheets.toLocaleString()} sheets) for ${weight} KG of ${gsm} GSM (${w}×${l} cm). Please verify actual production or input reel weight.`
+        );
+      }
+    }
+
     // Auto-generate slip number if missing
     let finalSlipNumber = reqSlipNumber;
     if (!finalSlipNumber) {
@@ -350,6 +373,30 @@ exports.createCuttingSlip = async (req, res) => {
     const sourceH = await getHierarchy(sourceLocationId || selectedReels?.[0]?.locationId, companyId, session);
     const destH = await getHierarchy(destinationLocationId, companyId, session);
 
+    // Standardize Sheets per Ream (standard is 500 sheets)
+    const resolvedSheetsPerReam = (Number(sheetsPerReam) > 0 && Number(sheetsPerReam) <= 1000)
+      ? Number(sheetsPerReam)
+      : 500;
+
+    // Accurate Costing: Reel Value ÷ Valid Actual Parent Sheets, then apply 4-UP once
+    const reelValue = Number(totalInputCost || 0);
+    const finalTheoreticalSheets = maxTheoSheets || Number(theoreticalSheets) || 0;
+    const finalTheoreticalReams = resolvedSheetsPerReam > 0
+      ? Number((finalTheoreticalSheets / resolvedSheetsPerReam).toFixed(2))
+      : 0;
+    const resolvedActualReams = resolvedSheetsPerReam > 0
+      ? Number((validActualSheets / resolvedSheetsPerReam).toFixed(2))
+      : 0;
+    const effectiveCostPerSheet = validActualSheets > 0
+      ? reelValue / validActualSheets
+      : 0;
+    const effectiveCostPerReam = resolvedActualReams > 0
+      ? reelValue / resolvedActualReams
+      : 0;
+    const costPer4UpPiece = validActualSheets > 0
+      ? Number((effectiveCostPerSheet / 4).toFixed(4))
+      : 0;
+
     // 1. Create Cutting Slip Document
     const cuttingSlip = new CuttingSlip({
       slipNumber: finalSlipNumber,
@@ -365,34 +412,36 @@ exports.createCuttingSlip = async (req, res) => {
         gsm: Number(r.gsm || 0),
         locationId: toObjectId(r.locationId)
       })),
-      totalInputWeight: Number(totalInputWeight),
+      totalInputWeight: weight,
       inputRatePerKg: Number(inputRatePerKg || 0),
-      totalInputCost: Number(totalInputCost || 0),
+      totalInputCost: reelValue,
       targetSku: toObjectId(targetSku),
-      sheetWidth: Number(sheetWidth),
-      sheetLength: Number(sheetLength),
-      sheetGsm: Number(sheetGsm),
-      sheetsPerReam: Number(sheetsPerReam || 500),
+      sheetWidth: w,
+      sheetLength: l,
+      sheetGsm: gsm,
+      sheetsPerReam: resolvedSheetsPerReam,
       startMeterReading: Number(startMeterReading || 0),
       endMeterReading: Number(endMeterReading || 0),
       cutsCount: Number(cutsCount || 0),
       reelsOnStand: Number(reelsOnStand || selectedReels?.length || 1),
       slitsCount: Number(slitsCount || 1),
-      theoreticalSheets: Number(theoreticalSheets),
-      theoreticalReams: Number(theoreticalReams || 0),
-      actualSheets: Number(actualSheets),
-      actualReams: Number(actualReams || (actualSheets / (sheetsPerReam || 500))),
-      varianceSheets: Number(varianceSheets || 0),
-      wastePercentage: Number(wastePercentage || 0),
+      theoreticalSheets: finalTheoreticalSheets,
+      theoreticalReams: finalTheoreticalReams,
+      actualSheets: validActualSheets,
+      actualReams: resolvedActualReams,
+      varianceSheets: validActualSheets - finalTheoreticalSheets,
+      wastePercentage: (finalTheoreticalSheets > 0 && validActualSheets <= finalTheoreticalSheets)
+        ? Number((((finalTheoreticalSheets - validActualSheets) / finalTheoreticalSheets) * 100).toFixed(1))
+        : 0,
       scrapWeightKg: 0,
       scrapRatePerKg: 0,
       coreCount: 0,
       coreRatePerPc: 0,
       totalScrapCredit: 0,
-      netProductionCost: Number(totalInputCost || 0),
-      effectiveCostPerSheet: Number(actualSheets) > 0 ? Number(totalInputCost || 0) / Number(actualSheets) : 0,
-      effectiveCostPerReam: Number(actualReams) > 0 ? Number(totalInputCost || 0) / Number(actualReams) : 0,
-      costPer4UpPiece: Number(actualSheets) > 0 ? Number((Number(totalInputCost || 0) / Number(actualSheets) / 4).toFixed(4)) : 0,
+      netProductionCost: reelValue,
+      effectiveCostPerSheet,
+      effectiveCostPerReam,
+      costPer4UpPiece,
       destinationLocationId: toObjectId(destinationLocationId),
       machineName: machineName || "Sheeter 01",
       operatorName: operatorName || "",

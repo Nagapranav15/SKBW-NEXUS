@@ -245,11 +245,9 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
     if (sku.width) setSheetWidth(String(sku.width));
     if (sku.length) setSheetLength(String(sku.length));
     if (sku.gsm) setSheetGsm(String(sku.gsm));
-    if (sku.altUnitConversion) {
-      setSheetsPerReamInput(String(sku.altUnitConversion));
-    } else if (sku.booksGbl) {
-      setSheetsPerReamInput(String(sku.booksGbl));
-    }
+    const rawReam = (sku as any).sheetsPerReam ?? (sku as any).standardSheets ?? sku.pages;
+    const validReam = (rawReam && Number(rawReam) > 0 && Number(rawReam) <= 1000) ? Number(rawReam) : 500;
+    setSheetsPerReamInput(String(validReam));
     setTargetSkuSearch('');
     setShowTargetDropdown(false);
   };
@@ -638,6 +636,14 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
   const numActualSheets = parseFloat(actualSheetsInput) || 0;
   const numActualReams = parseFloat(actualReamsInput) || 0;
 
+  const theoreticalMaxAllowed = useMemo(() => {
+    return theoreticalSheets;
+  }, [theoreticalSheets]);
+
+  const isExceedingTheoretical = useMemo(() => {
+    return theoreticalSheets > 0 && numActualSheets > theoreticalSheets;
+  }, [numActualSheets, theoreticalSheets]);
+
   const varianceSheets = useMemo(() => {
     if (theoreticalSheets <= 0) return 0;
     return numActualSheets - theoreticalSheets;
@@ -686,6 +692,12 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
     }
     if (numActualSheets <= 0) {
       alert('Please enter the actual good sheets produced.');
+      return;
+    }
+    if (theoreticalSheets > 0 && numActualSheets > theoreticalSheets) {
+      alert(
+        `Cannot post Cutting Slip:\n\nActual good sheets (${numActualSheets.toLocaleString()}) exceeds the theoretical maximum yield (${theoreticalSheets.toLocaleString()} sheets) from ${totalInputWeight} KG of ${sheetGsm} GSM (${sheetWidth}×${sheetLength} CM).\n\nMathematically, that reel can only produce about ${theoreticalSheets.toLocaleString()} parent sheets maximum. Please adjust actual sheets to be ≤ ${theoreticalSheets.toLocaleString()} or increase the input reel weight.`
+      );
       return;
     }
 
@@ -1588,9 +1600,13 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                             value={actualReamsInput}
                             onChange={e => handleReamsChange(e.target.value)}
                             placeholder="0.00"
-                            className="w-full h-9 pl-2.5 pr-14 bg-white border-2 border-blue-200 hover:border-blue-400 rounded-lg text-xs sm:text-sm font-bold font-mono text-blue-950 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs transition-all"
+                            className={`w-full h-9 pl-2.5 pr-14 bg-white border-2 ${
+                              isExceedingTheoretical
+                                ? 'border-red-400 focus:border-red-600 focus:ring-red-500/20 text-red-950'
+                                : 'border-blue-200 hover:border-blue-400 focus:border-blue-600 focus:ring-blue-500/20 text-blue-950'
+                            } rounded-lg text-xs sm:text-sm font-bold font-mono focus:outline-none focus:ring-1 shadow-3xs transition-all`}
                           />
-                          <span className="absolute right-2 top-2 text-[10px] font-bold text-blue-700 select-none">
+                          <span className={`absolute right-2 top-2 text-[10px] font-bold ${isExceedingTheoretical ? 'text-red-600' : 'text-blue-700'} select-none`}>
                             REAMS
                           </span>
                         </div>
@@ -1607,14 +1623,44 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                             value={actualSheetsInput}
                             onChange={e => handleSheetsChange(e.target.value)}
                             placeholder="0"
-                            className="w-full h-9 pl-2.5 pr-14 bg-white border-2 border-blue-200 hover:border-blue-400 rounded-lg text-xs sm:text-sm font-bold font-mono text-blue-950 focus:outline-none focus:ring-1 focus:ring-blue-500/20 focus:border-blue-600 shadow-3xs transition-all"
+                            className={`w-full h-9 pl-2.5 pr-14 bg-white border-2 ${
+                              isExceedingTheoretical
+                                ? 'border-red-500 bg-red-50/20 focus:border-red-600 focus:ring-red-500/20 text-red-950'
+                                : 'border-blue-200 hover:border-blue-400 focus:border-blue-600 focus:ring-blue-500/20 text-blue-950'
+                            } rounded-lg text-xs sm:text-sm font-bold font-mono focus:outline-none focus:ring-1 shadow-3xs transition-all`}
                           />
-                          <span className="absolute right-2 top-2 text-[10px] font-bold text-blue-700 select-none">
+                          <span className={`absolute right-2 top-2 text-[10px] font-bold ${isExceedingTheoretical ? 'text-red-600' : 'text-blue-700'} select-none`}>
                             SHEETS
                           </span>
                         </div>
                       </div>
                     </div>
+
+                    {/* Exceeding Theoretical Limit Warning Banner */}
+                    {isExceedingTheoretical && (
+                      <div className="p-2.5 bg-red-50 border-2 border-red-300 rounded-lg flex items-start gap-2 text-xs text-red-900 shadow-3xs animate-in fade-in">
+                        <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                        <div className="flex-1 space-y-1">
+                          <div className="font-bold flex items-center justify-between">
+                            <span>Exceeds Theoretical Maximum Yield!</span>
+                            <span className="font-mono text-[11px] bg-red-200/80 text-red-900 px-1.5 py-0.5 rounded">
+                              Limit: {theoreticalSheets.toLocaleString()} Sheets
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-red-700 leading-tight">
+                            Mathematically, {totalInputWeight} KG of {sheetGsm} GSM ({sheetWidth}×{sheetLength} CM) paper can yield at most <strong className="font-mono">{theoreticalSheets.toLocaleString()} parent sheets</strong>. Actual good sheets cannot exceed theoretical maximum without increasing reel weight.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => handleSheetsChange(String(theoreticalSheets))}
+                            className="mt-1 px-2.5 py-1 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer transition-colors shadow-3xs"
+                          >
+                            <CheckCircle2 className="w-3 h-3 text-white" />
+                            Cap to Theoretical Max ({theoreticalSheets.toLocaleString()} Sheets)
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Theoretical vs Actual Live Variance Meter */}
@@ -1635,19 +1681,28 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
 
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="font-semibold text-slate-500">Actual Good Stock In:</span>
-                      <span className="font-mono font-bold text-blue-900">
+                      <span className={`font-mono font-bold ${isExceedingTheoretical ? 'text-red-700' : 'text-blue-900'}`}>
                         {numActualSheets.toLocaleString()} Sheets ({numActualReams} Reams)
                       </span>
                     </div>
 
                     <div className="pt-1 border-t border-slate-200 flex items-center justify-between text-xs">
                       <span className="font-bold text-slate-700">Live Production Variance:</span>
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold flex items-center gap-1 bg-blue-600 text-white shadow-3xs">
-                        {varianceSheets < 0 ? <AlertTriangle className="w-3 h-3 text-white" /> : <CheckCircle2 className="w-3 h-3 text-white" />}
-                        <span>
-                          {varianceSheets > 0 ? '+' : ''}{varianceSheets.toLocaleString()} Sheets ({wastePercentage > 0 ? `-${wastePercentage}% Loss` : '100% Tally'})
+                      {isExceedingTheoretical ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold flex items-center gap-1 bg-red-600 text-white shadow-3xs">
+                          <AlertTriangle className="w-3 h-3 text-white" />
+                          <span>
+                            +{varianceSheets.toLocaleString()} Sheets (Exceeds Max by {varianceSheets.toLocaleString()})
+                          </span>
                         </span>
-                      </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold flex items-center gap-1 bg-blue-600 text-white shadow-3xs">
+                          {varianceSheets < 0 ? <AlertTriangle className="w-3 h-3 text-white" /> : <CheckCircle2 className="w-3 h-3 text-white" />}
+                          <span>
+                            {varianceSheets > 0 ? '+' : ''}{varianceSheets.toLocaleString()} Sheets ({wastePercentage > 0 ? `-${wastePercentage}% Loss` : '100% Tally'})
+                          </span>
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1786,13 +1841,27 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                   <button
                     type="button"
                     onClick={handleSubmit}
-                    disabled={submitting || selectedReels.length === 0}
-                    className="px-4.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs shadow-3xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-40"
+                    disabled={submitting || selectedReels.length === 0 || isExceedingTheoretical}
+                    title={
+                      isExceedingTheoretical
+                        ? `Cannot post: Actual output (${numActualSheets.toLocaleString()} sheets) exceeds theoretical maximum yield (${theoreticalSheets.toLocaleString()} sheets)`
+                        : undefined
+                    }
+                    className={`px-4.5 py-1.5 font-bold rounded-lg text-xs shadow-3xs flex items-center gap-1.5 transition-all ${
+                      isExceedingTheoretical
+                        ? 'bg-slate-300 text-slate-500 cursor-not-allowed border border-slate-300'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer disabled:opacity-40'
+                    }`}
                   >
                     {submitting ? (
                       <>
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                         <span>Posting Stock Journal...</span>
+                      </>
+                    ) : isExceedingTheoretical ? (
+                      <>
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Exceeds Max Theoretical Yield</span>
                       </>
                     ) : (
                       <>
