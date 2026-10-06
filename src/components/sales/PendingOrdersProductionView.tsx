@@ -62,6 +62,42 @@ interface SkuProductionRequirement {
   productionStatus: 'Ready' | 'In Production' | 'Shortfall';
 }
 
+export type ViewTabMode = 'material_view' | 'production_view' | 'customer_view';
+
+export interface MaterialRequirementItem {
+  id: string;
+  materialCode: string;
+  materialName: string;
+  category: string;
+  uom: string;
+  stockInHand: number;
+  totalRequiredQty: number;
+  shortfallRequiredQty: number;
+  deficit: number;
+  status: 'In Stock' | 'Partial' | 'Shortfall';
+  skuId?: string;
+  contributingFgCount: number;
+  contributingOrderCount: number;
+  contributions: Array<{
+    fgSkuCode: string;
+    fgSkuName: string;
+    orderId: string;
+    orderNumber: string;
+    orderDate: string;
+    promisedDate: string;
+    customerName: string;
+    customerPhone?: string;
+    city?: string;
+    orderedPcs: number;
+    pendingPcs: number;
+    pendingGbl: number;
+    shortfallPcs: number;
+    perBookBasis: number;
+    requiredQty: number;
+    rawOrder: SalesOrderV2;
+  }>;
+}
+
 export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewProps> = ({
   orders,
   onViewOrder,
@@ -73,21 +109,27 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
   const navigate = useNavigate();
 
   // Persist viewMode in localStorage and searchParams so it survives page reloads
-  const [viewMode, setViewModeState] = useState<'item_wise' | 'order_wise'>(() => {
+  // Tab order: Material View (default) -> Production View -> Customer view
+  const [viewMode, setViewModeState] = useState<ViewTabMode>(() => {
     const fromUrl = searchParams.get('pview');
-    if (fromUrl === 'customer' || fromUrl === 'order_wise') return 'order_wise';
-    if (fromUrl === 'production' || fromUrl === 'item_wise') return 'item_wise';
-    const saved = localStorage.getItem('pending_orders_view_mode');
-    return (saved === 'order_wise' || saved === 'item_wise') ? saved : 'item_wise';
+    if (fromUrl === 'customer' || fromUrl === 'order_wise' || fromUrl === 'customer_view') return 'customer_view';
+    if (fromUrl === 'production' || fromUrl === 'item_wise' || fromUrl === 'production_view') return 'production_view';
+    if (fromUrl === 'material' || fromUrl === 'material_view') return 'material_view';
+    const saved = localStorage.getItem('pending_orders_view_mode') as ViewTabMode | null;
+    if (saved === 'material_view') return 'material_view';
+    if (saved === 'production_view' || (saved as any) === 'item_wise') return 'production_view';
+    if (saved === 'customer_view' || (saved as any) === 'order_wise') return 'customer_view';
+    return 'material_view';
   });
 
-  const setViewMode = (mode: 'item_wise' | 'order_wise') => {
+  const setViewMode = (mode: ViewTabMode) => {
     setViewModeState(mode);
     localStorage.setItem('pending_orders_view_mode', mode);
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
-      if (mode === 'item_wise') next.delete('pview');
-      else next.set('pview', 'customer');
+      if (mode === 'material_view') next.delete('pview');
+      else if (mode === 'production_view') next.set('pview', 'production');
+      else if (mode === 'customer_view') next.set('pview', 'customer');
       return next;
     }, { replace: true });
   };
@@ -105,6 +147,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
 
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedSkus, setExpandedSkus] = useState<Set<string>>(new Set());
+  const [expandedMaterials, setExpandedMaterials] = useState<Set<string>>(new Set());
   const [stockMap, setStockMap] = useState<Map<string, { pcs: number; gbl: number }>>(new Map());
   const [categoryMap, setCategoryMap] = useState<Map<string, string>>(new Map());
   const [loadingStock, setLoadingStock] = useState(false);
@@ -203,7 +246,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
     });
   }, [selectedCompany?._id, stockRefreshKey]);
 
-  // Compute Item-wise Production Requirements (Tally Sales Orders Outstanding)
+  // Compute Item-wise Production Requirements (Sales Orders Outstanding)
   const itemWiseRequirements = useMemo<SkuProductionRequirement[]>(() => {
     const map = new Map<string, SkuProductionRequirement>();
 
@@ -429,15 +472,6 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
     };
   }, [itemWiseRequirements, pendingOrders]);
 
-  // Toggle Detailed View for All SKUs (Tally Alt+F1)
-  const toggleAllDetails = () => {
-    if (expandedSkus.size === filteredRequirements.length && filteredRequirements.length > 0) {
-      setExpandedSkus(new Set());
-    } else {
-      const all = new Set(filteredRequirements.map(r => r.skuCode));
-      setExpandedSkus(all);
-    }
-  };
 
   const toggleSingleSku = (code: string) => {
     setExpandedSkus(prev => {
@@ -447,6 +481,254 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
       return next;
     });
   };
+
+  const toggleSingleMaterial = (code: string) => {
+    setExpandedMaterials(prev => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+  };
+
+  // Compute Material Requirements (Raw Material / Component Explosion for Pending Orders)
+  const materialRequirements = useMemo<MaterialRequirementItem[]>(() => {
+    const map = new Map<string, MaterialRequirementItem>();
+
+    itemWiseRequirements.forEach(req => {
+      if (req.balancePendingPcs <= 0) return;
+
+      // 1. Match finished good SKU in loadedSkus
+      const fgSku = loadedSkus.find(s => 
+        (req.skuId && String(s._id) === String(req.skuId)) ||
+        (s.skuCode && s.skuCode.toLowerCase().trim() === req.skuCode.toLowerCase().trim()) ||
+        (s.name && s.name.toLowerCase().trim() === req.skuName.toLowerCase().trim())
+      );
+
+      const convFactor = req.pcsPerGbl > 0 ? req.pcsPerGbl : 100;
+      const rawBom = fgSku?.bomItems || (fgSku as any)?.bom || [];
+
+      let components: Array<{
+        name: string;
+        code: string;
+        category: string;
+        uom: string;
+        perBookBasis: number;
+        skuId?: string;
+      }> = [];
+
+      if (Array.isArray(rawBom) && rawBom.length > 0) {
+        const yieldUnit = ((fgSku as any)?.recipeYieldUnit || (fgSku as any)?.batchYieldUnit || fgSku?.unit || 'PCS').toUpperCase().trim();
+        const rawYield = Number((fgSku as any)?.recipeYieldQty || (fgSku as any)?.batchYieldQty || 1) || 1;
+        const recipeBasePcs = yieldUnit === 'GBL' ? rawYield * convFactor : (rawYield > 0 ? rawYield : 1);
+
+        components = rawBom.map((b: any, bIdx: number) => {
+          const rawQty = Number(b.qty ?? b.qtyPerBatch) || 1;
+          const perBookBasis = recipeBasePcs > 0 ? rawQty / recipeBasePcs : rawQty;
+          const matchedMatSku = loadedSkus.find(s => 
+            (b.skuId && String(s._id) === String(b.skuId)) ||
+            (b.skuCode && s.skuCode?.toLowerCase().trim() === b.skuCode.toLowerCase().trim()) ||
+            (b.code && s.skuCode?.toLowerCase().trim() === b.code.toLowerCase().trim()) ||
+            (b.name && s.name?.toLowerCase().trim() === b.name.toLowerCase().trim())
+          );
+
+          let resolvedUom = b.uom || b.unit || matchedMatSku?.unit || 'PCS';
+          if (resolvedUom.toUpperCase() === 'GBL') resolvedUom = 'PCS';
+
+          return {
+            name: b.name || b.itemName || b.component || `Material ${bIdx + 1}`,
+            code: b.skuCode || b.code || matchedMatSku?.skuCode || `RM-${String(bIdx + 1).padStart(3, '0')}`,
+            category: matchedMatSku?.category || b.category || 'Raw Materials',
+            uom: resolvedUom,
+            perBookBasis,
+            skuId: matchedMatSku?._id || b.skuId
+          };
+        });
+      } else {
+        // Intelligently derive from standard notebook specifications
+        const pageMatch = req.skuName.match(/(\d+)\s*P/i) || req.skuCode.match(/(\d+)\s*P/i);
+        const pages = Number(fgSku?.pages) || (pageMatch ? parseInt(pageMatch[1], 10) : 72);
+        const isUnruled = req.skuCode.includes('UR') || req.skuName.toUpperCase().includes('UR');
+        const rulingLabel = isUnruled ? 'UR' : 'SR';
+
+        // 1. Inner Paper Sheets (4-up layout: pages / 8 sheets per finished book)
+        const innerSheets = Math.max(1, Math.round(pages / 8));
+        const matchedPaperSku = loadedSkus.find(s => 
+          (s.category && /paper|sheet|reel/i.test(s.category)) &&
+          ((s.ruleType && s.ruleType.toLowerCase() === (isUnruled ? 'unruled' : 'single ruled')) ||
+           (s.name && s.name.toUpperCase().includes(rulingLabel)))
+        ) || loadedSkus.find(s => s.paperType === 'Sheets' || (s.category && /raw material|sheets/i.test(s.category)));
+
+        components.push({
+          name: matchedPaperSku?.name || `Inner Paper Sheet ${rulingLabel} (${pages}P)`,
+          code: matchedPaperSku?.skuCode || `RM-PAP-${pages}P-${rulingLabel}`,
+          category: matchedPaperSku?.category || 'Paper Sheets',
+          uom: matchedPaperSku?.unit || 'Sheets',
+          perBookBasis: innerSheets,
+          skuId: matchedPaperSku?._id
+        });
+
+        // 2. Cover Board (Duplex Cover Board)
+        const matchedBoardSku = loadedSkus.find(s => 
+          (s.paperType === 'Board') ||
+          (s.category && /board|cover/i.test(s.category)) ||
+          (s.name && /board|duplex/i.test(s.name))
+        );
+        components.push({
+          name: matchedBoardSku?.name || `Duplex Cover Board (${pages}P)`,
+          code: matchedBoardSku?.skuCode || `RM-BRD-${pages}P`,
+          category: matchedBoardSku?.category || 'Cover Board',
+          uom: matchedBoardSku?.unit || 'Pcs',
+          perBookBasis: 1,
+          skuId: matchedBoardSku?._id
+        });
+
+        // 3. Stitching Wire
+        const matchedWireSku = loadedSkus.find(s => 
+          (s.category && /wire|stitching/i.test(s.category)) ||
+          (s.name && /wire/i.test(s.name))
+        );
+        components.push({
+          name: matchedWireSku?.name || 'Stitching Wire (No. 24)',
+          code: matchedWireSku?.skuCode || 'RM-WIRE-24',
+          category: matchedWireSku?.category || 'Consumables',
+          uom: matchedWireSku?.unit || 'KG',
+          perBookBasis: 0.0005,
+          skuId: matchedWireSku?._id
+        });
+      }
+
+      // Distribute requirements across components and pending customer orders
+      components.forEach(comp => {
+        const matKey = (comp.code || comp.name).trim().toUpperCase();
+
+        if (!map.has(matKey)) {
+          let liveStock = 0;
+          const lookupKey = comp.code.toLowerCase();
+          const nameLookup = comp.name.toLowerCase();
+          const sIdLookup = comp.skuId ? String(comp.skuId) : '';
+
+          if (sIdLookup && stockMap.has(sIdLookup)) {
+            liveStock = stockMap.get(sIdLookup)!.pcs;
+          } else if (stockMap.has(lookupKey)) {
+            liveStock = stockMap.get(lookupKey)!.pcs;
+          } else if (stockMap.has(nameLookup)) {
+            liveStock = stockMap.get(nameLookup)!.pcs;
+          } else {
+            const s = loadedSkus.find(sku => 
+              (comp.skuId && String(sku._id) === comp.skuId) ||
+              (sku.skuCode && sku.skuCode.toUpperCase() === comp.code.toUpperCase()) ||
+              (sku.name && sku.name.toUpperCase() === comp.name.toUpperCase())
+            );
+            if (s) {
+              liveStock = Number(s.presentStock ?? s.openingStock ?? 0);
+            }
+          }
+
+          map.set(matKey, {
+            id: `mat-${matKey}`,
+            materialCode: comp.code,
+            materialName: comp.name,
+            category: comp.category,
+            uom: comp.uom,
+            stockInHand: liveStock,
+            totalRequiredQty: 0,
+            shortfallRequiredQty: 0,
+            deficit: 0,
+            status: 'In Stock',
+            skuId: comp.skuId,
+            contributingFgCount: 0,
+            contributingOrderCount: 0,
+            contributions: []
+          });
+        }
+
+        const matReq = map.get(matKey)!;
+
+        req.orders.forEach(o => {
+          if (o.pendingPcs <= 0) return;
+          const requiredForOrder = Math.round(o.pendingPcs * comp.perBookBasis * 100) / 100;
+          matReq.totalRequiredQty = Math.round((matReq.totalRequiredQty + requiredForOrder) * 100) / 100;
+
+          if (req.shortfallPcs > 0) {
+            const shortfallForThisItem = Math.min(o.pendingPcs, req.shortfallPcs);
+            const shortfallMat = Math.round(shortfallForThisItem * comp.perBookBasis * 100) / 100;
+            matReq.shortfallRequiredQty = Math.round((matReq.shortfallRequiredQty + shortfallMat) * 100) / 100;
+          }
+
+          matReq.contributions.push({
+            fgSkuCode: req.skuCode,
+            fgSkuName: req.skuName,
+            orderId: o.orderId,
+            orderNumber: o.orderNumber,
+            orderDate: o.orderDate,
+            promisedDate: o.promisedDate,
+            customerName: o.customerName,
+            customerPhone: o.customerPhone,
+            city: o.city,
+            orderedPcs: o.orderedPcs,
+            pendingPcs: o.pendingPcs,
+            pendingGbl: o.pendingGbl,
+            shortfallPcs: req.shortfallPcs,
+            perBookBasis: comp.perBookBasis,
+            requiredQty: requiredForOrder,
+            rawOrder: o.rawOrder
+          });
+        });
+      });
+    });
+
+    const result: MaterialRequirementItem[] = [];
+    map.forEach(item => {
+      item.totalRequiredQty = Math.round(item.totalRequiredQty * 100) / 100;
+      item.shortfallRequiredQty = Math.round(item.shortfallRequiredQty * 100) / 100;
+      const deficit = Math.max(0, Math.round((item.totalRequiredQty - item.stockInHand) * 100) / 100);
+      item.deficit = deficit;
+
+      if (deficit === 0) {
+        item.status = 'In Stock';
+      } else if (item.stockInHand > 0) {
+        item.status = 'Partial';
+      } else {
+        item.status = 'Shortfall';
+      }
+
+      const uniqueFg = new Set(item.contributions.map(c => c.fgSkuCode));
+      const uniqueOrders = new Set(item.contributions.map(c => c.orderNumber));
+      item.contributingFgCount = uniqueFg.size;
+      item.contributingOrderCount = uniqueOrders.size;
+
+      result.push(item);
+    });
+
+    return result.sort((a, b) => {
+      if (b.deficit !== a.deficit) return b.deficit - a.deficit;
+      return b.totalRequiredQty - a.totalRequiredQty;
+    });
+  }, [itemWiseRequirements, loadedSkus, stockMap]);
+
+  // Filtered Materials based on Search and Filter Mode
+  const filteredMaterials = useMemo(() => {
+    return materialRequirements.filter(mat => {
+      if (filterMode === 'shortfall' && mat.deficit <= 0) return false;
+      if (filterMode === 'in_stock' && mat.deficit > 0) return false;
+
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase().trim();
+        const mCode = mat.materialCode.toLowerCase().includes(q);
+        const mName = mat.materialName.toLowerCase().includes(q);
+        const mCat = mat.category.toLowerCase().includes(q);
+        const mContr = mat.contributions.some(c => 
+          c.fgSkuName.toLowerCase().includes(q) ||
+          c.fgSkuCode.toLowerCase().includes(q) ||
+          c.orderNumber.toLowerCase().includes(q) ||
+          c.customerName.toLowerCase().includes(q)
+        );
+        if (!mCode && !mName && !mCat && !mContr) return false;
+      }
+      return true;
+    });
+  }, [materialRequirements, filterMode, searchTerm]);
 
   // Handle Start Production: opens wizard modal directly in Sales Orders
   const handleStartProduction = (skuCode: string, skuName: string, shortfallGbl: number, orderRef?: string, orderId?: string) => {
@@ -488,10 +770,48 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
     return `${fmt(minD)} to ${fmt(maxD)}`;
   };
 
-  // Export to Excel (Tally Alt+E) - Production View matches user screenshot exactly:
-  // Stock Item | SKU Code | Stock | Pending | Produce | Produce | Status
+  // Export to Excel:
+  // Material View: Raw Material | Code | Category | Unit | Stock | Required | Deficit | Status
+  // Production View: Stock Item | SKU Code | Stock | Pending | Produce | Produce | Status
+  // Customer View: Date | Ledger Name | Order No | Item Name | Pending Qty
   const handleExportExcel = () => {
-    if (viewMode === 'order_wise') {
+    if (viewMode === 'material_view') {
+      const headers = ['Raw Material', 'Material Code', 'Category', 'Unit', 'Stock In Hand', 'Required Qty', 'Shortfall (Deficit)', 'Status', 'FG Demand Count', 'Pending Orders Count'];
+      const rows = filteredMaterials.map(m => [
+        m.materialName,
+        m.materialCode,
+        m.category,
+        m.uom,
+        m.stockInHand,
+        m.totalRequiredQty,
+        m.deficit,
+        m.status,
+        m.contributingFgCount,
+        m.contributingOrderCount
+      ]);
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      ws['!cols'] = [
+        { wch: 35 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 10 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 18 },
+        { wch: 14 },
+        { wch: 18 },
+        { wch: 20 }
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Material Requirements');
+      XLSX.writeFile(wb, `Material_Requirements_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      showToast('Exported Material Requirements to Excel', 'success');
+      return;
+    }
+
+    if (viewMode === 'customer_view') {
       const headers = ['Date', 'Ledger Name', 'Order No', 'Item Name', 'Pending Qty (GBL)', 'Pending Qty (Pcs)', 'Overdue Days'];
       const today = new Date();
       const rows: any[] = [];
@@ -551,7 +871,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
       return;
     }
 
-    // View 1 (Production View): exactly matches the screenshot headers:
+    // View 2 (Production View): exactly matches the screenshot headers:
     // Stock Item | SKU Code | Stock | Pending | Produce | Produce | Status
     const headers = ['Stock Item', 'SKU Code', 'Stock', 'Pending', 'Produce', 'Produce', 'Status'];
     const rows = filteredRequirements.map(req => [
@@ -581,7 +901,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
     showToast('Exported Production Schedule to Excel', 'success');
   };
 
-  // Export PDF Report dynamically matching Tally ERP format (Stock Category Outstandings or Pending Sales Order)
+  // Export PDF Report dynamically
   const handleExportPdf = () => {
     try {
       const companyName = (selectedCompany?.name || 'SRI KRISHNA BINDING WORKS').toUpperCase();
@@ -590,7 +910,81 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
       const dateRange = getReportDateRangeText();
       const today = new Date();
 
-      if (viewMode === 'order_wise') {
+      if (viewMode === 'material_view') {
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        let curY = 15;
+        let curPage = 1;
+
+        const renderMatTableHeader = () => {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(13);
+          doc.text(companyName, 105, curY, { align: 'center' });
+          curY += 5.5;
+          doc.setFontSize(11);
+          doc.text('Material Requirement Analysis', 105, curY, { align: 'center' });
+          const titleW = doc.getTextWidth('Material Requirement Analysis');
+          doc.setLineWidth(0.3);
+          doc.line(105 - titleW / 2, curY + 0.8, 105 + titleW / 2, curY + 0.8);
+          curY += 6;
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.text(`As on: ${formatDateDDMMYYYY(today.toISOString())} | Page ${curPage}`, 195, curY, { align: 'right' });
+          curY += 3;
+
+          doc.line(15, curY, 195, curY);
+          curY += 3.5;
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8);
+          doc.text('RAW MATERIAL / COMPONENT', 16, curY);
+          doc.text('CATEGORY', 80, curY);
+          doc.text('UOM', 114, curY, { align: 'center' });
+          doc.text('IN HAND', 138, curY, { align: 'right' });
+          doc.text('REQUIRED', 166, curY, { align: 'right' });
+          doc.text('DEFICIT', 194, curY, { align: 'right' });
+          curY += 2;
+          doc.line(15, curY, 195, curY);
+          curY += 4;
+        };
+
+        renderMatTableHeader();
+
+        filteredMaterials.forEach(m => {
+          if (curY > 275) {
+            doc.addPage();
+            curPage++;
+            curY = 15;
+            renderMatTableHeader();
+          }
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8);
+          doc.text(m.materialName.slice(0, 34), 16, curY);
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7.5);
+          doc.text(m.category.slice(0, 18), 80, curY);
+          doc.text(m.uom, 114, curY, { align: 'center' });
+          doc.text(m.stockInHand.toLocaleString(), 138, curY, { align: 'right' });
+          doc.text(m.totalRequiredQty.toLocaleString(), 166, curY, { align: 'right' });
+
+          if (m.deficit > 0) {
+            doc.setFont('helvetica', 'bold');
+            doc.text(`${m.deficit.toLocaleString()}`, 194, curY, { align: 'right' });
+          } else {
+            doc.text('In Stock', 194, curY, { align: 'right' });
+          }
+
+          curY += 4.5;
+        });
+
+        doc.line(15, curY, 195, curY);
+        doc.save(`Material_Requirements_${new Date().toISOString().slice(0, 10)}.pdf`);
+        showToast('Exported Material Requirements PDF successfully', 'success');
+        return;
+      }
+
+      if (viewMode === 'customer_view') {
         // ══════════════════════════════════════════════════════════════
         // PDF REPORT 1: PENDING SALES ORDER (CUSTOMER ORDER WISE)
         // ══════════════════════════════════════════════════════════════
@@ -871,7 +1265,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
     }
   };
 
-  // Print (Tally Alt+P): Identical to the attached Tally ERP printouts
+  // Print Report Handler
   const handlePrint = () => {
     const printWin = window.open('', '', 'width=950,height=1150');
     if (!printWin) {
@@ -887,7 +1281,68 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
 
     let html = '';
 
-    if (viewMode === 'order_wise') {
+    if (viewMode === 'material_view') {
+      const matRowsHtml = filteredMaterials.map(m => `
+        <tr>
+          <td style="padding: 4px 6px; font-weight: 600;">${m.materialName} <div style="font-size: 8pt; color: #555;">${m.materialCode}</div></td>
+          <td style="padding: 4px 6px; text-align: center;">${m.category}</td>
+          <td style="padding: 4px 6px; text-align: center;">${m.uom}</td>
+          <td style="padding: 4px 6px; text-align: right; font-weight: bold;">${m.stockInHand.toLocaleString()}</td>
+          <td style="padding: 4px 6px; text-align: right;">${m.totalRequiredQty.toLocaleString()}</td>
+          <td style="padding: 4px 6px; text-align: right; font-weight: bold; color: ${m.deficit > 0 ? '#b91c1c' : '#15803d'};">
+            ${m.deficit > 0 ? `${m.deficit.toLocaleString()} Deficit` : 'In Stock'}
+          </td>
+          <td style="padding: 4px 6px; text-align: center;">${m.status}</td>
+        </tr>
+      `).join('');
+
+      html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Material Requirement Analysis</title>
+          <style>
+            @media print {
+              @page { size: A4 portrait; margin: 10mm 12mm; }
+              body { margin: 0; }
+            }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; font-size: 9pt; }
+            .header { text-align: center; margin-bottom: 8px; }
+            .company { font-size: 14pt; font-weight: bold; }
+            .title { font-size: 12pt; font-weight: bold; margin-top: 3px; text-decoration: underline; }
+            .date { text-align: right; font-size: 8.5pt; margin: 6px 0; }
+            table { width: 100%; border-collapse: collapse; border: 1px solid #000; font-size: 8.5pt; }
+            th { border: 1px solid #000; padding: 4px 6px; background: #f9f9f9; text-align: center; font-weight: bold; }
+            td { border: 1px solid #ddd; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="company">${companyName}</div>
+            <div style="font-size: 8pt; color: #444;">${companyAddress}</div>
+            <div class="title">Material Requirement Analysis</div>
+          </div>
+          <div class="date">Date: ${formatDateDDMMYYYY(today.toISOString())}</div>
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: left;">Raw Material / Component</th>
+                <th>Category</th>
+                <th>UOM</th>
+                <th>Stock In Hand</th>
+                <th>Required Qty</th>
+                <th>Shortfall (Deficit)</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${matRowsHtml}
+            </tbody>
+          </table>
+        </body>
+        </html>
+      `;
+    } else if (viewMode === 'customer_view') {
       // ══════════════════════════════════════════════════════════════
       // REPORT 1: PENDING SALES ORDER (CUSTOMER ORDER WISE VIEW)
       // ══════════════════════════════════════════════════════════════
@@ -1381,13 +1836,28 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
 
       {/* ── MINIMAL CONTROL TOOLBAR ── */}
       <div className="bg-white rounded-xl border border-gray-200/90 p-2.5 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
-        {/* Left: View Mode Toggle */}
+        {/* Left: View Mode Toggle (Order: Material View -> Production View -> Customer view) */}
         <div className="flex items-center gap-2">
           <div className="bg-gray-100 p-0.5 rounded-lg flex items-center">
+            {/* Tab 1: Material View */}
             <button
-              onClick={() => setViewMode('item_wise')}
+              onClick={() => setViewMode('material_view')}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                viewMode === 'item_wise'
+                viewMode === 'material_view'
+                  ? 'bg-white text-gray-900 shadow-2xs'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Box className="w-3.5 h-3.5 text-gray-500" />
+              <span>Material View</span>
+              <span className="text-[10px] text-gray-400 font-mono">({filteredMaterials.length})</span>
+            </button>
+
+            {/* Tab 2: Production View */}
+            <button
+              onClick={() => setViewMode('production_view')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'production_view'
                   ? 'bg-white text-gray-900 shadow-2xs'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
@@ -1397,30 +1867,20 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
               <span className="text-[10px] text-gray-400 font-mono">({filteredRequirements.length})</span>
             </button>
 
+            {/* Tab 3: Customer view */}
             <button
-              onClick={() => setViewMode('order_wise')}
+              onClick={() => setViewMode('customer_view')}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                viewMode === 'order_wise'
+                viewMode === 'customer_view'
                   ? 'bg-white text-gray-900 shadow-2xs'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               <Building className="w-3.5 h-3.5 text-gray-500" />
-              <span>Customer View</span>
+              <span>Customer view</span>
               <span className="text-[10px] text-gray-400 font-mono">({pendingOrders.length})</span>
             </button>
           </div>
-
-          {viewMode === 'item_wise' && (
-            <button
-              onClick={toggleAllDetails}
-              className="px-2.5 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer flex items-center gap-1 font-medium"
-              title="Expand/Collapse all customer orders (Alt+F1)"
-            >
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${expandedSkus.size === filteredRequirements.length ? 'rotate-180' : ''}`} />
-              <span>{expandedSkus.size === filteredRequirements.length ? 'Collapse All' : 'Detailed View'}</span>
-            </button>
-          )}
         </div>
 
         {/* Center: Quick Shortfall Filters */}
@@ -1433,7 +1893,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            All ({viewMode === 'item_wise' ? itemWiseRequirements.length : pendingOrders.length})
+            All ({viewMode === 'material_view' ? materialRequirements.length : viewMode === 'production_view' ? itemWiseRequirements.length : pendingOrders.length})
           </button>
           <button
             onClick={() => setFilterMode('shortfall')}
@@ -1443,13 +1903,15 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Shortfall Only ({viewMode === 'item_wise' 
-              ? itemWiseRequirements.filter(r => r.shortfallGbl > 0).length 
-              : pendingOrders.filter(o => (o.items || []).some(item => {
-                  const code = (item.skuCode || '').toLowerCase().trim();
-                  const req = itemWiseRequirements.find(r => r.skuCode.toLowerCase() === code);
-                  return req ? req.shortfallGbl > 0 : true;
-                })).length})
+            Shortfall Only ({viewMode === 'material_view'
+              ? materialRequirements.filter(m => m.deficit > 0).length
+              : viewMode === 'production_view'
+                ? itemWiseRequirements.filter(r => r.shortfallGbl > 0).length 
+                : pendingOrders.filter(o => (o.items || []).some(item => {
+                    const code = (item.skuCode || '').toLowerCase().trim();
+                    const req = itemWiseRequirements.find(r => r.skuCode.toLowerCase() === code);
+                    return req ? req.shortfallGbl > 0 : true;
+                  })).length})
           </button>
           <button
             onClick={() => setFilterMode('in_stock')}
@@ -1459,16 +1921,18 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            In Stock ({viewMode === 'item_wise' 
-              ? itemWiseRequirements.filter(r => r.shortfallGbl === 0).length 
-              : pendingOrders.filter(o => {
-                  const items = o.items || [];
-                  return items.length > 0 && items.every(item => {
-                    const code = (item.skuCode || '').toLowerCase().trim();
-                    const req = itemWiseRequirements.find(r => r.skuCode.toLowerCase() === code);
-                    return req ? req.shortfallGbl === 0 : false;
-                  });
-                }).length})
+            In Stock ({viewMode === 'material_view'
+              ? materialRequirements.filter(m => m.deficit === 0).length
+              : viewMode === 'production_view'
+                ? itemWiseRequirements.filter(r => r.shortfallGbl === 0).length 
+                : pendingOrders.filter(o => {
+                    const items = o.items || [];
+                    return items.length > 0 && items.every(item => {
+                      const code = (item.skuCode || '').toLowerCase().trim();
+                      const req = itemWiseRequirements.find(r => r.skuCode.toLowerCase() === code);
+                      return req ? req.shortfallGbl === 0 : false;
+                    });
+                  }).length})
           </button>
         </div>
 
@@ -1527,9 +1991,258 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
       </div>
 
       {/* ── MAIN CONTENT AREA ── */}
-      {viewMode === 'item_wise' ? (
+      {viewMode === 'material_view' ? (
         /* ═══════════════════════════════════════════════════════════════
-           VIEW 1: TALLY STOCK ITEM PRODUCTION VIEW (ITEM-WISE MRP)
+           VIEW 1: MATERIAL VIEW (RAW MATERIAL / BOM REQUIREMENT ANALYSIS)
+        ═══════════════════════════════════════════════════════════════ */
+        <div className="bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs">
+          <div className="overflow-x-auto min-h-[350px]">
+            <table className="w-full text-left divide-y divide-gray-200">
+              <thead className="bg-gray-50/90 text-[11px] font-bold text-gray-600 uppercase tracking-wider select-none">
+                <tr>
+                  <th className="py-3 px-3 w-8 text-center">#</th>
+                  <th className="py-3 px-4">Raw Material / Component Description</th>
+                  <th className="py-3 px-3 text-center">Category</th>
+                  <th className="py-3 px-3 text-center">Stock In Hand</th>
+                  <th className="py-3 px-3 text-center">Total Required Qty</th>
+                  <th className="py-3 px-4 text-center bg-rose-50/50 text-rose-900 border-x border-rose-100">
+                    Shortfall (Deficit)
+                  </th>
+                  <th className="py-3 px-3 text-center">Status</th>
+                  <th className="py-3 px-3 text-center">Contributing Demands</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-150 text-xs font-medium">
+                {filteredMaterials.map((mat, idx) => {
+                  const isExpanded = expandedMaterials.has(mat.materialCode);
+                  const hasDeficit = mat.deficit > 0;
+
+                  return (
+                    <React.Fragment key={mat.materialCode}>
+                      <tr
+                        onClick={() => toggleSingleMaterial(mat.materialCode)}
+                        className="hover:bg-gray-50/80 transition-colors cursor-pointer border-b border-gray-100"
+                      >
+                        {/* Expand Button & Index */}
+                        <td className="py-2.5 px-3 text-center text-gray-400 font-mono">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleSingleMaterial(mat.materialCode);
+                            }}
+                            className="p-1 hover:bg-gray-200 rounded cursor-pointer transition-colors"
+                          >
+                            <ChevronRight className={`w-3.5 h-3.5 text-gray-600 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                          </button>
+                        </td>
+
+                        {/* Raw Material Name & Code */}
+                        <td className="py-2.5 px-4">
+                          <div className="font-semibold text-gray-900">
+                            {mat.materialName}
+                          </div>
+                          <div className="text-[10.5px] text-gray-400 font-mono mt-0.5">
+                            {mat.materialCode} • {mat.uom}
+                          </div>
+                        </td>
+
+                        {/* Category */}
+                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                          <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-semibold inline-block">
+                            {mat.category || 'Raw Material'}
+                          </span>
+                        </td>
+
+                        {/* Stock In Hand */}
+                        <td className="py-2.5 px-3 text-center">
+                          <div className={`font-bold font-mono text-xs ${mat.stockInHand > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
+                            {mat.stockInHand.toLocaleString()} <span className="text-[10px] text-gray-500 font-normal">{mat.uom}</span>
+                          </div>
+                        </td>
+
+                        {/* Total Required Qty */}
+                        <td className="py-2.5 px-3 text-center">
+                          <div className="font-semibold font-mono text-gray-900 text-xs">
+                            {mat.totalRequiredQty.toLocaleString()} <span className="text-[10px] text-gray-400 font-normal">{mat.uom}</span>
+                          </div>
+                          {mat.shortfallRequiredQty > 0 && mat.shortfallRequiredQty !== mat.totalRequiredQty && (
+                            <div className="text-[10px] text-gray-400 font-mono">
+                              ({mat.shortfallRequiredQty.toLocaleString()} {mat.uom} for deficit)
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Shortfall (Deficit) */}
+                        <td className="py-2.5 px-4 text-center">
+                          {hasDeficit ? (
+                            <div>
+                              <span className="font-mono text-xs font-bold text-rose-600">
+                                {mat.deficit.toLocaleString()} {mat.uom} Deficit
+                              </span>
+                              <div className="text-[10px] text-rose-500 font-mono">
+                                Required for pending orders
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="font-mono text-xs text-emerald-600 font-medium">
+                              In Stock
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Status */}
+                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                          {mat.status === 'In Stock' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-mono">
+                              <Check className="w-3 h-3 text-emerald-600" />
+                              <span>Sufficient</span>
+                            </span>
+                          )}
+                          {mat.status === 'Partial' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/60 font-mono">
+                              <Clock className="w-3 h-3 text-amber-600" />
+                              <span>Partial</span>
+                            </span>
+                          )}
+                          {mat.status === 'Shortfall' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/60 font-mono">
+                              <AlertTriangle className="w-3 h-3 text-rose-600" />
+                              <span>Shortfall</span>
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Contributing Demands */}
+                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                          <span className="text-[11px] text-gray-700 font-mono font-medium bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-md">
+                            {mat.contributingFgCount} FG • {mat.contributingOrderCount} order{mat.contributingOrderCount > 1 ? 's' : ''}
+                          </span>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="py-2.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1.5">
+                            {hasDeficit ? (
+                              <button
+                                onClick={() => navigate('/purchases/batches')}
+                                className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1"
+                                title="Create Purchase Batch for this raw material"
+                              >
+                                <span>Procure</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => navigate('/stock')}
+                                className="px-2.5 py-1 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded text-xs font-semibold cursor-pointer transition-colors"
+                                title="View inventory stock"
+                              >
+                                <span>View Stock</span>
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => toggleSingleMaterial(mat.materialCode)}
+                              className="px-2 py-1 text-gray-500 hover:text-gray-800 text-xs font-medium cursor-pointer"
+                            >
+                              {isExpanded ? 'Hide' : 'Orders'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Expanded Sub-Table: Contributing FG and Sales Orders */}
+                      {isExpanded && (
+                        <tr className="bg-slate-50/70 border-b border-gray-200">
+                          <td colSpan={10} className="p-3 pl-8">
+                            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
+                              <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                                <span className="text-xs font-bold text-gray-700">
+                                  Orders & Products Demanding {mat.materialName} ({mat.contributions.length} allocations)
+                                </span>
+                                <span className="text-[11px] text-gray-500 font-mono">
+                                  Gross Required: {mat.totalRequiredQty.toLocaleString()} {mat.uom}
+                                </span>
+                              </div>
+
+                              <table className="w-full text-left text-xs divide-y divide-gray-150">
+                                <thead className="bg-gray-50/70 text-[10.5px] font-semibold text-gray-500 uppercase tracking-wider">
+                                  <tr>
+                                    <th className="py-2 px-3">SO No.</th>
+                                    <th className="py-2 px-3">Customer / Party Name</th>
+                                    <th className="py-2 px-3">Finished Good (FG)</th>
+                                    <th className="py-2 px-3 text-center">Due On</th>
+                                    <th className="py-2 px-3 text-center">FG Pending Qty</th>
+                                    <th className="py-2 px-3 text-center">BOM Ratio</th>
+                                    <th className="py-2 px-3 text-center font-semibold text-rose-700">Material Required</th>
+                                    <th className="py-2 px-3 text-right">Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 font-medium">
+                                  {mat.contributions.map((c, cIdx) => (
+                                    <tr 
+                                      key={`${c.orderId}-${c.fgSkuCode}-${cIdx}`}
+                                      onClick={() => onViewOrder(c.rawOrder)}
+                                      className="hover:bg-blue-50/40 transition-colors cursor-pointer"
+                                    >
+                                      <td className="py-2 px-3 font-mono font-bold text-blue-700 hover:text-blue-900">
+                                        {c.orderNumber}
+                                      </td>
+                                      <td className="py-2 px-3 font-semibold text-gray-900">
+                                        {c.customerName}
+                                      </td>
+                                      <td className="py-2 px-3">
+                                        <div className="font-semibold text-gray-800">{c.fgSkuName}</div>
+                                        <div className="text-[10px] text-gray-400 font-mono">{c.fgSkuCode}</div>
+                                      </td>
+                                      <td className="py-2 px-3 text-center font-mono text-gray-600">
+                                        {formatDateDDMMYYYY(c.promisedDate)}
+                                      </td>
+                                      <td className="py-2 px-3 text-center font-mono text-gray-700">
+                                        {c.pendingGbl} GBL <span className="text-[10px] text-gray-400">({c.pendingPcs.toLocaleString()} pcs)</span>
+                                      </td>
+                                      <td className="py-2 px-3 text-center font-mono text-gray-500">
+                                        {c.perBookBasis} {mat.uom}/pc
+                                      </td>
+                                      <td className="py-2 px-3 text-center font-mono font-bold text-rose-600">
+                                        {c.requiredQty.toLocaleString()} {mat.uom}
+                                      </td>
+                                      <td className="py-2 px-3 text-right" onClick={(e) => e.stopPropagation()}>
+                                        <button
+                                          onClick={() => onViewOrder(c.rawOrder)}
+                                          className="px-2 py-0.5 text-blue-600 hover:text-blue-800 text-xs font-semibold cursor-pointer hover:underline"
+                                        >
+                                          View SO
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+
+                {filteredMaterials.length === 0 && (
+                  <tr>
+                    <td colSpan={10} className="py-12 text-center text-gray-500">
+                      <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-400 mb-2" />
+                      <p className="font-bold text-sm text-gray-800">No material requirements found!</p>
+                      <p className="text-xs text-gray-400">All materials are either in stock or there are no pending customer sales orders.</p>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : viewMode === 'production_view' ? (
+        /* ═══════════════════════════════════════════════════════════════
+           VIEW 2: STOCK ITEM PRODUCTION VIEW (ITEM-WISE MRP)
         ═══════════════════════════════════════════════════════════════ */
         <div className="bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs">
           <div className="overflow-x-auto min-h-[350px]">
@@ -1632,7 +2345,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                           </div>
                         </td>
 
-                        {/* Production Shortfall (Tally MRP Calculation) */}
+                        {/* Production Shortfall (MRP Calculation) */}
                         <td className="py-2.5 px-4 text-center">
                           {hasShortfall ? (
                             <div>
@@ -1715,7 +2428,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                         </td>
                       </tr>
 
-                      {/* ── EXPANDED DETAILED ORDERS SUB-TABLE (TALLY ALT+F1) ── */}
+                      {/* ── EXPANDED DETAILED ORDERS SUB-TABLE ── */}
                       {isExpanded && (
                         <tr className="bg-slate-50/50 border-b border-gray-200">
                           <td colSpan={10} className="p-3 pl-8 pr-4">
@@ -1862,7 +2575,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
         </div>
       ) : (
         /* ═══════════════════════════════════════════════════════════════
-           VIEW 2: TALLY ORDER OUTSTANDINGS VIEW (ORDER-WISE DRILLDOWN)
+           VIEW 3: CUSTOMER VIEW (ORDER-WISE DRILLDOWN)
         ═══════════════════════════════════════════════════════════════ */
         <div className="bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs">
           <div className="overflow-x-auto min-h-[350px]">
