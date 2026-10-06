@@ -760,11 +760,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   };
 
   // Converts BOM "recipe makes" quantity into base PCS:
-  // e.g. If recipe makes 5 GBL, and 1 GBL = 400 PCS, then recipeBasePcs = 5 * 400 = 2,000 PCS.
-  // For Finished Goods (notebooks), BOM requirements (e.g. 23 UR sheets, 1 Index, 1 Board)
-  // are already defined for 1 finished book (1 PCS). It must NOT divide by 4-UP or 2-UP again!
+  // e.g. If recipe makes 4 PCS (batch size = 4), recipeBasePcs = 4.
+  // If recipe makes 5 GBL, and 1 GBL = 400 PCS, then recipeBasePcs = 5 * 400 = 2,000 PCS.
   const getSkuRecipeBasePcs = (sku: SkuV2, convFactor: number): number => {
-    const isFinished = getItemClassification(sku) === 'products';
     const yieldUnit = (
       (sku as any).recipeYieldUnit || 
       (sku as any).batchYieldUnit || 
@@ -772,17 +770,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       'PCS'
     ).toUpperCase().trim();
 
-    if (isFinished) {
-      if (yieldUnit === 'GBL') {
-        const rawYieldQty = Number(sku.recipeYieldQty) || Number(sku.batchYieldQty) || 1;
-        const factor = convFactor > 0 ? convFactor : 1;
-        return rawYieldQty * factor;
-      }
-      // For Finished Goods in PCS, BOM recipe lines are already expressed per 1 finished book.
-      return 1;
-    }
-
     const rawYieldQty = Number(sku.recipeYieldQty) || Number(sku.batchYieldQty) || 1;
+
     if (yieldUnit === 'GBL') {
       const factor = convFactor > 0 ? convFactor : 1;
       return rawYieldQty * factor;
@@ -1092,19 +1081,30 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     setShowProductDropdown(false);
     setProductSearch('');
 
-    const assignedUnit = (overrideUom || sku.unit || 'PCS').toUpperCase().trim();
+    const bomYieldQty = Number(sku.recipeYieldQty) || Number(sku.batchYieldQty) || 0;
+    const bomYieldUnit = (
+      (sku as any).recipeYieldUnit || 
+      (sku as any).batchYieldUnit || 
+      sku.unit || 
+      'PCS'
+    ).toUpperCase().trim();
+
+    // Dynamically load the planned quantity field according to the assigned BOM batch size
+    const initialQty = overrideQty !== undefined
+      ? overrideQty
+      : (bomYieldQty > 0 ? bomYieldQty : 1);
+
+    const assignedUnit = (overrideUom || (bomYieldQty > 0 && bomYieldUnit ? bomYieldUnit : (sku.unit || 'PCS'))).toUpperCase().trim();
+
+    setPlannedQty(initialQty);
     setUom(assignedUnit);
 
     // Compute factor synchronously (not from stale state) so BOM scales correctly
     const newFactor = getSkuPcsPerGbl(sku);
     setConversionFactor(newFactor);
 
-    if (overrideQty !== undefined) {
-      setPlannedQty(overrideQty);
-    }
-
     // Compute actual planned PCS inline using the freshly computed factor
-    const curPlannedQty = overrideQty !== undefined ? overrideQty : (Number(plannedQty) || 0);
+    const curPlannedQty = initialQty;
     const actualPlannedPcs = assignedUnit === 'GBL' 
       ? curPlannedQty * (newFactor > 0 ? newFactor : 1) 
       : curPlannedQty;
@@ -1236,7 +1236,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     const targetSkuCode = initialSkuCode || searchParams.get('skuCode') || searchParams.get('itemCode') || '';
     const targetSkuName = initialSkuName || searchParams.get('skuName') || searchParams.get('itemName') || '';
     const targetQty = initialPlannedQty !== undefined ? String(initialPlannedQty) : (searchParams.get('plannedQty') || searchParams.get('qty') || '');
-    const targetUom = initialPlannedUom || searchParams.get('plannedUom') || searchParams.get('uom') || 'GBL';
+    const targetUom = initialPlannedUom || searchParams.get('plannedUom') || searchParams.get('uom') || undefined;
     const targetSoRef = salesOrderRef || searchParams.get('salesOrderRef') || '';
 
     if (targetSkuCode || targetSkuName) {
@@ -1259,7 +1259,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         }
         // Auto set remarks if empty
         if (!remarks) {
-          setRemarks(targetSoRef ? `Production for Sales Order ${targetSoRef} (${matched.name} - ${parsedQty || 1} ${targetUom})` : `Shortfall production for ${matched.name} (${parsedQty || 1} ${targetUom})`);
+          const displayQty = parsedQty || matched.recipeYieldQty || matched.batchYieldQty || 1;
+          const displayUom = targetUom || matched.recipeYieldUnit || matched.batchYieldUnit || matched.unit || 'PCS';
+          setRemarks(targetSoRef ? `Production for Sales Order ${targetSoRef} (${matched.name} - ${displayQty} ${displayUom})` : `Shortfall production for ${matched.name} (${displayQty} ${displayUom})`);
         }
       }
     }
@@ -1952,6 +1954,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         plannedUom: uom,
         plannedPcs: plannedPcs,
         conversionFactor: conversionFactor,
+        recipeYieldQty: Number(currentSku?.recipeYieldQty || currentSku?.batchYieldQty) || 1,
+        recipeYieldUnit: (currentSku as any)?.recipeYieldUnit || (currentSku as any)?.batchYieldUnit || uom,
         producedQty: editOrder?.producedQty || 0,
         producedPcs: editOrder?.producedPcs || 0,
         balanceQty: Math.max(0, numPlannedQty - (editOrder?.producedQty || 0)),
