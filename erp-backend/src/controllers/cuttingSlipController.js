@@ -8,6 +8,7 @@ const Sequence = require("../models/sequenceModel");
 const PurchaseInvoiceV2 = require("../models/purchaseInvoiceV2Model");
 const { getNextSequenceNumber, peekNextSequenceNumber, syncSequenceNumber } = require("../utils/sequenceManager");
 const { broadcast } = require("../utils/realtimeService");
+const { convertAltToPrimary } = require("../utils/uomConversion");
 
 const toObjectId = (id) => {
   if (!id) return null;
@@ -515,25 +516,31 @@ exports.createCuttingSlip = async (req, res) => {
     // Entry B: IN (Generation of Converted Sheets / Semi-Finished Units)
     const targetUnitNorm = (targetSkuDoc.unit || '').trim().toLowerCase();
     const isTargetUnitReam = targetUnitNorm.includes('ream');
-    const isTargetUnitPcs = targetUnitNorm === 'pcs' || targetUnitNorm === 'piece' || targetUnitNorm === 'pieces';
-    const isTargetUnitGbl = targetUnitNorm === 'gbl';
-    const convFactor = Number(targetSkuDoc.altUnitConversion || targetSkuDoc.conv || targetSkuDoc.booksGbl || targetSkuDoc.pcsPerGbl || 400);
+    const isTargetUnitGbl = targetUnitNorm === 'gbl' || targetUnitNorm.includes('bundle') || targetUnitNorm.includes('box') || targetUnitNorm.includes('carton');
+    const convFactor = Number(
+      targetSkuDoc.altUnitConversion ||
+      targetSkuDoc.conv ||
+      targetSkuDoc.booksGbl ||
+      targetSkuDoc.pcsPerGbl ||
+      0
+    );
 
     let finalOutputQty = Number(actualSheets);
     let unitRate = Number(actualSheets) > 0 ? Number(totalInputCost || 0) / Number(actualSheets) : 0;
 
     if (isTargetUnitReam) {
       finalOutputQty = Number(actualReams);
-      unitRate = Number(actualReams) > 0 ? Number(totalInputCost || 0) / Number(actualReams) : 0;
-    } else if (isTargetUnitPcs) {
-      // 4-UP: 1 parent sheet yields 4 semi-finished PCS
-      finalOutputQty = Number(actualSheets) * 4;
-      unitRate = Math.round((Number(unitRate) / 4) * 10000) / 10000;
-    } else if (isTargetUnitGbl) {
-      // 4-UP converted to GBL: total PCS / convFactor
-      const totalPcs = Number(actualSheets) * 4;
-      finalOutputQty = Math.round((totalPcs / (convFactor > 0 ? convFactor : 400)) * 1000) / 1000;
-      unitRate = Math.round(((Number(unitRate) / 4) * (convFactor > 0 ? convFactor : 400)) * 10000) / 10000;
+      unitRate = finalOutputQty > 0 ? Math.round((Number(totalInputCost || 0) / finalOutputQty) * 10000) / 10000 : 0;
+    } else if (isTargetUnitGbl && convFactor > 0) {
+      // Conversion according to the conversion rate of that particular item in item master (e.g. 10172 / 2500 = 4.0688)
+      finalOutputQty = Math.round((Number(actualSheets) / convFactor) * 10000) / 10000;
+      unitRate = finalOutputQty > 0 ? Math.round((Number(totalInputCost || 0) / finalOutputQty) * 10000) / 10000 : 0;
+    } else if (targetSkuDoc.altUnit && convFactor > 0) {
+      finalOutputQty = convertAltToPrimary(Number(actualSheets), targetSkuDoc);
+      unitRate = finalOutputQty > 0 ? Math.round((Number(totalInputCost || 0) / finalOutputQty) * 10000) / 10000 : 0;
+    } else {
+      finalOutputQty = Number(actualSheets);
+      unitRate = Number(actualSheets) > 0 ? Number(totalInputCost || 0) / Number(actualSheets) : 0;
     }
 
     const txNumIn = await Sequence.getNextSequence("IL", session);
@@ -680,7 +687,7 @@ exports.getCuttingSlips = async (req, res) => {
     const total = await CuttingSlip.countDocuments(query);
     const cuttingSlips = await CuttingSlip.find(query)
       .populate("sourceSku", "name skuCode unit gsm width")
-      .populate("targetSku", "name skuCode unit gsm width length")
+      .populate("targetSku", "name skuCode unit gsm width length altUnit altUnitConversion booksGbl pcsPerGbl")
       .populate("destinationLocationId", "name code level")
       .populate("sourceLocationId", "name code level")
       .sort({ date: -1, createdAt: -1 })
@@ -728,8 +735,26 @@ exports.cancelCuttingSlip = async (req, res) => {
 
     const targetSkuDoc = await SkuV2.findById(slip.targetSku).session(session);
     if (targetSkuDoc) {
-      const isTargetUnitReam = (targetSkuDoc.unit || '').toLowerCase().includes('ream');
-      const finalOut = isTargetUnitReam ? Number(slip.actualReams) : Number(slip.actualSheets);
+      const targetUnitNorm = (targetSkuDoc.unit || '').trim().toLowerCase();
+      const isTargetUnitReam = targetUnitNorm.includes('ream');
+      const isTargetUnitGbl = targetUnitNorm === 'gbl' || targetUnitNorm.includes('bundle') || targetUnitNorm.includes('box') || targetUnitNorm.includes('carton');
+      const convFactor = Number(
+        targetSkuDoc.altUnitConversion ||
+        targetSkuDoc.conv ||
+        targetSkuDoc.booksGbl ||
+        targetSkuDoc.pcsPerGbl ||
+        0
+      );
+
+      let finalOut = Number(slip.actualSheets);
+      if (isTargetUnitReam) {
+        finalOut = Number(slip.actualReams);
+      } else if (isTargetUnitGbl && convFactor > 0) {
+        finalOut = Math.round((Number(slip.actualSheets) / convFactor) * 10000) / 10000;
+      } else if (targetSkuDoc.altUnit && convFactor > 0) {
+        finalOut = convertAltToPrimary(Number(slip.actualSheets), targetSkuDoc);
+      }
+
       if (targetSkuDoc.presentStock !== undefined) {
         targetSkuDoc.presentStock = Math.max(0, Number(targetSkuDoc.presentStock || 0) - finalOut);
       }

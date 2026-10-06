@@ -233,17 +233,29 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
                         </div>
                       </td>
                       <td className="py-3 px-3 text-right font-mono">
-                        <span className="font-black text-emerald-800 text-xs">
-                          {slip.actualSheets?.toLocaleString()} Sheets
-                        </span>
-                        <span className="text-[10px] text-slate-500 block">
-                          {slip.actualReams?.toFixed(2)} Reams
-                        </span>
-                        {slip.cutsCount ? (
-                          <span className="text-[9.5px] text-indigo-600 font-bold block">
-                            {slip.cutsCount.toLocaleString()} cuts @ {slip.reelsOnStand || 1}R
-                          </span>
-                        ) : null}
+                        {(() => {
+                          const targetDoc = slip.targetSku as any;
+                          const tUnit = (targetDoc?.unit || '').trim().toUpperCase();
+                          const conv = Number(targetDoc?.altUnitConversion || targetDoc?.booksGbl || targetDoc?.pcsPerGbl || 0);
+                          const isGbl = tUnit === 'GBL' || tUnit.includes('BUNDLE') || tUnit.includes('BOX');
+                          const convertedQty = isGbl && conv > 0 ? (slip.actualSheets / conv) : null;
+
+                          return (
+                            <>
+                              <span className="font-black text-emerald-800 text-xs block">
+                                {convertedQty !== null ? `${convertedQty.toFixed(4)} ${tUnit}` : `${slip.actualSheets?.toLocaleString()} Sheets`}
+                              </span>
+                              <span className="text-[10px] text-slate-500 block">
+                                {slip.actualSheets?.toLocaleString()} Sheets ({slip.actualReams?.toFixed(2)} Reams)
+                              </span>
+                              {slip.cutsCount ? (
+                                <span className="text-[9.5px] text-indigo-600 font-bold block">
+                                  {slip.cutsCount.toLocaleString()} cuts @ {slip.reelsOnStand || 1}R
+                                </span>
+                              ) : null}
+                            </>
+                          );
+                        })()}
                       </td>
                       <td className="py-3 px-3 text-center">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold inline-flex items-center gap-1 ${
@@ -265,12 +277,24 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
                         </span>
                       </td>
                       <td className="py-3 px-3 text-right font-mono text-[11px]">
-                        <div className="font-bold text-slate-900">
-                          ₹{slip.effectiveCostPerSheet?.toFixed(2)}/sh
-                        </div>
-                        <div className="text-[9.5px] text-slate-400">
-                          ₹{slip.effectiveCostPerReam?.toFixed(1)}/rm
-                        </div>
+                        {(() => {
+                          const targetDoc = slip.targetSku as any;
+                          const tUnit = (targetDoc?.unit || '').trim().toUpperCase();
+                          const conv = Number(targetDoc?.altUnitConversion || targetDoc?.booksGbl || targetDoc?.pcsPerGbl || 0);
+                          const isGbl = tUnit === 'GBL' || tUnit.includes('BUNDLE') || tUnit.includes('BOX');
+                          const costPerTargetUnit = isGbl && conv > 0 ? (slip.effectiveCostPerSheet * conv) : null;
+
+                          return (
+                            <>
+                              <div className="font-bold text-slate-900">
+                                {costPerTargetUnit !== null ? `₹${costPerTargetUnit.toFixed(2)}/${tUnit}` : `₹${slip.effectiveCostPerSheet?.toFixed(2)}/sh`}
+                              </div>
+                              <div className="text-[9.5px] text-slate-400">
+                                ₹{slip.effectiveCostPerSheet?.toFixed(2)}/sh • ₹{slip.effectiveCostPerReam?.toFixed(1)}/rm
+                              </div>
+                            </>
+                          );
+                        })()}
                       </td>
                       <td className="py-3 px-3 text-center">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${

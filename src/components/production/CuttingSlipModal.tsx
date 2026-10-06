@@ -705,6 +705,36 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
     return Math.round((netProductionCost / numActualReams) * 100) / 100;
   }, [netProductionCost, numActualReams]);
 
+  // Target SKU Unit and Conversion Factor
+  const targetConvFactor = useMemo(() => {
+    if (!targetSkuDoc) return 0;
+    return Number(
+      targetSkuDoc.altUnitConversion ||
+      (targetSkuDoc as any).conv ||
+      (targetSkuDoc as any).booksGbl ||
+      (targetSkuDoc as any).pcsPerGbl ||
+      0
+    );
+  }, [targetSkuDoc]);
+
+  const targetUnit = useMemo(() => {
+    return (targetSkuDoc?.unit || '').trim().toUpperCase();
+  }, [targetSkuDoc]);
+
+  const convertedTargetQty = useMemo(() => {
+    if (numActualSheets <= 0) return 0;
+    if (targetUnit.includes('REAM')) return numActualReams;
+    if (targetConvFactor > 0 && (targetUnit === 'GBL' || targetUnit.includes('BUNDLE') || targetUnit.includes('BOX') || targetUnit.includes('CARTON'))) {
+      return Math.round((numActualSheets / targetConvFactor) * 10000) / 10000;
+    }
+    return numActualSheets;
+  }, [numActualSheets, numActualReams, targetUnit, targetConvFactor]);
+
+  const costPerTargetUnit = useMemo(() => {
+    if (convertedTargetQty <= 0) return 0;
+    return Math.round((netProductionCost / convertedTargetQty) * 10000) / 10000;
+  }, [netProductionCost, convertedTargetQty]);
+
   // Semi-Finished 4-UP Book-Size Piece Cost (Parent Sheet Cost / 4)
   const costPer4UpPiece = useMemo(() => {
     if (effectiveCostPerSheet <= 0) return 0;
@@ -1843,22 +1873,43 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                   </span>
                 </div>
 
-                {/* Card 4: Semi-Finished 4-UP Cost */}
+                {/* Card 4: Converted Yield & Rate */}
                 <div className="lg:col-span-3 bg-blue-900 text-white p-2.5 rounded-lg border border-blue-800 flex flex-col justify-between h-full shadow-3xs">
-                  <div>
-                    <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider block">
-                      Semi-Finished 4-UP Cost (Book Size PCS)
-                    </span>
-                    <span className="text-[9.5px] text-blue-300 block">
-                      4 PCS per parent sheet
-                    </span>
-                  </div>
-                  <div className="text-[10px] font-mono text-blue-200 mt-1">
-                    ₹{effectiveCostPerSheet.toFixed(3)} ÷ 4 = <span className="font-bold text-white">₹{costPer4UpPiece.toFixed(3)} / PCS</span>
-                  </div>
-                  <div className="mt-1 px-2 py-0.5 bg-blue-800/80 rounded border border-blue-700 text-center font-mono font-bold text-xs text-white">
-                    ₹{costPer4UpPiece.toFixed(2)} per PCS (Approx.)
-                  </div>
+                  {targetConvFactor > 0 && (targetUnit === 'GBL' || targetUnit.includes('BUNDLE') || targetUnit.includes('BOX') || targetUnit.includes('CARTON')) ? (
+                    <>
+                      <div>
+                        <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider block">
+                          Converted Yield ({targetUnit})
+                        </span>
+                        <span className="text-[9.5px] text-blue-300 block truncate">
+                          1 {targetUnit} = {targetConvFactor} {targetSkuDoc?.altUnit || 'Sheets'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-mono text-blue-200 mt-1">
+                        {numActualSheets.toLocaleString()} ÷ {targetConvFactor} = <span className="font-bold text-white">{convertedTargetQty} {targetUnit}</span>
+                      </div>
+                      <div className="mt-1 px-2 py-0.5 bg-blue-800/80 rounded border border-blue-700 text-center font-mono font-bold text-xs text-white">
+                        ₹{costPerTargetUnit.toFixed(2)} / {targetUnit}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider block">
+                          Semi-Finished Cost ({targetUnit || 'PCS'})
+                        </span>
+                        <span className="text-[9.5px] text-blue-300 block">
+                          Per sheet / piece yield
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-mono text-blue-200 mt-1">
+                        Rate: <span className="font-bold text-white">₹{effectiveCostPerSheet.toFixed(3)} / sheet</span>
+                      </div>
+                      <div className="mt-1 px-2 py-0.5 bg-blue-800/80 rounded border border-blue-700 text-center font-mono font-bold text-xs text-white">
+                        ₹{effectiveCostPerSheet.toFixed(2)} per sheet
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
