@@ -1235,12 +1235,12 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                           return (
                             <div key={batchInfo.batch} className="rounded-lg border border-blue-200 overflow-hidden bg-white shadow-3xs">
                               {/* Batch Header */}
-                              <div className="px-2.5 py-1 bg-blue-50/60 border-b border-blue-100 flex items-center justify-between">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-mono font-bold text-xs text-blue-950 bg-white px-2 py-0.5 rounded border border-blue-200 shadow-3xs">
+                              <div className="px-2.5 py-1 bg-blue-50/60 border-b border-blue-100 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+                                <div className="flex items-center gap-2 flex-nowrap whitespace-nowrap shrink-0">
+                                  <span className="font-mono font-bold text-xs text-blue-950 bg-white px-2 py-0.5 rounded border border-blue-200 shadow-3xs whitespace-nowrap shrink-0">
                                     Batch: {batchInfo.batch}
                                   </span>
-                                  <span className="text-xs text-slate-600 font-medium">
+                                  <span className="text-xs text-slate-600 font-medium whitespace-nowrap">
                                     {batchReels.length} {batchReels.length === 1 ? 'Reel' : 'Reels'} • {batchInfo.totalWeight.toLocaleString()} kg • ₹{formatRate(batchInfo.avgRate)}/kg
                                   </span>
                                 </div>

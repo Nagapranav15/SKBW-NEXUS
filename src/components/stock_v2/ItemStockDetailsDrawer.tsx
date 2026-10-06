@@ -2367,11 +2367,11 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
 
                   <div className="flex flex-wrap items-center gap-2">
                     {/* Status Toggle Pills */}
-                    <div className="flex items-center bg-gray-200/60 p-0.5 rounded-xl text-xs font-bold">
+                    <div className="flex items-center bg-gray-200/60 p-0.5 rounded-xl text-xs font-bold shrink-0">
                       <button
                         type="button"
                         onClick={() => { setReelStatusFilter('ALL'); setReelPage(1); }}
-                        className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                        className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                           reelStatusFilter === 'ALL'
                             ? 'bg-white text-gray-900 shadow-2xs'
                             : 'text-gray-500 hover:text-gray-900'
@@ -2382,7 +2382,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       <button
                         type="button"
                         onClick={() => { setReelStatusFilter('Available'); setReelPage(1); }}
-                        className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                        className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                           reelStatusFilter === 'Available'
                             ? 'bg-emerald-600 text-white shadow-2xs'
                             : 'text-emerald-700 hover:text-emerald-900'
@@ -2393,7 +2393,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       <button
                         type="button"
                         onClick={() => { setReelStatusFilter('Consumed'); setReelPage(1); }}
-                        className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                        className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                           reelStatusFilter === 'Consumed'
                             ? 'bg-gray-700 text-white shadow-2xs'
                             : 'text-gray-500 hover:text-gray-900'
@@ -2403,30 +2403,49 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       </button>
                     </div>
 
-                    {/* Batch Dropdown */}
+                    {/* Batch Number Quick Pills Filter (All in One Line) */}
                     {reelBatches.length > 0 && (
-                      <select
-                        aria-label="Filter reels by batch"
-                        value={reelBatchFilter}
-                        onChange={(e) => { setReelBatchFilter(e.target.value); setReelPage(1); }}
-                        className="px-2.5 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none cursor-pointer"
-                      >
-                        <option value="ALL">All Batches ({reelBatches.length})</option>
+                      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 shrink-0 bg-gray-100/80 p-0.5 rounded-xl border border-gray-200/60">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider shrink-0 px-1.5 whitespace-nowrap">
+                          Batch:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => { setReelBatchFilter('ALL'); setReelPage(1); }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                            reelBatchFilter === 'ALL'
+                              ? 'bg-blue-600 text-white shadow-2xs'
+                              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
+                          }`}
+                        >
+                          All ({reelBatches.length})
+                        </button>
                         {reelBatches.map(b => (
-                          <option key={b} value={b}>Batch: {b}</option>
+                          <button
+                            key={b}
+                            type="button"
+                            onClick={() => { setReelBatchFilter(b); setReelPage(1); }}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono whitespace-nowrap transition-all cursor-pointer ${
+                              reelBatchFilter === b
+                                ? 'bg-blue-600 text-white shadow-2xs'
+                                : 'text-gray-700 hover:text-gray-900 hover:bg-gray-200/50'
+                            }`}
+                          >
+                            {b}
+                          </button>
                         ))}
-                      </select>
+                      </div>
                     )}
 
                     {/* Search Input */}
-                    <div className="relative">
+                    <div className="relative shrink-0">
                       <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                       <input
                         type="text"
                         placeholder="Search reel #, batch, zone..."
                         value={reelSearch}
                         onChange={(e) => { setReelSearch(e.target.value); setReelPage(1); }}
-                        className="pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none w-48 sm:w-56"
+                        className="pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none w-44 sm:w-52"
                       />
                     </div>
 
@@ -2435,7 +2454,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       type="button"
                       onClick={fetchStockDetails}
                       title="Reload Reel Records"
-                      className="p-1.5 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-xl transition-all cursor-pointer"
+                      className="p-1.5 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-xl transition-all cursor-pointer shrink-0"
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
                     </button>
@@ -2444,7 +2463,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     <button
                       type="button"
                       onClick={exportReelsToExcel}
-                      className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                      className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 whitespace-nowrap"
                     >
                       <Download className="w-3.5 h-3.5 text-gray-500" />
                       <span>Excel</span>
@@ -2455,18 +2474,18 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                 {/* Table */}
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
-                    <thead className="bg-gray-50/80 border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <thead className="bg-gray-50/80 border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
                       <tr>
-                        <th className="p-3 text-center w-12">#</th>
-                        <th className="p-3">REEL NUMBER</th>
-                        <th className="p-3">BATCH / INVOICE</th>
-                        <th className="p-3 text-right">WEIGHT (KG)</th>
-                        <th className="p-3">SIZE • GSM</th>
-                        <th className="p-3">LOCATION / GODOWN</th>
-                        <th className="p-3 text-center">STATUS</th>
-                        <th className="p-3">CUTTING SLIP / REF</th>
-                        <th className="p-3">RECEIVED DATE</th>
-                        <th className="p-3 text-right">RATE / KG</th>
+                        <th className="px-3.5 py-3 text-center w-12 whitespace-nowrap">#</th>
+                        <th className="px-3.5 py-3 whitespace-nowrap">REEL NUMBER</th>
+                        <th className="px-3.5 py-3 whitespace-nowrap">BATCH NO.</th>
+                        <th className="px-3.5 py-3 text-right whitespace-nowrap">WEIGHT</th>
+                        <th className="px-3.5 py-3 whitespace-nowrap">SPECS</th>
+                        <th className="px-3.5 py-3 whitespace-nowrap">LOCATION / GODOWN</th>
+                        <th className="px-3.5 py-3 text-center whitespace-nowrap">STATUS</th>
+                        <th className="px-3.5 py-3 whitespace-nowrap">CUTTING VOUCHER</th>
+                        <th className="px-3.5 py-3 whitespace-nowrap">RECEIVED DATE</th>
+                        <th className="px-3.5 py-3 text-right whitespace-nowrap">RATE / KG</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -2474,62 +2493,62 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                         const isAvailable = reel.status === 'Available';
                         return (
                           <tr key={reel.id || `${reel.reelNumber}-${idx}`} className="hover:bg-blue-50/30 transition-colors">
-                            <td className="p-3 text-center font-mono text-gray-400 text-[11px]">
+                            <td className="px-3.5 py-3 text-center font-mono text-gray-400 text-[11px] whitespace-nowrap">
                               {(reelPage - 1) * reelPageSize + idx + 1}
                             </td>
-                            <td className="p-3">
+                            <td className="px-3.5 py-3 whitespace-nowrap">
                               <div className="flex items-center gap-2">
                                 <div className={`p-1.5 rounded-lg shrink-0 ${isAvailable ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
                                   <Disc className="w-3.5 h-3.5" />
                                 </div>
-                                <span className="font-mono font-black text-gray-900 tracking-tight text-xs sm:text-sm">
+                                <span className="font-mono font-black text-gray-900 tracking-tight text-xs sm:text-sm whitespace-nowrap">
                                   {reel.reelNumber}
                                 </span>
                               </div>
                             </td>
-                            <td className="p-3">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 font-mono text-[11px] font-semibold border border-gray-200">
+                            <td className="px-3.5 py-3 whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 font-mono text-xs font-bold border border-slate-200/80 whitespace-nowrap shadow-3xs">
                                 {reel.batchNumber || '-'}
                               </span>
                             </td>
-                            <td className="p-3 text-right font-mono font-black text-xs sm:text-sm text-gray-900">
+                            <td className="px-3.5 py-3 text-right font-mono font-black text-xs sm:text-sm text-gray-900 whitespace-nowrap">
                               {(Number(reel.weight) || 0).toLocaleString('en-IN')} <span className="text-[10px] font-bold text-gray-500 font-sans">KG</span>
                             </td>
-                            <td className="p-3 text-gray-600 font-medium">
+                            <td className="px-3.5 py-3 text-gray-600 font-medium whitespace-nowrap">
                               {reel.width ? `${reel.width} cm` : '-'}
                               {reel.gsm ? ` • ${reel.gsm} GSM` : ''}
                             </td>
-                            <td className="p-3">
-                              <div className="flex items-center gap-1.5 text-gray-700 font-medium">
+                            <td className="px-3.5 py-3 whitespace-nowrap">
+                              <div className="flex items-center gap-1.5 text-gray-700 font-medium whitespace-nowrap">
                                 <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                                 <span>{reel.locationName || 'General Floor'}</span>
                               </div>
                             </td>
-                            <td className="p-3 text-center">
+                            <td className="px-3.5 py-3 text-center whitespace-nowrap">
                               {isAvailable ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 whitespace-nowrap">
                                   <CheckCircle2 className="w-3 h-3" />
                                   Available
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200 whitespace-nowrap">
                                   Consumed
                                 </span>
                               )}
                             </td>
-                            <td className="p-3 font-mono text-[11px]">
+                            <td className="px-3.5 py-3 font-mono text-[11px] whitespace-nowrap">
                               {reel.consumedIn ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 font-bold">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 font-bold whitespace-nowrap">
                                   {reel.consumedIn}
                                 </span>
                               ) : (
                                 <span className="text-gray-400">-</span>
                               )}
                             </td>
-                            <td className="p-3 text-gray-500 font-medium whitespace-nowrap">
+                            <td className="px-3.5 py-3 text-gray-500 font-medium whitespace-nowrap">
                               {reel.date ? new Date(reel.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
                             </td>
-                            <td className="p-3 text-right font-mono font-semibold text-gray-700">
+                            <td className="px-3.5 py-3 text-right font-mono font-semibold text-gray-700 whitespace-nowrap">
                               {reel.ratePerKg ? `₹${Number(reel.ratePerKg).toFixed(2)}` : '-'}
                             </td>
                           </tr>
