@@ -995,6 +995,16 @@ exports.recordProductionEntry = async (req, res) => {
       producedPcs = enteredQty;
     }
 
+    const remainingQty = Math.max(0, (order.plannedQty || 0) - (order.producedQty || 0));
+    const remainingPcs = Math.max(0, (order.plannedPcs || 0) - (order.producedPcs || 0));
+
+    // Prevent entries that exceed remaining required amount
+    if (producedQty > remainingQty + 0.001 || producedPcs > remainingPcs) {
+      return res.status(400).json({
+        msg: `Produced quantity exceeds remaining required amount (${remainingQty} ${orderUom})`
+      });
+    }
+
     const newCumulativeQty = (order.producedQty || 0) + producedQty;
     const newCumulativePcs = (order.producedPcs || 0) + producedPcs;
     const newBalanceQty = Math.max(0, order.plannedQty - newCumulativeQty);

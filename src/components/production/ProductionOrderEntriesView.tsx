@@ -51,6 +51,24 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
   const remainingQty = Math.max(0, (order.plannedQty || 0) - (order.producedQty || 0));
   const remainingPcs = Math.max(0, plannedPcs - completedPcs);
 
+  // Maximum allowed required quantity in currently selected UOM
+  const maxRequiredQty = useMemo(() => {
+    if (orderIsGbl && !isGbl) {
+      // Order is planned in GBL, but user is entering in PCS
+      return remainingPcs;
+    } else if (!orderIsGbl && isGbl) {
+      // Order is planned in PCS, but user is entering in GBL
+      return conversion > 0 ? (Math.round((remainingQty / conversion) * 1000) / 1000) : remainingQty;
+    } else {
+      // Same UOM
+      return remainingQty;
+    }
+  }, [orderIsGbl, isGbl, remainingPcs, remainingQty, conversion]);
+
+  const qtyNumber = producedQty === '' ? 0 : Number(producedQty) || 0;
+  const isOverLimit = qtyNumber > maxRequiredQty;
+  const isOrderFullyCompleted = remainingQty <= 0;
+
   const formRef = useRef<HTMLFormElement>(null);
 
   // Tally Keyboard Navigation
@@ -77,6 +95,10 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
     if (e.key === 'Enter') {
       const target = e.target as HTMLElement;
       if (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON') return;
+      if (isOverLimit) {
+        e.preventDefault();
+        return;
+      }
       e.preventDefault();
       shiftFocus(1);
     }
@@ -96,14 +118,17 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
         onViewOverview(order, 'overview');
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A' || e.key === 'Enter')) {
         e.preventDefault();
+        if (isOverLimit) return;
         const submitBtn = document.querySelector('button[type="submit"]') as HTMLButtonElement;
-        submitBtn?.click();
+        if (submitBtn && !submitBtn.disabled) {
+          submitBtn.click();
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [order, onBack, onPrint, onViewOverview]);
+  }, [order, onBack, onPrint, onViewOverview, isOverLimit]);
 
   const handleClear = () => {
     setProducedQty('');
@@ -114,7 +139,10 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
     e.preventDefault();
     const qtyNum = Number(producedQty);
     if (!qtyNum || qtyNum <= 0) {
-      showToast('Produced quantity must be greater than 0', 'error');
+      return;
+    }
+    // Block if exceeding required amount - no unnecessary popups, just reject
+    if (qtyNum > maxRequiredQty) {
       return;
     }
 
@@ -346,27 +374,60 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
                   <input
                     type="number"
                     min={0.1}
+                    max={maxRequiredQty > 0 ? maxRequiredQty : undefined}
                     step="any"
-                    value={producedQty || ''}
-                    onChange={e => setProducedQty(Number(e.target.value) || 0)}
-                    placeholder="0"
-                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-bold focus:outline-none focus:border-blue-500"
+                    value={producedQty === '' ? '' : producedQty}
+                    disabled={isOrderFullyCompleted}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        setProducedQty('');
+                        return;
+                      }
+                      setProducedQty(Number(val));
+                    }}
+                    placeholder={isOrderFullyCompleted ? "Order completed (0 remaining)" : "0"}
+                    className={`w-full text-xs font-bold rounded-lg px-3 py-2 transition-all focus:outline-none ${
+                      isOverLimit
+                        ? 'border-2 border-rose-500 bg-rose-50/60 text-rose-900 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20'
+                        : isOrderFullyCompleted
+                        ? 'border border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'border border-gray-200 bg-white text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10'
+                    }`}
                   />
                   <select
                     value={producedUom}
                     onChange={e => setProducedUom(e.target.value)}
-                    className="w-24 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg px-2.5 py-2 font-semibold focus:outline-none focus:border-blue-500 cursor-pointer"
+                    disabled={isOrderFullyCompleted}
+                    className="w-24 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg px-2.5 py-2 font-semibold focus:outline-none focus:border-blue-500 cursor-pointer disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value={order.plannedUom || 'PCS'}>{order.plannedUom || 'PCS'}</option>
                     {order.plannedUom !== 'PCS' && <option value="PCS">PCS</option>}
                   </select>
                 </div>
-                {isGbl && (
+                {isOverLimit && (
+                  <div className="flex items-center justify-between gap-1 text-[11px] text-rose-600 font-semibold mt-1">
+                    <span className="flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                      <span>Exceeds required amount (Max: {maxRequiredQty} {producedUom})</span>
+                    </span>
+                    {maxRequiredQty > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setProducedQty(maxRequiredQty)}
+                        className="text-[10px] underline font-bold text-rose-700 hover:text-rose-900 cursor-pointer ml-1"
+                      >
+                        Set to max ({maxRequiredQty})
+                      </button>
+                    )}
+                  </div>
+                )}
+                {isGbl && !isOverLimit && (
                   <p className="text-[11px] text-gray-500 mt-1 font-medium">
                     = <span className="font-bold text-gray-800">{producedPcs.toLocaleString()} PCS</span> (1 GBL = {conversion} PCS)
                   </p>
                 )}
-                {!isGbl && orderIsGbl && Number(producedQty) > 0 && (
+                {!isGbl && orderIsGbl && Number(producedQty) > 0 && !isOverLimit && (
                   <p className="text-[11px] text-blue-500 mt-1 font-medium">
                     = <span className="font-bold text-blue-700">{(Math.round((Number(producedQty) / conversion) * 10000) / 10000).toLocaleString()} GBL</span> (÷ {conversion} PCS/GBL)
                   </p>
@@ -413,7 +474,12 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
 
               <button
                 type="submit"
-                className="inline-flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-1.5 rounded-lg shadow-sm hover:shadow transition-all cursor-pointer"
+                disabled={isOverLimit || !producedQty || qtyNumber <= 0 || isOrderFullyCompleted}
+                className={`inline-flex items-center space-x-1.5 text-xs font-semibold px-4 py-1.5 rounded-lg transition-all ${
+                  isOverLimit || !producedQty || qtyNumber <= 0 || isOrderFullyCompleted
+                    ? 'bg-gray-200 text-gray-400 border border-gray-200 cursor-not-allowed shadow-none'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow cursor-pointer'
+                }`}
               >
                 <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>Add Production Entry</span>
