@@ -2,12 +2,13 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, Truck, Package, CheckCircle2, Printer,
-  Edit3, MapPin, Phone, Save
+  Edit3, MapPin, Phone, Save, Plus, Trash2, Calendar
 } from 'lucide-react';
 import { SalesOrderV2, updateSalesOrderV2 } from '../../api/salesOrderApiV2';
-import { createDeliveryChallan } from '../../api/deliveryChallanApi';
+import { createDeliveryChallan, updateDeliveryChallan } from '../../api/deliveryChallanApi';
 import { saveCustomSalesOrder } from '../../utils/salesOrderStorage';
 import { getBalancesV2, getSkusV2 } from '../../api/mfgApiV2';
+import { getParties } from '../../api/partyApi';
 import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../ui/Toast';
 
@@ -16,7 +17,9 @@ export interface CreateDispatchModalProps {
   onClose: () => void;
   order: SalesOrderV2 | null;
   allOrders?: SalesOrderV2[];
-  onOrderChange?: (newOrder: SalesOrderV2) => void;
+  editingChallan?: any;
+  isDirectDispatch?: boolean;
+  onOrderChange?: (newOrder: SalesOrderV2 | null) => void;
   onDispatchCreated: (challan: any) => void;
 }
 
@@ -42,44 +45,89 @@ interface ItemRow {
   isAvailable?: boolean;
 }
 
-/* ─────────────────────────────────────────────── */
-
 export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
   isOpen,
   onClose,
   order,
   allOrders = [],
+  editingChallan,
+  isDirectDispatch = false,
   onOrderChange,
   onDispatchCreated,
 }) => {
   const { selectedCompany } = useAuth();
   const checkboxRef = useRef<HTMLInputElement>(null);
 
-  /* ── order selection ── */
-  const [selectedOrderId, setSelectedOrderId] = useState<string>(() => order?._id || '');
-  const activeOrder = useMemo(
-    () => (selectedOrderId ? (allOrders.find(o => o._id === selectedOrderId) ?? order ?? null) : (order ?? null)),
-    [allOrders, selectedOrderId, order]
-  );
-  // When modal opens with an order or order changes, sync selectedOrderId
-  useEffect(() => {
-    if (isOpen && order?._id) {
-      setSelectedOrderId(order._id);
+  // Dispatch Mode: 'order' | 'direct'
+  const isEditing = Boolean(editingChallan);
+  const [dispatchMode, setDispatchMode] = useState<'order' | 'direct'>(() => {
+    if (editingChallan) {
+      return (editingChallan.orderNumber === 'DIRECT' || !editingChallan.orderId) ? 'direct' : 'order';
     }
-  }, [isOpen, order]);
+    return isDirectDispatch || !order ? 'direct' : 'order';
+  });
+
+  // Direct Customer info state
+  const [directCustomerName, setDirectCustomerName] = useState('');
+  const [directCustomerPhone, setDirectCustomerPhone] = useState('');
+  const [directRegion, setDirectRegion] = useState('');
+
+  // Parties & Master SKUs for direct creation
+  const [partyOptions, setPartyOptions] = useState<any[]>([]);
+  const [availableSkus, setAvailableSkus] = useState<any[]>([]);
+
+  // Order selection
+  const [selectedOrderId, setSelectedOrderId] = useState<string>(() => order?._id || '');
+  const activeOrder = useMemo(() => {
+    if (dispatchMode === 'direct') return null;
+    return (selectedOrderId ? (allOrders.find(o => o._id === selectedOrderId) ?? order ?? null) : (order ?? null));
+  }, [allOrders, selectedOrderId, order, dispatchMode]);
 
   // Live stock map for displaying stock availability of order items
   const [modalStockMap, setModalStockMap] = useState<Map<string, { pcs: number; gbl: number }>>(new Map());
 
+  // Dispatch type
+  const [dispatchType, setDispatchType] = useState<'full' | 'partial'>('full');
+
+  // Dispatch details
+  const [dispatchDate, setDispatchDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [transporter, setTransporter] = useState('');
+  const [vehicleNumber, setVehicleNumber] = useState('');
+  const [lrNumber, setLrNumber] = useState('');
+  const [lrDate, setLrDate] = useState('');
+  const [remarks, setRemarks] = useState('');
+
+  // Address
+  const [sameAsBillTo, setSameAsBillTo] = useState(true);
+  const [editBillTo, setEditBillTo] = useState(false);
+  const [editShipTo, setEditShipTo] = useState(false);
+  const [billToAddress, setBillToAddress] = useState('');
+  const [shipToAddress, setShipToAddress] = useState('');
+
+  // Items
+  const [itemRows, setItemRows] = useState<ItemRow[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // DC Number
+  const dcNumber = useMemo(() => {
+    if (editingChallan?.dcNumber) return editingChallan.dcNumber;
+    const y = new Date().getFullYear();
+    const r = Math.floor(1000 + Math.random() * 9000);
+    return `DC-${y}-${r}`;
+  }, [editingChallan]);
+
+  // Load parties & SKUs when modal opens
   useEffect(() => {
     if (!isOpen) return;
-    const compId = (activeOrder?.company as any)?._id || activeOrder?.company || selectedCompany?._id;
+    const compId = selectedCompany?._id;
     if (!compId) return;
 
+    // Load SKUs & balances
     Promise.all([
       getBalancesV2(compId).catch(() => []),
-      getSkusV2(compId).catch(() => [])
-    ]).then(([balances, skus]) => {
+      getSkusV2(compId).catch(() => []),
+      getParties({ company: compId, limit: 1000, light: true }).catch(() => ({ data: [] }))
+    ]).then(([balances, skus, partiesRes]) => {
       const smap = new Map<string, { pcs: number; gbl: number }>();
       const skuPcsMap = new Map<string, number>();
       const bList = Array.isArray(balances) ? balances : [];
@@ -118,46 +166,114 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
       });
 
       setModalStockMap(smap);
-    }).catch(() => {});
-  }, [isOpen, activeOrder, selectedCompany?._id]);
+      setAvailableSkus(sList);
 
-  /* ── dispatch type ── */
-  const [dispatchType, setDispatchType] = useState<'full' | 'partial'>('full');
+      const pList = Array.isArray(partiesRes) ? partiesRes : (partiesRes?.data || partiesRes?.parties || []);
+      setPartyOptions(Array.isArray(pList) ? pList : []);
+    }).catch(err => {
+      console.warn('Failed to load modal dependencies:', err);
+    });
+  }, [isOpen, selectedCompany?._id]);
 
-  /* ── dispatch details ── */
-  const [dispatchDate, setDispatchDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [transporter, setTransporter] = useState('');
-  const [lrNumber, setLrNumber] = useState('');
-  const [lrDate, setLrDate] = useState('');
-  const [remarks, setRemarks] = useState('');
-
-  /* ── address ── */
-  const [sameAsBillTo, setSameAsBillTo] = useState(true);
-  const [editBillTo, setEditBillTo] = useState(false);
-  const [editShipTo, setEditShipTo] = useState(false);
-  const [billToAddress, setBillToAddress] = useState('');
-  const [shipToAddress, setShipToAddress] = useState('');
-
-  /* ── items ── */
-  const [itemRows, setItemRows] = useState<ItemRow[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  /* ── dc number ── */
-  const dcNumber = useMemo(() => {
-    const y = new Date().getFullYear();
-    const r = Math.floor(1000 + Math.random() * 9000);
-    return `DC-${y}-${r}`;
-  }, []);
-
-  /* ─── Build item rows from active order ─── */
+  // Synchronize initial state when modal opens
   useEffect(() => {
-    if (!activeOrder?.items) return;
+    if (!isOpen) return;
+
+    if (editingChallan) {
+      // Pre-fill from existing challan for editing
+      const ch = editingChallan;
+      setDirectCustomerName(ch.customerName || '');
+      setTransporter(ch.transporterName || '');
+      setVehicleNumber(ch.vehicleNumber || '');
+      setLrNumber(ch.lrNumber || '');
+      setLrDate(ch.lrDate || '');
+      setRemarks(ch.remarks || ch.notes || '');
+      setDispatchDate(ch.date || new Date().toISOString().split('T')[0]);
+      setBillToAddress(ch.billToAddress || '');
+      setShipToAddress(ch.shipToAddress || '');
+      setSameAsBillTo(ch.sameAsBillTo ?? (ch.billToAddress === ch.shipToAddress));
+
+      if (ch.items && Array.isArray(ch.items)) {
+        setItemRows(ch.items.map((it: any, idx: number) => {
+          const qty = Number(it.deliveredQty || it.quantity || it.orderedQty || 0);
+          const pcs = Number(it.deliveredPcs || it.pcs || qty * 100);
+          return {
+            key: it._id || `edit-item-${idx}`,
+            itemCode: it.skuCode || `FG-${idx + 1}`,
+            itemName: it.itemName || 'Item',
+            uom: it.uom || 'GBL',
+            pcsPerGbl: 100,
+            orderedQty: qty,
+            dispatchedQty: qty,
+            pendingQty: qty,
+            pendingPcs: pcs,
+            isGblItem: (it.uom || '').toUpperCase() === 'GBL',
+            selected: true,
+            dispatchGbl: qty,
+            dispatchPcs: pcs,
+            skuId: it.skuId,
+            skuCode: it.skuCode,
+            unitPrice: Number(it.price || it.unitPrice || 0),
+            stockOnHandGbl: 0,
+            stockOnHandPcs: 0,
+            isAvailable: true
+          };
+        }));
+      }
+      return;
+    }
+
+    if (isDirectDispatch || !order) {
+      setDispatchMode('direct');
+      if (itemRows.length === 0) {
+        // Start with one empty item row in direct mode
+        handleAddNewDirectItem();
+      }
+    } else {
+      setDispatchMode('order');
+      if (order?._id) setSelectedOrderId(order._id);
+    }
+  }, [isOpen, editingChallan, isDirectDispatch, order]);
+
+  // Handle adding a new item row in Direct Dispatch mode
+  const handleAddNewDirectItem = () => {
+    const newKey = `direct-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newRow: ItemRow = {
+      key: newKey,
+      itemCode: '',
+      itemName: '',
+      uom: 'GBL',
+      pcsPerGbl: 100,
+      orderedQty: 0,
+      dispatchedQty: 0,
+      pendingQty: 1,
+      pendingPcs: 100,
+      isGblItem: true,
+      selected: true,
+      dispatchGbl: 1,
+      dispatchPcs: 100,
+      skuId: undefined,
+      skuCode: '',
+      unitPrice: 0,
+      stockOnHandGbl: 0,
+      stockOnHandPcs: 0,
+      isAvailable: true
+    };
+    setItemRows(prev => [...prev, newRow]);
+  };
+
+  const handleRemoveDirectItem = (key: string) => {
+    setItemRows(prev => prev.filter(r => r.key !== key));
+  };
+
+  // Build item rows from active order when in 'order' mode
+  useEffect(() => {
+    if (dispatchMode !== 'order' || !activeOrder?.items || isEditing) return;
 
     if ((activeOrder as any).transporter && !transporter) {
       setTransporter((activeOrder as any).transporter);
     }
 
-    // Build address from order data
     const custName = activeOrder.customerName || '';
     const billingAddr = (activeOrder as any).billingAddress;
     const shippingAddr = (activeOrder as any).shippingAddress;
@@ -206,7 +322,6 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
       const pendingGbl = Math.max(0, orderedGbl - dispatchedGbl) || (conv > 0 ? Math.ceil(pendingPcs / conv) : pendingPcs);
 
       const isGbl = (item.uom || '').toUpperCase() === 'GBL';
-
       const codeKey = (item.skuCode || '').toLowerCase().trim();
       const idKey = String(item.skuId || '');
       const nameKey = (item.itemName || item.description || '').toLowerCase().trim();
@@ -217,8 +332,6 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
 
       const hasStock = (stock.gbl >= pendingGbl && pendingGbl > 0) || 
                        (stock.pcs >= pendingPcs && pendingPcs > 0);
-
-      const isAvailable = hasStock;
 
       return {
         key: item._id || `item-${idx}`,
@@ -239,15 +352,16 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
         unitPrice: Number(item.unitPrice) || 0,
         stockOnHandGbl: stock.gbl,
         stockOnHandPcs: stock.pcs,
-        isAvailable
+        isAvailable: hasStock
       };
     });
 
     setItemRows(rows);
-  }, [activeOrder, modalStockMap]);
+  }, [activeOrder, modalStockMap, dispatchMode, isEditing]);
 
-  /* ─── Sync dispatch qty when type changes ─── */
+  // Sync dispatch qty when type changes in order mode
   useEffect(() => {
+    if (dispatchMode !== 'order') return;
     setItemRows(prev =>
       prev.map(r => ({
         ...r,
@@ -256,9 +370,9 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
         selected: dispatchType === 'full' ? true : r.selected,
       }))
     );
-  }, [dispatchType]);
+  }, [dispatchType, dispatchMode]);
 
-  /* ─── Indeterminate checkbox for "select all" ─── */
+  // Indeterminate checkbox for "select all"
   const allSelected = itemRows.length > 0 && itemRows.every(r => r.selected);
   const someSelected = itemRows.some(r => r.selected);
   useEffect(() => {
@@ -267,7 +381,6 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     }
   }, [allSelected, someSelected]);
 
-  /* ─── Handlers ─── */
   const handleToggleAll = (checked: boolean) => {
     setItemRows(prev =>
       prev.map(r => ({
@@ -298,22 +411,72 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     setItemRows(prev =>
       prev.map(r => {
         if (r.key !== key) return r;
-        const clamped = Math.max(0, Math.min(val, r.pendingQty));
+        const clamped = Math.max(0, dispatchMode === 'direct' ? val : Math.min(val, r.pendingQty));
         const pcs = r.isGblItem ? Math.round(clamped * r.pcsPerGbl) : clamped;
         return { ...r, dispatchGbl: clamped, dispatchPcs: pcs, selected: clamped > 0 };
       })
     );
   };
 
-  /* ─── Computed totals ─── */
+  // Direct item SKU selector change handler
+  const handleDirectSkuChange = (key: string, skuIdOrCode: string) => {
+    const selectedSku = availableSkus.find(s => s._id === skuIdOrCode || s.skuCode === skuIdOrCode);
+    if (!selectedSku) return;
+
+    const pcsPerGbl = Number(selectedSku.altUnitConversion || selectedSku.booksGbl || 100) || 100;
+    const stock = modalStockMap.get(String(selectedSku._id)) || modalStockMap.get((selectedSku.skuCode || '').toLowerCase()) || { pcs: 0, gbl: 0 };
+    const price = Number(selectedSku.sellingPrice || selectedSku.rate || 0);
+
+    setItemRows(prev =>
+      prev.map(r => {
+        if (r.key !== key) return r;
+        const gbl = r.dispatchGbl || 1;
+        return {
+          ...r,
+          skuId: selectedSku._id,
+          skuCode: selectedSku.skuCode,
+          itemName: selectedSku.name,
+          uom: selectedSku.unit || 'GBL',
+          pcsPerGbl,
+          unitPrice: price,
+          stockOnHandGbl: stock.gbl,
+          stockOnHandPcs: stock.pcs,
+          dispatchGbl: gbl,
+          dispatchPcs: gbl * pcsPerGbl,
+          pendingQty: gbl,
+          pendingPcs: gbl * pcsPerGbl,
+          isAvailable: stock.gbl >= gbl
+        };
+      })
+    );
+  };
+
+  // Direct party select handler
+  const handleSelectParty = (partyId: string) => {
+    const p = partyOptions.find(item => item._id === partyId || item.id === partyId);
+    if (p) {
+      setDirectCustomerName(p.name || p.companyName || '');
+      setDirectCustomerPhone(p.phone || p.mobile || '');
+      setDirectRegion(p.state || p.city || '');
+      const addr = p.address || (p.city ? `${p.name}\n${p.city}${p.state ? ', ' + p.state : ''}` : '');
+      if (addr) {
+        setBillToAddress(addr);
+        setShipToAddress(addr);
+      }
+    }
+  };
+
+  // Computed totals
   const totals = useMemo(() => {
     const active = itemRows.filter(r => r.selected && r.dispatchGbl > 0);
     const totalDispatchGbl = active.reduce((s, r) => s + r.dispatchGbl, 0);
     const totalDispatchPcs = active.reduce((s, r) => s + r.dispatchPcs, 0);
-    const totalPendingGbl = itemRows.reduce((s, r) => s + r.pendingQty, 0);
-    const totalPendingPcs = itemRows.reduce((s, r) => s + r.pendingPcs, 0);
+    const totalPendingGbl = itemRows.reduce((s, r) => s + (dispatchMode === 'direct' ? r.dispatchGbl : r.pendingQty), 0);
+    const totalPendingPcs = itemRows.reduce((s, r) => s + (dispatchMode === 'direct' ? r.dispatchPcs : r.pendingPcs), 0);
     const remainingGbl = Math.max(0, totalPendingGbl - totalDispatchGbl);
     const remainingPcs = Math.max(0, totalPendingPcs - totalDispatchPcs);
+    const totalAmount = active.reduce((s, r) => s + (r.dispatchGbl * (r.unitPrice || 0)), 0);
+
     return {
       totalDispatchGbl,
       totalDispatchPcs,
@@ -321,13 +484,25 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
       totalPendingPcs,
       remainingGbl,
       remainingPcs,
+      totalAmount,
       fullyDispatched: remainingGbl <= 0 && totalPendingGbl > 0,
     };
-  }, [itemRows]);
+  }, [itemRows, dispatchMode]);
 
-  /* ─── Submit ─── */
+  // Submit Handler: supports direct dispatch, SO dispatch, and editing existing challans
   const buildAndSubmit = async (asDraft: boolean) => {
-    if (!activeOrder) { showToast('Please select a sales order', 'error'); return; }
+    if (dispatchMode === 'direct') {
+      if (!directCustomerName.trim()) {
+        showToast('Please enter customer name for direct dispatch', 'error');
+        return;
+      }
+    } else {
+      if (!activeOrder) {
+        showToast('Please select a sales order', 'error');
+        return;
+      }
+    }
+
     if (totals.totalDispatchGbl <= 0) {
       showToast('Please enter dispatch quantity for at least one item', 'error');
       return;
@@ -341,7 +516,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
         skuId: r.skuId,
         skuCode: r.skuCode,
         itemName: r.itemName,
-        orderedQty: r.orderedQty,
+        orderedQty: r.orderedQty || r.dispatchGbl,
         deliveredQty: r.dispatchGbl,
         deliveredPcs: r.dispatchPcs,
         uom: r.uom,
@@ -349,25 +524,30 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
         total: r.dispatchGbl * (r.unitPrice || 0),
       }));
 
-      const challanPayload = {
+      const finalCustomerName = dispatchMode === 'direct'
+        ? directCustomerName.trim()
+        : (activeOrder?.customerName || 'Customer');
+
+      const challanPayload: any = {
         dcNumber,
-        orderId: activeOrder._id,
-        orderNumber: activeOrder.orderNumber,
-        customerName: activeOrder.customerName || 'Customer',
-        customerId: (activeOrder.customer as any)?._id || (activeOrder as any).customerId,
+        orderId: dispatchMode === 'direct' ? null : activeOrder?._id,
+        orderNumber: dispatchMode === 'direct' ? 'DIRECT' : (activeOrder?.orderNumber || 'DIRECT'),
+        customerName: finalCustomerName,
+        customerId: dispatchMode === 'direct' ? null : ((activeOrder?.customer as any)?._id || (activeOrder as any)?.customerId),
         date: dispatchDate || new Date().toISOString().split('T')[0],
         transporterName: transporter.trim(),
+        vehicleNumber: vehicleNumber.trim(),
         lrNumber: lrNumber.trim(),
         lrDate,
         items: dcItems,
         billToAddress,
         shipToAddress: sameAsBillTo ? billToAddress : shipToAddress,
         sameAsBillTo,
-        subtotal: activeRows.reduce((s, r) => s + r.dispatchGbl * (r.unitPrice || 0), 0),
+        subtotal: totals.totalAmount,
         status: asDraft ? 'draft' : 'dispatched',
         remarks: remarks.trim(),
         company: selectedCompany?._id,
-        dispatchType,
+        dispatchType: dispatchMode === 'direct' ? 'direct' : dispatchType,
         totalGbl: totals.totalDispatchGbl,
         totalPcs: totals.totalDispatchPcs,
         remainingGbl: totals.remainingGbl,
@@ -375,47 +555,72 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
         fulfillmentStatus: totals.fullyDispatched ? 'Fully Dispatched' : 'Partially Dispatched',
       };
 
-      let createdChallan: any = challanPayload;
-      try {
-        const res = await createDeliveryChallan(challanPayload);
-        if (res?.data) createdChallan = res.data;
-      } catch (apiErr) {
-        console.warn('createDeliveryChallan API fallback:', apiErr);
+      let resultChallan: any = challanPayload;
+
+      if (isEditing && editingChallan?._id) {
+        // UPDATE EXISTING DELIVERY CHALLAN
+        try {
+          const res = await updateDeliveryChallan(editingChallan._id, challanPayload);
+          if (res?.data) resultChallan = res.data;
+        } catch (apiErr) {
+          console.warn('updateDeliveryChallan API fallback:', apiErr);
+        }
+      } else {
+        // CREATE NEW DELIVERY CHALLAN
+        try {
+          const res = await createDeliveryChallan(challanPayload);
+          if (res?.data) resultChallan = res.data;
+        } catch (apiErr) {
+          console.warn('createDeliveryChallan API fallback:', apiErr);
+        }
+
+        // If linked to a sales order, update order fulfilled quantities
+        if (dispatchMode === 'order' && activeOrder) {
+          const updatedItems = (activeOrder.items || []).map((item, idx) => {
+            const row = itemRows.find(r => r.key === (item._id || `item-${idx}`));
+            if (!row) return item;
+            return { ...item, dispatchedQty: (Number(item.dispatchedQty) || 0) + row.dispatchGbl };
+          });
+          const allFulfilled = updatedItems.every(i => (Number(i.dispatchedQty) || 0) >= (Number(i.quantity) || 0));
+          const someDispatched = updatedItems.some(i => (Number(i.dispatchedQty) || 0) > 0);
+          const updatedOrder: SalesOrderV2 = {
+            ...activeOrder,
+            items: updatedItems,
+            fulfillmentStatus: allFulfilled ? 'Fulfilled' : someDispatched ? 'Partially Dispatched' : (activeOrder.fulfillmentStatus || 'Pending'),
+            status: allFulfilled ? 'Delivered' : someDispatched ? 'Partially Delivered' : (activeOrder.status || 'Confirmed'),
+          };
+
+          saveCustomSalesOrder(updatedOrder, selectedCompany?._id);
+          if (activeOrder._id && !activeOrder._id.startsWith('seed-') && !activeOrder._id.startsWith('so-mock-')) {
+            updateSalesOrderV2(activeOrder._id, updatedOrder).catch(() => {});
+          }
+        }
       }
 
-      // Update sales order dispatched quantities
-      const updatedItems = (activeOrder.items || []).map((item, idx) => {
-        const row = itemRows.find(r => r.key === (item._id || `item-${idx}`));
-        if (!row) return item;
-        return { ...item, dispatchedQty: (Number(item.dispatchedQty) || 0) + row.dispatchGbl };
-      });
-      const allFulfilled = updatedItems.every(i => (Number(i.dispatchedQty) || 0) >= (Number(i.quantity) || 0));
-      const someDispatched = updatedItems.some(i => (Number(i.dispatchedQty) || 0) > 0);
-      const updatedOrder: SalesOrderV2 = {
-        ...activeOrder,
-        items: updatedItems,
-        fulfillmentStatus: allFulfilled ? 'Fulfilled' : someDispatched ? 'Partially Dispatched' : (activeOrder.fulfillmentStatus || 'Pending'),
-        status: allFulfilled ? 'Delivered' : someDispatched ? 'Partially Delivered' : (activeOrder.status || 'Confirmed'),
-      };
-
-      saveCustomSalesOrder(updatedOrder, selectedCompany?._id);
-      if (activeOrder._id && !activeOrder._id.startsWith('seed-') && !activeOrder._id.startsWith('so-mock-')) {
-        updateSalesOrderV2(activeOrder._id, updatedOrder).catch(() => {});
-      }
-
-      // Cache in localStorage
+      // Update LocalStorage cache
       const cKey = `skbw_delivery_challans_${selectedCompany?._id || 'default'}`;
       const stored = JSON.parse(localStorage.getItem(cKey) || '[]');
-      localStorage.setItem(cKey, JSON.stringify([createdChallan, ...stored]));
+      if (isEditing) {
+        const filtered = stored.filter((c: any) => c._id !== editingChallan._id && c.dcNumber !== editingChallan.dcNumber);
+        localStorage.setItem(cKey, JSON.stringify([resultChallan, ...filtered]));
+      } else {
+        localStorage.setItem(cKey, JSON.stringify([resultChallan, ...stored]));
+      }
 
-      showToast(`Dispatch ${dcNumber} ${asDraft ? 'saved as draft' : 'created successfully'}!`, 'success');
+      showToast(
+        isEditing
+          ? `Dispatch ${dcNumber} updated successfully!`
+          : `Dispatch ${dcNumber} ${asDraft ? 'saved as draft' : 'created successfully'}!`,
+        'success'
+      );
+
       window.dispatchEvent(new CustomEvent('stock_balance_changed'));
       window.dispatchEvent(new CustomEvent('sales_order_updated'));
-      onDispatchCreated(createdChallan);
+      onDispatchCreated(resultChallan);
       onClose();
     } catch (err: any) {
       console.error(err);
-      showToast('Failed to create dispatch', 'error');
+      showToast('Failed to save dispatch', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -423,49 +628,42 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
 
   if (!isOpen) return null;
 
-  /* ─── Customer derived fields ─── */
-  const contactNo =
-    (activeOrder as any)?.customerPhone ||
-    (activeOrder?.customer as any)?.phone ||
-    (activeOrder?.customer as any)?.mobile || '';
-  const region =
-    (activeOrder as any)?.region ||
-    (activeOrder as any)?.city ||
-    (activeOrder as any)?.billingAddress?.state || '';
-  const orderDateDisplay = activeOrder
-    ? (() => {
-        const d = new Date((activeOrder as any).orderDate || (activeOrder as any).createdAt || Date.now());
-        return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-      })()
-    : '—';
-
-  /* ─── Portal render ─── */
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center"
-      style={{ backgroundColor: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(3px)' }}
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4"
+      style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(3px)' }}
       onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full flex flex-col overflow-hidden"
-        style={{ maxWidth: 920, maxHeight: '94vh', margin: '0 16px' }}
+        className="bg-white rounded-2xl shadow-2xl w-full flex flex-col overflow-hidden max-w-4xl max-h-[94vh]"
         onMouseDown={e => e.stopPropagation()}
       >
-        {/* ── HEADER ─────────────────────────────── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+        {/* ── HEADER ── */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0 bg-white">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
-              <Truck className="w-4.5 h-4.5" style={{ width: 18, height: 18 }} />
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm shadow-blue-500/20">
+              <Truck className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
-              <h2 className="text-sm font-black text-gray-900 tracking-tight">
-                {dispatchType === 'partial' ? 'Create Dispatch (Partial)' : 'Create Dispatch'}
-              </h2>
-              <p className="text-[11px] text-gray-500 mt-0.5">
-                {dispatchType === 'partial'
-                  ? <>Dispatch selected items and quantities for Sales Order <strong className="text-gray-800">{activeOrder?.orderNumber}</strong>.</>
-                  : <>Create a dispatch for Sales Order <strong className="text-gray-800">{activeOrder?.orderNumber}</strong>. You can dispatch full or partial quantities.</>
-                }
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base font-black text-gray-900 tracking-tight">
+                  {isEditing ? `Edit Dispatch (${dcNumber})` : dispatchMode === 'direct' ? 'Create Direct Dispatch' : 'Create Dispatch from Sales Order'}
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-blue-50 text-blue-700 border border-blue-200">
+                  {dcNumber}
+                </span>
+                {dispatchMode === 'direct' && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                    Standalone Batch
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {isEditing
+                  ? 'Update dispatch quantities, vehicle, transporter, and delivery addresses.'
+                  : dispatchMode === 'direct'
+                  ? 'Create a delivery challan directly without linking to an existing Sales Order.'
+                  : `Dispatch pending items for Sales Order ${activeOrder?.orderNumber || ''}.`}
               </p>
             </div>
           </div>
@@ -473,100 +671,166 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
             onClick={onClose}
             className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* ── SCROLLABLE BODY ─────────────────────── */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        {/* ── SCROLLABLE BODY ── */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
 
-          {/* ① ORDER & CUSTOMER DETAILS */}
-          <Section num={1} label="Order & Customer Details" color="blue">
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <FieldLabel>Sales Order <Required /></FieldLabel>
-                <select
-                  value={selectedOrderId}
-                  onChange={e => {
-                    setSelectedOrderId(e.target.value);
-                    const m = allOrders.find(o => o._id === e.target.value);
-                    if (m && onOrderChange) onOrderChange(m);
-                  }}
-                  className="w-full h-8 bg-white border border-gray-200 rounded-lg px-2.5 text-xs font-semibold text-gray-800 focus:outline-none focus:border-blue-500 cursor-pointer"
+          {/* MODE SELECTOR TOGGLE (If not editing existing challan) */}
+          {!isEditing && (
+            <div className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-200 gap-2">
+              <span className="text-[11px] font-bold text-gray-600 pl-2">Dispatch Source:</span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setDispatchMode('order')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    dispatchMode === 'order'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                  }`}
                 >
-                  <option value="">— Select Sales Order —</option>
-                  {(allOrders.length > 0 ? allOrders : order ? [order] : []).map(o => (
-                    <option key={o._id} value={o._id}>{o.orderNumber}</option>
-                  ))}
-                </select>
+                  <Package className="w-3.5 h-3.5" />
+                  <span>From Sales Order</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDispatchMode('direct');
+                    if (itemRows.length === 0) handleAddNewDirectItem();
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    dispatchMode === 'direct'
+                      ? 'bg-purple-600 text-white shadow-2xs'
+                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  <Truck className="w-3.5 h-3.5" />
+                  <span>Direct Dispatch (No Sales Order)</span>
+                </button>
               </div>
-              <div>
-                <FieldLabel>Order Date</FieldLabel>
-                <ReadOnlyField>{orderDateDisplay}</ReadOnlyField>
-              </div>
-              <div>
-                <FieldLabel>Customer</FieldLabel>
-                <ReadOnlyField>{activeOrder?.customerName || '—'}</ReadOnlyField>
-              </div>
-              <div>
-                <FieldLabel>Contact No.</FieldLabel>
-                <ReadOnlyField icon={<Phone className="w-3 h-3 text-gray-400" />}>
-                  {contactNo || '—'}
-                </ReadOnlyField>
-              </div>
-              <div>
-                <FieldLabel>Region</FieldLabel>
-                <ReadOnlyField icon={<MapPin className="w-3 h-3 text-gray-400" />}>
-                  {region || '—'}
-                </ReadOnlyField>
-              </div>
-            </div>
-          </Section>
-
-          {/* ── Empty state when no order selected ── */}
-          {!activeOrder && (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mb-3">
-                <Truck className="w-7 h-7 text-blue-300" />
-              </div>
-              <p className="text-sm font-bold text-gray-400">Select a Sales Order to continue</p>
-              <p className="text-xs text-gray-300 mt-1">Order details, items, and addresses will appear here</p>
             </div>
           )}
 
-          {activeOrder && (
-            <>
-              {/* ② DISPATCH TYPE */}
-              <Section num={2} label="Dispatch Type" color="blue">
-            <div className="grid grid-cols-2 gap-3">
-              <TypeCard
-                id="full"
-                title="Full Dispatch"
-                desc="Dispatch all pending items and quantities for this order."
-                active={dispatchType === 'full'}
-                onSelect={() => setDispatchType('full')}
-              />
-              <TypeCard
-                id="partial"
-                title="Partial Dispatch"
-                desc="Select items and enter quantities to dispatch."
-                active={dispatchType === 'partial'}
-                onSelect={() => setDispatchType('partial')}
-              />
-            </div>
+          {/* ① CUSTOMER & ORDER DETAILS */}
+          <Section num={1} label={dispatchMode === 'direct' ? 'Customer & Dispatch Destination' : 'Order & Customer Details'} color="blue">
+            {dispatchMode === 'order' ? (
+              /* SALES ORDER SOURCE FIELDS */
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <FieldLabel>Sales Order <Required /></FieldLabel>
+                  <select
+                    value={selectedOrderId}
+                    onChange={e => {
+                      setSelectedOrderId(e.target.value);
+                      const m = allOrders.find(o => o._id === e.target.value);
+                      if (m && onOrderChange) onOrderChange(m);
+                    }}
+                    className="w-full h-8 bg-white border border-gray-200 rounded-lg px-2.5 text-xs font-semibold text-gray-800 focus:outline-none focus:border-blue-500 cursor-pointer"
+                  >
+                    <option value="">— Select Sales Order —</option>
+                    {(allOrders.length > 0 ? allOrders : order ? [order] : []).map(o => (
+                      <option key={o._id} value={o._id}>{o.orderNumber} ({o.customerName})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <FieldLabel>Order Date</FieldLabel>
+                  <ReadOnlyField>{activeOrder?.orderDate || '—'}</ReadOnlyField>
+                </div>
+                <div>
+                  <FieldLabel>Customer / Party</FieldLabel>
+                  <ReadOnlyField>{activeOrder?.customerName || '—'}</ReadOnlyField>
+                </div>
+                <div>
+                  <FieldLabel>Contact Number</FieldLabel>
+                  <ReadOnlyField icon={<Phone className="w-3 h-3 text-gray-400" />}>
+                    {activeOrder?.customerPhone || (activeOrder?.customer as any)?.phone || '—'}
+                  </ReadOnlyField>
+                </div>
+                <div>
+                  <FieldLabel>Region</FieldLabel>
+                  <ReadOnlyField icon={<MapPin className="w-3 h-3 text-gray-400" />}>
+                    {activeOrder?.region || '—'}
+                  </ReadOnlyField>
+                </div>
+              </div>
+            ) : (
+              /* DIRECT STANDALONE DISPATCH FIELDS */
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <FieldLabel>Select Party / Customer (Optional)</FieldLabel>
+                    <select
+                      onChange={e => handleSelectParty(e.target.value)}
+                      className="w-full h-8 bg-white border border-gray-200 rounded-lg px-2.5 text-xs font-semibold text-gray-800 focus:outline-none focus:border-blue-500 cursor-pointer"
+                    >
+                      <option value="">— Choose from Directory —</option>
+                      {partyOptions.map(p => (
+                        <option key={p._id || p.id} value={p._id || p.id}>{p.name || p.companyName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <FieldLabel>Customer / Consignee Name <Required /></FieldLabel>
+                    <input
+                      type="text"
+                      placeholder="e.g. Abbu Stationery"
+                      value={directCustomerName}
+                      onChange={e => setDirectCustomerName(e.target.value)}
+                      className="w-full h-8 px-2.5 text-xs border border-gray-200 rounded-lg font-bold text-gray-900 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel>Contact Phone</FieldLabel>
+                    <input
+                      type="text"
+                      placeholder="e.g. 9848012345"
+                      value={directCustomerPhone}
+                      onChange={e => setDirectCustomerPhone(e.target.value)}
+                      className="w-full h-8 px-2.5 text-xs border border-gray-200 rounded-lg font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </Section>
+
+          {/* ② DISPATCH TYPE (In Order mode) */}
+          {dispatchMode === 'order' && (
+            <Section num={2} label="Dispatch Type" color="blue">
+              <div className="grid grid-cols-2 gap-3">
+                <TypeCard
+                  id="full"
+                  title="Full Dispatch"
+                  desc="Dispatch all pending items and quantities for this order."
+                  active={dispatchType === 'full'}
+                  onSelect={() => setDispatchType('full')}
+                />
+                <TypeCard
+                  id="partial"
+                  title="Partial Dispatch"
+                  desc="Select items and enter partial quantities to dispatch."
+                  active={dispatchType === 'partial'}
+                  onSelect={() => setDispatchType('partial')}
+                />
+              </div>
+            </Section>
+          )}
 
           {/* ③ ITEMS TO DISPATCH */}
           <Section
-            num={3}
-            label={dispatchType === 'full' ? 'Items to Dispatch (All Pending Items)' : 'Items to Dispatch (Select quantities)'}
+            num={dispatchMode === 'order' ? 3 : 2}
+            label={dispatchMode === 'direct' ? 'Items in Direct Dispatch' : 'Items to Dispatch'}
             color="blue"
           >
             <div className="overflow-x-auto -mx-4 px-4">
               <table className="w-full text-xs border-collapse min-w-[700px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-500 uppercase tracking-wider">
-                    {dispatchType === 'partial' && (
+                    {dispatchMode === 'order' && dispatchType === 'partial' && (
                       <th className="py-2 px-3 w-8 text-center">
                         <input
                           ref={checkboxRef}
@@ -578,45 +842,37 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                       </th>
                     )}
                     <th className="py-2 px-3 w-8 text-center">#</th>
-                    <th className="py-2 px-3">Item Code</th>
-                    <th className="py-2 px-3">Item Name</th>
+                    <th className="py-2 px-3">Item Name & SKU</th>
+                    <th className="py-2 px-3 text-center">Available Stock</th>
                     <th className="py-2 px-2 text-right">
-                      Pending Qty<br /><span className="font-semibold normal-case text-gray-400">(GBL)</span>
-                    </th>
-                    <th className="py-2 px-2 text-right">
-                      Pending Qty<br /><span className="font-semibold normal-case text-gray-400">(PCS)</span>
+                      {dispatchMode === 'direct' ? 'Quantity (GBL)' : 'Pending Qty (GBL)'}
                     </th>
                     <th className="py-2 px-2 text-right">
-                      Dispatch Qty<br /><span className="font-semibold normal-case text-gray-400">(GBL)</span>
+                      {dispatchMode === 'direct' ? 'Quantity (PCS)' : 'Pending Qty (PCS)'}
                     </th>
-                    <th className="py-2 px-2 text-right">
-                      Dispatch Qty<br /><span className="font-semibold normal-case text-gray-400">(PCS)</span>
-                    </th>
-                    <th className="py-2 px-3 text-right">
-                      {dispatchType === 'partial' ? 'Remaining After' : 'After Dispatch'}<br />
-                      <span className="font-semibold normal-case text-gray-400">(GBL | PCS)</span>
-                    </th>
+                    <th className="py-2 px-2 text-right">Dispatch Qty (GBL)</th>
+                    <th className="py-2 px-2 text-right">Rate (₹)</th>
+                    <th className="py-2 px-3 text-right">Total (₹)</th>
+                    {dispatchMode === 'direct' && <th className="py-2 px-2 text-center w-10">Remove</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {itemRows.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-8 text-center">
+                      <td colSpan={10} className="py-8 text-center text-gray-400">
                         <Package className="w-6 h-6 text-gray-300 mx-auto mb-1" />
-                        <p className="text-gray-400 text-xs">No items found in this order</p>
+                        <p className="text-xs">No items added yet. Click "+ Add Item" below to add items.</p>
                       </td>
                     </tr>
                   ) : (
                     itemRows.map((row, idx) => {
-                      const afterGbl = Math.max(0, row.pendingQty - row.dispatchGbl);
-                      const afterPcs = Math.max(0, row.pendingPcs - row.dispatchPcs);
-                      const dimmed = dispatchType === 'partial' && !row.selected;
+                      const dimmed = dispatchMode === 'order' && dispatchType === 'partial' && !row.selected;
                       return (
                         <tr
                           key={row.key}
                           className={`transition-colors ${dimmed ? 'opacity-40' : 'hover:bg-blue-50/20'}`}
                         >
-                          {dispatchType === 'partial' && (
+                          {dispatchMode === 'order' && dispatchType === 'partial' && (
                             <td className="py-2.5 px-3 text-center">
                               <input
                                 type="checkbox"
@@ -627,32 +883,74 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                             </td>
                           )}
                           <td className="py-2.5 px-3 text-center text-gray-400 font-semibold">{idx + 1}</td>
-                          <td className="py-2.5 px-3 font-mono font-bold text-gray-700">{row.itemCode}</td>
+
+                          {/* Item Name / SKU selection */}
                           <td className="py-2.5 px-3">
-                            <div className="font-semibold text-gray-900 flex items-center gap-1.5 flex-wrap">
-                              <span>{row.itemName}</span>
-                              {row.isAvailable ? (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
-                                  In Stock
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                  Needs Mfg
-                                </span>
-                              )}
-                            </div>
+                            {dispatchMode === 'direct' ? (
+                              <div className="space-y-1">
+                                <select
+                                  value={row.skuId || row.skuCode || ''}
+                                  onChange={e => handleDirectSkuChange(row.key, e.target.value)}
+                                  className="w-full h-7 bg-white border border-gray-300 rounded px-1.5 text-xs font-semibold text-gray-800"
+                                >
+                                  <option value="">— Select SKU Master Item —</option>
+                                  {availableSkus.map(s => (
+                                    <option key={s._id} value={s._id}>
+                                      {s.name} ({s.skuCode}) — Stock: {s.presentStock || 0}
+                                    </option>
+                                  ))}
+                                </select>
+                                <input
+                                  type="text"
+                                  placeholder="Or enter custom item name"
+                                  value={row.itemName}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setItemRows(prev => prev.map(r => r.key === row.key ? { ...r, itemName: val } : r));
+                                  }}
+                                  className="w-full h-6 px-1.5 border border-gray-200 rounded text-[11px]"
+                                />
+                              </div>
+                            ) : (
+                              <div className="font-semibold text-gray-900 flex items-center gap-1.5 flex-wrap">
+                                <span>{row.itemName}</span>
+                                {row.skuCode && <span className="font-mono text-[10px] text-gray-400">({row.skuCode})</span>}
+                              </div>
+                            )}
                           </td>
-                          <td className="py-2.5 px-2 text-right font-bold font-mono text-gray-800">{row.pendingQty}</td>
-                          <td className="py-2.5 px-2 text-right font-mono text-gray-600">{row.pendingPcs.toLocaleString()}</td>
+
+                          {/* Live Warehouse Stock */}
+                          <td className="py-2.5 px-3 text-center">
+                            {row.stockOnHandGbl !== undefined && row.stockOnHandGbl > 0 ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                {row.stockOnHandGbl} GBL
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                0 Stock
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Pending QTY GBL */}
+                          <td className="py-2.5 px-2 text-right font-bold font-mono text-gray-800">
+                            {dispatchMode === 'direct' ? row.dispatchGbl : row.pendingQty}
+                          </td>
+
+                          {/* Pending QTY PCS */}
+                          <td className="py-2.5 px-2 text-right font-mono text-gray-600">
+                            {(dispatchMode === 'direct' ? row.dispatchPcs : row.pendingPcs).toLocaleString()}
+                          </td>
+
+                          {/* Dispatch Qty GBL */}
                           <td className="py-2.5 px-2 text-right">
-                            {dispatchType === 'full' ? (
+                            {dispatchMode === 'order' && dispatchType === 'full' ? (
                               <span className="font-bold font-mono text-blue-700">{row.dispatchGbl}</span>
                             ) : (
                               <input
                                 type="number"
                                 min={0}
-                                max={row.pendingQty}
                                 step="any"
                                 value={row.dispatchGbl || ''}
                                 placeholder="0"
@@ -661,24 +959,50 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                               />
                             )}
                           </td>
-                          <td className="py-2.5 px-2 text-right font-mono text-gray-600">{row.dispatchPcs.toLocaleString()}</td>
-                          <td className="py-2.5 px-3 text-right font-mono">
-                            <span className={`font-bold text-xs ${afterGbl > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                              {afterGbl} GBL
-                            </span>
-                            <span className="text-gray-300 mx-1">|</span>
-                            <span className={`text-xs ${afterPcs > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
-                              ({afterPcs.toLocaleString()} PCS)
-                            </span>
+
+                          {/* Unit Rate */}
+                          <td className="py-2.5 px-2 text-right font-mono">
+                            <input
+                              type="number"
+                              min={0}
+                              step="any"
+                              value={row.unitPrice || ''}
+                              placeholder="0"
+                              onChange={e => {
+                                const p = Number(e.target.value);
+                                setItemRows(prev => prev.map(r => r.key === row.key ? { ...r, unitPrice: p } : r));
+                              }}
+                              className="w-16 h-7 px-2 border border-gray-200 rounded-md text-right font-mono text-gray-800 text-xs"
+                            />
                           </td>
+
+                          {/* Total Amount */}
+                          <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-900">
+                            ₹{(row.dispatchGbl * (row.unitPrice || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </td>
+
+                          {/* Remove row button for direct mode */}
+                          {dispatchMode === 'direct' && (
+                            <td className="py-2.5 px-2 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveDirectItem(row.key)}
+                                className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                                title="Remove item"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       );
                     })
                   )}
+
                   {/* Totals row */}
                   {itemRows.length > 0 && (
                     <tr className="bg-gray-50 border-t-2 border-gray-200 text-xs font-black">
-                      {dispatchType === 'partial' && <td />}
+                      {dispatchMode === 'order' && dispatchType === 'partial' && <td />}
                       <td />
                       <td colSpan={2} className="py-2 px-3 text-gray-500 uppercase text-[10px] tracking-wider">Total</td>
                       <td className="py-2 px-2 text-right font-black font-mono text-gray-900">
@@ -690,30 +1014,39 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                       <td className="py-2 px-2 text-right font-black font-mono text-blue-700">
                         {totals.totalDispatchGbl}
                       </td>
-                      <td className="py-2 px-2 text-right font-mono font-bold text-blue-600">
-                        {totals.totalDispatchPcs.toLocaleString()}
+                      <td className="py-2 px-2 text-right font-mono font-bold text-gray-700">
+                        —
                       </td>
-                      <td className="py-2 px-3 text-right font-mono">
-                        <span className={`font-bold text-xs ${totals.remainingGbl > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                          {totals.remainingGbl} GBL
-                        </span>
-                        <span className="text-gray-300 mx-1">|</span>
-                        <span className={`text-xs ${totals.remainingPcs > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
-                          ({totals.remainingPcs.toLocaleString()} PCS)
-                        </span>
+                      <td className="py-2 px-3 text-right font-mono font-black text-blue-700">
+                        ₹{totals.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
+                      {dispatchMode === 'direct' && <td />}
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
+
+            {/* Direct mode: Add Item button */}
+            {dispatchMode === 'direct' && (
+              <div className="pt-2 flex justify-start">
+                <button
+                  type="button"
+                  onClick={handleAddNewDirectItem}
+                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5 border border-blue-200"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Add Item</span>
+                </button>
+              </div>
+            )}
           </Section>
 
-          {/* ④ DISPATCH DETAILS + ADDRESSES */}
+          {/* ④ DISPATCH DETAILS & ADDRESSES */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            {/* Dispatch Details — left 3/5 */}
+            {/* Dispatch Logistics Details */}
             <div className="lg:col-span-3">
-              <SectionInner num={4} label="Dispatch Details" color="blue">
+              <SectionInner num={dispatchMode === 'order' ? 4 : 3} label="Dispatch & Transport Details" color="blue">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <FieldLabel>Dispatch Date <Required /></FieldLabel>
@@ -725,27 +1058,37 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                     />
                   </div>
                   <div>
-                    <FieldLabel>Transporter <Required /></FieldLabel>
+                    <FieldLabel>Transporter Name</FieldLabel>
                     <input
                       type="text"
-                      placeholder="e.g. Chennupati Cargo Services"
+                      placeholder="e.g. Chennupati Cargo / Self"
                       value={transporter}
                       onChange={e => setTransporter(e.target.value)}
                       className="w-full h-8 px-2.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
                     />
                   </div>
                   <div>
-                    <FieldLabel>LR/RR No.</FieldLabel>
+                    <FieldLabel>Vehicle Number</FieldLabel>
                     <input
                       type="text"
-                      placeholder="e.g. LR124578"
+                      placeholder="e.g. TS09UA1234"
+                      value={vehicleNumber}
+                      onChange={e => setVehicleNumber(e.target.value)}
+                      className="w-full h-8 px-2.5 text-xs border border-gray-200 rounded-lg font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel>LR / Bilty Number</FieldLabel>
+                    <input
+                      type="text"
+                      placeholder="e.g. LR-987654"
                       value={lrNumber}
                       onChange={e => setLrNumber(e.target.value)}
                       className="w-full h-8 px-2.5 text-xs border border-gray-200 rounded-lg font-mono focus:outline-none focus:border-blue-500"
                     />
                   </div>
                   <div>
-                    <FieldLabel>LR/RR Date</FieldLabel>
+                    <FieldLabel>LR Date</FieldLabel>
                     <input
                       type="date"
                       value={lrDate}
@@ -753,13 +1096,13 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                       className="w-full h-8 px-2.5 text-xs border border-gray-200 rounded-lg font-mono focus:outline-none focus:border-blue-500"
                     />
                   </div>
-                  <div className="col-span-2">
-                    <FieldLabel>Remarks (Optional)</FieldLabel>
+                  <div>
+                    <FieldLabel>Remarks / Delivery Notes</FieldLabel>
                     <input
                       type="text"
                       value={remarks}
                       onChange={e => setRemarks(e.target.value)}
-                      placeholder="Add remarks about this dispatch..."
+                      placeholder="Special instructions..."
                       className="w-full h-8 px-2.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500"
                     />
                   </div>
@@ -767,7 +1110,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
               </SectionInner>
             </div>
 
-            {/* Billing & Delivery — right 2/5 */}
+            {/* Addresses */}
             <div className="lg:col-span-2">
               <div className="h-full border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
                 <div className="bg-blue-50/60 px-4 py-2 border-b border-blue-100 flex items-center gap-2">
@@ -811,7 +1154,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                         setSameAsBillTo(e.target.checked);
                         if (e.target.checked) setShipToAddress(billToAddress);
                       }}
-                      className="w-3.5 h-3.5 rounded accent-blue-600"
+                      className="w-3.5 h-3.5 rounded accent-blue-600 cursor-pointer"
                     />
                     <span className="text-[11px] font-semibold text-gray-600">Same as Bill To</span>
                   </label>
@@ -849,13 +1192,11 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
             </div>
           </div>
 
-          {/* ⑤ DISPATCH SUMMARY */}
-          <Section num={5} label="Dispatch Summary" color="green">
+          {/* ⑤ SUMMARY */}
+          <Section num={dispatchMode === 'order' ? 5 : 4} label="Dispatch Summary" color="green">
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                  {dispatchType === 'partial' ? 'Dispatching' : 'Total Dispatching'}
-                </p>
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Total Dispatching</p>
                 <p className="text-2xl font-black text-blue-700 font-mono leading-none">
                   {totals.totalDispatchGbl}
                   <span className="text-sm font-bold ml-1">GBL</span>
@@ -865,33 +1206,24 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                 </p>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Remaining After Dispatch</p>
-                <p className={`text-2xl font-black font-mono leading-none ${totals.remainingGbl > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                  {totals.remainingGbl}
-                  <span className="text-sm font-bold ml-1">GBL</span>
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Total Valuation</p>
+                <p className="text-2xl font-black text-emerald-700 font-mono leading-none">
+                  ₹{totals.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </p>
-                <p className={`text-xs font-bold font-mono mt-0.5 ${totals.remainingGbl > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
-                  ({totals.remainingPcs.toLocaleString()} PCS)
-                </p>
+                <p className="text-xs text-gray-500 mt-0.5 font-medium">Estimated Challan Value</p>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Status After Posting</p>
-                <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold border ${
-                  totals.fullyDispatched
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-amber-50 text-amber-700 border-amber-200'
-                }`}>
-                  {totals.fullyDispatched ? 'Fully Dispatched' : 'Partially Dispatched'}
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Status</p>
+                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200">
+                  Ready to Dispatch
                 </span>
               </div>
             </div>
           </Section>
-            </>
-          )}
         </div>
 
-        {/* ── FOOTER ─────────────────────────────── */}
-        <div className="px-6 py-3.5 border-t border-gray-200 bg-gray-50/60 flex items-center justify-between shrink-0">
+        {/* ── FOOTER ── */}
+        <div className="px-6 py-3.5 border-t border-gray-200 bg-gray-50/70 flex items-center justify-between shrink-0">
           <button
             type="button"
             onClick={onClose}
@@ -902,10 +1234,10 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              disabled={isSubmitting || !activeOrder || totals.totalDispatchGbl <= 0}
+              disabled={isSubmitting || totals.totalDispatchGbl <= 0}
               onClick={() => buildAndSubmit(true)}
               className={`px-4 py-2 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition-all ${
-                activeOrder && totals.totalDispatchGbl > 0
+                totals.totalDispatchGbl > 0
                   ? 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50 cursor-pointer'
                   : 'text-gray-400 bg-gray-100 border-gray-200 cursor-not-allowed'
               }`}
@@ -915,10 +1247,10 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
             </button>
             <button
               type="button"
-              disabled={isSubmitting || !activeOrder || totals.totalDispatchGbl <= 0}
+              disabled={isSubmitting || totals.totalDispatchGbl <= 0}
               onClick={() => buildAndSubmit(false)}
               className={`px-5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm ${
-                activeOrder && totals.totalDispatchGbl > 0
+                totals.totalDispatchGbl > 0
                   ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200/60 cursor-pointer'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
               }`}
@@ -926,12 +1258,12 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
               {isSubmitting ? (
                 <>
                   <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Creating...</span>
+                  <span>Saving...</span>
                 </>
               ) : (
                 <>
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Save & Print</span>
+                  <span>{isEditing ? 'Update & Save' : 'Save & Print'}</span>
                 </>
               )}
             </button>
@@ -1036,7 +1368,7 @@ function TypeCard({
         value={id}
         checked={active}
         onChange={onSelect}
-        className="mt-0.5 accent-blue-600 shrink-0"
+        className="mt-0.5 accent-blue-600 shrink-0 cursor-pointer"
       />
       <div>
         <p className="text-xs font-black text-gray-900">{title}</p>
@@ -1047,4 +1379,3 @@ function TypeCard({
 }
 
 export default CreateDispatchModal;
-

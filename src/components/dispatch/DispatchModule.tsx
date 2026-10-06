@@ -4,14 +4,14 @@ import {
   Truck, Package, CheckCircle2, Clock, AlertCircle,
   Search, Filter, RefreshCw, ChevronDown,
   Phone, MapPin, Download, Eye, Plus, ArrowUpDown, ChevronLeft, ChevronRight,
-  Printer, X, ArrowUp, ArrowDown
+  Printer, X, ArrowUp, ArrowDown, Calendar, Edit3, Trash2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../../context/AuthContext';
-import { getSalesOrdersV2, SalesOrderV2 } from '../../api/salesOrderApiV2';
-import { getCustomSalesOrders } from '../../utils/salesOrderStorage';
+import { getSalesOrdersV2, SalesOrderV2, updateSalesOrderV2 } from '../../api/salesOrderApiV2';
+import { getCustomSalesOrders, saveCustomSalesOrder } from '../../utils/salesOrderStorage';
 import { getBalancesV2, getSkusV2 } from '../../api/mfgApiV2';
-import { getDeliveryChallans } from '../../api/deliveryChallanApi';
+import { getDeliveryChallans, deleteDeliveryChallan } from '../../api/deliveryChallanApi';
 import { CreateDispatchModal } from './CreateDispatchModal';
 import { ViewDeliveryChallanModal } from './ViewDeliveryChallanModal';
 import { DispatchOrderDetailModal } from './DispatchOrderDetailModal';
@@ -248,16 +248,26 @@ export const DispatchModule: React.FC = () => {
 
   // Filter Popover Menu State
   const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const filterMenuRef = useRef<HTMLDivElement>(null);
+
+  // Dedicated Date Filter Popover State
+  const [showDateFilter, setShowDateFilter] = useState(false);
   const [datePreset, setDatePreset] = useState<string>('All');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
-  const filterMenuRef = useRef<HTMLDivElement>(null);
+  const dateFilterRef = useRef<HTMLDivElement>(null);
 
-  // Sorting
-  const [sortField, setSortField] = useState<'orderNumber' | 'rawDate' | 'pendingGbl' | 'customerName'>('orderNumber');
+  // Sorting for Orders View (All columns clickable)
+  type SortField = 'orderNumber' | 'rawDate' | 'customerName' | 'region' | 'itemCount' | 'pendingGbl' | 'pendingPcs' | 'readyStatus';
+  const [sortField, setSortField] = useState<SortField>('orderNumber');
   const [sortAsc, setSortAsc] = useState(false);
   const [showSortMenu, setShowSortMenu] = useState(false);
   const sortMenuRef = useRef<HTMLDivElement>(null);
+
+  // Sorting for Challans History View
+  type ChallanSortField = 'dcNumber' | 'date' | 'orderNumber' | 'customerName' | 'transporterName' | 'vehicleNumber' | 'items' | 'status';
+  const [challanSortField, setChallanSortField] = useState<ChallanSortField>('date');
+  const [challanSortAsc, setChallanSortAsc] = useState(false);
 
   // Row Action Dropdowns (orderId -> boolean)
   const [openActionDropdownId, setOpenActionDropdownId] = useState<string | null>(null);
@@ -270,6 +280,9 @@ export const DispatchModule: React.FC = () => {
   // Modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedOrderForDispatch, setSelectedOrderForDispatch] = useState<SalesOrderV2 | null>(null);
+  const [editingChallan, setEditingChallan] = useState<any | null>(null);
+  const [isDirectDispatch, setIsDirectDispatch] = useState(false);
+
   const [isChallanModalOpen, setIsChallanModalOpen] = useState(false);
   const [activeChallan, setActiveChallan] = useState<any>(null);
   const [selectedOrderDetailRow, setSelectedOrderDetailRow] = useState<DispatchRowOrder | null>(null);
@@ -282,6 +295,9 @@ export const DispatchModule: React.FC = () => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (filterMenuRef.current && !filterMenuRef.current.contains(e.target as Node)) {
         setShowFilterMenu(false);
+      }
+      if (dateFilterRef.current && !dateFilterRef.current.contains(e.target as Node)) {
+        setShowDateFilter(false);
       }
       if (sortMenuRef.current && !sortMenuRef.current.contains(e.target as Node)) {
         setShowSortMenu(false);
@@ -325,7 +341,7 @@ export const DispatchModule: React.FC = () => {
 
       setSalesOrders(combined);
 
-      // 2. Fetch Live Stock Balances & SKU Master Data for accurate stock readiness
+      // 2. Fetch Live Stock Balances & SKU Master Data
       try {
         const [balances, skus] = await Promise.all([
           getBalancesV2(companyId).catch(() => []),
@@ -407,6 +423,24 @@ export const DispatchModule: React.FC = () => {
     fetchData(true);
   }, [selectedCompany?._id]);
 
+  // Lookup map: Challans by Sales Order
+  const orderChallansMap = useMemo(() => {
+    const map = new Map<string, any[]>();
+    deliveryChallansList.forEach(ch => {
+      const keyId = ch.orderId ? String(ch.orderId) : '';
+      const keyNum = ch.orderNumber ? String(ch.orderNumber) : '';
+      if (keyId) {
+        if (!map.has(keyId)) map.set(keyId, []);
+        map.get(keyId)!.push(ch);
+      }
+      if (keyNum && keyNum !== keyId && keyNum !== 'DIRECT') {
+        if (!map.has(keyNum)) map.set(keyNum, []);
+        map.get(keyNum)!.push(ch);
+      }
+    });
+    return map;
+  }, [deliveryChallansList]);
+
   // Transform and filter sales orders into display rows
   const displayRows: DispatchRowOrder[] = useMemo(() => {
     const pendingOrders = salesOrders.filter(o => {
@@ -439,7 +473,6 @@ export const DispatchModule: React.FC = () => {
         let orderedPcs = 0;
         let orderedGbl = 0;
 
-        // Determine true ordered PCS vs GBL
         if (itemGbl > 0 && rawOrdered > itemGbl) {
           orderedPcs = rawOrdered;
           orderedGbl = itemGbl;
@@ -617,17 +650,25 @@ export const DispatchModule: React.FC = () => {
       return true;
     });
 
-    // Sorting
+    // Sorting by all column fields
     return res.sort((a, b) => {
       let cmp = 0;
       if (sortField === 'orderNumber') {
         cmp = a.orderNumber.localeCompare(b.orderNumber, undefined, { numeric: true });
       } else if (sortField === 'rawDate') {
         cmp = (a.rawDate || '').localeCompare(b.rawDate || '');
-      } else if (sortField === 'pendingGbl') {
-        cmp = a.pendingGbl - b.pendingGbl;
       } else if (sortField === 'customerName') {
         cmp = a.customerName.localeCompare(b.customerName);
+      } else if (sortField === 'region') {
+        cmp = a.region.localeCompare(b.region);
+      } else if (sortField === 'itemCount') {
+        cmp = a.itemCount - b.itemCount;
+      } else if (sortField === 'pendingGbl') {
+        cmp = a.pendingGbl - b.pendingGbl;
+      } else if (sortField === 'pendingPcs') {
+        cmp = a.pendingPcs - b.pendingPcs;
+      } else if (sortField === 'readyStatus') {
+        cmp = a.readyStatus.localeCompare(b.readyStatus);
       }
       return sortAsc ? cmp : -cmp;
     });
@@ -639,6 +680,32 @@ export const DispatchModule: React.FC = () => {
     const start = (currentPage - 1) * pageSize;
     return filteredRows.slice(start, start + pageSize);
   }, [filteredRows, currentPage, pageSize]);
+
+  // Sorted Delivery Challans List (for History Tab)
+  const sortedChallansList = useMemo(() => {
+    const list = [...deliveryChallansList];
+    return list.sort((a, b) => {
+      let cmp = 0;
+      if (challanSortField === 'dcNumber') {
+        cmp = (a.dcNumber || '').localeCompare(b.dcNumber || '', undefined, { numeric: true });
+      } else if (challanSortField === 'date') {
+        cmp = (a.date || '').localeCompare(b.date || '');
+      } else if (challanSortField === 'orderNumber') {
+        cmp = (a.orderNumber || '').localeCompare(b.orderNumber || '');
+      } else if (challanSortField === 'customerName') {
+        cmp = (a.customerName || '').localeCompare(b.customerName || '');
+      } else if (challanSortField === 'transporterName') {
+        cmp = (a.transporterName || '').localeCompare(b.transporterName || '');
+      } else if (challanSortField === 'vehicleNumber') {
+        cmp = (a.vehicleNumber || '').localeCompare(b.vehicleNumber || '');
+      } else if (challanSortField === 'items') {
+        cmp = (a.items?.length || 0) - (b.items?.length || 0);
+      } else if (challanSortField === 'status') {
+        cmp = (a.status || '').localeCompare(b.status || '');
+      }
+      return challanSortAsc ? cmp : -cmp;
+    });
+  }, [deliveryChallansList, challanSortField, challanSortAsc]);
 
   // Accordion Expand Handlers
   const toggleOrderExpand = (id: string) => {
@@ -679,8 +746,8 @@ export const DispatchModule: React.FC = () => {
     setSelectedOrderIds(next);
   };
 
-  // Sort Handler
-  const handleSort = (field: 'orderNumber' | 'rawDate' | 'pendingGbl' | 'customerName') => {
+  // Sort Handlers (Invoked by clicking column headers)
+  const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortAsc(!sortAsc);
     } else {
@@ -689,8 +756,19 @@ export const DispatchModule: React.FC = () => {
     }
   };
 
-  // Open Dispatch Modal
+  const handleChallanSort = (field: ChallanSortField) => {
+    if (challanSortField === field) {
+      setChallanSortAsc(!challanSortAsc);
+    } else {
+      setChallanSortField(field);
+      setChallanSortAsc(true);
+    }
+  };
+
+  // Open Dispatch Modal for Sales Order
   const handleOpenDispatch = (orderRow?: DispatchRowOrder) => {
+    setEditingChallan(null);
+    setIsDirectDispatch(false);
     if (orderRow) {
       setSelectedOrderForDispatch(orderRow.rawOrder);
     } else if (displayRows.length > 0) {
@@ -701,29 +779,111 @@ export const DispatchModule: React.FC = () => {
     setIsCreateModalOpen(true);
   };
 
-  // Auto-open dispatch if orderId is provided in URL
-  useEffect(() => {
-    const targetOrderId = searchParams.get('orderId');
-    if (targetOrderId && displayRows.length > 0 && !urlOrderIdHandled.current) {
-      const found = displayRows.find(r => r._id === targetOrderId || r.orderNumber === targetOrderId || (r.rawOrder && r.rawOrder._id === targetOrderId));
-      if (found) {
-        urlOrderIdHandled.current = true;
-        handleOpenDispatch(found);
-      }
+  // Open Direct Standalone Dispatch (Without Sales Order)
+  const handleOpenDirectDispatch = () => {
+    setEditingChallan(null);
+    setIsDirectDispatch(true);
+    setSelectedOrderForDispatch(null);
+    setIsCreateModalOpen(true);
+  };
+
+  // Open Edit Dispatch Modal for an existing delivery challan
+  const handleEditChallan = (challan: any) => {
+    setEditingChallan(challan);
+    setIsDirectDispatch(challan.orderNumber === 'DIRECT' || !challan.orderId);
+    if (challan.orderId) {
+      const matched = salesOrders.find(o => o._id === challan.orderId || o.orderNumber === challan.orderNumber);
+      setSelectedOrderForDispatch(matched || null);
+    } else {
+      setSelectedOrderForDispatch(null);
     }
-  }, [searchParams, displayRows]);
+    setIsCreateModalOpen(true);
+  };
+
+  // Delete Delivery Challan
+  const handleDeleteChallan = async (challan: any) => {
+    const dcNo = challan.dcNumber || 'this delivery challan';
+    if (!window.confirm(`Are you sure you want to delete Delivery Challan ${dcNo}? This action will remove the dispatch record and restore pending inventory quantities.`)) {
+      return;
+    }
+
+    try {
+      const companyId = selectedCompany?._id;
+
+      if (challan._id) {
+        try {
+          await deleteDeliveryChallan(challan._id);
+        } catch (apiErr) {
+          console.warn('Backend deleteDeliveryChallan failed, proceeding with local reversal:', apiErr);
+        }
+      }
+
+      // Revert sales order dispatched quantities if linked to an SO
+      const targetOrderId = challan.orderId || challan.orderNumber;
+      if (targetOrderId && targetOrderId !== 'DIRECT') {
+        const targetSO = salesOrders.find(o => o._id === targetOrderId || o.orderNumber === targetOrderId);
+        if (targetSO) {
+          const updatedItems = (targetSO.items || []).map(soItem => {
+            const matchedDcItem = (challan.items || []).find((ci: any) =>
+              (ci.skuCode && ci.skuCode === soItem.skuCode) ||
+              (ci.itemName && ci.itemName === soItem.itemName) ||
+              (ci.itemId && String(ci.itemId) === String(soItem._id || soItem.skuId))
+            );
+            if (matchedDcItem) {
+              const delivered = Number(matchedDcItem.deliveredQty || matchedDcItem.quantity || 0);
+              const revertedQty = Math.max(0, (Number(soItem.dispatchedQty) || 0) - delivered);
+              return { ...soItem, dispatchedQty: revertedQty };
+            }
+            return soItem;
+          });
+
+          const allPending = updatedItems.every(i => (Number(i.dispatchedQty) || 0) === 0);
+          const someDispatched = updatedItems.some(i => (Number(i.dispatchedQty) || 0) > 0);
+          const revertedOrder: SalesOrderV2 = {
+            ...targetSO,
+            items: updatedItems,
+            fulfillmentStatus: allPending ? 'Unfulfilled' : someDispatched ? 'Partially Dispatched' : 'Fulfilled',
+            status: allPending ? 'Confirmed' : someDispatched ? 'Partially Delivered' : 'Delivered'
+          };
+
+          saveCustomSalesOrder(revertedOrder, companyId);
+          if (targetSO._id && !targetSO._id.startsWith('seed-') && !targetSO._id.startsWith('so-mock-')) {
+            updateSalesOrderV2(targetSO._id, revertedOrder).catch(() => {});
+          }
+        }
+      }
+
+      // Update state and localStorage
+      setDeliveryChallansList(prev => prev.filter(c => c._id !== challan._id && c.dcNumber !== challan.dcNumber));
+      const cKey = `skbw_delivery_challans_${companyId || 'default'}`;
+      const stored = JSON.parse(localStorage.getItem(cKey) || '[]');
+      const filtered = stored.filter((c: any) => c._id !== challan._id && c.dcNumber !== challan.dcNumber);
+      localStorage.setItem(cKey, JSON.stringify(filtered));
+
+      window.dispatchEvent(new CustomEvent('stock_balance_changed'));
+      window.dispatchEvent(new CustomEvent('sales_order_updated'));
+      showToast(`Delivery Challan ${dcNo} deleted successfully`, 'success');
+      fetchData(false);
+    } catch (err) {
+      console.error('Failed to delete delivery challan:', err);
+      showToast('Failed to delete delivery challan', 'error');
+    }
+  };
 
   // Quick Instant Full Dispatch
   const handleQuickFullDispatch = (orderRow: DispatchRowOrder) => {
+    setEditingChallan(null);
+    setIsDirectDispatch(false);
     setSelectedOrderForDispatch(orderRow.rawOrder);
     setIsCreateModalOpen(true);
     showToast(`Opening dispatch with full pending quantities for ${orderRow.orderNumber}`, 'info');
   };
 
-  // Dispatch Created Callback
+  // Dispatch Created/Updated Callback
   const handleDispatchCreated = (challan: any) => {
     setActiveChallan(challan);
     setIsCreateModalOpen(false);
+    setEditingChallan(null);
     setIsChallanModalOpen(true);
     fetchData(false);
   };
@@ -756,7 +916,7 @@ export const DispatchModule: React.FC = () => {
     }
   };
 
-  // Quick Date Preset Handler
+  // Date Preset Handler
   const applyDatePreset = (preset: string) => {
     setDatePreset(preset);
     const now = new Date();
@@ -781,6 +941,7 @@ export const DispatchModule: React.FC = () => {
       setStartDate(toYMD(first));
       setEndDate(toYMD(last));
     }
+    setShowDateFilter(false);
     setCurrentPage(1);
   };
 
@@ -800,13 +961,13 @@ export const DispatchModule: React.FC = () => {
               </span>
             </h1>
             <p className="text-xs text-gray-500 font-medium">
-              Select a pending sales order and create a dispatch. You can dispatch full or partial quantities.
+              Create dispatches from Sales Orders or create direct standalone dispatches directly.
             </p>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap">
           <button
             onClick={() => handleExportExcel()}
             className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-xl border border-gray-200 text-xs font-bold flex items-center gap-2 shadow-2xs transition-colors cursor-pointer"
@@ -815,6 +976,17 @@ export const DispatchModule: React.FC = () => {
             <span className="hidden sm:inline">Export Excel</span>
           </button>
 
+          {/* Direct Dispatch without Sales Order */}
+          <button
+            onClick={handleOpenDirectDispatch}
+            className="px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold flex items-center gap-2 shadow-2xs transition-all cursor-pointer"
+            title="Create a new dispatch batch directly without any Sales Order"
+          >
+            <Plus className="w-4 h-4 text-purple-600 stroke-[2.5]" />
+            <span>+ Direct Dispatch</span>
+          </button>
+
+          {/* Standard Dispatch from Sales Order */}
           <button
             onClick={() => handleOpenDispatch()}
             className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm shadow-blue-500/25 transition-all cursor-pointer"
@@ -834,7 +1006,7 @@ export const DispatchModule: React.FC = () => {
             { id: 'ready', label: 'Ready to Dispatch', count: metrics.readyOrders },
             { id: 'partial', label: 'Partially Ready', count: metrics.partiallyReadyOrders },
             { id: 'not_ready', label: 'Not Ready', count: metrics.notReadyOrders },
-            ...(deliveryChallansList.length > 0 ? [{ id: 'history', label: 'Challans History', count: deliveryChallansList.length }] : [])
+            { id: 'history', label: 'Challans History', count: deliveryChallansList.length }
           ].map(tab => {
             const active = activeTab === tab.id;
             return (
@@ -869,7 +1041,7 @@ export const DispatchModule: React.FC = () => {
               type="text"
               value={searchQuery}
               onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              placeholder="Search orders, items..."
+              placeholder="Search orders, items, DC..."
               className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-36 md:w-48 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
             />
             {searchQuery && (
@@ -897,16 +1069,97 @@ export const DispatchModule: React.FC = () => {
             <span className="hidden sm:inline">{isAllExpanded ? 'Collapse All' : 'Detailed View'}</span>
           </button>
 
-          {/* Filter Popover Icon Button */}
+          {/* Dedicated Date Filter Button + Popover */}
+          <div className="relative" ref={dateFilterRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setShowDateFilter(!showDateFilter);
+                setShowFilterMenu(false);
+                setShowSortMenu(false);
+              }}
+              className={`px-2.5 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs text-xs font-bold ${
+                datePreset !== 'All' || startDate || endDate
+                  ? 'bg-blue-50 border-blue-300 text-blue-700 ring-2 ring-blue-100'
+                  : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-700'
+              }`}
+              title="Filter by Order Date"
+            >
+              <Calendar className="w-3.5 h-3.5 text-blue-600" />
+              <span className="hidden md:inline">
+                {datePreset === 'All' ? 'Date Filter' : datePreset === 'Custom' ? 'Custom Date' : datePreset}
+              </span>
+              <ChevronDown className="w-3 h-3 text-gray-400" />
+            </button>
+
+            {showDateFilter && (
+              <div 
+                className="absolute right-0 mt-1.5 w-68 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-xs text-left animate-in fade-in zoom-in-95 duration-100"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
+                  <span className="font-bold text-gray-800 text-xs">Date Range Filter</span>
+                  {(datePreset !== 'All' || startDate || endDate) && (
+                    <button
+                      onClick={() => applyDatePreset('All')}
+                      className="text-blue-600 hover:text-blue-800 text-[11px] font-bold cursor-pointer"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+
+                {/* Date Presets */}
+                <div className="grid grid-cols-2 gap-1.5">
+                  {['All', 'Today', 'This Week', 'This Month'].map(preset => (
+                    <button
+                      key={preset}
+                      onClick={() => applyDatePreset(preset)}
+                      className={`px-2.5 py-1.5 text-xs font-bold rounded-lg text-center transition-colors cursor-pointer ${
+                        datePreset === preset ? 'bg-blue-600 text-white' : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Custom Date Pickers */}
+                <div className="space-y-1.5 pt-2 border-t border-gray-100">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-500 block mb-0.5">From Date</label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={e => { setStartDate(e.target.value); setDatePreset('Custom'); }}
+                      className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-500 block mb-0.5">To Date</label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={e => { setEndDate(e.target.value); setDatePreset('Custom'); }}
+                      className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Filter Popover Icon Button (Customer, Region, Status) */}
           <div className="relative" ref={filterMenuRef}>
             <button
               type="button"
               onClick={() => {
                 setShowFilterMenu(!showFilterMenu);
+                setShowDateFilter(false);
                 setShowSortMenu(false);
               }}
               className={`p-2 rounded-xl border transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
-                (selectedCustomer !== 'ALL' || selectedRegion !== 'ALL' || selectedStatus !== 'ALL' || datePreset !== 'All')
+                (selectedCustomer !== 'ALL' || selectedRegion !== 'ALL' || selectedStatus !== 'ALL')
                   ? 'bg-blue-50 border-blue-300 text-blue-700 ring-2 ring-blue-100'
                   : 'bg-white hover:bg-blue-50/60 border-gray-200 hover:border-blue-200 text-blue-600'
               }`}
@@ -921,42 +1174,19 @@ export const DispatchModule: React.FC = () => {
                 onClick={e => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
-                  <span className="font-bold text-gray-800 text-xs">Filter Orders</span>
-                  {(selectedCustomer !== 'ALL' || selectedRegion !== 'ALL' || selectedStatus !== 'ALL' || datePreset !== 'All') && (
+                  <span className="font-bold text-gray-800 text-xs">Filter Attributes</span>
+                  {(selectedCustomer !== 'ALL' || selectedRegion !== 'ALL' || selectedStatus !== 'ALL') && (
                     <button
                       onClick={() => {
                         setSelectedCustomer('ALL');
                         setSelectedRegion('ALL');
                         setSelectedStatus('ALL');
-                        setDatePreset('All');
-                        setStartDate('');
-                        setEndDate('');
                       }}
                       className="text-blue-600 hover:text-blue-800 text-[11px] font-bold cursor-pointer"
                     >
                       Reset All
                     </button>
                   )}
-                </div>
-
-                {/* Period Preset */}
-                <div>
-                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Period</label>
-                  <div className="grid grid-cols-4 gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200">
-                    {['All', 'Today', 'This Week', 'This Month'].map(p => (
-                      <button
-                        key={p}
-                        onClick={() => applyDatePreset(p)}
-                        className={`text-xs font-semibold py-1 rounded-lg transition-all text-center cursor-pointer ${
-                          datePreset === p
-                            ? 'bg-blue-600 text-white shadow-2xs'
-                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
                 {/* Customer Filter */}
@@ -1003,31 +1233,6 @@ export const DispatchModule: React.FC = () => {
                     <option value="Not Ready">Not Ready</option>
                   </select>
                 </div>
-
-                {/* Custom Date Range */}
-                <div className="pt-2 border-t border-gray-100">
-                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Custom Date Range</label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <div>
-                      <span className="text-[10px] text-gray-400 block mb-0.5">From</span>
-                      <input
-                        type="date"
-                        value={startDate}
-                        onChange={e => { setStartDate(e.target.value); setDatePreset('Custom'); }}
-                        className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-gray-400 block mb-0.5">To</span>
-                      <input
-                        type="date"
-                        value={endDate}
-                        onChange={e => { setEndDate(e.target.value); setDatePreset('Custom'); }}
-                        className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
           </div>
@@ -1039,6 +1244,7 @@ export const DispatchModule: React.FC = () => {
               onClick={() => {
                 setShowSortMenu(!showSortMenu);
                 setShowFilterMenu(false);
+                setShowDateFilter(false);
               }}
               className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
               title="Sort Orders"
@@ -1053,32 +1259,32 @@ export const DispatchModule: React.FC = () => {
               >
                 <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block px-2 py-1">Sort Orders</span>
                 <button
-                  onClick={() => { setSortField('orderNumber'); setSortAsc(p => !p); setShowSortMenu(false); }}
+                  onClick={() => { handleSort('orderNumber'); setShowSortMenu(false); }}
                   className="w-full px-2.5 py-1.5 text-left rounded-xl hover:bg-gray-50 flex items-center justify-between font-semibold text-gray-700"
                 >
                   <span>SO Number</span>
                   {sortField === 'orderNumber' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
                 </button>
                 <button
-                  onClick={() => { setSortField('rawDate'); setSortAsc(p => !p); setShowSortMenu(false); }}
+                  onClick={() => { handleSort('rawDate'); setShowSortMenu(false); }}
                   className="w-full px-2.5 py-1.5 text-left rounded-xl hover:bg-gray-50 flex items-center justify-between font-semibold text-gray-700"
                 >
                   <span>Order Date</span>
                   {sortField === 'rawDate' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
                 </button>
                 <button
-                  onClick={() => { setSortField('pendingGbl'); setSortAsc(p => !p); setShowSortMenu(false); }}
-                  className="w-full px-2.5 py-1.5 text-left rounded-xl hover:bg-gray-50 flex items-center justify-between font-semibold text-gray-700"
-                >
-                  <span>Pending Quantity</span>
-                  {sortField === 'pendingGbl' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
-                </button>
-                <button
-                  onClick={() => { setSortField('customerName'); setSortAsc(p => !p); setShowSortMenu(false); }}
+                  onClick={() => { handleSort('customerName'); setShowSortMenu(false); }}
                   className="w-full px-2.5 py-1.5 text-left rounded-xl hover:bg-gray-50 flex items-center justify-between font-semibold text-gray-700"
                 >
                   <span>Customer Name</span>
                   {sortField === 'customerName' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
+                </button>
+                <button
+                  onClick={() => { handleSort('pendingGbl'); setShowSortMenu(false); }}
+                  className="w-full px-2.5 py-1.5 text-left rounded-xl hover:bg-gray-50 flex items-center justify-between font-semibold text-gray-700"
+                >
+                  <span>Pending Quantity</span>
+                  {sortField === 'pendingGbl' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
                 </button>
               </div>
             )}
@@ -1103,63 +1309,175 @@ export const DispatchModule: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50/80 text-[11px] font-bold uppercase tracking-wider text-gray-500">
-                  <th className="py-3 px-4">DC NUMBER</th>
-                  <th className="py-3 px-4">DATE</th>
-                  <th className="py-3 px-4">SO REF</th>
-                  <th className="py-3 px-4">CUSTOMER</th>
-                  <th className="py-3 px-4">TRANSPORTER</th>
-                  <th className="py-3 px-4">VEHICLE</th>
-                  <th className="py-3 px-4 text-center">ITEMS</th>
-                  <th className="py-3 px-4 text-right">ACTION</th>
+                <tr className="border-b border-gray-200 bg-gray-50/80 text-[11px] font-bold uppercase tracking-wider text-gray-500 select-none">
+                  <th 
+                    onClick={() => handleChallanSort('dcNumber')}
+                    className="py-3 px-4 cursor-pointer hover:text-gray-900 transition-colors"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>DC NUMBER</span>
+                      {challanSortField === 'dcNumber' ? (challanSortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-gray-400" />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleChallanSort('date')}
+                    className="py-3 px-4 cursor-pointer hover:text-gray-900 transition-colors"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>DATE</span>
+                      {challanSortField === 'date' ? (challanSortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-gray-400" />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleChallanSort('orderNumber')}
+                    className="py-3 px-4 cursor-pointer hover:text-gray-900 transition-colors"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>SO REF</span>
+                      {challanSortField === 'orderNumber' ? (challanSortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-gray-400" />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleChallanSort('customerName')}
+                    className="py-3 px-4 cursor-pointer hover:text-gray-900 transition-colors"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>CUSTOMER</span>
+                      {challanSortField === 'customerName' ? (challanSortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-gray-400" />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleChallanSort('transporterName')}
+                    className="py-3 px-4 cursor-pointer hover:text-gray-900 transition-colors"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>TRANSPORTER</span>
+                      {challanSortField === 'transporterName' ? (challanSortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-gray-400" />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleChallanSort('vehicleNumber')}
+                    className="py-3 px-4 cursor-pointer hover:text-gray-900 transition-colors"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>VEHICLE</span>
+                      {challanSortField === 'vehicleNumber' ? (challanSortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-gray-400" />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleChallanSort('items')}
+                    className="py-3 px-4 text-center cursor-pointer hover:text-gray-900 transition-colors"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>ITEMS</span>
+                      {challanSortField === 'items' ? (challanSortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-gray-400" />}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleChallanSort('status')}
+                    className="py-3 px-4 text-center cursor-pointer hover:text-gray-900 transition-colors"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>STATUS</span>
+                      {challanSortField === 'status' ? (challanSortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-gray-400" />}
+                    </div>
+                  </th>
+                  <th className="py-3 px-4 text-right">ACTIONS</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {deliveryChallansList.map((ch, idx) => (
-                  <tr key={ch._id || idx} className="hover:bg-gray-50/60 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-blue-600">
-                      {ch.dcNumber || `DC-${idx + 1}`}
-                    </td>
-                    <td className="py-3.5 px-4 font-medium text-gray-700 whitespace-nowrap">
-                      {ch.date || '—'}
-                    </td>
-                    <td className="py-3.5 px-4 font-mono font-bold text-gray-800">
-                      {ch.orderNumber || '—'}
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-gray-900">
-                      {ch.customerName || '—'}
-                    </td>
-                    <td className="py-3.5 px-4 text-gray-700">
-                      {ch.transporterName || 'Direct / Self'}
-                    </td>
-                    <td className="py-3.5 px-4 font-mono text-gray-700">
-                      {ch.vehicleNumber || '—'}
-                    </td>
-                    <td className="py-3.5 px-4 text-center">
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700">
-                        {ch.items?.length || 0} items
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => {
-                          setActiveChallan(ch);
-                          setIsChallanModalOpen(true);
-                        }}
-                        className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg text-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                      >
-                        <Printer className="w-3.5 h-3.5" />
-                        <span>Print DC</span>
-                      </button>
+                {sortedChallansList.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-12 text-center text-gray-400">
+                      <Truck className="w-8 h-8 mx-auto text-gray-300 mb-2" />
+                      <p className="font-semibold text-gray-600">No delivery challans created yet</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Click "+ Direct Dispatch" or create a dispatch from any sales order.</p>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  sortedChallansList.map((ch, idx) => (
+                    <tr key={ch._id || idx} className="hover:bg-blue-50/30 transition-colors">
+                      <td className="py-3.5 px-4 font-mono font-bold text-blue-600 whitespace-nowrap">
+                        {ch.dcNumber || `DC-${idx + 1}`}
+                      </td>
+                      <td className="py-3.5 px-4 font-medium text-gray-700 whitespace-nowrap font-mono">
+                        {ch.date || '—'}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono font-bold whitespace-nowrap">
+                        {ch.orderNumber && ch.orderNumber !== 'DIRECT' ? (
+                          <span className="text-gray-800">{ch.orderNumber}</span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                            Direct Dispatch
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-gray-900">
+                        {ch.customerName || '—'}
+                      </td>
+                      <td className="py-3.5 px-4 text-gray-700">
+                        {ch.transporterName || 'Direct / Self'}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-gray-700">
+                        {ch.vehicleNumber || '—'}
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700">
+                          {ch.items?.length || 0} items
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                          ch.status === 'draft'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        }`}>
+                          {ch.status || 'dispatched'}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* Edit Dispatch */}
+                          <button
+                            onClick={() => handleEditChallan(ch)}
+                            className="p-1.5 bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-blue-700 rounded-lg text-xs font-bold transition-colors cursor-pointer border border-slate-200"
+                            title="Edit Dispatch"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Delete Dispatch */}
+                          <button
+                            onClick={() => handleDeleteChallan(ch)}
+                            className="p-1.5 bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-lg text-xs font-bold transition-colors cursor-pointer border border-slate-200"
+                            title="Delete Dispatch"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Print DC */}
+                          <button
+                            onClick={() => {
+                              setActiveChallan(ch);
+                              setIsChallanModalOpen(true);
+                            }}
+                            className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg text-xs transition-colors cursor-pointer inline-flex items-center gap-1"
+                            title="Print Delivery Challan"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>Print</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </div>
       ) : (
-        /* Orders Master Table with Expandable Items Accordion Dropdown */
+        /* Orders Master Table with Clickable Column Header Sorting & Expandable Items Accordion Dropdown */
         <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
@@ -1174,46 +1492,127 @@ export const DispatchModule: React.FC = () => {
                     />
                   </th>
                   <th className="py-3 px-2 w-10 text-center font-bold">#</th>
+
+                  {/* 1. SO NO */}
                   <th 
                     onClick={() => handleSort('orderNumber')}
-                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-800 whitespace-nowrap"
+                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-900 whitespace-nowrap transition-colors"
                   >
                     <div className="flex items-center space-x-1">
                       <span>SO NO.</span>
-                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      {sortField === 'orderNumber' ? (
+                        sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      )}
                     </div>
                   </th>
+
+                  {/* 2. DATE */}
                   <th 
                     onClick={() => handleSort('rawDate')}
-                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-800 whitespace-nowrap"
+                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-900 whitespace-nowrap transition-colors"
                   >
                     <div className="flex items-center space-x-1">
                       <span>DATE</span>
-                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      {sortField === 'rawDate' ? (
+                        sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      )}
                     </div>
                   </th>
+
+                  {/* 3. CUSTOMER / PARTY */}
                   <th 
                     onClick={() => handleSort('customerName')}
-                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-800 min-w-[200px]"
+                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-900 min-w-[200px] transition-colors"
                   >
                     <div className="flex items-center space-x-1">
                       <span>CUSTOMER / PARTY</span>
-                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      {sortField === 'customerName' ? (
+                        sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      )}
                     </div>
                   </th>
-                  <th className="py-3 px-3 font-bold whitespace-nowrap">REGION</th>
-                  <th className="py-3 px-3 font-bold text-center whitespace-nowrap w-32">ITEMS</th>
+
+                  {/* 4. REGION */}
+                  <th 
+                    onClick={() => handleSort('region')}
+                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-900 whitespace-nowrap transition-colors"
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>REGION</span>
+                      {sortField === 'region' ? (
+                        sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      )}
+                    </div>
+                  </th>
+
+                  {/* 5. ITEMS COUNT */}
+                  <th 
+                    onClick={() => handleSort('itemCount')}
+                    className="py-3 px-3 font-bold text-center cursor-pointer hover:text-gray-900 whitespace-nowrap w-32 transition-colors"
+                  >
+                    <div className="flex items-center justify-center space-x-1">
+                      <span>ITEMS</span>
+                      {sortField === 'itemCount' ? (
+                        sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      )}
+                    </div>
+                  </th>
+
+                  {/* 6. PENDING GBL */}
                   <th 
                     onClick={() => handleSort('pendingGbl')}
-                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-800 text-right whitespace-nowrap"
+                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-900 text-right whitespace-nowrap transition-colors"
                   >
                     <div className="flex items-center justify-end space-x-1">
                       <span>PENDING (GBL)</span>
-                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      {sortField === 'pendingGbl' ? (
+                        sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      )}
                     </div>
                   </th>
-                  <th className="py-3 px-3 font-bold text-right whitespace-nowrap">PENDING (PCS)</th>
-                  <th className="py-3 px-3 font-bold text-center whitespace-nowrap min-w-[140px]">READY STATUS</th>
+
+                  {/* 7. PENDING PCS */}
+                  <th 
+                    onClick={() => handleSort('pendingPcs')}
+                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-900 text-right whitespace-nowrap transition-colors"
+                  >
+                    <div className="flex items-center justify-end space-x-1">
+                      <span>PENDING (PCS)</span>
+                      {sortField === 'pendingPcs' ? (
+                        sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      )}
+                    </div>
+                  </th>
+
+                  {/* 8. READY STATUS */}
+                  <th 
+                    onClick={() => handleSort('readyStatus')}
+                    className="py-3 px-3 font-bold text-center cursor-pointer hover:text-gray-900 whitespace-nowrap min-w-[140px] transition-colors"
+                  >
+                    <div className="flex items-center justify-center space-x-1">
+                      <span>READY STATUS</span>
+                      {sortField === 'readyStatus' ? (
+                        sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      )}
+                    </div>
+                  </th>
+
                   <th className="py-3 px-3 text-center font-bold w-28 whitespace-nowrap">ACTIONS</th>
                 </tr>
               </thead>
@@ -1234,6 +1633,7 @@ export const DispatchModule: React.FC = () => {
                     const isChecked = selectedOrderIds.has(row._id);
                     const isExpanded = expandedOrderIds.has(row._id);
                     const isMenuOpen = openActionDropdownId === row._id;
+                    const rowChallans = orderChallansMap.get(row._id) || orderChallansMap.get(row.orderNumber) || [];
 
                     return (
                       <React.Fragment key={row._id}>
@@ -1367,9 +1767,10 @@ export const DispatchModule: React.FC = () => {
                               {/* Dropdown Options */}
                               {isMenuOpen && (
                                 <div
-                                  className="absolute right-0 top-full mt-1.5 w-44 bg-white rounded-xl shadow-xl border border-gray-200 py-1.5 z-50 text-left animate-in fade-in zoom-in-95 duration-100"
+                                  className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-1.5 z-50 text-left animate-in fade-in zoom-in-95 duration-100"
                                   onClick={e => e.stopPropagation()}
                                 >
+                                  {/* 1. Dispatch Actions */}
                                   <button
                                     onClick={() => {
                                       setOpenActionDropdownId(null);
@@ -1378,7 +1779,7 @@ export const DispatchModule: React.FC = () => {
                                     className="w-full px-3 py-1.5 text-xs text-left font-bold text-gray-800 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
                                   >
                                     <Truck className="w-3.5 h-3.5 text-blue-600" />
-                                    <span>Custom Dispatch</span>
+                                    <span>Dispatch (Custom)</span>
                                   </button>
                                   <button
                                     onClick={() => {
@@ -1390,7 +1791,6 @@ export const DispatchModule: React.FC = () => {
                                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                                     <span>Dispatch All Pending</span>
                                   </button>
-                                  <div className="border-t border-gray-100 my-1" />
                                   <button
                                     onClick={() => {
                                       setOpenActionDropdownId(null);
@@ -1401,6 +1801,58 @@ export const DispatchModule: React.FC = () => {
                                     <Eye className="w-3.5 h-3.5 text-gray-400" />
                                     <span>View Order Details</span>
                                   </button>
+
+                                  {/* 2. Existing Dispatches for this order (Edit & Delete options) */}
+                                  {rowChallans.length > 0 && (
+                                    <>
+                                      <div className="border-t border-gray-100 my-1 px-3 py-1 bg-gray-50/80 text-[10px] font-black uppercase tracking-wider text-gray-500">
+                                        Dispatches ({rowChallans.length})
+                                      </div>
+                                      {rowChallans.map((ch: any) => (
+                                        <div key={ch._id || ch.dcNumber} className="px-1 py-0.5">
+                                          <div className="flex items-center justify-between px-2 py-1 text-[11px] font-bold text-blue-700 bg-blue-50/50 rounded-lg">
+                                            <span className="font-mono">{ch.dcNumber}</span>
+                                            <div className="flex items-center gap-1">
+                                              {/* Edit Dispatch */}
+                                              <button
+                                                onClick={() => {
+                                                  setOpenActionDropdownId(null);
+                                                  handleEditChallan(ch);
+                                                }}
+                                                className="p-1 text-gray-600 hover:text-blue-700 hover:bg-white rounded transition-colors"
+                                                title="Edit Dispatch"
+                                              >
+                                                <Edit3 className="w-3 h-3" />
+                                              </button>
+                                              {/* Delete Dispatch */}
+                                              <button
+                                                onClick={() => {
+                                                  setOpenActionDropdownId(null);
+                                                  handleDeleteChallan(ch);
+                                                }}
+                                                className="p-1 text-gray-600 hover:text-rose-600 hover:bg-white rounded transition-colors"
+                                                title="Delete Dispatch"
+                                              >
+                                                <Trash2 className="w-3 h-3" />
+                                              </button>
+                                              {/* Print DC */}
+                                              <button
+                                                onClick={() => {
+                                                  setOpenActionDropdownId(null);
+                                                  setActiveChallan(ch);
+                                                  setIsChallanModalOpen(true);
+                                                }}
+                                                className="p-1 text-gray-600 hover:text-blue-700 hover:bg-white rounded transition-colors"
+                                                title="Print Delivery Challan"
+                                              >
+                                                <Printer className="w-3 h-3" />
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1612,13 +2064,19 @@ export const DispatchModule: React.FC = () => {
         </div>
       )}
 
-      {/* ── CREATE DISPATCH MODAL ── */}
+      {/* ── CREATE / EDIT DISPATCH MODAL ── */}
       {isCreateModalOpen && (
         <CreateDispatchModal
           isOpen={isCreateModalOpen}
-          onClose={() => setIsCreateModalOpen(false)}
+          onClose={() => {
+            setIsCreateModalOpen(false);
+            setEditingChallan(null);
+            setIsDirectDispatch(false);
+          }}
           order={selectedOrderForDispatch}
           allOrders={salesOrders}
+          editingChallan={editingChallan}
+          isDirectDispatch={isDirectDispatch}
           onOrderChange={(newOrder) => setSelectedOrderForDispatch(newOrder)}
           onDispatchCreated={handleDispatchCreated}
         />

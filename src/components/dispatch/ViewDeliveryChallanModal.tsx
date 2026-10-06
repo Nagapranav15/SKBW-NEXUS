@@ -75,7 +75,9 @@ export const ViewDeliveryChallanModal: React.FC<ViewDeliveryChallanModalProps> =
               <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-500 block mb-1">Delivered To:</span>
                 <span className="font-bold text-gray-900 text-sm block">{challan.customerName}</span>
-                <span className="text-gray-600 block mt-0.5">Sales Order: <strong className="font-mono text-blue-700">{challan.orderNumber}</strong></span>
+                <span className="text-gray-600 block mt-0.5">
+                  Order Ref: <strong className="font-mono text-blue-700">{challan.orderNumber && challan.orderNumber !== 'DIRECT' ? challan.orderNumber : 'Direct Dispatch (Standalone)'}</strong>
+                </span>
               </div>
               <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-500 block mb-1">Dispatch Details:</span>
