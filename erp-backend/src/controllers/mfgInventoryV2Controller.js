@@ -1993,10 +1993,16 @@ exports.getBalances = async (req, res, next) => {
                   $in: [
                     "$$r.reelNumber",
                     {
-                      $reduce: {
-                        input: "$reelsOut",
-                        initialValue: [],
-                        in: { $concatArrays: ["$$value", "$$this"] }
+                      $map: {
+                        input: {
+                          $reduce: {
+                            input: "$reelsOut",
+                            initialValue: [],
+                            in: { $concatArrays: ["$$value", "$$this"] }
+                          }
+                        },
+                        as: "ro",
+                        in: "$$ro.reelNumber"
                       }
                     }
                   ]

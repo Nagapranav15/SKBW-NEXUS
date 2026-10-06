@@ -80,103 +80,67 @@ exports.getAvailableReels = async (req, res) => {
 
     const reelSkuIds = reelSkus.map(s => s._id);
 
-    // Step B: Query ALL already cut / consumed reels from posted Cutting Slips and InventoryLedger
-    const postedSlips = await CuttingSlip.find({
+    // Step B: Query ALL permanently cut or consumed reels from Cutting Slips and InventoryLedger
+    const slips = await CuttingSlip.find({
       company: companyId,
-      status: "Posted"
-    }).select("sourceSku purchaseBatch selectedReels").lean();
+      status: { $ne: "Cancelled" }
+    }).select("selectedReels sourceSku").lean();
 
-    const cutReelNumbers = new Set();
-    const cutReelKeys = new Set();
-
-    for (const slip of postedSlips) {
-      const skuIdStr = String(slip.sourceSku || '');
-      const batchStr = String(slip.purchaseBatch || '').trim().toLowerCase();
-      for (const r of (slip.selectedReels || [])) {
+    const consumedReelNumbers = new Set();
+    slips.forEach(s => {
+      (s.selectedReels || []).forEach(r => {
         if (r && r.reelNumber) {
-          const num = String(r.reelNumber).trim().toLowerCase();
-          cutReelNumbers.add(num);
-          if (skuIdStr) {
-            cutReelKeys.add(`${skuIdStr}_${num}`);
-            if (batchStr) {
-              cutReelKeys.add(`${skuIdStr}_${batchStr}_${num}`);
-            }
-          }
-          if (batchStr) {
-            cutReelKeys.add(`${batchStr}_${num}`);
-          }
+          consumedReelNumbers.add(String(r.reelNumber).trim().toLowerCase());
         }
-      }
-    }
+      });
+    });
 
-    const ledgerOuts = await InventoryLedger.find({
+    // Step C: Query ALL ledger records for reel SKUs (status not Cancelled)
+    const allLedgers = await InventoryLedger.find({
       company: companyId,
-      direction: "OUT",
-      status: "Posted",
-      "reels.0": { $exists: true }
-    }).select("skuId batchNumber reels").lean();
+      skuId: { $in: reelSkuIds },
+      status: { $ne: "Cancelled" }
+    }).sort({ createdAt: 1 }).lean();
 
-    for (const entry of ledgerOuts) {
-      const skuIdStr = String(entry.skuId || '');
-      const batchStr = String(entry.batchNumber || '').trim().toLowerCase();
-      for (const r of (entry.reels || [])) {
-        if (r && r.reelNumber) {
-          const num = String(r.reelNumber).trim().toLowerCase();
-          cutReelNumbers.add(num);
-          if (skuIdStr) {
-            cutReelKeys.add(`${skuIdStr}_${num}`);
-            if (batchStr) {
-              cutReelKeys.add(`${skuIdStr}_${batchStr}_${num}`);
-            }
+    // Track explicit reel OUTs (non-transfers, e.g. processing or dispatch)
+    allLedgers.forEach(l => {
+      if (l.direction === "OUT") {
+        const isTransfer = l.transactionType === "Transfer" ||
+          l.referenceType === "StockTransfer" ||
+          l.referenceType === "PurchaseInvoiceAllocation";
+        (l.reels || []).forEach(r => {
+          if (!r || !r.reelNumber) return;
+          const clean = String(r.reelNumber).trim().toLowerCase();
+          if (!isTransfer) {
+            consumedReelNumbers.add(clean);
           }
-        }
+        });
       }
-    }
+    });
 
-    // Step C: Query InventoryLedger to find on-hand reels
-    const ledgerAgg = await InventoryLedger.aggregate([
-      {
-        $match: {
-          company: companyId,
-          skuId: { $in: reelSkuIds },
-          status: "Posted"
+    // Check secondary ledger V2 for explicit OUTs
+    const v2Outs = await InventoryLedgerV2.find({
+      company: companyId,
+      skuId: { $in: reelSkuIds },
+      qtyOut: { $gt: 0 }
+    }).lean();
+    v2Outs.forEach(l => {
+      const isTransfer = (l.transactionType || "").includes("Transfer");
+      (l.reels || []).forEach(r => {
+        const rNum = typeof r === "string" ? r : r?.reelNumber;
+        if (rNum && !isTransfer) {
+          consumedReelNumbers.add(String(rNum).trim().toLowerCase());
         }
-      },
-      {
-        $group: {
-          _id: { skuId: "$skuId", locationId: "$locationId", batchNumber: "$batchNumber" },
-          qtyIn: { $sum: { $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", 0] } },
-          qtyOut: { $sum: { $cond: [{ $eq: ["$direction", "OUT"] }, "$quantity", 0] } },
-          reelsIn: { $push: { $cond: [{ $eq: ["$direction", "IN"] }, "$reels", []] } },
-          reelsOut: { $push: { $cond: [{ $eq: ["$direction", "OUT"] }, "$reels", []] } }
-        }
-      },
-      {
-        $project: {
-          skuId: "$_id.skuId",
-          locationId: "$_id.locationId",
-          batchNumber: "$_id.batchNumber",
-          onHandQty: { $subtract: ["$qtyIn", "$qtyOut"] },
-          allReelsIn: {
-            $reduce: {
-              input: "$reelsIn",
-              initialValue: [],
-              in: { $concatArrays: ["$$value", "$$this"] }
-            }
-          }
-        }
-      },
-      { $match: { onHandQty: { $gt: 0.1 } } }
-    ]);
+      });
+    });
 
     // Lookup Locations
-    const locationIds = [...new Set(ledgerAgg.map(l => String(l.locationId)))];
+    const locationIds = [...new Set(allLedgers.map(l => String(l.locationId)).filter(Boolean))];
     const locations = await WarehouseLocationV2.find({ _id: { $in: locationIds.map(toObjectId) } }).lean();
     const locMap = new Map(locations.map(l => [String(l._id), l]));
-    const skuMap = new Map(reelSkus.map(s => [String(s._id), s]));
 
-    // Lookup Purchase Invoice item rates for purchase batches
-    const batchNumbers = [...new Set(ledgerAgg.map(l => l.batchNumber).filter(Boolean))];
+    // Lookup Invoices for batch rates
+    const batchNumbers = [...new Set(allLedgers.map(l => l.batchNumber).filter(Boolean))];
     const invoices = await PurchaseInvoiceV2.find({
       company: companyId,
       invoiceNumber: { $in: batchNumbers }
@@ -192,76 +156,163 @@ exports.getAvailableReels = async (req, res) => {
     const result = [];
     const seenReelIds = new Set();
 
-    for (const group of ledgerAgg) {
-      const sku = skuMap.get(String(group.skuId));
-      const loc = locMap.get(String(group.locationId));
-      const invItem = invoiceItemMap.get(`${group.batchNumber}_${String(group.skuId)}`);
-      const rate = Number(
-        invItem?.ratePerKg ||
-        invItem?.purchasePrice ||
-        (invItem?.totalPrice && invItem?.quantity ? invItem.totalPrice / invItem.quantity : 0) ||
-        sku?.avgCost ||
-        sku?.purchasePrice ||
-        sku?.costPrice ||
-        sku?.rate ||
-        80
-      );
+    // Step D: Process SKU by SKU, dynamically reconciling on-hand stock and FIFO consumption
+    for (const sku of reelSkus) {
+      const skuIdStr = String(sku._id);
+      const skuLedgers = allLedgers.filter(l => String(l.skuId) === skuIdStr);
 
-      const allReels = group.allReelsIn || [];
-      // Filter out any reel that has been cut or consumed
-      const activeReels = allReels.filter(r => {
-        if (!r || !r.reelNumber) return false;
-        const cleanNum = String(r.reelNumber).trim().toLowerCase();
-        const skuIdStr = String(group.skuId || '');
-        const batchStr = String(group.batchNumber || '').trim().toLowerCase();
+      const totalIn = skuLedgers
+        .filter(l => l.direction === "IN")
+        .reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
+      const totalOut = skuLedgers
+        .filter(l => l.direction === "OUT")
+        .reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
+      const skuNetStock = totalIn - totalOut;
 
-        if (cutReelNumbers.has(cleanNum)) return false;
-        if (cutReelKeys.has(`${skuIdStr}_${cleanNum}`)) return false;
-        if (cutReelKeys.has(`${skuIdStr}_${batchStr}_${cleanNum}`)) return false;
-        if (cutReelKeys.has(`${batchStr}_${cleanNum}`)) return false;
-        return true;
+      // If SKU has zero or negative overall stock in Stock & Inventory, skip all reels
+      if (skuNetStock <= 0.01) {
+        continue;
+      }
+
+      // Group inwards by batch and location
+      const batchMap = new Map();
+      const unassignedOuts = [];
+
+      skuLedgers.forEach(l => {
+        const bNum = (l.batchNumber || "").trim();
+        const locId = String(l.locationId || "");
+        const key = `${bNum}_${locId}`;
+        const qty = Number(l.quantity) || 0;
+
+        if (l.direction === "IN") {
+          if (!batchMap.has(key)) {
+            batchMap.set(key, {
+              batchNumber: bNum,
+              locationId: locId,
+              date: l.createdAt,
+              inwardQty: 0,
+              directOutQty: 0,
+              remainingQty: 0,
+              reelsIn: []
+            });
+          }
+          const b = batchMap.get(key);
+          b.inwardQty += qty;
+          b.remainingQty += qty;
+          if (Array.isArray(l.reels)) {
+            b.reelsIn.push(...l.reels);
+          }
+        } else {
+          // Direct matching batch or unassigned OUT
+          const target = batchMap.get(key) || (bNum ? [...batchMap.values()].find(b => b.batchNumber === bNum) : null);
+          if (target) {
+            target.directOutQty += qty;
+            target.remainingQty = Math.max(0, target.remainingQty - qty);
+          } else {
+            unassignedOuts.push(qty);
+          }
+        }
       });
 
-      if (activeReels.length > 0) {
-        activeReels.forEach((r, idx) => {
-          const uniqueId = `${group.skuId}_${group.batchNumber || 'batch'}_${r.reelNumber || idx}`;
-          if (seenReelIds.has(uniqueId)) return;
-          seenReelIds.add(uniqueId);
+      // Deduct unassigned OUTs (e.g. from Production Orders or Dispatches) across batches via FIFO
+      const batches = [...batchMap.values()].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      unassignedOuts.forEach(outQty => {
+        let toDeduct = outQty;
+        for (const b of batches) {
+          if (b.remainingQty > 0.0001) {
+            const take = Math.min(toDeduct, b.remainingQty);
+            b.remainingQty -= take;
+            toDeduct -= take;
+            if (toDeduct <= 0.0001) break;
+          }
+        }
+      });
 
-          result.push({
-            id: uniqueId,
-            reelNumber: r.reelNumber || `R-${idx + 1}`,
-            weight: Number(r.weight) || (group.onHandQty / activeReels.length),
-            width: Number(r.width) || sku?.width || 0,
-            gsm: Number(r.gsm) || sku?.gsm || 0,
-            skuId: group.skuId,
-            skuName: sku?.name || "Paper Reel",
-            skuCode: sku?.skuCode || "",
-            locationId: group.locationId,
-            locationName: loc ? `${loc.code || loc.name} (${loc.level || 'Godown'})` : "Warehouse",
-            purchaseBatch: group.batchNumber || "PB-OPEN",
-            ratePerKg: rate
-          });
+      // For each active batch with remaining on-hand stock:
+      for (const b of batches) {
+        if (b.remainingQty <= 0.01) continue;
+
+        const loc = locMap.get(b.locationId);
+        const invItem = invoiceItemMap.get(`${b.batchNumber}_${skuIdStr}`);
+        const rate = Number(
+          invItem?.ratePerKg ||
+          invItem?.purchasePrice ||
+          (invItem?.totalPrice && invItem?.quantity ? invItem.totalPrice / invItem.quantity : 0) ||
+          sku?.avgCost ||
+          sku?.purchasePrice ||
+          sku?.costPrice ||
+          sku?.rate ||
+          80
+        );
+
+        // Filter out permanently consumed reel numbers
+        const unconsumed = b.reelsIn.filter(r => {
+          if (!r || !r.reelNumber) return false;
+          return !consumedReelNumbers.has(String(r.reelNumber).trim().toLowerCase());
         });
-      } else if (allReels.length === 0 && group.onHandQty > 0.1) {
-        // Only if no explicit reels were defined in the batch, expose as lot
-        const uniqueId = `${group.skuId}_${group.batchNumber || 'lot'}_lot`;
-        if (!seenReelIds.has(uniqueId)) {
-          seenReelIds.add(uniqueId);
-          result.push({
-            id: uniqueId,
-            reelNumber: `LOT-${group.batchNumber || 'STK'}`,
-            weight: group.onHandQty,
-            width: sku?.width || 0,
-            gsm: sku?.gsm || 0,
-            skuId: group.skuId,
-            skuName: sku?.name || "Paper Reel",
-            skuCode: sku?.skuCode || "",
-            locationId: group.locationId,
-            locationName: loc ? `${loc.code || loc.name}` : "Warehouse",
-            purchaseBatch: group.batchNumber || "PB-OPEN",
-            ratePerKg: rate
+
+        // Apply FIFO weight consumption if stock was consumed from this batch
+        const consumedWeight = Math.max(0, b.inwardQty - b.remainingQty);
+        let consumedAccumulator = consumedWeight;
+
+        const survivingReels = [];
+        for (const r of unconsumed) {
+          const rWeight = Number(r.weight) || 0;
+          if (consumedAccumulator >= rWeight && consumedAccumulator > 0) {
+            consumedAccumulator -= rWeight;
+          } else {
+            const remainingReelWeight = consumedAccumulator > 0 ? Math.max(0, rWeight - consumedAccumulator) : rWeight;
+            consumedAccumulator = 0;
+            if (remainingReelWeight > 0.1) {
+              survivingReels.push({
+                ...r,
+                weight: remainingReelWeight
+              });
+            }
+          }
+        }
+
+        if (survivingReels.length > 0) {
+          survivingReels.forEach((r, idx) => {
+            const uniqueId = `${sku._id}_${b.batchNumber || 'batch'}_${r.reelNumber || idx}`;
+            if (seenReelIds.has(uniqueId)) return;
+            seenReelIds.add(uniqueId);
+
+            result.push({
+              id: uniqueId,
+              reelNumber: r.reelNumber || `R-${idx + 1}`,
+              weight: Number(r.weight),
+              width: Number(r.width) || sku?.width || 0,
+              gsm: Number(r.gsm) || sku?.gsm || 0,
+              skuId: sku._id,
+              skuName: sku?.name || "Paper Reel",
+              skuCode: sku?.skuCode || "",
+              locationId: b.locationId,
+              locationName: loc ? `${loc.code || loc.name} (${loc.level || 'Godown'})` : "Warehouse",
+              purchaseBatch: b.batchNumber || "PB-OPEN",
+              ratePerKg: rate
+            });
           });
+        } else if (b.remainingQty > 0.1) {
+          // If no explicit individual reels were defined, expose the on-hand batch weight as a lot
+          const uniqueId = `${sku._id}_${b.batchNumber || 'lot'}_lot`;
+          if (!seenReelIds.has(uniqueId)) {
+            seenReelIds.add(uniqueId);
+            result.push({
+              id: uniqueId,
+              reelNumber: `LOT-${b.batchNumber || 'STK'}`,
+              weight: b.remainingQty,
+              width: sku?.width || 0,
+              gsm: sku?.gsm || 0,
+              skuId: sku._id,
+              skuName: sku?.name || "Paper Reel",
+              skuCode: sku?.skuCode || "",
+              locationId: b.locationId,
+              locationName: loc ? `${loc.code || loc.name}` : "Warehouse",
+              purchaseBatch: b.batchNumber || "PB-OPEN",
+              ratePerKg: rate
+            });
+          }
         }
       }
     }
