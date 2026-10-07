@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   ClipboardList, Search, Download, X, Copy, Save, RefreshCw, Layers, Boxes, Package, Trash2,
-  Settings, Plus, Tag, Receipt, Info
+  Settings, Plus, Tag, Receipt, Info, Sparkles, ChevronDown, Star, RotateCcw
 } from 'lucide-react';
-import { SkuV2, getSkusV2, updateSkuV2, getMetadataV2 } from '../../api/mfgApiV2';
+import { SkuV2, getSkusV2, updateSkuV2, getMetadataV2, updateMetadataV2 } from '../../api/mfgApiV2';
 import Modal from '../ui/Modal';
 import { SearchableMaterialDropdown } from '../inventory_v2/AddSkuDrawerV2';
 import { BomCopyPasteControls, MakoroPasteIcon } from '../inventory_v2/BomCopyPasteControls';
@@ -68,6 +68,75 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
     } catch (e) {}
     return DEFAULT_PREDEFINED_COSTS;
   });
+
+  // ── PRESET DROPDOWN / MANAGE MODAL STATE ──
+  const [showQuickCostPresetMenu, setShowQuickCostPresetMenu] = useState(false);
+  const [showManageCostModal, setShowManageCostModal] = useState(false);
+  const [highlightedCostPresetIdx, setHighlightedCostPresetIdx] = useState(0);
+  const [quickCostOpenUpwards, setQuickCostOpenUpwards] = useState(false);
+  const costPresetMenuRef = useRef<HTMLDivElement>(null);
+  const costPresetListRef = useRef<HTMLDivElement>(null);
+  // New preset form state
+  const [newPresetName, setNewPresetName] = useState('');
+  const [newPresetBasis, setNewPresetBasis] = useState<'Per BOM' | 'Per Ream' | 'Per GBL' | 'Per Piece' | string>('Per Piece');
+  const [newPresetRate, setNewPresetRate] = useState<number | ''>('');
+
+  // Close preset dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (costPresetMenuRef.current && !costPresetMenuRef.current.contains(e.target as Node)) {
+        setShowQuickCostPresetMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // ── PRESET HANDLERS ──
+  const handleAddPredefinedCost = useCallback((preset: PredefinedCost) => {
+    setActiveAdditionalCosts(prev => [
+      ...prev,
+      {
+        id: `cost-${Date.now()}-${prev.length}`,
+        costType: preset.name,
+        calcBasis: preset.basis,
+        amount: preset.defaultRate,
+        appliedAs: preset.basis
+      }
+    ]);
+    showToast(`Added "${preset.name}" overhead`, 'success');
+  }, []);
+
+  const handleSaveNewPreset = useCallback(() => {
+    if (!newPresetName.trim()) { showToast('Please enter a preset name', 'error'); return; }
+    const newPreset: PredefinedCost = {
+      id: `preset-${Date.now()}`,
+      name: newPresetName.trim(),
+      basis: newPresetBasis,
+      defaultRate: Number(newPresetRate) || 0
+    };
+    const updated = [...costPresets, newPreset];
+    setCostPresets(updated);
+    try { localStorage.setItem(`skbw_predefined_costs_${companyId || 'default'}`, JSON.stringify(updated)); } catch (e) {}
+    updateMetadataV2({ companyId, additionalCostPresets: updated }).catch(() => {});
+    setNewPresetName(''); setNewPresetRate(''); setNewPresetBasis('Per Piece');
+    showToast(`Saved preset "${newPreset.name}"`, 'success');
+  }, [newPresetName, newPresetBasis, newPresetRate, costPresets, companyId]);
+
+  const handleDeletePreset = useCallback((id: string) => {
+    const updated = costPresets.filter(p => p.id !== id);
+    setCostPresets(updated);
+    try { localStorage.setItem(`skbw_predefined_costs_${companyId || 'default'}`, JSON.stringify(updated)); } catch (e) {}
+    updateMetadataV2({ companyId, additionalCostPresets: updated }).catch(() => {});
+    showToast('Preset deleted', 'info');
+  }, [costPresets, companyId]);
+
+  const handleResetPresets = useCallback(() => {
+    setCostPresets(DEFAULT_PREDEFINED_COSTS);
+    try { localStorage.setItem(`skbw_predefined_costs_${companyId || 'default'}`, JSON.stringify(DEFAULT_PREDEFINED_COSTS)); } catch (e) {}
+    updateMetadataV2({ companyId, additionalCostPresets: DEFAULT_PREDEFINED_COSTS }).catch(() => {});
+    showToast('Reset to defaults', 'info');
+  }, [companyId]);
 
   // Listen to realtime metadata preset updates
   useRealtimeSync(['metadata'], (evt) => {
@@ -479,6 +548,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
   if (!isOpen) return null;
 
   return (
+    <>
     <Modal
       isOpen={isOpen}
       onClose={onClose}
@@ -1233,25 +1303,103 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveAdditionalCosts(prev => [
-                            ...prev,
-                            {
-                              id: `cost-${Date.now()}-${prev.length}`,
-                              costType: '',
-                              calcBasis: 'Per Piece',
-                              amount: '',
-                              appliedAs: 'Per Unit (PCS)'
-                            }
-                          ]);
-                        }}
-                        className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 font-bold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer transition-all shadow-3xs"
-                      >
-                        <Plus className="w-3.5 h-3.5 text-amber-600" />
-                        <span>Add Cost</span>
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        {/* Preset Picker Dropdown */}
+                        <div className="relative" ref={costPresetMenuRef}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const spaceBelow = window.innerHeight - rect.bottom;
+                              setQuickCostOpenUpwards(spaceBelow < 280 && rect.top > 280);
+                              setShowQuickCostPresetMenu(v => !v);
+                              setHighlightedCostPresetIdx(0);
+                            }}
+                            className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100/80 text-blue-700 font-bold rounded-lg text-[11px] flex items-center gap-1.5 cursor-pointer transition-all border border-blue-200 shadow-3xs"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                            <span>Add Preset</span>
+                            <ChevronDown className="w-3 h-3 text-blue-400" />
+                          </button>
+
+                          {showQuickCostPresetMenu && (
+                            <div
+                              className={`absolute right-0 ${quickCostOpenUpwards ? 'bottom-full mb-1' : 'top-full mt-1'} w-80 max-h-[80vh] bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 text-xs divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100`}
+                              role="menu"
+                            >
+                              <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                                <span className="flex items-center gap-1.5"><span>Predefined Overheads</span></span>
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowQuickCostPresetMenu(false); setShowManageCostModal(true); }}
+                                  className="text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer font-bold"
+                                >
+                                  <Settings className="w-3 h-3" />
+                                  <span>Manage</span>
+                                </button>
+                              </div>
+                              <div className="max-h-56 overflow-y-auto py-1" ref={costPresetListRef}>
+                                {costPresets.map((p, pIdx) => {
+                                  const isSelected = pIdx === highlightedCostPresetIdx;
+                                  return (
+                                    <button
+                                      key={p.id}
+                                      type="button"
+                                      onClick={() => { handleAddPredefinedCost(p); setShowQuickCostPresetMenu(false); }}
+                                      onMouseEnter={() => setHighlightedCostPresetIdx(pIdx)}
+                                      className={`w-full px-3 py-1.5 text-left flex items-center justify-between group transition-colors cursor-pointer ${
+                                        isSelected ? 'bg-blue-100/90 text-blue-900 font-bold ring-1 ring-inset ring-blue-400' : 'hover:bg-blue-50/70 text-gray-800'
+                                      }`}
+                                      role="menuitem"
+                                    >
+                                      <span className="font-semibold truncate">{p.name}</span>
+                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ml-2 ${
+                                        ['Per GBL','Per Piece','Per BOM','Per Ream'].includes(p.basis)
+                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                          : 'bg-gray-100 text-gray-600'
+                                      }`}>
+                                        {p.basis === 'Per GBL' ? `₹${p.defaultRate}/GBL` : p.basis === 'Per Piece' ? `₹${p.defaultRate}/PCS` : p.basis === 'Per BOM' ? `₹${p.defaultRate}/BOM` : p.basis === 'Per Ream' ? `₹${p.defaultRate}/Ream` : `₹${p.defaultRate}`}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                                {costPresets.length === 0 && (
+                                  <div className="px-3 py-4 text-center text-[11px] text-gray-400">No presets saved. Click Manage to add.</div>
+                                )}
+                              </div>
+                              <div className="px-3 py-1 bg-gray-50 text-[10px] text-gray-500 flex items-center justify-between">
+                                <span>Use <kbd className="font-mono bg-white border border-gray-200 px-1 rounded font-bold">↑</kbd><kbd className="font-mono bg-white border border-gray-200 px-1 rounded font-bold ml-0.5">↓</kbd></span>
+                                <span><kbd className="font-mono bg-white border border-gray-200 px-1 rounded font-bold">Enter</kbd> to add</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Manage Presets Button */}
+                        <button
+                          type="button"
+                          onClick={() => setShowManageCostModal(true)}
+                          className="px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-600 font-bold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer transition-all border border-gray-200 shadow-3xs"
+                        >
+                          <Settings className="w-3.5 h-3.5" />
+                          <span>Manage Presets</span>
+                        </button>
+
+                        {/* Custom Row Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveAdditionalCosts(prev => [
+                              ...prev,
+                              { id: `cost-${Date.now()}-${prev.length}`, costType: '', calcBasis: 'Per Piece', amount: '', appliedAs: 'Per Unit (PCS)' }
+                            ]);
+                          }}
+                          className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 font-bold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer transition-all shadow-3xs"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Add Cost</span>
+                        </button>
+                      </div>
                     </div>
 
                     <div className="overflow-x-auto border border-slate-100 rounded-lg custom-scrollbar">
@@ -1655,5 +1803,124 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
         </div>
       </div>
     </Modal>
+
+      {/* ── MANAGE PRESETS MODAL ── */}
+      {showManageCostModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowManageCostModal(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] z-10">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center">
+                  <Star className="w-4 h-4 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">Manage Overhead Presets</h3>
+                  <p className="text-[10px] text-gray-500">Predefined overheads appear in the quick cost selector dropdown and sync across users.</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowManageCostModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Preset List */}
+            <div className="flex-1 overflow-y-auto px-5 py-3 space-y-1.5">
+              {costPresets.length === 0 && (
+                <div className="py-8 text-center text-[12px] text-gray-400">No predefined overheads saved. Add one below or click Reset to Defaults.</div>
+              )}
+              {costPresets.map((p) => (
+                <div key={p.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-100 group hover:border-blue-200 transition-all">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-gray-800 truncate">{p.name}</div>
+                    <div className="text-[10px] text-gray-400 font-mono">{p.basis} · ₹{p.defaultRate}</div>
+                  </div>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ${
+                    ['Per GBL','Per Piece','Per BOM','Per Ream'].includes(p.basis)
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {p.basis === 'Per GBL' ? `/GBL` : p.basis === 'Per Piece' ? `/PCS` : p.basis === 'Per BOM' ? `/BOM` : p.basis === 'Per Ream' ? `/Ream` : `flat`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleDeletePreset(p.id)}
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-all cursor-pointer"
+                    title="Delete preset"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Add New Preset Form */}
+            <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50 space-y-2">
+              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Add New Preset</div>
+              <div className="flex gap-2 items-center flex-wrap">
+                <input
+                  type="text"
+                  value={newPresetName}
+                  onChange={e => setNewPresetName(e.target.value)}
+                  placeholder="e.g. Freight Charges"
+                  className="flex-1 min-w-0 h-8 px-2.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  onKeyDown={e => e.key === 'Enter' && handleSaveNewPreset()}
+                />
+                <select
+                  value={newPresetBasis}
+                  onChange={e => setNewPresetBasis(e.target.value)}
+                  className="h-8 px-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                >
+                  <option value="Per BOM">📦 Per BOM</option>
+                  <option value="Per Piece">⚡ Per Piece</option>
+                  <option value="Per GBL">📦 Per GBL</option>
+                  <option value="Per Ream">📋 Per Ream</option>
+                </select>
+                <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 h-8">
+                  <span className="text-gray-400 text-xs font-bold">₹</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newPresetRate}
+                    onChange={e => setNewPresetRate(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="Rate"
+                    className="w-20 bg-transparent text-xs font-bold font-mono text-gray-800 focus:outline-none"
+                    onKeyDown={e => e.key === 'Enter' && handleSaveNewPreset()}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSaveNewPreset}
+                  className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-sm"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Save
+                </button>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={handleResetPresets}
+                className="flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-red-600 font-semibold cursor-pointer transition-colors"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Reset to Defaults
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowManageCostModal(false)}
+                className="px-4 py-1.5 bg-gray-900 hover:bg-gray-800 text-white font-bold text-xs rounded-lg cursor-pointer transition-all"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
