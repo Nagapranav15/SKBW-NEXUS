@@ -98,7 +98,10 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
 
   // ── 4. ADDITIONAL COSTS / OVERHEADS STATE (DYNAMIC & PRESETS) ──
   const [additionalCosts, setAdditionalCosts] = useState<AdditionalCostRow[]>([]);
-  const [predefinedCosts, setPredefinedCosts] = useState<PredefinedCost[]>(DEFAULT_PREDEFINED_COSTS);
+  const [predefinedCosts, setPredefinedCosts] = useState<PredefinedCost[]>([
+    ...DEFAULT_PREDEFINED_COSTS,
+    { id: 'cost-sheeting', name: 'Sheeting & Reel Cutting Charges', basis: 'Per Ream', defaultRate: 25 }
+  ]);
   const [showManageCostModal, setShowManageCostModal] = useState<boolean>(false);
   const [showQuickCostPresetMenu, setShowQuickCostPresetMenu] = useState<boolean>(false);
   const [quickCostOpenUpwards, setQuickCostOpenUpwards] = useState<boolean>(false);
