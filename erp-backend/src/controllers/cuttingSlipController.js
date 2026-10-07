@@ -549,6 +549,12 @@ exports.createCuttingSlip = async (req, res) => {
       unitRate = pieceCost;
     }
 
+    // Persist final output quantity and rate to cutting slip record
+    cuttingSlip.outputQty = finalOutputQty;
+    cuttingSlip.outputUnit = targetSkuDoc.unit || (isTargetUnitReam ? "Reams" : "Sheets");
+    cuttingSlip.unitRate = unitRate;
+    await cuttingSlip.save({ session });
+
     const txNumIn = await Sequence.getNextSequence("IL", session);
     const ledgerIn = new InventoryLedger({
       transactionNumber: txNumIn,
