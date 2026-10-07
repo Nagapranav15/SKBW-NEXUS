@@ -1869,29 +1869,20 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       if (batchTotal > 0) stockQty = batchTotal;
     }
 
-    const isRaw = (matchedSku && getItemClassification(matchedSku) === 'materials') ||
-                  (m.code && m.code.toUpperCase().startsWith('RM-')) ||
-                  (matchedSku?.category && /sheet|board|paper|reel/i.test(matchedSku.category)) ||
-                  (m.component && /sheet|board/i.test(m.component));
-
-    // Raw materials (especially boards/sheets) must stay in their own actual UOM (PCS) and NEVER display as GBL
-    let resolvedStockUom = m.uom || 'PCS';
-    if (isRaw) {
-      if (resolvedStockUom.toUpperCase() === 'GBL' || (matchedSku?.unit && matchedSku.unit.toUpperCase() === 'GBL')) {
-        resolvedStockUom = (m.uom && m.uom.toUpperCase() !== 'GBL') ? m.uom : 'PCS';
-      }
-    } else {
-      resolvedStockUom = matchedSku?.unit || m.uom || 'PCS';
-    }
-
-    const uom = resolvedStockUom;
+    // Stock is stored in the SKU's primary stocking unit (e.g. GBL for RM-027, KG for reels, PCS for books)
+    const uom = (matchedSku?.unit || m.uom || 'PCS').trim();
     const reqQty = Number(m.requiredQty) || 0;
-    const isAvailable = stockQty >= reqQty;
-    const shortage = Math.max(0, reqQty - stockQty);
+    const reqUom = (m.uom || uom).trim();
+
+    // Convert stock quantity to the row's required UOM to accurately check availability
+    const stockInReqUom = convertUom(stockQty, uom, reqUom, matchedSku);
+    const isAvailable = stockInReqUom >= reqQty;
+    const shortage = Math.max(0, reqQty - stockInReqUom);
 
     return {
       stockQty,
       uom,
+      stockInReqUom,
       reqQty,
       isAvailable,
       shortage,
@@ -1991,18 +1982,23 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           const sId = m.skuId ? String(m.skuId) : '';
           const sCode = (m.code || '').toLowerCase().trim();
           const sName = (m.component || '').toLowerCase().trim();
+          const matchedSku = backendSkus.find(s => 
+            (sId && s._id === sId) || 
+            (sCode && (s.skuCode || '').toLowerCase() === sCode) || 
+            (sName && (s.name || '').toLowerCase() === sName)
+          );
           let realStock = 0;
           if (sId && liveStockMap.has(sId)) realStock = liveStockMap.get(sId)!;
           else if (sCode && liveStockMap.has(sCode)) realStock = liveStockMap.get(sCode)!;
           else if (sName && liveStockMap.has(sName)) realStock = liveStockMap.get(sName)!;
           else {
-            const matchedSku = backendSkus.find(s => 
-              (sId && s._id === sId) || 
-              (sCode && (s.skuCode || '').toLowerCase() === sCode) || 
-              (sName && (s.name || '').toLowerCase() === sName)
-            );
             realStock = Number(matchedSku?.presentStock ?? matchedSku?.openingStock ?? 0);
           }
+
+          const skuStockUnit = (matchedSku?.unit || m.uom || 'PCS').trim();
+          const rowUom = (m.uom || skuStockUnit).trim();
+          const stockInRowUom = convertUom(realStock, skuStockUnit, rowUom, matchedSku);
+          const isStockAvail = stockInRowUom >= (Number(m.requiredQty) || 0);
 
           return {
             id: m.id,
@@ -2014,7 +2010,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             totalRequired: m.requiredQty,
             uom: m.uom,
             availableStock: realStock,
-            stockStatus: realStock >= m.requiredQty ? 'Available' : 'Shortage',
+            stockStatus: isStockAvail ? 'Available' : 'Shortage',
             rateMode: m.rateMode || 'avg_purchase',
             rate: m.rate,
             amount: m.amount,
@@ -3033,13 +3029,14 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                               const isZero = stockQty <= 0;
                               const conv = Number(matchedSku?.altUnitConversion || (matchedSku as any)?.booksGbl || (matchedSku as any)?.pcsPerGbl || 0);
                               const normUom = (uom || '').toUpperCase();
+                              const altUom = (matchedSku?.altUnit || '').toUpperCase();
                               let altStockStr = '';
                               if (normUom === 'GBL' && conv > 0) {
                                 const altVal = stockQty * conv;
-                                altStockStr = `≈ ${altVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })} PCS`;
+                                altStockStr = `≈ ${altVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })} ${altUom || 'PCS'}`;
                               } else if ((normUom === 'PCS' || normUom === 'SHEETS') && conv > 0) {
                                 const altVal = stockQty / conv;
-                                altStockStr = `≈ ${altVal < 1 ? altVal.toFixed(3) : altVal.toLocaleString('en-IN', { maximumFractionDigits: 3 })} GBL`;
+                                altStockStr = `≈ ${altVal < 1 ? altVal.toFixed(3) : altVal.toLocaleString('en-IN', { maximumFractionDigits: 3 })} ${altUom || 'GBL'}`;
                               }
 
                               return (
@@ -3403,13 +3400,14 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   const displayName = m.component || m.code || `Item ${idx + 1}`;
                   const conv = Number(matchedSku?.altUnitConversion || (matchedSku as any)?.booksGbl || (matchedSku as any)?.pcsPerGbl || 0);
                   const normUom = (uom || '').toUpperCase();
+                  const altUom = (matchedSku?.altUnit || '').toUpperCase();
                   let altStockStr = '';
                   if (normUom === 'GBL' && conv > 0) {
                     const altVal = stockQty * conv;
-                    altStockStr = `≈ ${altVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })} PCS`;
+                    altStockStr = `≈ ${altVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })} ${altUom || 'PCS'}`;
                   } else if ((normUom === 'PCS' || normUom === 'SHEETS') && conv > 0) {
                     const altVal = stockQty / conv;
-                    altStockStr = `≈ ${altVal < 1 ? altVal.toFixed(3) : altVal.toLocaleString('en-IN', { maximumFractionDigits: 3 })} GBL`;
+                    altStockStr = `≈ ${altVal < 1 ? altVal.toFixed(3) : altVal.toLocaleString('en-IN', { maximumFractionDigits: 3 })} ${altUom || 'GBL'}`;
                   }
 
                   return (

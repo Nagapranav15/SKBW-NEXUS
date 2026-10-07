@@ -28,6 +28,7 @@ import {
   ChevronDown, ChevronRight, ChevronLeft, Calculator, Eye, Filter, Check, Clock, TrendingUp, Info,
   Boxes, ArrowUpDown, Download, Printer, Pencil, MoreVertical, RotateCcw, Activity, MessageCircle
 } from 'lucide-react';
+import { convertUom } from '../../utils/uomConversion';
 
 export const ProductionModule: React.FC = () => {
   const { selectedCompany } = useAuth();
@@ -675,10 +676,14 @@ export const ProductionModule: React.FC = () => {
           liveStock = Number(compSku.presentStock ?? compSku.openingStock ?? 0);
         }
 
+        const itemUom = (b.uom || compSku?.unit || 'PCS').trim();
+        const skuUnit = (compSku?.unit || itemUom).trim();
+        const liveStockInRowUom = convertUom(liveStock, skuUnit, itemUom, compSku);
+
         const rawAvail = Number(b.availableStock);
         const availableQty = (rawAvail !== undefined && !isNaN(rawAvail) && rawAvail > 0 && rawAvail < 900000)
-          ? rawAvail
-          : liveStock;
+          ? convertUom(rawAvail, skuUnit, itemUom, compSku)
+          : liveStockInRowUom;
         const reservedQty = Number(b.issuedQty !== undefined ? b.issuedQty : Math.min(Math.max(0, availableQty), requiredQty));
         const shortageQty = Math.max(0, requiredQty - availableQty);
         const itemStatus: 'Shortage' | 'Ready' | 'Partial' = shortageQty > 0 

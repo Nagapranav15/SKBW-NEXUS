@@ -255,29 +255,43 @@ export function convertUom(
   toUnit: string,
   sku?: SkuUomLike | null
 ): number {
-  const factor = getSkuConversionFactor(sku);
-  if (!sku || !sku.altUnit || factor <= 0) return qty;
+  if (isNaN(qty) || !isFinite(qty) || qty === 0) return 0;
   const normFrom = normalizeUnit(fromUnit);
   const normTo = normalizeUnit(toUnit);
-  const normPrimary = normalizeUnit(sku.unit);
-  const normAlt = normalizeUnit(sku.altUnit);
 
   // If units are identical, no conversion needed (prevents double conversion)
   if (normFrom === normTo || !normFrom || !normTo) {
     return qty;
   }
 
-  // From Primary to Alt
-  if (normFrom === normPrimary && normTo === normAlt) {
-    return convertPrimaryToAlt(qty, sku);
+  const factor = getSkuConversionFactor(sku);
+  if (!sku || factor <= 0) return qty;
+
+  const normPrimary = normalizeUnit(sku.unit);
+  const normAlt = normalizeUnit(sku.altUnit);
+
+  // Exact matching against primary & alt
+  if (normPrimary && normAlt) {
+    if (normFrom === normPrimary && normTo === normAlt) {
+      return convertPrimaryToAlt(qty, sku);
+    }
+    if (normFrom === normAlt && normTo === normPrimary) {
+      return convertAltToPrimary(qty, sku);
+    }
   }
 
-  // From Alt to Primary
-  if (normFrom === normAlt && normTo === normPrimary) {
-    return convertAltToPrimary(qty, sku);
+  // Fallback: rank-based / semantic matching if one unit is aggregate (GBL, REAM) and other is discrete (PCS, SHEET)
+  const fromRank = getUnitRank(fromUnit);
+  const toRank = getUnitRank(toUnit);
+
+  if (fromRank > toRank) {
+    // E.g. from GBL/REAM to PCS/SHEETS
+    return roundUomQty(qty * factor, 8);
+  } else if (toRank > fromRank) {
+    // E.g. from PCS/SHEETS to GBL/REAM
+    return roundUomQty(qty / factor, 8);
   }
 
-  // Fallback if units don't match
   return qty;
 }
 
