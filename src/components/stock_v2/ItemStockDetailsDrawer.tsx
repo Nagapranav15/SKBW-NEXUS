@@ -1596,7 +1596,6 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-3 shadow-2xs">
                   <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">TOTAL QUANTITY</span>
                   <span className="text-base font-black text-gray-900 font-mono leading-tight block">
-                  <span className="text-base font-black text-gray-900 font-mono leading-tight block">
                     {totalBatchQty.toLocaleString('en-IN')} {unit}
                   </span>
                   {altUnit && conversionFactor > 1 && (
