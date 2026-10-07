@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Building2, Layers, Search,
   Edit2, Trash2, ChevronDown, ChevronUp,
@@ -41,6 +42,9 @@ const ZONE_COLOR_PALETTES: Record<string, { bg: string; text: string; border: st
   E: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200/80', dot: 'bg-rose-500' },
   F: { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200/80', dot: 'bg-cyan-500' }
 };
+
+const getFactoryStorageKey = (companyId?: string) => `skbw_warehouse_selected_factory_${companyId || 'default'}`;
+const getFloorStorageKey = (companyId?: string, factoryId?: string) => `skbw_warehouse_selected_floor_${companyId || 'default'}_${factoryId || 'all'}`;
 
 const getZoneColor = (zoneName: string) => {
   const clean = zoneName.replace(/zone/i, '').trim().toUpperCase();
@@ -220,14 +224,54 @@ export const calculateSkuWeightInKg = (
 
 const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded = false }) => {
   const { selectedCompany } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [locations, setLocations] = useState<WarehouseLocationV2[]>([]);
   const [skus, setSkus] = useState<SkuV2[]>([]);
   const [balances, setBalances] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Active Selections
-  const [selectedFactoryId, setSelectedFactoryId] = useState<string>('');
+  // Active Selections with persistence
+  const [selectedFactoryId, setSelectedFactoryId] = useState<string>(() => {
+    const fromUrl = searchParams.get('factoryId') || searchParams.get('factory');
+    if (fromUrl) return fromUrl;
+    const companyKey = selectedCompany?._id || 'default';
+    return localStorage.getItem(getFactoryStorageKey(companyKey)) || '';
+  });
   const [selectedFloorId, setSelectedFloorId] = useState<string>('');
+
+  const handleSelectFactory = (factoryId: string) => {
+    setSelectedFactoryId(factoryId);
+    const companyKey = selectedCompany?._id || 'default';
+    if (factoryId) {
+      localStorage.setItem(getFactoryStorageKey(companyKey), factoryId);
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.set('factory', factoryId);
+        return next;
+      }, { replace: true });
+    }
+
+    const fls = locations.filter(l => l.parentId === factoryId && l.level === 'Floor');
+    if (fls.length > 0) {
+      const storedFloor = localStorage.getItem(getFloorStorageKey(companyKey, factoryId));
+      const targetFloor = fls.find(f => f._id === storedFloor) || fls[0];
+      const nextFloorId = targetFloor?._id || '';
+      setSelectedFloorId(nextFloorId);
+      if (nextFloorId) {
+        localStorage.setItem(getFloorStorageKey(companyKey, factoryId), nextFloorId);
+      }
+    } else {
+      setSelectedFloorId('');
+    }
+  };
+
+  const handleSelectFloor = (floorId: string) => {
+    setSelectedFloorId(floorId);
+    const companyKey = selectedCompany?._id || 'default';
+    if (activeFactory?._id && floorId) {
+      localStorage.setItem(getFloorStorageKey(companyKey, activeFactory._id), floorId);
+    }
+  };
 
   // Selected Location for Details Drawer / Stock Inspection
   const [selectedLocationForDetails, setSelectedLocationForDetails] = useState<WarehouseLocationV2 | null>(null);
@@ -307,14 +351,49 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
       setSkus(skusData);
       setBalances(balancesData || []);
 
-      // Initialize selected factory and floor
+      // Initialize selected factory and floor (persisting selection across refresh)
       const factoriesList = hierarchyData.filter(l => l.level === 'Factory');
       if (factoriesList.length > 0) {
-        const defaultFactory = factoriesList[0];
-        setSelectedFactoryId(defaultFactory._id || '');
-        const floors = hierarchyData.filter(l => l.parentId === defaultFactory._id && l.level === 'Floor');
+        const companyKey = selectedCompany?._id || 'default';
+        const urlFactory = searchParams.get('factoryId') || searchParams.get('factory');
+        const storedFactory = localStorage.getItem(getFactoryStorageKey(companyKey));
+
+        let targetFactory = factoriesList.find(f => f._id === urlFactory || f.name.toLowerCase() === urlFactory?.toLowerCase());
+        if (!targetFactory && storedFactory) {
+          targetFactory = factoriesList.find(f => f._id === storedFactory || f.name.toLowerCase() === storedFactory.toLowerCase());
+        }
+        if (!targetFactory && selectedFactoryId) {
+          targetFactory = factoriesList.find(f => f._id === selectedFactoryId);
+        }
+        if (!targetFactory) {
+          targetFactory = factoriesList[0];
+        }
+
+        const chosenFactoryId = targetFactory._id || '';
+        setSelectedFactoryId(chosenFactoryId);
+        localStorage.setItem(getFactoryStorageKey(companyKey), chosenFactoryId);
+
+        const floors = hierarchyData.filter(l => l.parentId === chosenFactoryId && l.level === 'Floor');
         if (floors.length > 0) {
-          setSelectedFloorId(floors[0]._id || '');
+          const urlFloor = searchParams.get('floorId') || searchParams.get('floor');
+          const storedFloor = localStorage.getItem(getFloorStorageKey(companyKey, chosenFactoryId));
+          let targetFloor = floors.find(fl => fl._id === urlFloor || fl.name.toLowerCase() === urlFloor?.toLowerCase());
+          if (!targetFloor && storedFloor) {
+            targetFloor = floors.find(fl => fl._id === storedFloor || fl.name.toLowerCase() === storedFloor.toLowerCase());
+          }
+          if (!targetFloor && selectedFloorId) {
+            targetFloor = floors.find(fl => fl._id === selectedFloorId);
+          }
+          if (!targetFloor) {
+            targetFloor = floors[0];
+          }
+          const chosenFloorId = targetFloor?._id || '';
+          setSelectedFloorId(chosenFloorId);
+          if (chosenFloorId) {
+            localStorage.setItem(getFloorStorageKey(companyKey, chosenFactoryId), chosenFloorId);
+          }
+        } else {
+          setSelectedFloorId('');
         }
       }
     } catch (e) {
@@ -796,12 +875,21 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
     return factories.find(f => f._id === selectedFactoryId) || factories[0] || null;
   }, [factories, selectedFactoryId]);
 
-  // Ensure active factory is set
+  // Ensure active factory is set and persisted
   useEffect(() => {
-    if (!selectedFactoryId && factories.length > 0) {
-      setSelectedFactoryId(factories[0]._id || '');
+    if (factories.length > 0) {
+      const isValid = factories.some(f => f._id === selectedFactoryId);
+      if (!isValid) {
+        const companyKey = selectedCompany?._id || 'default';
+        const storedFactory = localStorage.getItem(getFactoryStorageKey(companyKey));
+        const target = factories.find(f => f._id === storedFactory || f.name.toLowerCase() === storedFactory?.toLowerCase()) || factories[0];
+        if (target?._id) {
+          setSelectedFactoryId(target._id);
+          localStorage.setItem(getFactoryStorageKey(companyKey), target._id);
+        }
+      }
     }
-  }, [factories, selectedFactoryId]);
+  }, [factories, selectedFactoryId, selectedCompany?._id]);
 
   // Floors of Active Factory
   const activeFloors = useMemo(() => {
@@ -814,12 +902,30 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
     return activeFloors.find(fl => fl._id === selectedFloorId) || activeFloors[0] || null;
   }, [activeFloors, selectedFloorId]);
 
-  // Ensure active floor is set
+  // Ensure active floor is set and persisted
   useEffect(() => {
     if (activeFloors.length > 0 && (!selectedFloorId || !activeFloors.some(f => f._id === selectedFloorId))) {
-      setSelectedFloorId(activeFloors[0]._id || '');
+      const companyKey = selectedCompany?._id || 'default';
+      const factoryKey = activeFactory?._id || 'all';
+      const savedFloor = localStorage.getItem(getFloorStorageKey(companyKey, factoryKey));
+      const target = activeFloors.find(fl => fl._id === savedFloor) || activeFloors[0];
+      if (target?._id) {
+        setSelectedFloorId(target._id);
+        localStorage.setItem(getFloorStorageKey(companyKey, factoryKey), target._id);
+      }
     }
-  }, [activeFloors, selectedFloorId]);
+  }, [activeFloors, selectedFloorId, activeFactory?._id, selectedCompany?._id]);
+
+  // Sync factory selection if URL parameter changes externally
+  useEffect(() => {
+    const urlFactory = searchParams.get('factory') || searchParams.get('factoryId');
+    if (urlFactory && factories.length > 0) {
+      const match = factories.find(f => f._id === urlFactory || f.name.toLowerCase() === urlFactory.toLowerCase());
+      if (match && match._id && match._id !== selectedFactoryId) {
+        handleSelectFactory(match._id);
+      }
+    }
+  }, [searchParams, factories]);
 
   // Zones of Active Floor
   const activeZones = useMemo(() => {
@@ -1183,7 +1289,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
         });
         showToast(`Created ${addForm.level} '${addForm.name}'`, 'success');
         if (addForm.level === 'Factory' && !selectedFactoryId) {
-          setSelectedFactoryId(created._id || '');
+          handleSelectFactory(created._id || '');
         }
       }
       setShowAddModal(false);
@@ -1226,17 +1332,33 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
       // Adjust active selections if deleted item was active
       if (deletedLevel === 'Factory' && selectedFactoryId === deletedId) {
         const remainingFactories = updated.filter(l => l.level === 'Factory');
+        const companyKey = selectedCompany?._id || 'default';
         if (remainingFactories.length > 0) {
-          setSelectedFactoryId(remainingFactories[0]._id || '');
-          const fls = updated.filter(l => l.parentId === remainingFactories[0]._id && l.level === 'Floor');
-          setSelectedFloorId(fls[0]?._id || '');
+          const nextFactoryId = remainingFactories[0]._id || '';
+          setSelectedFactoryId(nextFactoryId);
+          localStorage.setItem(getFactoryStorageKey(companyKey), nextFactoryId);
+          const fls = updated.filter(l => l.parentId === nextFactoryId && l.level === 'Floor');
+          const nextFloorId = fls[0]?._id || '';
+          setSelectedFloorId(nextFloorId);
+          if (nextFloorId) {
+            localStorage.setItem(getFloorStorageKey(companyKey, nextFactoryId), nextFloorId);
+          }
         } else {
           setSelectedFactoryId('');
           setSelectedFloorId('');
+          localStorage.removeItem(getFactoryStorageKey(companyKey));
         }
       } else if (deletedLevel === 'Floor' && selectedFloorId === deletedId) {
         const remainingFloors = updated.filter(l => l.parentId === selectedFactoryId && l.level === 'Floor');
-        setSelectedFloorId(remainingFloors[0]?._id || '');
+        const companyKey = selectedCompany?._id || 'default';
+        const factoryKey = selectedFactoryId || 'all';
+        const nextFloorId = remainingFloors[0]?._id || '';
+        setSelectedFloorId(nextFloorId);
+        if (nextFloorId) {
+          localStorage.setItem(getFloorStorageKey(companyKey, factoryKey), nextFloorId);
+        } else {
+          localStorage.removeItem(getFloorStorageKey(companyKey, factoryKey));
+        }
       }
     } catch (err: any) {
       showToast(err.message || 'Failed to delete location', 'error');
@@ -1479,15 +1601,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
               return (
                 <div
                   key={factory._id}
-                  onClick={() => {
-                    setSelectedFactoryId(factory._id!);
-                    const fls = locations.filter(l => l.parentId === factory._id && l.level === 'Floor');
-                    if (fls.length > 0) {
-                      setSelectedFloorId(fls[0]._id || '');
-                    } else {
-                      setSelectedFloorId('');
-                    }
-                  }}
+                  onClick={() => handleSelectFactory(factory._id!)}
                   className={`shrink-0 w-56 sm:w-60 p-2.5 rounded-xl transition-all text-left flex items-center justify-between gap-2.5 cursor-pointer relative group ${isSelected
                       ? 'border border-blue-500 bg-blue-50/40 shadow-xs ring-1 ring-blue-500/20'
                       : 'border border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/50 shadow-2xs'
@@ -1576,7 +1690,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
                   >
                     <button
                       type="button"
-                      onClick={() => setSelectedFloorId(floor._id!)}
+                      onClick={() => handleSelectFloor(floor._id!)}
                       className="cursor-pointer"
                     >
                       {floor.name}
@@ -2763,7 +2877,7 @@ const WarehouseStructureV2: React.FC<WarehouseStructureV2Props> = ({ isEmbedded 
         companyName={selectedCompany?.name || 'SKBW MANUFACTURING & WAREHOUSE'}
         activeFactory={activeFactory}
         factories={factories}
-        onSelectFactory={(fId) => setSelectedFactoryId(fId)}
+        onSelectFactory={(fId) => handleSelectFactory(fId)}
         locations={locations}
         skus={skus}
         balances={balances}

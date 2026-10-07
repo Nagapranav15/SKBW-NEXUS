@@ -3,7 +3,7 @@ import {
   ClipboardList, Search, Download, X, Copy, Save, RefreshCw, Layers, Boxes, Package, Trash2,
   Settings, Plus, Tag, Receipt, Info
 } from 'lucide-react';
-import { SkuV2, getSkusV2, updateSkuV2 } from '../../api/mfgApiV2';
+import { SkuV2, getSkusV2, updateSkuV2, getMetadataV2 } from '../../api/mfgApiV2';
 import Modal from '../ui/Modal';
 import { SearchableMaterialDropdown } from '../inventory_v2/AddSkuDrawerV2';
 import { BomCopyPasteControls, MakoroPasteIcon } from '../inventory_v2/BomCopyPasteControls';
@@ -12,7 +12,8 @@ import { AdditionalCostRow, ProfitPricingState, calculateCosting, formatInr } fr
 import { showToast } from '../ui/Toast';
 import { getItemClassification } from '../../utils/skuClassification';
 import { convertRateToUom } from '../../utils/uomConversion';
-import { DEFAULT_PREDEFINED_COSTS } from './NewProductionOrderWizard';
+import { DEFAULT_PREDEFINED_COSTS, PredefinedCost } from './NewProductionOrderWizard';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import * as XLSX from 'xlsx';
 
 export interface BomRecipeItem {
@@ -52,6 +53,41 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
   const [activeBomProduct, setActiveBomProduct] = useState<SkuV2 | null>(null);
   const [activeRecipeItems, setActiveRecipeItems] = useState<BomRecipeItem[]>([]);
   const [activeAdditionalCosts, setActiveAdditionalCosts] = useState<AdditionalCostRow[]>([]);
+  const [costPresets, setCostPresets] = useState<PredefinedCost[]>(() => {
+    try {
+      const stored = localStorage.getItem(`skbw_predefined_costs_${companyId || 'default'}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      const legacy = localStorage.getItem('skbw_predefined_costs_v2');
+      if (legacy) {
+        const parsedLegacy = JSON.parse(legacy);
+        if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) return parsedLegacy;
+      }
+    } catch (e) {}
+    return DEFAULT_PREDEFINED_COSTS;
+  });
+
+  // Listen to realtime metadata preset updates
+  useRealtimeSync(['metadata'], (evt) => {
+    if (evt?.data?.additionalCostPresets && Array.isArray(evt.data.additionalCostPresets)) {
+      setCostPresets(evt.data.additionalCostPresets);
+      try {
+        localStorage.setItem(`skbw_predefined_costs_${companyId || 'default'}`, JSON.stringify(evt.data.additionalCostPresets));
+      } catch (e) {}
+    } else if (companyId) {
+      getMetadataV2(companyId).then(meta => {
+        if (meta?.additionalCostPresets && Array.isArray(meta.additionalCostPresets) && meta.additionalCostPresets.length > 0) {
+          setCostPresets(meta.additionalCostPresets);
+          try {
+            localStorage.setItem(`skbw_predefined_costs_${companyId || 'default'}`, JSON.stringify(meta.additionalCostPresets));
+          } catch (e) {}
+        }
+      }).catch(() => {});
+    }
+  });
+
   const [activeProfitPricing, setActiveProfitPricing] = useState<ProfitPricingState>({
     pricingMethod: 'Margin %',
     markupPercentage: ''
@@ -71,11 +107,21 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
   // BOM Clipboard
   const copiedBom = useCopiedBom();
 
-  // Load SKUs
+  // Load SKUs & Metadata Presets
   useEffect(() => {
     if (!isOpen || !companyId) return;
     let isMounted = true;
     setLoading(true);
+
+    getMetadataV2(companyId).then(meta => {
+      if (!isMounted) return;
+      if (meta?.additionalCostPresets && Array.isArray(meta.additionalCostPresets) && meta.additionalCostPresets.length > 0) {
+        setCostPresets(meta.additionalCostPresets);
+        try {
+          localStorage.setItem(`skbw_predefined_costs_${companyId || 'default'}`, JSON.stringify(meta.additionalCostPresets));
+        } catch (e) {}
+      }
+    }).catch(() => {});
 
     getSkusV2(companyId)
       .then(res => {
@@ -1215,8 +1261,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                             <th className="py-1.5 px-2 w-7 text-center">#</th>
                             <th className="py-1.5 px-2">COST TYPE</th>
                             <th className="py-1.5 px-1.5 text-center w-28">CALC BASIS</th>
-                            <th className="py-1.5 px-1.5 text-right w-20">AMOUNT (₹)</th>
-                            <th className="py-1.5 px-1.5 text-center w-48">APPLIED AS</th>
+                            <th className="py-1.5 px-1.5 text-right w-24">AMOUNT (₹)</th>
                             <th className="py-1.5 px-1.5 text-center w-10"></th>
                           </tr>
                         </thead>
@@ -1233,14 +1278,14 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                   value={cost.costType}
                                   onChange={e => {
                                     const val = e.target.value;
-                                    const matched = DEFAULT_PREDEFINED_COSTS.find(p => p.name.toLowerCase() === val.toLowerCase());
+                                    const matched = costPresets.find(p => p.name.toLowerCase() === val.toLowerCase());
                                     if (matched) {
                                       setActiveAdditionalCosts(prev => prev.map(c => c.id === cost.id ? {
                                         ...c,
                                         costType: matched.name,
                                         calcBasis: matched.basis,
                                         amount: matched.defaultRate,
-                                        appliedAs: matched.appliedAs
+                                        appliedAs: matched.basis
                                       } : c));
                                     } else {
                                       setActiveAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, costType: val } : c));
@@ -1250,7 +1295,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                   className="w-full h-7 px-2 py-0.5 bg-white border border-slate-200 rounded-md text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-amber-500 focus:outline-none"
                                 />
                                 <datalist id="bulk-edit-cost-presets">
-                                  {DEFAULT_PREDEFINED_COSTS.map(p => (
+                                  {costPresets.map(p => (
                                     <option key={p.id} value={p.name}>
                                       {p.basis} — ₹{p.defaultRate}
                                     </option>
@@ -1262,16 +1307,13 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                   value={cost.calcBasis}
                                   onChange={e => {
                                     const val = e.target.value;
-                                    setActiveAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, calcBasis: val } : c));
+                                    setActiveAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, calcBasis: val, appliedAs: val } : c));
                                   }}
                                   className="h-7 px-1.5 py-0.5 bg-white border border-slate-200 rounded-md text-[11px] font-semibold text-slate-800 cursor-pointer focus:outline-none"
                                 >
                                   <option value="Per BOM">Per BOM</option>
-                                  <option value="Total / Batch">Total / Batch</option>
-                                  <option value="Per Batch">Per Batch</option>
                                   <option value="Per Piece">Per Piece</option>
                                   <option value="Per GBL">Per GBL</option>
-                                  <option value="Fixed">Fixed</option>
                                 </select>
                               </td>
                               <td className="py-1.5 px-1.5 text-right">
@@ -1286,24 +1328,6 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                   placeholder="0.00"
                                   className="w-20 h-7 px-1.5 py-0.5 bg-white border border-slate-200 rounded-md text-xs font-bold font-mono text-slate-800 text-right focus:ring-1 focus:ring-amber-500 focus:outline-none"
                                 />
-                              </td>
-                              <td className="py-1.5 px-1.5 text-center">
-                                <select
-                                  value={cost.appliedAs}
-                                  onChange={e => {
-                                    const val = e.target.value as any;
-                                    setActiveAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, appliedAs: val } : c));
-                                  }}
-                                  className="h-7 w-full max-w-[210px] px-1.5 py-0.5 bg-white border border-slate-200 rounded-md text-[11px] font-semibold text-slate-800 cursor-pointer focus:outline-none text-ellipsis overflow-hidden"
-                                >
-                                  <option value="Per BOM">Per BOM</option>
-                                  <option value="Per Batch">Per Batch</option>
-                                  <option value="Total Cost for this production/batch">Total Cost for this production/batch</option>
-                                  <option value="Total Cost for this production">Total Cost for this production</option>
-                                  <option value="Per Unit (PCS)">Per Unit (PCS)</option>
-                                  <option value="Per Unit (GBL)">Per Unit (GBL)</option>
-                                  <option value="Total Cost">Total Cost</option>
-                                </select>
                               </td>
                               <td className="py-1.5 px-1.5 text-center">
                                 <button

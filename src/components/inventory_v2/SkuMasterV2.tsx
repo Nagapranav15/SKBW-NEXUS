@@ -93,6 +93,8 @@ import { copyBom, useCopiedBom } from '../../utils/bomClipboard';
 import { BulkEditBomModal } from '../production/BulkEditBomModal';
 import { getActivityLogs, createActivityLog } from '../../api/activityLogApi';
 import { getItemClassification } from '../../utils/skuClassification';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
+import { DEFAULT_PREDEFINED_COSTS, PredefinedCost } from '../production/NewProductionOrderWizard';
 
 // Helper to render neat domain icon for items
 const renderItemDomainIcon = (skuItem: SkuV2, currentTab?: string) => {
@@ -325,6 +327,12 @@ const SkuMasterV2: React.FC = () => {
         localStorage.setItem(`skbw_erp_categories_cards_${id}`, JSON.stringify(data.categoryCards));
       } else {
         setCategoriesData([]);
+      }
+      if (data?.additionalCostPresets && Array.isArray(data.additionalCostPresets) && data.additionalCostPresets.length > 0) {
+        setCostPresets(data.additionalCostPresets);
+        try {
+          localStorage.setItem(`skbw_predefined_costs_${id}`, JSON.stringify(data.additionalCostPresets));
+        } catch (e) {}
       }
     }).catch(err => {
       console.error('Failed to load company metadata in SkuMasterV2:', err);
@@ -621,6 +629,32 @@ const SkuMasterV2: React.FC = () => {
   const [bomAdditionalCosts, setBomAdditionalCosts] = useState<Array<{
     id: string; costType: string; basis: string; amount: number | string; appliedAs: string;
   }>>([]);
+  const [costPresets, setCostPresets] = useState<PredefinedCost[]>(() => {
+    try {
+      const stored = localStorage.getItem(`skbw_predefined_costs_${selectedCompany?._id || 'default'}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return DEFAULT_PREDEFINED_COSTS;
+  });
+
+  useRealtimeSync(['metadata'], (evt) => {
+    if (evt?.data?.additionalCostPresets && Array.isArray(evt.data.additionalCostPresets)) {
+      setCostPresets(evt.data.additionalCostPresets);
+      try {
+        localStorage.setItem(`skbw_predefined_costs_${selectedCompany?._id || 'default'}`, JSON.stringify(evt.data.additionalCostPresets));
+      } catch (e) {}
+    } else if (selectedCompany?._id) {
+      getMetadataV2(selectedCompany._id).then(data => {
+        if (data?.additionalCostPresets && Array.isArray(data.additionalCostPresets)) {
+          setCostPresets(data.additionalCostPresets);
+        }
+      }).catch(() => {});
+    }
+  });
+
   const [bomProfitPricing, setBomProfitPricing] = useState<{
     pricingMethod: string; markupPercentage: string | number;
   }>({ pricingMethod: 'Margin %', markupPercentage: '' });
@@ -6335,9 +6369,8 @@ const SkuMasterV2: React.FC = () => {
                               <tr>
                                 <th className="py-2 px-3 w-8 text-center">#</th>
                                 <th className="py-2 px-3">COST TYPE</th>
-                                <th className="py-2 px-3 text-center w-32">CALC BASIS</th>
-                                <th className="py-2 px-3 text-right w-24">AMOUNT (₹)</th>
-                                <th className="py-2 px-3 w-44">APPLIED AS</th>
+                                <th className="py-2 px-3 text-center w-36">CALC BASIS</th>
+                                <th className="py-2 px-3 text-right w-28">AMOUNT (₹)</th>
                                 <th className="py-2 px-3 text-center w-16">ACTIONS</th>
                               </tr>
                             </thead>
@@ -6348,8 +6381,23 @@ const SkuMasterV2: React.FC = () => {
                                   <td className="py-2 px-3">
                                     <input
                                       type="text"
+                                      list="sku-cost-presets"
                                       value={cost.costType}
-                                      onChange={e => setBomAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, costType: e.target.value } : c))}
+                                      onChange={e => {
+                                        const val = e.target.value;
+                                        const matched = costPresets.find(p => p.name.toLowerCase() === val.toLowerCase());
+                                        if (matched) {
+                                          setBomAdditionalCosts(prev => prev.map(c => c.id === cost.id ? {
+                                            ...c,
+                                            costType: matched.name,
+                                            basis: matched.basis,
+                                            appliedAs: matched.basis,
+                                            amount: matched.defaultRate
+                                          } : c));
+                                        } else {
+                                          setBomAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, costType: val } : c));
+                                        }
+                                      }}
                                       placeholder="e.g. Labour, Electricity"
                                       className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                                     />
@@ -6359,13 +6407,11 @@ const SkuMasterV2: React.FC = () => {
                                       value={cost.basis}
                                       onChange={e => {
                                         const val = e.target.value;
-                                        setBomAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, basis: val } : c));
+                                        setBomAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, basis: val, appliedAs: val } : c));
                                       }}
                                       className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer"
                                     >
                                       <option value="Per BOM">Per BOM</option>
-                                      <option value="Total / Batch">Total / Batch</option>
-                                      <option value="Per Batch">Per Batch</option>
                                       <option value="Per Piece">Per Piece</option>
                                       <option value="Per GBL">Per GBL</option>
                                     </select>
@@ -6378,23 +6424,6 @@ const SkuMasterV2: React.FC = () => {
                                       onChange={e => setBomAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, amount: e.target.value } : c))}
                                       className="w-20 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-xs font-bold"
                                     />
-                                  </td>
-                                  <td className="py-2 px-3">
-                                    <select
-                                      value={cost.appliedAs}
-                                      onChange={e => {
-                                        const val = e.target.value;
-                                        setBomAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, appliedAs: val } : c));
-                                      }}
-                                      className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer"
-                                    >
-                                      <option value="Per BOM">Per BOM</option>
-                                      <option value="Per Batch">Per Batch</option>
-                                      <option value="Total Cost for this production/batch">Total Cost for this production/batch</option>
-                                      <option value="Total Cost for this production">Total Cost for this production</option>
-                                      <option value="Per Unit (PCS)">Per Unit (PCS)</option>
-                                      <option value="Per Unit (GBL)">Per Unit (GBL)</option>
-                                    </select>
                                   </td>
                                   <td className="py-2 px-3 text-center">
                                     <button
@@ -6409,13 +6438,20 @@ const SkuMasterV2: React.FC = () => {
                               ))}
                               {bomAdditionalCosts.length === 0 && (
                                 <tr>
-                                  <td colSpan={6} className="py-4 text-center text-xs text-gray-400 italic bg-gray-50/30">
-                                    No additional costs added. Click <strong className="text-orange-600 cursor-pointer" onClick={() => setBomAdditionalCosts(prev => [...prev, { id: `cost-${Date.now()}`, costType: '', basis: 'Per Piece', amount: 0, appliedAs: 'Per Unit (PCS)' }])}>"+ Add Cost"</strong> above to record direct labour, machine charges, or printing.
+                                  <td colSpan={5} className="py-4 text-center text-xs text-gray-400 italic bg-gray-50/30">
+                                    No additional costs added. Click <strong className="text-orange-600 cursor-pointer" onClick={() => setBomAdditionalCosts(prev => [...prev, { id: `cost-${Date.now()}`, costType: '', basis: 'Per Piece', amount: 0, appliedAs: 'Per Piece' }])}>"+ Add Cost"</strong> above to record direct labour, machine charges, or printing.
                                   </td>
                                 </tr>
                               )}
                             </tbody>
                           </table>
+                          <datalist id="sku-cost-presets">
+                            {costPresets.map(p => (
+                              <option key={p.id} value={p.name}>
+                                {p.basis} — ₹{p.defaultRate}
+                              </option>
+                            ))}
+                          </datalist>
                         </div>
                       </div>
 

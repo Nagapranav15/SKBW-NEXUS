@@ -20,6 +20,7 @@ import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
 import { convertRateToUom, convertUom } from '../../utils/uomConversion';
 import { getItemClassification } from '../../utils/skuClassification';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 export interface NewProductionOrderWizardProps {
   onCancel: () => void;
   onCreated: (order: ProductionOrder) => void;
@@ -48,9 +49,9 @@ export interface DepartmentPreset {
 export interface PredefinedCost {
   id: string;
   name: string;
-  basis: 'Per BOM' | 'Total / Batch' | 'Per Batch' | 'Per GBL' | 'Per Piece' | string;
+  basis: 'Per BOM' | 'Per GBL' | 'Per Piece' | string;
   defaultRate: number;
-  appliedAs: 'Per BOM' | 'Total Cost for this production/batch' | 'Total Cost for this production' | 'Per Unit (GBL)' | 'Per Unit (PCS)' | 'Per Batch' | string;
+  appliedAs?: string;
 }
 
 export type BomRateMode = 'avg_purchase' | 'fifo' | 'custom';
@@ -116,9 +117,9 @@ interface ScrapRow {
 interface AdditionalCostRow {
   id: string;
   costType: string;
-  basis: 'Per BOM' | 'Total / Batch' | 'Per Batch' | 'Per GBL' | 'Per Piece' | string;
-  amount: number;
-  appliedAs: 'Per BOM' | 'Total Cost for this production/batch' | 'Total Cost for this production' | 'Per Unit (GBL)' | 'Per Unit (PCS)' | 'Per Batch' | string;
+  basis: 'Per BOM' | 'Per GBL' | 'Per Piece' | string;
+  amount: number | string;
+  appliedAs?: string;
 }
 
 export const buildCleanDepartmentPresets = (locs: WarehouseLocationV2[]): DepartmentPreset[] => {
@@ -188,13 +189,13 @@ export const buildCleanDepartmentPresets = (locs: WarehouseLocationV2[]): Depart
 const DEFAULT_DEPARTMENT_PRESETS: DepartmentPreset[] = buildCleanDepartmentPresets([]);
 
 export const DEFAULT_PREDEFINED_COSTS: PredefinedCost[] = [
-  { id: 'cost-printing', name: 'Cover Printing & Lamination (Job Work)', basis: 'Per Piece', defaultRate: 3, appliedAs: 'Per Unit (PCS)' },
-  { id: 'cost-elec', name: 'Electricity / Power Charges', basis: 'Per GBL', defaultRate: 25, appliedAs: 'Per Unit (GBL)' },
-  { id: 'cost-labour', name: 'Direct Labour / Helper Wages', basis: 'Per GBL', defaultRate: 35, appliedAs: 'Per Unit (GBL)' },
-  { id: 'cost-wire', name: 'Stitching Wire & Adhesive', basis: 'Per GBL', defaultRate: 15, appliedAs: 'Per Unit (GBL)' },
-  { id: 'cost-machine', name: 'Machine Running & Tooling', basis: 'Total / Batch', defaultRate: 350, appliedAs: 'Total Cost for this production' },
-  { id: 'cost-pack', name: 'Packaging & Shrink Wrap', basis: 'Per GBL', defaultRate: 20, appliedAs: 'Per Unit (GBL)' },
-  { id: 'cost-handling', name: 'Internal Handling & Shifting', basis: 'Total / Batch', defaultRate: 200, appliedAs: 'Total Cost for this production' }
+  { id: 'cost-printing', name: 'Cover Printing & Lamination (Job Work)', basis: 'Per Piece', defaultRate: 3 },
+  { id: 'cost-elec', name: 'Electricity / Power Charges', basis: 'Per GBL', defaultRate: 25 },
+  { id: 'cost-labour', name: 'Direct Labour / Helper Wages', basis: 'Per GBL', defaultRate: 35 },
+  { id: 'cost-wire', name: 'Stitching Wire & Adhesive', basis: 'Per GBL', defaultRate: 15 },
+  { id: 'cost-machine', name: 'Machine Running & Tooling', basis: 'Per BOM', defaultRate: 350 },
+  { id: 'cost-pack', name: 'Packaging & Shrink Wrap', basis: 'Per GBL', defaultRate: 20 },
+  { id: 'cost-handling', name: 'Internal Handling & Shifting', basis: 'Per GBL', defaultRate: 10 }
 ];
 
 export interface ScrapPreset {
@@ -272,9 +273,14 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   // Predefined Overhead Costs Presets (matching Sales Order predefined charges)
   const [predefinedCosts, setPredefinedCosts] = useState<PredefinedCost[]>(() => {
     try {
-      const stored = localStorage.getItem('skbw_predefined_costs_v2');
+      const stored = localStorage.getItem(`skbw_predefined_costs_${companyId || 'default'}`);
       if (stored) {
         const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      const legacy = localStorage.getItem('skbw_predefined_costs_v2');
+      if (legacy) {
+        const parsed = JSON.parse(legacy);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch (e) {}
@@ -285,17 +291,22 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   const [quickCostOpenUpwards, setQuickCostOpenUpwards] = useState<boolean>(false);
   const [showManageCostModal, setShowManageCostModal] = useState<boolean>(false);
   const [newCostName, setNewCostName] = useState<string>('');
-  const [newCostBasis, setNewCostBasis] = useState<'Per BOM' | 'Total / Batch' | 'Per Batch' | 'Per GBL' | 'Per Piece' | string>('Per BOM');
+  const [newCostBasis, setNewCostBasis] = useState<'Per BOM' | 'Per GBL' | 'Per Piece' | string>('Per BOM');
   const [newCostRate, setNewCostRate] = useState<string>('');
   const costPresetMenuRef = useRef<HTMLDivElement>(null);
   const costPresetListRef = useRef<HTMLDivElement>(null);
 
-  // Predefined By-Product / Scrap Presets (persisted in localStorage)
+  // Predefined By-Product / Scrap Presets (persisted in DB metadata + localStorage)
   const [scrapPresets, setScrapPresets] = useState<ScrapPreset[]>(() => {
     try {
-      const stored = localStorage.getItem('skbw_scrap_presets_v2');
+      const stored = localStorage.getItem(`skbw_scrap_presets_${companyId || 'default'}`);
       if (stored) {
         const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      const legacy = localStorage.getItem('skbw_scrap_presets_v2');
+      if (legacy) {
+        const parsed = JSON.parse(legacy);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch (e) {}
@@ -412,13 +423,19 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   // Additional Costs Table
   const [additionalCosts, setAdditionalCosts] = useState<AdditionalCostRow[]>(() => {
     if (editOrder?.additionalCosts && Array.isArray(editOrder.additionalCosts)) {
-      return editOrder.additionalCosts.map((c: any, idx: number) => ({
-        id: c.id || `cost-${idx}`,
-        costType: c.costType,
-        basis: (c.basis as any) || 'Per GBL',
-        amount: Number(c.amount) || 0,
-        appliedAs: (c as any).appliedAs || 'Per Unit (GBL)'
-      }));
+      return editOrder.additionalCosts.map((c: any, idx: number) => {
+        let b = c.calcBasis || c.basis || 'Per Piece';
+        if (b.toLowerCase().includes('bom') || b.toLowerCase().includes('batch')) b = 'Per BOM';
+        else if (b.toLowerCase().includes('piece') || b.toLowerCase().includes('pcs')) b = 'Per Piece';
+        else if (b.toLowerCase().includes('gbl')) b = 'Per GBL';
+        return {
+          id: c.id || `cost-${idx}`,
+          costType: c.costType,
+          basis: b,
+          amount: Number(c.amount) || 0,
+          appliedAs: b
+        };
+      });
     }
     return [];
   });
@@ -512,9 +529,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             if (Array.isArray(serverPresets) && serverPresets.length > 0) {
               setDepartmentPresets(serverPresets);
               try {
-                localStorage.setItem('skbw_department_presets_v2', JSON.stringify(serverPresets));
+                localStorage.setItem(`skbw_department_presets_${companyId || 'default'}`, JSON.stringify(serverPresets));
               } catch (e) {}
-            } else {
+            } else if (serverPresets === undefined || serverPresets === null) {
               const freshDefaults = buildCleanDepartmentPresets(loadedWhLocs);
               setDepartmentPresets(freshDefaults);
               updateMetadataV2({ companyId, departmentPresets: freshDefaults }).catch(() => {});
@@ -522,18 +539,37 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
             // Sync Additional Cost / Overheads Presets from database so all systems have identical presets
             const serverCosts = metaRes.value.additionalCostPresets;
-            let mergedCosts: PredefinedCost[] = DEFAULT_PREDEFINED_COSTS;
             if (Array.isArray(serverCosts) && serverCosts.length > 0) {
-              const existingIds = new Set(serverCosts.map((c: any) => c.id || c.name));
-              const missingDefaults = DEFAULT_PREDEFINED_COSTS.filter(d => !existingIds.has(d.id) && !existingIds.has(d.name));
-              mergedCosts = [...serverCosts, ...missingDefaults];
+              setPredefinedCosts(serverCosts);
+              try {
+                localStorage.setItem(`skbw_predefined_costs_${companyId || 'default'}`, JSON.stringify(serverCosts));
+              } catch (e) {}
+            } else if (serverCosts === undefined || serverCosts === null) {
+              // Only initialize if never configured on server
+              setPredefinedCosts(DEFAULT_PREDEFINED_COSTS);
+              try {
+                localStorage.setItem(`skbw_predefined_costs_${companyId || 'default'}`, JSON.stringify(DEFAULT_PREDEFINED_COSTS));
+              } catch (e) {}
+              updateMetadataV2({ companyId, additionalCostPresets: DEFAULT_PREDEFINED_COSTS }).catch(() => {});
+            } else if (Array.isArray(serverCosts) && serverCosts.length === 0) {
+              setPredefinedCosts([]);
             }
-            setPredefinedCosts(mergedCosts);
-            try {
-              localStorage.setItem('skbw_predefined_costs_v2', JSON.stringify(mergedCosts));
-            } catch (e) {}
-            if (!Array.isArray(serverCosts) || serverCosts.length === 0 || serverCosts.length !== mergedCosts.length) {
-              updateMetadataV2({ companyId, additionalCostPresets: mergedCosts }).catch(() => {});
+
+            // Sync Scrap Presets from database so all systems have identical presets
+            const serverScraps = metaRes.value.scrapPresets;
+            if (Array.isArray(serverScraps) && serverScraps.length > 0) {
+              setScrapPresets(serverScraps);
+              try {
+                localStorage.setItem(`skbw_scrap_presets_${companyId || 'default'}`, JSON.stringify(serverScraps));
+              } catch (e) {}
+            } else if (serverScraps === undefined || serverScraps === null) {
+              setScrapPresets(DEFAULT_SCRAP_PRESETS);
+              try {
+                localStorage.setItem(`skbw_scrap_presets_${companyId || 'default'}`, JSON.stringify(DEFAULT_SCRAP_PRESETS));
+              } catch (e) {}
+              updateMetadataV2({ companyId, scrapPresets: DEFAULT_SCRAP_PRESETS }).catch(() => {});
+            } else if (Array.isArray(serverScraps) && serverScraps.length === 0) {
+              setScrapPresets([]);
             }
           }
         }
@@ -547,6 +583,49 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     loadData();
     return () => { isMounted = false; };
   }, [companyId]);
+
+  // Real-time synchronization for company metadata & presets across all users
+  useRealtimeSync(['metadata'], (event) => {
+    if (!companyId) return;
+    if (event?.data) {
+      if (Array.isArray(event.data.additionalCostPresets)) {
+        setPredefinedCosts(event.data.additionalCostPresets);
+        try {
+          localStorage.setItem(`skbw_predefined_costs_${companyId}`, JSON.stringify(event.data.additionalCostPresets));
+        } catch (e) {}
+      }
+      if (Array.isArray(event.data.scrapPresets)) {
+        setScrapPresets(event.data.scrapPresets);
+        try {
+          localStorage.setItem(`skbw_scrap_presets_${companyId}`, JSON.stringify(event.data.scrapPresets));
+        } catch (e) {}
+      }
+      if (Array.isArray(event.data.departmentPresets)) {
+        setDepartmentPresets(event.data.departmentPresets);
+        try {
+          localStorage.setItem(`skbw_department_presets_${companyId}`, JSON.stringify(event.data.departmentPresets));
+        } catch (e) {}
+      }
+    } else {
+      getMetadataV2(companyId).then(meta => {
+        if (meta?.additionalCostPresets && Array.isArray(meta.additionalCostPresets)) {
+          setPredefinedCosts(meta.additionalCostPresets);
+          try {
+            localStorage.setItem(`skbw_predefined_costs_${companyId}`, JSON.stringify(meta.additionalCostPresets));
+          } catch (e) {}
+        }
+        if (meta?.scrapPresets && Array.isArray(meta.scrapPresets)) {
+          setScrapPresets(meta.scrapPresets);
+          try {
+            localStorage.setItem(`skbw_scrap_presets_${companyId}`, JSON.stringify(meta.scrapPresets));
+          } catch (e) {}
+        }
+        if (meta?.departmentPresets && Array.isArray(meta.departmentPresets)) {
+          setDepartmentPresets(meta.departmentPresets);
+        }
+      }).catch(() => {});
+    }
+  });
 
   // Sync backendSkus if initialSkus prop updates
   useEffect(() => {
@@ -1029,12 +1108,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       name: newCostName.trim(),
       basis: newCostBasis,
       defaultRate: rateNum,
-      appliedAs: newCostBasis === 'Per BOM' ? 'Per BOM' : newCostBasis === 'Per GBL' ? 'Per Unit (GBL)' : newCostBasis === 'Per Piece' ? 'Per Unit (PCS)' : 'Total Cost for this production/batch'
+      appliedAs: newCostBasis
     };
     const updated = [...predefinedCosts, newPreset];
     setPredefinedCosts(updated);
     try {
-      localStorage.setItem('skbw_predefined_costs_v2', JSON.stringify(updated));
+      localStorage.setItem(`skbw_predefined_costs_${companyId || 'default'}`, JSON.stringify(updated));
     } catch (e) {}
     if (companyId) {
       updateMetadataV2({ companyId, additionalCostPresets: updated }).catch(e => console.error(e));
@@ -1044,16 +1123,43 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     showToast(`Added "${newPreset.name}" to predefined overheads`, 'success');
   };
 
+  const handleUpdateCostPreset = (id: string, updates: Partial<PredefinedCost>) => {
+    const updated = predefinedCosts.map(c => {
+      if (c.id !== id) return c;
+      const merged = { ...c, ...updates };
+      if (updates.basis) merged.appliedAs = updates.basis;
+      return merged;
+    });
+    setPredefinedCosts(updated);
+    try {
+      localStorage.setItem(`skbw_predefined_costs_${companyId || 'default'}`, JSON.stringify(updated));
+    } catch (e) {}
+    if (companyId) {
+      updateMetadataV2({ companyId, additionalCostPresets: updated }).catch(e => console.error(e));
+    }
+  };
+
   const handleDeleteCostPreset = (id: string) => {
     const updated = predefinedCosts.filter(c => c.id !== id);
     setPredefinedCosts(updated);
     try {
-      localStorage.setItem('skbw_predefined_costs_v2', JSON.stringify(updated));
+      localStorage.setItem(`skbw_predefined_costs_${companyId || 'default'}`, JSON.stringify(updated));
     } catch (e) {}
     if (companyId) {
       updateMetadataV2({ companyId, additionalCostPresets: updated }).catch(e => console.error(e));
     }
     showToast('Predefined overhead deleted', 'info');
+  };
+
+  const handleResetCostPresets = () => {
+    setPredefinedCosts(DEFAULT_PREDEFINED_COSTS);
+    try {
+      localStorage.setItem(`skbw_predefined_costs_${companyId || 'default'}`, JSON.stringify(DEFAULT_PREDEFINED_COSTS));
+    } catch (e) {}
+    if (companyId) {
+      updateMetadataV2({ companyId, additionalCostPresets: DEFAULT_PREDEFINED_COSTS }).catch(e => console.error(e));
+    }
+    showToast('Reset predefined overheads to defaults', 'info');
   };
 
   // Output location change handler
@@ -1208,22 +1314,13 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     if (Array.isArray((sku as any).additionalCosts) && (sku as any).additionalCosts.length > 0) {
       setAdditionalCosts((sku as any).additionalCosts.map((c: any, i: number) => {
         let basis = c.calcBasis || c.basis || 'Per Piece';
-        let applied = c.appliedAs || '';
-
-        const isBatch = basis.toLowerCase().includes('batch') || applied.toLowerCase().includes('batch') || basis.toLowerCase().includes('bom') || applied.toLowerCase().includes('bom') || basis.toLowerCase().includes('total') || applied.toLowerCase().includes('total') || basis === 'Fixed' || applied === 'Fixed';
-        if (isBatch) {
-          if (!basis.toLowerCase().includes('batch') && !basis.toLowerCase().includes('bom') && !basis.toLowerCase().includes('total') && basis !== 'Fixed') {
-            basis = applied.toLowerCase().includes('bom') ? 'Per BOM' : 'Per Batch';
-          }
-          if (!applied) {
-            applied = basis === 'Per BOM' ? 'Per BOM' : (basis === 'Total / Batch' ? 'Total Cost for this production/batch' : 'Per Batch');
-          } else if (basis === 'Per Batch' && applied !== 'Per Batch') {
-            applied = 'Per Batch';
-          }
-        } else if (basis === 'Per Piece') {
-          applied = 'Per Unit (PCS)';
-        } else if (basis === 'Per GBL') {
-          applied = 'Per Unit (GBL)';
+        const bLower = basis.toLowerCase();
+        if (bLower.includes('bom') || bLower.includes('batch')) {
+          basis = 'Per BOM';
+        } else if (bLower.includes('piece') || bLower.includes('pcs')) {
+          basis = 'Per Piece';
+        } else if (bLower.includes('gbl')) {
+          basis = 'Per GBL';
         }
 
         return {
@@ -1231,7 +1328,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           costType: c.costType || '',
           basis: basis as any,
           amount: Number(c.amount) || 0,
-          appliedAs: (applied || (isBatch ? 'Per Batch' : 'Per Unit (PCS)')) as any,
+          appliedAs: basis as any,
           totalAmount: 0
         };
       }));
@@ -1688,20 +1785,48 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     const updated = [newPreset, ...scrapPresets];
     setScrapPresets(updated);
     try {
-      localStorage.setItem('skbw_scrap_presets_v2', JSON.stringify(updated));
+      localStorage.setItem(`skbw_scrap_presets_${companyId || 'default'}`, JSON.stringify(updated));
     } catch (e) {}
+    if (companyId) {
+      updateMetadataV2({ companyId, scrapPresets: updated }).catch(e => console.error(e));
+    }
     setNewScrapItem('');
     setNewScrapRate('');
     showToast(`Added scrap preset "${newPreset.item}"`, 'success');
+  };
+
+  const handleUpdateScrapPreset = (id: string, updates: Partial<ScrapPreset>) => {
+    const updated = scrapPresets.map(p => p.id === id ? { ...p, ...updates } : p);
+    setScrapPresets(updated);
+    try {
+      localStorage.setItem(`skbw_scrap_presets_${companyId || 'default'}`, JSON.stringify(updated));
+    } catch (e) {}
+    if (companyId) {
+      updateMetadataV2({ companyId, scrapPresets: updated }).catch(e => console.error(e));
+    }
   };
 
   const handleDeleteScrapPreset = (id: string) => {
     const updated = scrapPresets.filter(p => p.id !== id);
     setScrapPresets(updated);
     try {
-      localStorage.setItem('skbw_scrap_presets_v2', JSON.stringify(updated));
+      localStorage.setItem(`skbw_scrap_presets_${companyId || 'default'}`, JSON.stringify(updated));
     } catch (e) {}
+    if (companyId) {
+      updateMetadataV2({ companyId, scrapPresets: updated }).catch(e => console.error(e));
+    }
     showToast('Removed scrap preset', 'info');
+  };
+
+  const handleResetScrapPresets = () => {
+    setScrapPresets(DEFAULT_SCRAP_PRESETS);
+    try {
+      localStorage.setItem(`skbw_scrap_presets_${companyId || 'default'}`, JSON.stringify(DEFAULT_SCRAP_PRESETS));
+    } catch (e) {}
+    if (companyId) {
+      updateMetadataV2({ companyId, scrapPresets: DEFAULT_SCRAP_PRESETS }).catch(e => console.error(e));
+    }
+    showToast('Reset scrap presets to defaults', 'info');
   };
 
   // Additional Costs Handlers
@@ -1712,9 +1837,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       {
         id: newId,
         costType: '',
-        basis: 'Total / Batch',
+        basis: 'Per BOM',
         amount: 0,
-        appliedAs: 'Total Cost for this production'
+        appliedAs: 'Per BOM'
       }
     ]);
   };
@@ -1736,40 +1861,69 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     return scrapItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
   }, [scrapItems]);
 
+  // Dynamic calculation for an additional cost row based on calc basis and required order quantities
+  const calculateAdditionalCostRow = (cost: { basis?: string; amount?: number | string }) => {
+    const amt = Number(cost.amount) || 0;
+    const b = (cost.basis || '').toLowerCase().trim();
+
+    // 1. Per BOM: Multiply directly with Required Qty from Materials table
+    if (b === 'per bom' || b.includes('bom') || b.includes('batch')) {
+      const primaryBomMat = materials.find(m => {
+        const c = (m.component || '').toLowerCase();
+        const u = (m.uom || '').toLowerCase();
+        return (Number(m.requiredQty) > 0) && (c.includes('sheet') || c.includes('paper') || c.includes('board') || c.includes('reel') || u === 'pcs' || u === 'ream' || u === 'kg');
+      }) || materials.find(m => Number(m.requiredQty) > 0) || materials[0];
+
+      const reqQty = primaryBomMat && Number(primaryBomMat.requiredQty) > 0
+        ? Number(primaryBomMat.requiredQty)
+        : (numPlannedQty > 0 ? numPlannedQty : 1);
+
+      const cleanQty = Math.round(reqQty * 1000) / 1000;
+      const total = amt * cleanQty;
+      return {
+        total,
+        multiplier: cleanQty,
+        label: `${cleanQty} Required Qty`
+      };
+    }
+
+    // 2. Per Piece (PCS): Rate * total planned pieces to produce
+    if (b === 'per piece' || b.includes('piece') || b.includes('pcs')) {
+      const qty = plannedPcs > 0 ? plannedPcs : (numPlannedQty > 0 ? numPlannedQty : 1);
+      const total = amt * qty;
+      return {
+        total,
+        multiplier: qty,
+        label: `${qty.toLocaleString('en-IN')} PCS`
+      };
+    }
+
+    // 3. Per GBL: Rate * total planned GBL to produce
+    if (b === 'per gbl' || b.includes('gbl')) {
+      const qty = plannedGbl > 0 ? plannedGbl : (conversionFactor > 0 && plannedPcs > 0 ? plannedPcs / conversionFactor : 1);
+      const cleanQty = Math.round(qty * 100) / 100;
+      const total = amt * cleanQty;
+      return {
+        total,
+        multiplier: cleanQty,
+        label: `${cleanQty.toLocaleString('en-IN', { maximumFractionDigits: 2 })} GBL`
+      };
+    }
+
+    // 4. Fallback (Flat)
+    return {
+      total: amt,
+      multiplier: 1,
+      label: 'Flat'
+    };
+  };
+
   const totalAdditionalCost = useMemo(() => {
     return additionalCosts.reduce((sum, row) => {
-      const amt = Number(row.amount) || 0;
-      const b = (row.basis || '').toLowerCase().trim();
-      const a = (row.appliedAs || '').toLowerCase().trim();
-
-      // 1. Per BOM / Per Batch (multiplied with BOM automatically!)
-      if (b === 'per bom' || a === 'per bom' || (b === 'per batch' && a === 'per batch') || (b.includes('batch') && !b.includes('total') && a.includes('batch'))) {
-        return sum + (amt * bomMultiplier);
-      }
-
-      // 2. Fixed Total / Batch (flat lump sum for the whole production order)
-      if (b.includes('total') || b === 'fixed' || b === 'lump sum' || a.includes('total') || a === 'fixed') {
-        return sum + amt;
-      }
-
-      // 3. Per GBL
-      if (b === 'per gbl' || a.includes('(gbl)')) {
-        return sum + (amt * (plannedGbl || 1));
-      }
-
-      // 4. Per Piece
-      if (b === 'per piece' || a.includes('(pcs)')) {
-        return sum + (amt * (plannedPcs || 1));
-      }
-
-      // Default for any batch basis if not matched above
-      if (b.includes('batch') || a.includes('batch')) {
-        return sum + (amt * bomMultiplier);
-      }
-
-      return sum + amt;
+      const { total } = calculateAdditionalCostRow(row);
+      return sum + total;
     }, 0);
-  }, [additionalCosts, plannedGbl, plannedPcs, bomMultiplier]);
+  }, [additionalCosts, materials, plannedGbl, plannedPcs, numPlannedQty, conversionFactor]);
 
   // Production Cost Ledger: Material Cost + Overheads
   const totalProductionCost = useMemo(() => {
@@ -2023,20 +2177,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         }),
         byProducts: scrapItems,
         additionalCosts: additionalCosts.map(c => {
-          const amt = Number(c.amount) || 0;
-          const b = (c.basis || '').toLowerCase().trim();
-          const a = (c.appliedAs || '').toLowerCase().trim();
-          let lineTotal = amt;
-          if (b === 'per bom' || a === 'per bom' || (b === 'per batch' && a === 'per batch') || (b.includes('batch') && !b.includes('total') && a.includes('batch'))) {
-            lineTotal = Math.round(amt * bomMultiplier * 100) / 100;
-          } else if (b === 'per gbl' || a.includes('(gbl)')) {
-            lineTotal = Math.round(amt * (plannedGbl || 1) * 100) / 100;
-          } else if (b === 'per piece' || a.includes('(pcs)')) {
-            lineTotal = Math.round(amt * (plannedPcs || 1) * 100) / 100;
-          }
+          const { total } = calculateAdditionalCostRow(c);
           return {
             ...c,
-            totalAmount: lineTotal
+            appliedAs: c.basis,
+            totalAmount: Math.round(total * 100) / 100
           };
         }),
         profitPricing: {
@@ -3551,11 +3696,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                               >
                                 <span className="font-semibold truncate">{p.name}</span>
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ml-2 ${
-                                  p.basis === 'Per GBL' || p.basis === 'Per Piece' 
+                                  p.basis === 'Per GBL' || p.basis === 'Per Piece' || p.basis === 'Per BOM'
                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
                                     : 'bg-gray-100 text-gray-600'
                                 }`}>
-                                  {p.basis === 'Per GBL' ? `₹${p.defaultRate}/GBL` : p.basis === 'Per Piece' ? `₹${p.defaultRate}/PCS` : `₹${p.defaultRate} Flat`}
+                                  {p.basis === 'Per GBL' ? `₹${p.defaultRate}/GBL` : p.basis === 'Per Piece' ? `₹${p.defaultRate}/PCS` : p.basis === 'Per BOM' ? `₹${p.defaultRate}/BOM` : `₹${p.defaultRate}`}
                                 </span>
                               </button>
                             );
@@ -3581,92 +3726,95 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
               </div>
 
               <div className="overflow-x-auto border border-gray-200 rounded-xl custom-scrollbar">
-                <table className="w-full text-left border-collapse text-xs min-w-[640px]">
+                <table className="w-full text-left border-collapse text-xs min-w-[560px]">
                   <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
                     <tr>
                       <th className="py-2 px-3 w-8 text-center">#</th>
                       <th className="py-2 px-3">COST TYPE</th>
-                      <th className="py-2 px-3 text-center w-32">CALC BASIS</th>
-                      <th className="py-2 px-3 text-right w-24">AMOUNT (₹)</th>
-                      <th className="py-2 px-3 w-48">APPLIED AS</th>
+                      <th className="py-2 px-3 text-center w-36">CALC BASIS</th>
+                      <th className="py-2 px-3 text-right w-44">AMOUNT (₹)</th>
                       <th className="py-2 px-3 text-center w-20">ACTIONS</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white">
-                    {additionalCosts.map((cost, cIdx) => (
-                      <tr key={cost.id} className="hover:bg-gray-50/60">
-                        <td className="py-2 px-3 text-center font-bold text-gray-400">{cIdx + 1}</td>
-                        <td className="py-2 px-3">
-                          <input
-                            type="text"
-                            value={cost.costType}
-                            onChange={e => handleUpdateCost(cost.id, 'costType', e.target.value)}
-                            placeholder="e.g. Labour, Electricity"
-                            className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-center">
-                          <select
-                            value={cost.basis}
-                            onChange={e => handleUpdateCost(cost.id, 'basis', e.target.value as any)}
-                            className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer"
-                          >
-                            <option value="Per BOM">Per BOM</option>
-                            <option value="Total / Batch">Total / Batch</option>
-                            <option value="Per Batch">Per Batch</option>
-                            <option value="Per Piece">Per Piece</option>
-                            <option value="Per GBL">Per GBL</option>
-                          </select>
-                        </td>
-                        <td className="py-2 px-3 text-right">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={cost.amount}
-                            onChange={e => handleUpdateCost(cost.id, 'amount', e.target.value)}
-                            className="w-20 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-xs font-bold"
-                          />
-                          {((cost.basis === 'Per BOM' || (cost.basis === 'Per Batch' && cost.appliedAs === 'Per Batch')) && bomMultiplier > 0) && (
-                            <div className="text-[10px] text-blue-600 font-mono font-bold text-right mt-0.5 whitespace-nowrap">
-                              = ₹{((Number(cost.amount) || 0) * bomMultiplier).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              <span className="text-[9px] text-gray-400 font-sans font-normal ml-0.5">({bomMultiplier} BOM{bomMultiplier === 1 ? '' : 's'})</span>
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-2 px-3">
-                          <select
-                            value={cost.appliedAs}
-                            onChange={e => handleUpdateCost(cost.id, 'appliedAs', e.target.value as any)}
-                            className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer"
-                          >
-                            <option value="Per BOM">Per BOM</option>
-                            <option value="Per Batch">Per Batch</option>
-                            <option value="Total Cost for this production/batch">Total Cost for this production/batch</option>
-                            <option value="Total Cost for this production">Total Cost for this production</option>
-                            <option value="Per Unit (PCS)">Per Unit (PCS)</option>
-                            <option value="Per Unit (GBL)">Per Unit (GBL)</option>
-                          </select>
-                        </td>
-                        <td className="py-2 px-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteCost(cost.id)}
-                            className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {additionalCosts.map((cost, cIdx) => {
+                      const costCalc = calculateAdditionalCostRow(cost);
+                      return (
+                        <tr key={cost.id} className="hover:bg-gray-50/60">
+                          <td className="py-2 px-3 text-center font-bold text-gray-400">{cIdx + 1}</td>
+                          <td className="py-2 px-3">
+                            <input
+                              type="text"
+                              list="order-overhead-presets"
+                              value={cost.costType}
+                              onChange={e => {
+                                const val = e.target.value;
+                                handleUpdateCost(cost.id, 'costType', val);
+                                const matched = predefinedCosts.find(p => p.name.toLowerCase() === val.toLowerCase());
+                                if (matched) {
+                                  handleUpdateCost(cost.id, 'basis', matched.basis as any);
+                                  handleUpdateCost(cost.id, 'amount', matched.defaultRate);
+                                }
+                              }}
+                              placeholder="e.g. Labour, Electricity, Printing"
+                              className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                            />
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            <select
+                              value={cost.basis}
+                              onChange={e => handleUpdateCost(cost.id, 'basis', e.target.value as any)}
+                              className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-blue-500"
+                            >
+                              <option value="Per BOM">📦 Per BOM</option>
+                              <option value="Per Piece">⚡ Per Piece</option>
+                              <option value="Per GBL">📦 Per GBL</option>
+                            </select>
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={cost.amount}
+                              onChange={e => handleUpdateCost(cost.id, 'amount', e.target.value)}
+                              className="w-24 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-xs font-bold focus:ring-1 focus:ring-blue-500"
+                            />
+                            {Number(cost.amount) > 0 && (
+                              <div className="text-[10px] text-blue-600 font-mono font-bold text-right mt-0.5 whitespace-nowrap">
+                                = ₹{costCalc.total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                <span className="text-[9px] text-gray-400 font-sans font-normal ml-0.5">({costCalc.label})</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCost(cost.id)}
+                              className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                              title="Delete overhead"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {additionalCosts.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="py-4 text-center text-xs text-gray-400 italic bg-gray-50/30">
+                        <td colSpan={5} className="py-4 text-center text-xs text-gray-400 italic bg-gray-50/30">
                           No additional costs added. Click <strong className="text-blue-600 font-semibold cursor-pointer" onClick={() => setShowQuickCostPresetMenu(true)}>"Add Preset Overhead"</strong> above to select or add overheads.
                         </td>
                       </tr>
                     )}
                   </tbody>
                 </table>
+                <datalist id="order-overhead-presets">
+                  {predefinedCosts.map(p => (
+                    <option key={p.id} value={p.name}>
+                      {p.basis} — ₹{p.defaultRate}
+                    </option>
+                  ))}
+                </datalist>
               </div>
             </div>
 
@@ -4030,34 +4178,65 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           isOpen={showManageCostModal}
           onClose={() => setShowManageCostModal(false)}
           title="Manage Predefined Production Overheads"
-          maxWidth="max-w-lg"
+          maxWidth="max-w-xl"
         >
           <div className="space-y-4 p-2 text-xs">
             <p className="text-xs text-gray-500">
-              Predefined overheads appear in the quick cost selector dropdown. Any overhead set to <strong>Per GBL</strong> or <strong>Per Piece</strong> automatically calculates based on batch size.
+              Predefined overheads appear in the quick cost selector dropdown and auto-suggest when typing cost names. Changes sync dynamically across all users.
             </p>
 
             {/* List */}
-            <div className="max-h-60 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-100">
+            <div className="max-h-64 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-100">
               {predefinedCosts.map(p => (
-                <div key={p.id} className="p-2.5 flex items-center justify-between text-xs hover:bg-gray-50/80">
-                  <div>
-                    <span className="font-bold text-gray-800 block">{p.name}</span>
-                    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold mt-0.5 ${
-                      p.basis === 'Per GBL' || p.basis === 'Per Piece' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {p.basis === 'Per GBL' ? `Per GBL (₹${p.defaultRate}/GBL)` : p.basis === 'Per Piece' ? `Per Piece (₹${p.defaultRate}/PCS)` : `Fixed (₹${p.defaultRate})`}
-                    </span>
+                <div key={p.id} className="p-2.5 flex items-center justify-between gap-2.5 text-xs hover:bg-gray-50/80 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <input
+                      type="text"
+                      value={p.name}
+                      onChange={e => handleUpdateCostPreset(p.id, { name: e.target.value })}
+                      placeholder="Preset Name"
+                      className="w-full font-bold text-gray-800 bg-transparent border border-transparent hover:border-gray-200 focus:border-blue-400 focus:bg-white rounded-lg px-2 py-1 text-xs truncate transition-all"
+                    />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteCostPreset(p.id)}
-                    className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <select
+                      value={p.basis}
+                      onChange={e => handleUpdateCostPreset(p.id, { basis: e.target.value as any })}
+                      className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="Per BOM">📦 Per BOM</option>
+                      <option value="Per Piece">⚡ Per Piece</option>
+                      <option value="Per GBL">📦 Per GBL</option>
+                    </select>
+                    <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-0.5">
+                      <span className="text-gray-400 text-xs font-bold">₹</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={p.defaultRate}
+                        onChange={e => handleUpdateCostPreset(p.id, { defaultRate: Number(e.target.value) || 0 })}
+                        className="w-16 text-right font-mono text-xs font-bold text-gray-800 bg-transparent focus:outline-none"
+                      />
+                      <span className="text-[10px] text-gray-500 font-semibold font-mono">
+                        {p.basis === 'Per GBL' ? '/GBL' : p.basis === 'Per Piece' ? '/PCS' : '/BOM'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCostPreset(p.id)}
+                      className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                      title="Delete preset"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
+              {predefinedCosts.length === 0 && (
+                <div className="py-6 text-center text-gray-400 italic">
+                  No predefined overheads saved. Add one below or click Reset to Defaults.
+                </div>
+              )}
             </div>
 
             {/* Add new preset form */}
@@ -4085,10 +4264,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 cursor-pointer"
                 >
                   <option value="Per BOM">📦 Per BOM</option>
-                  <option value="Per Batch">Per Batch</option>
-                  <option value="Total / Batch">Total / Batch</option>
-                  <option value="Per GBL">⚡ Per GBL</option>
                   <option value="Per Piece">⚡ Per Piece</option>
+                  <option value="Per GBL">⚡ Per GBL</option>
                 </select>
                 <div className="flex gap-1">
                   <input
@@ -4113,16 +4290,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             <div className="flex justify-between items-center pt-2 border-t border-gray-100 text-xs">
               <button
                 type="button"
-                onClick={() => {
-                  setPredefinedCosts(DEFAULT_PREDEFINED_COSTS);
-                  try {
-                    localStorage.setItem('skbw_predefined_costs_v2', JSON.stringify(DEFAULT_PREDEFINED_COSTS));
-                  } catch (e) {}
-                  if (companyId) {
-                    updateMetadataV2({ companyId, additionalCostPresets: DEFAULT_PREDEFINED_COSTS }).catch(e => console.error(e));
-                  }
-                  showToast('Reset to default predefined overheads', 'info');
-                }}
+                onClick={handleResetCostPresets}
                 className="text-[11px] font-bold text-gray-500 hover:text-gray-700 cursor-pointer"
               >
                 Reset to Defaults
@@ -4145,31 +4313,60 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           isOpen={showManageScrapModal}
           onClose={() => setShowManageScrapModal(false)}
           title="Manage Predefined Scrap & By-Products"
-          maxWidth="max-w-lg"
+          maxWidth="max-w-xl"
         >
           <div className="space-y-4 p-2 text-xs">
             <p className="text-xs text-gray-500">
-              Predefined scrap items appear in the quick scrap selector. Selecting an item automatically loads its name, unit of measurement, and recovery rate.
+              Predefined scrap items appear in the quick scrap selector. Selecting an item automatically loads its name, unit of measurement, and recovery rate. Changes sync dynamically across all users.
             </p>
 
             {/* List */}
             <div className="max-h-60 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-100">
               {scrapPresets.map(p => (
-                <div key={p.id} className="p-2.5 flex items-center justify-between text-xs hover:bg-gray-50/80">
-                  <div>
-                    <span className="font-bold text-gray-800 block">{p.item}</span>
-                    <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold mt-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      ₹{p.defaultRate} / {p.uom}
-                    </span>
+                <div key={p.id} className="p-2.5 flex items-center justify-between gap-2.5 text-xs hover:bg-gray-50/80 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <input
+                      type="text"
+                      value={p.item}
+                      onChange={e => handleUpdateScrapPreset(p.id, { item: e.target.value })}
+                      placeholder="Scrap Item Name"
+                      className="w-full font-bold text-gray-800 bg-transparent border border-transparent hover:border-gray-200 focus:border-purple-400 focus:bg-white rounded-lg px-2 py-1 text-xs truncate transition-all"
+                    />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteScrapPreset(p.id)}
-                    className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer"
-                    title="Delete preset"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <select
+                      value={p.uom}
+                      onChange={e => handleUpdateScrapPreset(p.id, { uom: e.target.value })}
+                      className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-purple-500"
+                    >
+                      <option value="KG">KG</option>
+                      <option value="PCS">PCS</option>
+                      <option value="BDL">BDL (Bundle)</option>
+                      <option value="GBL">GBL</option>
+                      <option value="SHEET">SHEET</option>
+                    </select>
+                    <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-0.5">
+                      <span className="text-gray-400 text-xs font-bold">₹</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={p.defaultRate}
+                        onChange={e => handleUpdateScrapPreset(p.id, { defaultRate: Number(e.target.value) || 0 })}
+                        className="w-16 text-right font-mono text-xs font-bold text-gray-800 bg-transparent focus:outline-none"
+                      />
+                      <span className="text-[10px] text-gray-500 font-semibold font-mono">
+                        /{p.uom}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteScrapPreset(p.id)}
+                      className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                      title="Delete preset"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
               {scrapPresets.length === 0 && (
@@ -4230,13 +4427,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             <div className="flex justify-between items-center pt-2 border-t border-gray-100 text-xs">
               <button
                 type="button"
-                onClick={() => {
-                  setScrapPresets(DEFAULT_SCRAP_PRESETS);
-                  try {
-                    localStorage.setItem('skbw_scrap_presets_v2', JSON.stringify(DEFAULT_SCRAP_PRESETS));
-                  } catch (e) {}
-                  showToast('Reset to default scrap presets', 'info');
-                }}
+                onClick={handleResetScrapPresets}
                 className="text-[11px] font-bold text-gray-500 hover:text-gray-700 cursor-pointer"
               >
                 Reset to Defaults

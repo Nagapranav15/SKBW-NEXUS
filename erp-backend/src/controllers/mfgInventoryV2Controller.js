@@ -2723,6 +2723,9 @@ exports.updateMetadata = async (req, res, next) => {
       { $set: updateObj },
       { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
     );
+    if (doc) {
+      broadcast(companyObjId, { entity: "metadata", action: "update", data: doc });
+    }
     res.json(doc);
   } catch (err) {
     next(err);
