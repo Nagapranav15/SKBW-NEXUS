@@ -3022,8 +3022,19 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             </div>
                             {/* In-line Live Stock Indicator */}
                             {(row.component || row.code) && (() => {
-                              const { stockQty, uom, isAvailable } = getLiveStockForMaterial(row);
+                              const { stockQty, uom, isAvailable, matchedSku } = getLiveStockForMaterial(row);
                               const isZero = stockQty <= 0;
+                              const conv = Number(matchedSku?.altUnitConversion || (matchedSku as any)?.booksGbl || (matchedSku as any)?.pcsPerGbl || 0);
+                              const normUom = (uom || '').toUpperCase();
+                              let altStockStr = '';
+                              if (normUom === 'GBL' && conv > 0) {
+                                const altVal = stockQty * conv;
+                                altStockStr = `≈ ${altVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })} PCS`;
+                              } else if ((normUom === 'PCS' || normUom === 'SHEETS') && conv > 0) {
+                                const altVal = stockQty / conv;
+                                altStockStr = `≈ ${altVal < 1 ? altVal.toFixed(3) : altVal.toLocaleString('en-IN', { maximumFractionDigits: 3 })} GBL`;
+                              }
+
                               return (
                                 <div className="flex items-center gap-1 mt-0.5 px-0.5 text-[9.5px]">
                                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
@@ -3035,6 +3046,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                   }`}>
                                     {formatStockQty(stockQty)} {uom}
                                   </span>
+                                  {altStockStr && (
+                                    <span className="text-gray-400 font-mono text-[9px] font-medium">
+                                      ({altStockStr})
+                                    </span>
+                                  )}
                                 </div>
                               );
                             })()}
@@ -3101,6 +3117,33 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             onChange={e => handleUpdateMaterial(row.id, 'requiredQty', e.target.value)}
                             className="w-full text-right font-bold text-gray-900 bg-white border border-gray-200 rounded-md px-2 py-0.5 text-[11px] h-7 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                           />
+                          {(() => {
+                            const matched = backendSkus.find(s => 
+                              (row.skuId && s._id === row.skuId) ||
+                              (row.code && s.skuCode?.toLowerCase().trim() === row.code.toLowerCase().trim()) ||
+                              (row.component && s.name?.toLowerCase().trim() === row.component.toLowerCase().trim())
+                            );
+                            const conv = Number(matched?.altUnitConversion || (matched as any)?.booksGbl || (matched as any)?.pcsPerGbl || 0);
+                            const numReq = Number(row.requiredQty) || 0;
+                            if (numReq <= 0 || conv <= 0) return null;
+                            const curUom = (row.uom || matched?.unit || 'PCS').toUpperCase();
+                            if (curUom === 'GBL') {
+                              const pcsVal = numReq * conv;
+                              return (
+                                <span className="text-[9px] text-indigo-700 font-mono font-semibold block text-right mt-0.5" title={`${numReq} GBL = ${pcsVal} PCS`}>
+                                  ≈ {pcsVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })} PCS
+                                </span>
+                              );
+                            } else if (curUom === 'PCS' || curUom === 'SHEETS') {
+                              const gblVal = numReq / conv;
+                              return (
+                                <span className="text-[9px] text-gray-500 font-mono font-medium block text-right mt-0.5" title={`${numReq} PCS = ${gblVal.toFixed(4)} GBL`}>
+                                  ≈ {gblVal < 1 ? gblVal.toFixed(4) : gblVal.toLocaleString('en-IN', { maximumFractionDigits: 3 })} GBL
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
                         </td>
 
                         {/* Source Location (Mini Factory Location Modal) */}
@@ -3348,14 +3391,24 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                 <span className="text-[10.5px] text-gray-400 italic">No materials</span>
               ) : (
                 materials.map((m, idx) => {
-                  const { stockQty, uom, isAvailable } = getLiveStockForMaterial(m);
+                  const { stockQty, uom, isAvailable, matchedSku } = getLiveStockForMaterial(m);
                   const isZero = stockQty <= 0;
                   const displayName = m.component || m.code || `Item ${idx + 1}`;
+                  const conv = Number(matchedSku?.altUnitConversion || (matchedSku as any)?.booksGbl || (matchedSku as any)?.pcsPerGbl || 0);
+                  const normUom = (uom || '').toUpperCase();
+                  let altStockStr = '';
+                  if (normUom === 'GBL' && conv > 0) {
+                    const altVal = stockQty * conv;
+                    altStockStr = `≈ ${altVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })} PCS`;
+                  } else if ((normUom === 'PCS' || normUom === 'SHEETS') && conv > 0) {
+                    const altVal = stockQty / conv;
+                    altStockStr = `≈ ${altVal < 1 ? altVal.toFixed(3) : altVal.toLocaleString('en-IN', { maximumFractionDigits: 3 })} GBL`;
+                  }
 
                   return (
                     <div
                       key={m.id || idx}
-                      title={`${displayName} (${m.code || '—'}) • Live Stock: ${formatStockQty(stockQty)} ${uom}`}
+                      title={`${displayName} (${m.code || '—'}) • Live Stock: ${formatStockQty(stockQty)} ${uom}${altStockStr ? ` (${altStockStr})` : ''}`}
                       className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] border transition-all select-none ${
                         isAvailable && !isZero
                           ? 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100/60'
@@ -3375,6 +3428,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                       }`}>
                         {formatStockQty(stockQty)} {uom}
                       </span>
+                      {altStockStr && (
+                        <span className="font-mono text-gray-400 text-[9px] font-medium shrink-0">
+                          ({altStockStr})
+                        </span>
+                      )}
                     </div>
                   );
                 })
