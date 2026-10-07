@@ -1481,13 +1481,33 @@ exports.getMaterialRates = async (req, res) => {
         return rateVal;
       };
 
-      const finalStdRate = convertRate(standardRate || productionRate, skuStockingUnit, targetUom);
-      const finalProdRate = convertRate(productionRate > 0 ? productionRate : 0, skuStockingUnit, targetUom);
-      const finalAvgRate = convertRate(effectiveRate, skuStockingUnit, targetUom);
-      const finalFifoRate = convertRate(fifoRate > 0 ? fifoRate : effectiveRate, skuStockingUnit, targetUom);
-      const finalMajRate = convertRate(fifoResult.majorityRate, skuStockingUnit, targetUom);
-      const finalWeightRate = convertRate(fifoResult.weightedRate, skuStockingUnit, targetUom);
-      const finalLastProdRate = convertRate(lastProductionRate > 0 ? lastProductionRate : 0, skuStockingUnit, targetUom);
+      let finalStdRate = convertRate(standardRate || productionRate, skuStockingUnit, targetUom);
+      let finalProdRate = convertRate(productionRate > 0 ? productionRate : 0, skuStockingUnit, targetUom);
+      let finalAvgRate = convertRate(effectiveRate, skuStockingUnit, targetUom);
+      let finalFifoRate = convertRate(fifoRate > 0 ? fifoRate : effectiveRate, skuStockingUnit, targetUom);
+      let finalMajRate = convertRate(fifoResult.majorityRate, skuStockingUnit, targetUom);
+      let finalWeightRate = convertRate(fifoResult.weightedRate, skuStockingUnit, targetUom);
+      let finalLastProdRate = convertRate(lastProductionRate > 0 ? lastProductionRate : 0, skuStockingUnit, targetUom);
+
+      // ── Batch-cost multiplier for manufactured semi-finished items (boards, etc.) ──
+      // These items are produced in small batches (e.g. 4 boards per run). In a finished-goods
+      // BOM, "1 PCS of board" means "1 production run of boards", so the rate should be the
+      // full batch cost, NOT the per-individual-piece cost.
+      // Applies only when:
+      //   • The item is manufactured (semi/product code), not purchased
+      //   • recipeYieldQty is small (≤ 20) – distinguishes boards (yield=4) from ruled sheets (yield=500-2000)
+      //   • No cutting-slip rate exists (cutting-slip items are already priced per individual piece)
+      const recipeYieldQty = Number(sku.recipeYieldQty || sku.batchYieldQty || 1);
+      const isBatchPricedItem = isManufactured && recipeYieldQty > 1 && recipeYieldQty <= 20 && cuttingSlipRate <= 0;
+      if (isBatchPricedItem) {
+        finalStdRate  = Math.round(finalStdRate  * recipeYieldQty * 10000) / 10000;
+        finalProdRate = Math.round(finalProdRate * recipeYieldQty * 10000) / 10000;
+        finalAvgRate  = Math.round(finalAvgRate  * recipeYieldQty * 10000) / 10000;
+        finalFifoRate = Math.round(finalFifoRate * recipeYieldQty * 10000) / 10000;
+        finalMajRate  = Math.round(finalMajRate  * recipeYieldQty * 10000) / 10000;
+        finalWeightRate = Math.round(finalWeightRate * recipeYieldQty * 10000) / 10000;
+        finalLastProdRate = Math.round(finalLastProdRate * recipeYieldQty * 10000) / 10000;
+      }
 
       rates[skuIdStr] = {
         skuId: skuIdStr,
@@ -1498,6 +1518,8 @@ exports.getMaterialRates = async (req, res) => {
         altUnit: skuAltUnit,
         altUnitConversion: skuConv,
         altUnitDirection: sku.altUnitDirection || 'PRIMARY_TO_ALT',
+        isBatchPriced: isBatchPricedItem,
+        recipeYieldQty: isBatchPricedItem ? recipeYieldQty : 1,
         standardRate: finalStdRate,
         productionRate: finalProdRate,
         avgRate: finalAvgRate,
@@ -1508,10 +1530,20 @@ exports.getMaterialRates = async (req, res) => {
         weightedRate: finalWeightRate,
         fifoBatchInfo: fifoBatchInfo ? {
           ...fifoBatchInfo,
-          rate: convertRate(fifoBatchInfo.rate, skuStockingUnit, targetUom),
-          majorityRate: convertRate(fifoBatchInfo.majorityRate, skuStockingUnit, targetUom),
-          weightedRate: convertRate(fifoBatchInfo.weightedRate, skuStockingUnit, targetUom),
-          summary: `${fifoBatchInfo.majorityBatch || fifoBatchInfo.batchNumber} (@ ₹${convertRate(fifoBatchInfo.rate, skuStockingUnit, targetUom)}/${targetUom})`
+          rate: isBatchPricedItem
+            ? Math.round(convertRate(fifoBatchInfo.rate, skuStockingUnit, targetUom) * recipeYieldQty * 10000) / 10000
+            : convertRate(fifoBatchInfo.rate, skuStockingUnit, targetUom),
+          majorityRate: isBatchPricedItem
+            ? Math.round(convertRate(fifoBatchInfo.majorityRate, skuStockingUnit, targetUom) * recipeYieldQty * 10000) / 10000
+            : convertRate(fifoBatchInfo.majorityRate, skuStockingUnit, targetUom),
+          weightedRate: isBatchPricedItem
+            ? Math.round(convertRate(fifoBatchInfo.weightedRate, skuStockingUnit, targetUom) * recipeYieldQty * 10000) / 10000
+            : convertRate(fifoBatchInfo.weightedRate, skuStockingUnit, targetUom),
+          summary: `${fifoBatchInfo.majorityBatch || fifoBatchInfo.batchNumber} (@ ₹${
+            isBatchPricedItem
+              ? Math.round(convertRate(fifoBatchInfo.rate, skuStockingUnit, targetUom) * recipeYieldQty * 10000) / 10000
+              : convertRate(fifoBatchInfo.rate, skuStockingUnit, targetUom)
+          }/${targetUom} × ${isBatchPricedItem ? recipeYieldQty : 1})`
         } : null,
         batchBalances: activeBatches.map(b => ({
           batchNumber: b.batchNumber,
@@ -1519,7 +1551,9 @@ exports.getMaterialRates = async (req, res) => {
           qtyIn: b.qtyIn,
           qtyOut: b.qtyOut,
           remainingQty: Math.round(b.remainingQty * 100) / 100,
-          rate: convertRate(b.rate, skuStockingUnit, targetUom)
+          rate: isBatchPricedItem
+            ? Math.round(convertRate(b.rate, skuStockingUnit, targetUom) * recipeYieldQty * 10000) / 10000
+            : convertRate(b.rate, skuStockingUnit, targetUom)
         })),
         batchCount: activeBatches.length || allPurchasedItems.length,
         lastProductionRate: finalLastProdRate

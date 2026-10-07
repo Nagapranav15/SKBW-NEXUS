@@ -3,6 +3,7 @@ import { X, Printer, Ban, CheckCircle, Clock, Building2, MapPin } from 'lucide-r
 import { PurchaseInvoiceV2 } from './purchaseService';
 import { SkuV2, WarehouseLocationV2 } from '../../../api/mfgApiV2';
 import UniversalPrintVoucherModal from '../../ui/UniversalPrintVoucherModal';
+import { getItemMetrics } from './PurchaseInvoicePage';
 
 interface PurchaseBatchPrintModalProps {
   invoice: PurchaseInvoiceV2 | null;
@@ -69,19 +70,14 @@ export const PurchaseBatchPrintModal: React.FC<PurchaseBatchPrintModalProps> = (
 
     const reels = item.reels || [];
     const reelsCount = reels.length || Number(item.reelsCount) || 0;
-    if (paperType === 'Reels' || reelsCount > 0) {
-      totalReelsCount += reelsCount;
-    }
 
-    if (paperType === 'Sheets') {
-      const stdSheets = matchedSku?.pages ? Number(matchedSku.pages) : 0;
-      if (stdSheets > 0) {
-        totalReamsCount += qty / stdSheets;
-      }
-    }
-
-    if (matchedSku?.unit?.toLowerCase() === 'kg' || !matchedSku?.unit) {
-      totalKgWeight += qty;
+    const m = getItemMetrics(item, skus);
+    if (m.isReels) totalReelsCount += m.reelsCount;
+    if (m.isSheets) {
+      totalReamsCount += m.reams;
+      totalKgWeight += m.kgWeight;
+    } else if (m.isReels || matchedSku?.unit?.toLowerCase() === 'kg' || !matchedSku?.unit) {
+      totalKgWeight += m.kgWeight;
     }
 
     return {

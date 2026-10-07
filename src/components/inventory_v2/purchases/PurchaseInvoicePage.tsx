@@ -90,6 +90,134 @@ const getFallbackReamWeight = (
   return 0;
 };
 
+export interface ItemMetricsResult {
+  paperType: string;
+  isSheets: boolean;
+  isReels: boolean;
+  isFg: boolean;
+  reelsCount: number;
+  reams: number;
+  sheets: number;
+  gbl: number;
+  kgWeight: number;
+  reamWeight: number;
+  stdSheets: number;
+  stdPcsPerGbl: number;
+  unit: string;
+}
+
+export const getItemMetrics = (
+  item: any,
+  skus: SkuV2[] | Map<string, SkuV2> | any
+): ItemMetricsResult => {
+  const resolvedSku = typeof item?.skuId === 'object' && item?.skuId !== null ? (item.skuId as any) : null;
+  const skuIdStr = resolvedSku?._id || (typeof item?.skuId === 'string' ? item.skuId : '');
+  const fullSku = (skus instanceof Map ? skus.get(skuIdStr) : Array.isArray(skus) ? skus.find((s: any) => s._id === skuIdStr) : null) || resolvedSku;
+  
+  const paperType = resolvedSku?.paperType || fullSku?.paperType || (item?.reels && item.reels.length > 0 ? 'Reels' : 'None');
+  const rawQty = Number(item?.quantity) || 0;
+  const unit = String(item?.unit || fullSku?.unit || resolvedSku?.unit || '').trim().toUpperCase();
+
+  const stdSheets = Number(item?.sheetsPerReam) || Number(resolvedSku?.pages) || Number(fullSku?.pages) || Number(resolvedSku?.sheetsPerReam) || Number(fullSku?.sheetsPerReam) || Number(resolvedSku?.standardSheets) || Number(fullSku?.standardSheets) || 500;
+  const stdPcsPerGbl = Number(item?.pcsPerGbl) || Number(resolvedSku?.altUnitConversion) || Number(fullSku?.altUnitConversion) || Number(resolvedSku?.pcsPerGbl) || Number(fullSku?.pcsPerGbl) || 100;
+  
+  const reamWeight = Number(item?.reamWeight) || Number(resolvedSku?.reamWeight) || Number(fullSku?.reamWeight) || getFallbackReamWeight(fullSku || resolvedSku, stdSheets, Number(item?.width), Number(item?.length), Number(item?.gsm)) || 0;
+
+  const isSheets = paperType === 'Sheets';
+  const isReels = paperType === 'Reels' || (item?.reels && item.reels.length > 0) || Number(item?.reelsCount) > 0;
+  const isFg = !isSheets && !isReels && ((resolvedSku?.category === 'products') || (fullSku?.category === 'products') || unit === 'GBL' || unit === 'PCS');
+
+  if (isSheets) {
+    let reams = 0;
+    let sheets = 0;
+    let gbl = 0;
+    let kg = 0;
+
+    if (unit === 'GBL') {
+      gbl = rawQty;
+      sheets = rawQty * stdPcsPerGbl;
+      reams = stdSheets > 0 ? sheets / stdSheets : 0;
+      kg = reams * reamWeight;
+    } else if (unit === 'REAM' || unit === 'REAMS') {
+      reams = rawQty;
+      sheets = rawQty * stdSheets;
+      gbl = stdPcsPerGbl > 0 ? sheets / stdPcsPerGbl : 0;
+      kg = reams * reamWeight;
+    } else if (unit === 'KG') {
+      kg = rawQty;
+      reams = reamWeight > 0 ? kg / reamWeight : 0;
+      sheets = reams * stdSheets;
+      gbl = stdPcsPerGbl > 0 ? sheets / stdPcsPerGbl : 0;
+    } else {
+      // Default: unit is Sheets, PCS, Pcs, etc. (rawQty represents total sheets)
+      sheets = rawQty;
+      reams = stdSheets > 0 ? rawQty / stdSheets : 0;
+      gbl = stdPcsPerGbl > 0 ? rawQty / stdPcsPerGbl : 0;
+      kg = reams * reamWeight;
+    }
+
+    return {
+      paperType: 'Sheets',
+      isSheets: true,
+      isReels: false,
+      isFg: false,
+      reelsCount: 0,
+      reams,
+      sheets,
+      gbl,
+      kgWeight: kg,
+      reamWeight,
+      stdSheets,
+      stdPcsPerGbl,
+      unit
+    };
+  }
+
+  if (isReels) {
+    let reelsCount = 0;
+    let reelsKg = 0;
+    if (item?.reels && item.reels.length > 0) {
+      reelsCount = item.reels.length;
+      reelsKg = item.reels.reduce((s: number, r: any) => s + (Number(r.weight) || 0), 0);
+    } else {
+      reelsCount = Number(item?.reelsCount) || 1;
+      reelsKg = rawQty;
+    }
+
+    return {
+      paperType: 'Reels',
+      isSheets: false,
+      isReels: true,
+      isFg: false,
+      reelsCount,
+      reams: 0,
+      sheets: 0,
+      gbl: 0,
+      kgWeight: reelsKg > 0 ? reelsKg : rawQty,
+      reamWeight: 0,
+      stdSheets: 0,
+      stdPcsPerGbl: 0,
+      unit: 'KG'
+    };
+  }
+
+  return {
+    paperType: paperType || 'None',
+    isSheets: false,
+    isReels: false,
+    isFg: true,
+    reelsCount: 0,
+    reams: 0,
+    sheets: 0,
+    gbl: unit === 'GBL' ? rawQty : 0,
+    kgWeight: 0,
+    reamWeight: 0,
+    stdSheets: 0,
+    stdPcsPerGbl: 0,
+    unit
+  };
+};
+
 const InvoiceTable: React.FC<InvoiceTableProps> = ({ 
   invoices, 
   loading, 
@@ -143,27 +271,10 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
               let totalKgWeight = 0;
 
               inv.items?.forEach((item) => {
-                const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
-                const fullSku = skus.find(s => s._id === (resolvedSku?._id || item.skuId)) || resolvedSku;
-                const paperType = resolvedSku?.paperType || fullSku?.paperType;
-                if (paperType === 'Sheets') {
-                  const stdSheets = resolvedSku?.pages || fullSku?.pages || 500;
-                  const reamWeight = item.reamWeight || resolvedSku?.reamWeight || fullSku?.reamWeight || getFallbackReamWeight(fullSku || resolvedSku) || 0;
-                  const itemReams = (item.quantity || 0) / stdSheets;
-                  totalReamsCount += itemReams;
-                  totalKgWeight += itemReams * reamWeight;
-                } else if (item.reels && item.reels.length > 0) {
-                  totalReelsCount += item.reels.length;
-                  const reelsWt = item.reels.reduce((s, r) => s + (Number(r.weight) || 0), 0);
-                  totalKgWeight += reelsWt > 0 ? reelsWt : (item.quantity || 0);
-                } else if (paperType === 'Reels') {
-                  totalReelsCount += Number(item.reelsCount) || 1;
-                  totalKgWeight += item.quantity || 0;
-                } else if (resolvedSku?.category === 'products' || fullSku?.category === 'products' || item.unit === 'GBL' || item.altUnit === 'PCS') {
-                  // Finished goods (tracked in GBL / PCS, not KG)
-                } else {
-                  totalKgWeight += item.quantity || 0;
-                }
+                const m = getItemMetrics(item, skus);
+                totalReelsCount += m.reelsCount;
+                totalReamsCount += m.reams;
+                totalKgWeight += m.kgWeight;
               });
 
               // Grand Total (Last total value with all internal expenses & freight)
@@ -880,21 +991,8 @@ const PurchaseInvoicePage: React.FC = () => {
       const materialName = firstItem && typeof firstItem.skuId === 'object' && firstItem.skuId !== null ? (firstItem.skuId as any).name : 'Raw Material';
       let totalKgWeight = 0;
       inv.items?.forEach(item => {
-        const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
-        const fullSku = skus.find(s => s._id === (resolvedSku?._id || item.skuId)) || resolvedSku;
-        if (resolvedSku?.paperType === 'Sheets' || fullSku?.paperType === 'Sheets') {
-          const stdSheets = resolvedSku?.pages || fullSku?.pages || 500;
-          const reamWeight = item.reamWeight || resolvedSku?.reamWeight || fullSku?.reamWeight || getFallbackReamWeight(fullSku || resolvedSku) || 0;
-          const itemReams = (item.quantity || 0) / stdSheets;
-          totalKgWeight += itemReams * reamWeight;
-        } else if (item.reels && item.reels.length > 0) {
-          const reelsWt = item.reels.reduce((s, r) => s + (Number(r.weight) || 0), 0);
-          totalKgWeight += reelsWt > 0 ? reelsWt : (item.quantity || 0);
-        } else if (resolvedSku?.category === 'products' || fullSku?.category === 'products' || item.unit === 'GBL' || item.altUnit === 'PCS') {
-          // Finished goods (tracked in GBL / PCS, not KG)
-        } else {
-          totalKgWeight += item.quantity || 0;
-        }
+        const m = getItemMetrics(item, skus);
+        totalKgWeight += m.kgWeight;
       });
 
       const grandTotal = inv.grandTotal || ((inv.subTotal || 0) + (inv.freight || 0) + (inv.craneCharges || 0) + (inv.otherCharges || 0) + (inv.taxAmount || 0));
@@ -995,28 +1093,10 @@ const PurchaseInvoicePage: React.FC = () => {
         let totalKg = 0;
 
         inv.items?.forEach(item => {
-          const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
-          const fullSku = skus.find(s => s._id === (resolvedSku?._id || item.skuId)) || resolvedSku;
-          const paperType = resolvedSku?.paperType || fullSku?.paperType;
-
-          if (paperType === 'Sheets') {
-            const stdSheets = resolvedSku?.pages || fullSku?.pages || 500;
-            const reamWeight = item.reamWeight || resolvedSku?.reamWeight || fullSku?.reamWeight || getFallbackReamWeight(fullSku || resolvedSku) || 0;
-            const itemReams = (item.quantity || 0) / stdSheets;
-            reamsCount += itemReams;
-            totalKg += itemReams * reamWeight;
-          } else if (item.reels && item.reels.length > 0) {
-            reelsCount += item.reels.length;
-            const reelsWt = item.reels.reduce((s, r) => s + (Number(r.weight) || 0), 0);
-            totalKg += reelsWt > 0 ? reelsWt : (item.quantity || 0);
-          } else if (paperType === 'Reels') {
-            reelsCount += Number(item.reelsCount) || 1;
-            totalKg += item.quantity || 0;
-          } else if (resolvedSku?.category === 'products' || fullSku?.category === 'products' || item.unit === 'GBL' || item.altUnit === 'PCS') {
-            // Finished goods (tracked in GBL / PCS, not KG)
-          } else {
-            totalKg += item.quantity || 0;
-          }
+          const m = getItemMetrics(item, skus);
+          reelsCount += m.reelsCount;
+          reamsCount += m.reams;
+          totalKg += m.kgWeight;
         });
 
         if (inv.status !== 'Cancelled') {
@@ -1729,16 +1809,55 @@ const PurchaseInvoicePage: React.FC = () => {
         const skuIdVal = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any)._id : item.skuId;
         const selectedSku = skus.find(s => s._id === skuIdVal);
         const locIdVal = typeof item.locationId === 'object' && item.locationId !== null ? (item.locationId as any)._id : item.locationId;
+        
+        const isSheetItem = selectedSku?.paperType === 'Sheets';
+        const stdSheets = Number(item.sheetsPerReam) || Number((selectedSku as any)?.pages) || Number((selectedSku as any)?.sheetsPerReam) || 500;
+        const stdPcsPerGbl = Number(item.pcsPerGbl) || Number((selectedSku as any)?.altUnitConversion) || 100;
+        const itemUnit = String(item.unit || selectedSku?.unit || '').trim().toUpperCase();
+
+        const rawQty = Number(item.quantity) || 0;
+        let initialSheets = rawQty;
+        let initialGbl = '';
+        let initialPricePerSheet = Number(item.purchasePrice) || 0;
+
+        if (isSheetItem) {
+          if (itemUnit === 'GBL') {
+            initialSheets = rawQty * stdPcsPerGbl;
+            initialGbl = String(rawQty);
+            initialPricePerSheet = stdPcsPerGbl > 0 ? (initialPricePerSheet / stdPcsPerGbl) : initialPricePerSheet;
+          } else if (itemUnit === 'REAM' || itemUnit === 'REAMS') {
+            initialSheets = rawQty * stdSheets;
+            initialGbl = stdPcsPerGbl > 0 ? String(initialSheets / stdPcsPerGbl) : '';
+            initialPricePerSheet = stdSheets > 0 ? (initialPricePerSheet / stdSheets) : initialPricePerSheet;
+          } else {
+            // Unit is Sheets or PCS
+            initialSheets = rawQty;
+            initialGbl = stdPcsPerGbl > 0 ? String(rawQty / stdPcsPerGbl) : '';
+          }
+        }
+
         const mappedReels = (item.reels || []).map(r => ({
           ...r,
           locationId: typeof r.locationId === 'object' && r.locationId !== null ? (r.locationId as any)._id : (r.locationId || locIdVal)
         }));
+
         const mappedSplits = (item.splits && item.splits.length > 0)
-          ? item.splits.map(s => ({
-              locationId: typeof s.locationId === 'object' && s.locationId !== null ? (s.locationId as any)._id : s.locationId,
-              quantity: String(s.quantity !== undefined && s.quantity !== null ? s.quantity : '0')
-            }))
-          : (locIdVal ? [{ locationId: locIdVal, quantity: String(item.quantity !== undefined && item.quantity !== null ? item.quantity : '0') }] : []);
+          ? item.splits.map(s => {
+              const rawSplitQty = Number(s.quantity !== undefined && s.quantity !== null ? s.quantity : '0') || 0;
+              let splitSheets = rawSplitQty;
+              if (isSheetItem) {
+                if (itemUnit === 'GBL') {
+                  splitSheets = rawSplitQty * stdPcsPerGbl;
+                } else if (itemUnit === 'REAM' || itemUnit === 'REAMS') {
+                  splitSheets = rawSplitQty * stdSheets;
+                }
+              }
+              return {
+                locationId: typeof s.locationId === 'object' && s.locationId !== null ? (s.locationId as any)._id : s.locationId,
+                quantity: String(splitSheets)
+              };
+            })
+          : (locIdVal ? [{ locationId: locIdVal, quantity: String(initialSheets) }] : []);
 
         return {
           skuId: skuIdVal,
@@ -1761,17 +1880,16 @@ const PurchaseInvoicePage: React.FC = () => {
             return l;
           })(),
           reelsCount: String(item.reels?.length || 0),
-          quantity: String(item.quantity !== undefined && item.quantity !== null ? item.quantity : ''),
+          quantity: String(initialSheets),
           altQuantity: selectedSku?.altUnit && selectedSku?.altUnitConversion
-            ? String(convertPrimaryToAlt(Number(item.quantity) || 0, selectedSku))
+            ? String(convertPrimaryToAlt(initialSheets, selectedSku))
             : '',
-          purchasePrice: item.purchasePrice !== undefined && item.purchasePrice !== null ? String(item.purchasePrice) : '',
+          purchasePrice: String(initialPricePerSheet),
           reamWeight: item.reamWeight ? String(item.reamWeight) : ((selectedSku as any)?.reamWeight ? String((selectedSku as any).reamWeight) : ''),
           ratePerKg: item.ratePerKg ? String(item.ratePerKg) : (() => {
             const rw = item.reamWeight || (selectedSku as any)?.reamWeight || 0;
-            const stdSheets = selectedSku?.pages || 500;
-            if (rw > 0 && item.purchasePrice) {
-              return String((Number(item.purchasePrice) * stdSheets) / rw);
+            if (rw > 0 && initialPricePerSheet > 0) {
+              return String(Math.round(((initialPricePerSheet * stdSheets) / rw) * 100) / 100);
             }
             return '';
           })(),
@@ -1779,12 +1897,9 @@ const PurchaseInvoicePage: React.FC = () => {
           locationId: locIdVal,
           splits: mappedSplits,
           reels: mappedReels,
-          sheetsPerReam: (selectedSku as any)?.pages || (selectedSku as any)?.sheetsPerReam || 500,
-          pcsPerGbl: (selectedSku as any)?.altUnitConversion || (selectedSku as any)?.pcsPerGbl || 100,
-          gblQuantity: (() => {
-            const conv = Number((selectedSku as any)?.altUnitConversion) || 100;
-            return item.quantity ? String(Number(item.quantity) / conv) : '';
-          })()
+          sheetsPerReam: stdSheets,
+          pcsPerGbl: stdPcsPerGbl,
+          gblQuantity: initialGbl
         };
       })
     });
@@ -2090,22 +2205,14 @@ const PurchaseInvoicePage: React.FC = () => {
         dashboardTotalValue += finalVal;
 
         inv.items?.forEach(item => {
-          const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
-          const skuIdStr = resolvedSku?._id || (typeof item.skuId === 'string' ? item.skuId : '');
-          const fullSku = (skuIdStr ? skuMap.get(skuIdStr) : null) || resolvedSku;
-          const paperType = resolvedSku?.paperType || fullSku?.paperType;
-          if (paperType === 'Sheets') {
+          const m = getItemMetrics(item, skuMap);
+          if (m.isSheets) {
             hasAnySheets = true;
-            const stdSheets = resolvedSku?.pages || fullSku?.pages || 500;
-            const itemReams = (item.quantity || 0) / stdSheets;
-            dashboardTotalReams += itemReams;
-            dashboardTotalSheets += item.quantity || 0;
-          } else if (item.reels && item.reels.length > 0) {
+            dashboardTotalReams += m.reams;
+            dashboardTotalSheets += m.sheets;
+          } else if (m.isReels) {
             hasAnyReels = true;
-            dashboardTotalReels += item.reels.length;
-          } else if (paperType === 'Reels') {
-            hasAnyReels = true;
-            dashboardTotalReels += Number(item.reelsCount) || 1;
+            dashboardTotalReels += m.reelsCount;
           }
         });
       }
@@ -3087,10 +3194,13 @@ const PurchaseInvoicePage: React.FC = () => {
 
                         return (
                           <div className="col-span-1 sm:col-span-2 lg:col-span-4 space-y-3 mt-1">
-                            {/* 1st line: QTY in GBL (Primary), QTY in reams (Auto), sheets/ ream, sheets/ GBL */}
+                            {/* 1st line: QTY IN GBL (First), RATE / KG (Second), QTY IN REAMS (Third), SHEETS / REAM (Fourth) */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                               <div>
-                                <label className="block text-[11px] font-semibold text-blue-600 mb-1">QTY IN GBL *</label>
+                                <label className="block text-[11px] font-semibold text-blue-600 mb-1 flex items-center justify-between">
+                                  <span>QTY IN GBL *</span>
+                                  <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">PRIMARY</span>
+                                </label>
                                 <input
                                   type="number"
                                   step="any"
@@ -3104,15 +3214,15 @@ const PurchaseInvoicePage: React.FC = () => {
                                       updatedItems[idx].quantity = '';
                                     } else {
                                       const gbl = Number(rawVal);
-                                      const calcTotalSheets = !isNaN(gbl) ? gbl * stdPcsPerGbl : 0;
+                                      const calcTotalSheets = !isNaN(gbl) ? gbl * stdSheets : 0;
                                       updatedItems[idx].quantity = String(calcTotalSheets);
-                                      
+
                                       const firstStorage = locations.find(loc => loc.level === 'Storage Location');
                                       const defaultLocId = updatedItems[idx].locationId || firstStorage?._id || '';
                                       if (!updatedItems[idx].splits || updatedItems[idx].splits.length <= 1) {
                                         updatedItems[idx].splits = [{ locationId: defaultLocId, quantity: String(calcTotalSheets) }];
                                       }
-                                      
+
                                       if (reamWeightNum > 0 && ratePerKgNum > 0) {
                                         updatedItems[idx].purchasePrice = String((reamWeightNum * ratePerKgNum) / stdSheets);
                                       }
@@ -3125,15 +3235,63 @@ const PurchaseInvoicePage: React.FC = () => {
                               </div>
 
                               <div>
-                                <label className="block text-[11px] font-semibold text-gray-500 mb-1 flex items-center justify-between">
+                                <label className="block text-[11px] font-semibold text-blue-600 mb-1">RATE / KG (₹) *</label>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  placeholder="e.g. 80"
+                                  value={item.ratePerKg || ''}
+                                  onChange={e => {
+                                    const rkg = e.target.value;
+                                    const updatedItems = [...invoiceForm.items];
+                                    updatedItems[idx].ratePerKg = rkg;
+                                    
+                                    const rkgNum = Number(rkg) || 0;
+                                    if (reamWeightNum > 0 && rkgNum > 0 && stdSheets > 0) {
+                                      updatedItems[idx].purchasePrice = String((reamWeightNum * rkgNum) / stdSheets);
+                                    }
+                                    setInvoiceForm({ ...invoiceForm, items: updatedItems });
+                                  }}
+                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-right font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                                  required
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-indigo-600 mb-1 flex items-center justify-between">
                                   <span>QTY IN REAMS</span>
-                                  <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">AUTO</span>
+                                  <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100">SYNC</span>
                                 </label>
                                 <input
-                                  type="text"
-                                  value={reamsVal > 0 ? `${(reamsVal % 1 === 0 ? reamsVal : Number(reamsVal.toFixed(4)))} Reams` : '0 Reams'}
-                                  disabled
-                                  className="w-full px-3 py-2 border border-gray-200 bg-gray-50/80 rounded-xl text-xs text-right font-bold text-gray-700 cursor-not-allowed"
+                                  type="number"
+                                  step="any"
+                                  placeholder="0"
+                                  value={reamsVal > 0 ? (reamsVal % 1 === 0 ? reamsVal : Number(reamsVal.toFixed(4))) : ''}
+                                  onChange={e => {
+                                    const rawVal = e.target.value;
+                                    const updatedItems = [...invoiceForm.items];
+                                    if (rawVal === '' || rawVal === null || rawVal === undefined) {
+                                      updatedItems[idx].quantity = '';
+                                      updatedItems[idx].gblQuantity = '';
+                                    } else {
+                                      const reams = Number(rawVal);
+                                      const calcTotalSheets = !isNaN(reams) ? reams * stdSheets : 0;
+                                      updatedItems[idx].quantity = String(calcTotalSheets);
+                                      updatedItems[idx].gblQuantity = String(reams);
+
+                                      const firstStorage = locations.find(loc => loc.level === 'Storage Location');
+                                      const defaultLocId = updatedItems[idx].locationId || firstStorage?._id || '';
+                                      if (!updatedItems[idx].splits || updatedItems[idx].splits.length <= 1) {
+                                        updatedItems[idx].splits = [{ locationId: defaultLocId, quantity: String(calcTotalSheets) }];
+                                      }
+
+                                      if (reamWeightNum > 0 && ratePerKgNum > 0) {
+                                        updatedItems[idx].purchasePrice = String((reamWeightNum * ratePerKgNum) / stdSheets);
+                                      }
+                                    }
+                                    setInvoiceForm({ ...invoiceForm, items: updatedItems });
+                                  }}
+                                  className="w-full px-3 py-2 border border-indigo-200 bg-indigo-50/20 rounded-xl text-xs text-right font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                                 />
                               </div>
 
@@ -3167,36 +3325,9 @@ const PurchaseInvoicePage: React.FC = () => {
                                   required
                                 />
                               </div>
-
-                              <div>
-                                <label className="block text-[11px] font-semibold text-indigo-600 mb-1">SHEETS / GBL</label>
-                                <input
-                                  type="number"
-                                  step="any"
-                                  value={item.pcsPerGbl !== undefined && item.pcsPerGbl !== null && item.pcsPerGbl !== '' ? item.pcsPerGbl : stdPcsPerGbl}
-                                  onChange={e => {
-                                    const val = Number(e.target.value) || 100;
-                                    const updatedItems = [...invoiceForm.items];
-                                    updatedItems[idx].pcsPerGbl = String(val);
-
-                                    if (item.gblQuantity) {
-                                      const gbl = Number(item.gblQuantity) || 0;
-                                      const calcTotalSheets = gbl * val;
-                                      updatedItems[idx].quantity = String(calcTotalSheets);
-                                      if (!updatedItems[idx].splits || updatedItems[idx].splits.length <= 1) {
-                                        const firstStorage = locations.find(loc => loc.level === 'Storage Location');
-                                        const defaultLocId = updatedItems[idx].locationId || firstStorage?._id || '';
-                                        updatedItems[idx].splits = [{ locationId: defaultLocId, quantity: String(calcTotalSheets) }];
-                                      }
-                                    }
-                                    setInvoiceForm({ ...invoiceForm, items: updatedItems });
-                                  }}
-                                  className="w-full px-3 py-2 border border-indigo-200 bg-indigo-50/20 rounded-xl text-xs text-center font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 shadow-2xs"
-                                />
-                              </div>
                             </div>
 
-                            {/* 2nd line: ream weight, rate per kg, rate per sheet, rate per GBL */}
+                            {/* 2nd line: ream weight, sheets / GBL, rate per sheet, rate per GBL */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                               <div>
                                 <label className="block text-[11px] font-semibold text-blue-600 mb-1 flex items-center justify-between">
@@ -3223,6 +3354,22 @@ const PurchaseInvoicePage: React.FC = () => {
                                   }}
                                   className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-right font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
                                   required
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-indigo-600 mb-1">SHEETS / GBL</label>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  value={item.pcsPerGbl !== undefined && item.pcsPerGbl !== null && item.pcsPerGbl !== '' ? item.pcsPerGbl : stdPcsPerGbl}
+                                  onChange={e => {
+                                    const val = Number(e.target.value) || 100;
+                                    const updatedItems = [...invoiceForm.items];
+                                    updatedItems[idx].pcsPerGbl = String(val);
+                                    setInvoiceForm({ ...invoiceForm, items: updatedItems });
+                                  }}
+                                  className="w-full px-3 py-2 border border-indigo-200 bg-indigo-50/20 rounded-xl text-xs text-center font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                                 />
                               </div>
 
@@ -3996,28 +4143,20 @@ const PurchaseInvoicePage: React.FC = () => {
             let hasFg = false;
 
             selectedInvoice.items?.forEach(item => {
-              const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
-              const fullSku = skus.find(s => s._id === (resolvedSku?._id || item.skuId)) || resolvedSku;
-              const isFgItem = (resolvedSku?.category === 'products') || (fullSku?.category === 'products') || (item.unit === 'GBL') || (item.altUnit === 'PCS');
-              if (resolvedSku?.paperType === 'Sheets' || fullSku?.paperType === 'Sheets') {
+              const m = getItemMetrics(item, skus);
+              if (m.isSheets) {
                 hasSheets = true;
-                const stdSheets = resolvedSku?.pages || fullSku?.pages || 500;
-                const reamWeight = item.reamWeight || resolvedSku?.reamWeight || fullSku?.reamWeight || getFallbackReamWeight(fullSku || resolvedSku) || 0;
-                const itemReams = (item.quantity || 0) / stdSheets;
-                totalReamsCount += itemReams;
-                totalSheetsCount += item.quantity || 0;
-                totalKgWeight += itemReams * reamWeight;
-              } else if (item.reels && item.reels.length > 0) {
+                totalReamsCount += m.reams;
+                totalSheetsCount += m.sheets;
+                totalKgWeight += m.kgWeight;
+              } else if (m.isReels) {
                 hasReels = true;
-                totalReelsCount += item.reels.length;
-                const reelsWt = item.reels.reduce((s, r) => s + (Number(r.weight) || 0), 0);
-                totalKgWeight += reelsWt > 0 ? reelsWt : (item.quantity || 0);
-              } else if (resolvedSku?.paperType === 'Reels' || fullSku?.paperType === 'Reels') {
-                hasReels = true;
-                totalReelsCount += Number(item.reelsCount) || 1;
-                totalKgWeight += item.quantity || 0;
-              } else if (isFgItem) {
+                totalReelsCount += m.reelsCount;
+                totalKgWeight += m.kgWeight;
+              } else if (m.isFg) {
                 hasFg = true;
+                const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
+                const fullSku = skus.find(s => s._id === (resolvedSku?._id || item.skuId)) || resolvedSku;
                 const activeSku = fullSku || resolvedSku;
                 // Use actual SKU master altUnitConversion for GBL<->PCS conversion
                 const gblQty = item.unit === 'GBL' ? (item.quantity || 0) : (item.altUnit === 'GBL' ? (item.altQuantity || 0) : (item.quantity || 0));
@@ -4227,27 +4366,18 @@ const PurchaseInvoicePage: React.FC = () => {
                             if (widthMatch) widthVal = widthMatch[1];
                           }
 
-                          // Quantity KG / Units resolution
-                          let displayQtyKg = item.quantity || 0;
-                          const isSheets = (resolvedSku?.paperType === 'Sheets') || (fullSku?.paperType === 'Sheets');
-                          const isFgItem = (resolvedSku?.category === 'products') || (fullSku?.category === 'products') || (item.unit === 'GBL') || (item.altUnit === 'PCS');
+                          // Quantity KG / Units resolution using getItemMetrics
+                          const m = getItemMetrics(item, skus);
+                          const isFgItem = m.isFg;
+                          let displayQtyKg = m.kgWeight;
                           let itemUnitDisplay = '—';
 
-                          if (isSheets) {
-                            const stdSheets = resolvedSku?.pages || fullSku?.pages || 500;
-                            const reamWeight = item.reamWeight || resolvedSku?.reamWeight || fullSku?.reamWeight || getFallbackReamWeight(fullSku || resolvedSku) || 0;
-                            const reams = (item.quantity || 0) / stdSheets;
-                            if (reamWeight > 0) {
-                              displayQtyKg = reams * reamWeight;
-                            }
-                            itemUnitDisplay = reams > 0 ? `${reams.toLocaleString('en-IN', { maximumFractionDigits: 2 })} Rm` : '—';
-                          } else if (item.reels && item.reels.length > 0) {
-                            const reelsTotalWt = item.reels.reduce((sum, r) => sum + (Number(r.weight) || 0), 0);
-                            if (reelsTotalWt > 0) displayQtyKg = reelsTotalWt;
-                            itemUnitDisplay = `${item.reels.length} ${item.reels.length === 1 ? 'Reel' : 'Reels'}`;
+                          if (m.isSheets) {
+                            itemUnitDisplay = m.reams > 0 ? `${m.reams.toLocaleString('en-IN', { maximumFractionDigits: 2 })} Rm` : '—';
+                          } else if (m.isReels) {
+                            itemUnitDisplay = `${m.reelsCount} ${m.reelsCount === 1 ? 'Reel' : 'Reels'}`;
                           } else if (isFgItem) {
                             const activeSku = fullSku || resolvedSku;
-                            // Dynamically compute GBL->PCS using actual SKU master altUnitConversion
                             const gblQty = item.unit === 'GBL' ? (item.quantity || 0) : (item.altUnit === 'GBL' ? (item.altQuantity || 0) : (item.quantity || 0));
                             let pcsQty: number;
                             if (item.altUnit === 'PCS' || item.altUnit === 'PC' || item.altUnit === 'NOS') {
@@ -4263,7 +4393,7 @@ const PurchaseInvoicePage: React.FC = () => {
                             const gblLabel = activeSku?.unit || item.unit || 'GBL';
                             itemUnitDisplay = `${gblQty} ${gblLabel}`;
                           } else {
-                            itemUnitDisplay = `1 Reel`;
+                            itemUnitDisplay = `1 Lot`;
                           }
 
                           // Base Rate
