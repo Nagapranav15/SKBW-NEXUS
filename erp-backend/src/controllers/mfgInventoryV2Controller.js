@@ -2886,15 +2886,39 @@ exports.recordAdjustment = async (req, res, next) => {
       return res.status(404).json({ msg: "Location not found" });
     }
 
-    const zone = await WarehouseLocationV2.findOne({ _id: locationDoc.parentId, company: companyObjId });
-    const floor = zone ? await WarehouseLocationV2.findOne({ _id: zone.parentId, company: companyObjId }) : null;
-    const warehouse = floor ? await WarehouseLocationV2.findOne({ _id: floor.parentId, company: companyObjId }) : null;
+    const locH = await getHierarchy(locObjId, companyObjId, session);
 
-    const matchCriteria = { skuId: skuObjId, locationId: locObjId, company: companyObjId };
-    if (batchNumber) matchCriteria.batchNumber = batchNumber;
+    // Support multi-batch adjustments if batches array is passed, otherwise single adjustment
+    const itemsToAdjust = (Array.isArray(req.body.batches) && req.body.batches.length > 0)
+      ? req.body.batches.map(b => ({
+          batchNumber: b.batchNumber || batchNumber || "UNKNOWN",
+          quantity: Number(b.quantity || b.adjustmentQty || 0),
+          rate: Number(b.rate || 0),
+          reels: b.reels || []
+        })).filter(b => !isNaN(b.quantity) && b.quantity !== 0)
+      : [{
+          batchNumber: batchNumber || "UNKNOWN",
+          quantity: diffQty,
+          rate: Number(req.body.rate || 0),
+          reels: req.body.reels || []
+        }];
 
+    if (itemsToAdjust.length === 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ msg: "No valid adjustment quantities provided" });
+    }
+
+    // Get current overall balance at this location
     const currentLedgerAgg = await InventoryLedger.aggregate([
-      { $match: matchCriteria },
+      { 
+        $match: { 
+          skuId: skuObjId, 
+          locationId: locObjId, 
+          company: companyObjId,
+          status: { $ne: "Cancelled" }
+        } 
+      },
       {
         $group: {
           _id: null,
@@ -2905,52 +2929,60 @@ exports.recordAdjustment = async (req, res, next) => {
           }
         }
       }
-    ]);
-    const currentOnHand = currentLedgerAgg.length > 0 ? currentLedgerAgg[0].onHand : 0;
-    const isIncrease = diffQty > 0;
-    const absQty = Math.abs(diffQty);
-    const newBalance = isIncrease ? currentOnHand + absQty : (currentOnHand - absQty);
+    ]).session(session);
+    let runningBalance = currentLedgerAgg.length > 0 ? currentLedgerAgg[0].onHand : 0;
+    const initialBalance = runningBalance;
 
-    const referenceId = `ADJ-${Date.now()}`;
-    const transactionNumber = await Sequence.getNextSequence("IL", session);
+    const referenceId = req.body.referenceNumber || `ADJ-${Date.now()}`;
+    const userId = req.user ? toObjectId(req.user.id || req.user._id) : null;
 
-    // 1. Primary InventoryLedger
-    const primAdj = new InventoryLedger({
-      transactionNumber,
-      transactionType: "Adjustment",
-      skuId: skuObjId,
-      quantity: absQty,
-      unit: skuDoc.unit || "kg",
-      direction: isIncrease ? "IN" : "OUT",
-      referenceType: "StockAdjustment",
-      referenceId,
-      batchNumber: batchNumber || "UNKNOWN",
-      warehouseId: warehouse?._id || locObjId,
-      floorId: floor?._id || locObjId,
-      zoneId: zone?._id || locObjId,
-      locationId: locObjId,
-      remarks: remarks || `Stock Adjustment (${adjustmentType || 'General'}): ${reason || 'Physical Count Reconciliation'}`,
-      createdBy: toObjectId(req.user?.id),
-      company: companyObjId,
-      status: "Posted"
-    });
-    await primAdj.save({ session });
+    for (const item of itemsToAdjust) {
+      const isItemIncrease = item.quantity > 0;
+      const absItemQty = Math.abs(item.quantity);
+      runningBalance = isItemIncrease ? (runningBalance + absItemQty) : (runningBalance - absItemQty);
 
-    // 2. V2 Audit Ledger
-    const ledgerAdj = new InventoryLedgerV2({
-      transactionType: "Stock Adjustment",
-      referenceId,
-      skuId: skuObjId,
-      locationId: locObjId,
-      qtyIn: isIncrease ? absQty : 0,
-      qtyOut: isIncrease ? 0 : absQty,
-      balanceAfter: newBalance,
-      batchNumber: batchNumber || "UNKNOWN",
-      company: companyObjId,
-      remarks: `${adjustmentType || 'Adjustment'}: ${reason || ''} | ${remarks || ''}`.trim(),
-      userId: toObjectId(req.user?.id)
-    });
-    await ledgerAdj.save({ session });
+      const transactionNumber = await Sequence.getNextSequence("IL", session);
+
+      // 1. Primary InventoryLedger
+      const primAdj = new InventoryLedger({
+        transactionNumber,
+        transactionType: "Adjustment",
+        skuId: skuObjId,
+        quantity: absItemQty,
+        unit: skuDoc.unit || "kg",
+        direction: isItemIncrease ? "IN" : "OUT",
+        referenceType: "StockAdjustment",
+        referenceId,
+        batchNumber: item.batchNumber || "UNKNOWN",
+        warehouseId: locH.warehouseId,
+        floorId: locH.floorId,
+        zoneId: locH.zoneId,
+        locationId: locH.locationId,
+        reels: item.reels || [],
+        remarks: remarks || `Stock Adjustment (${adjustmentType || 'General'}): ${reason || 'Physical Count Reconciliation'}`,
+        createdBy: userId,
+        company: companyObjId,
+        status: "Posted"
+      });
+      await primAdj.save({ session });
+
+      // 2. V2 Audit Ledger
+      const ledgerAdj = new InventoryLedgerV2({
+        transactionType: "Stock Adjustment",
+        referenceId,
+        skuId: skuObjId,
+        locationId: locObjId,
+        qtyIn: isItemIncrease ? absItemQty : 0,
+        qtyOut: isItemIncrease ? 0 : absItemQty,
+        balanceAfter: runningBalance,
+        batchNumber: item.batchNumber || "UNKNOWN",
+        reels: item.reels || [],
+        company: companyObjId,
+        remarks: `${adjustmentType || 'Adjustment'}: ${reason || ''} | ${remarks || ''}`.trim(),
+        userId: userId
+      });
+      await ledgerAdj.save({ session });
+    }
 
     await session.commitTransaction();
     session.endSession();
@@ -2959,9 +2991,10 @@ exports.recordAdjustment = async (req, res, next) => {
     res.status(201).json({
       msg: "Stock adjustment recorded successfully",
       referenceId,
-      previousBalance: currentOnHand,
+      previousBalance: initialBalance,
       adjustmentQty: diffQty,
-      newBalance
+      newBalance: runningBalance,
+      adjustedItemsCount: itemsToAdjust.length
     });
   } catch (err) {
     await session.abortTransaction();

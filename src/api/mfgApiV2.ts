@@ -443,6 +443,15 @@ export interface StockAdjustmentPayload {
   reason: string;
   remarks?: string;
   batchNumber?: string;
+  referenceNumber?: string;
+  rate?: number;
+  reels?: any[];
+  batches?: Array<{
+    batchNumber?: string;
+    quantity: number;
+    rate?: number;
+    reels?: any[];
+  }>;
 }
 
 export const getSkuStockDetailsV2 = async (skuId: string, companyId: string): Promise<SkuStockDetailsResponse> => {
