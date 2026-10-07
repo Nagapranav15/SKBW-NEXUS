@@ -1272,6 +1272,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                 (raw.skuCode && (raw.skuCode.toUpperCase().startsWith('SM-') || raw.skuCode.toUpperCase().startsWith('FG-'))) ||
                                 (raw.code && (raw.code.toUpperCase().startsWith('SM-') || raw.code.toUpperCase().startsWith('FG-')));
 
+        const isBoardItem = (matchedSku && ((matchedSku.category || (matchedSku as any).group || '').toLowerCase().includes('board') || (matchedSku.name || '').toLowerCase().includes('(board)'))) || (raw.name && /board/i.test(raw.name));
+
         const isRawItem = !isSemiOrProduct && (
                           (matchedSku && getItemClassification(matchedSku) === 'materials') ||
                           (raw.skuCode && raw.skuCode.toUpperCase().startsWith('RM-')) ||
@@ -1280,7 +1282,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                           (raw.name && /reel/i.test(raw.name)));
 
         let resolvedUom = raw.uom || matchedSku?.unit || raw.unit || 'PCS';
-        if (isRawItem && (resolvedUom.toUpperCase() === 'GBL' || !resolvedUom)) {
+        if ((isRawItem || isBoardItem) && (resolvedUom.toUpperCase() === 'GBL' || !resolvedUom || isBoardItem)) {
           resolvedUom = (matchedSku?.unit && matchedSku.unit.toUpperCase() !== 'GBL') ? matchedSku.unit : 'PCS';
         }
 

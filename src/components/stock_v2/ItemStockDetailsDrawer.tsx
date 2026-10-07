@@ -539,11 +539,20 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
     showToast('Reels exported to Excel', 'success');
   };
 
+  // Board item detection to enforce 1 PCS = 1 parent board sheet
+  const isBoardItem = useMemo(() => {
+    if (!sku) return false;
+    const cat = (sku.category || (sku as any).group || '').toLowerCase();
+    const name = (sku.name || '').toLowerCase();
+    const rule = ((sku as any).ruleType || '').toLowerCase();
+    return cat.includes('board') || name.includes('(board)') || rule.includes('board');
+  }, [sku]);
+
   // Summary Metrics
-  const unit = sku?.unit || 'GBL';
-  const altUnit = sku?.altUnit || 'PCS';
+  const unit = isBoardItem ? (sku?.unit && sku.unit.toUpperCase() !== 'GBL' ? sku.unit : 'PCS') : (sku?.unit || 'GBL');
+  const altUnit = isBoardItem ? '' : (sku?.altUnit || 'PCS');
   // Use actual SKU master altUnitConversion — no hardcoded fallback
-  const conversionFactor = Number(sku?.altUnitConversion) || 0;
+  const conversionFactor = isBoardItem ? 1 : (Number(sku?.altUnitConversion) || 0);
 
   const totalStock = summary ? summary.onHand : (Number((sku as any)?.preparedStock ?? (sku as any)?.onHand ?? (sku as any)?.presentStock) || 0);
   const reservedStock = (summary && summary.reserved !== undefined && summary.reserved > 0) ? summary.reserved : (Number((sku as any)?.reserved) || 0);
@@ -699,7 +708,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
   const totalBatchesCount = batchesList.length;
   const totalBatchQty = batchesList.reduce((sum, b) => sum + (b.remainingQty || 0), 0);
   const totalBatchValue = batchesList.reduce((sum, b) => sum + (b.value || 0), 0);
-  const avgBatchRate = totalBatchQty > 0 ? Math.round(totalBatchValue / totalBatchQty) : 0;
+  const avgBatchRate = totalBatchQty > 0 ? (totalBatchValue / totalBatchQty) : 0;
   const batchRates = batchesList.map(b => b.rate).filter(r => r > 0);
   const highestBatchRate = batchRates.length > 0 ? Math.max(...batchRates) : avgBatchRate;
   const lowestBatchRate = batchRates.length > 0 ? Math.min(...batchRates) : avgBatchRate;
@@ -1587,11 +1596,14 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-3 shadow-2xs">
                   <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">TOTAL QUANTITY</span>
                   <span className="text-base font-black text-gray-900 font-mono leading-tight block">
+                  <span className="text-base font-black text-gray-900 font-mono leading-tight block">
                     {totalBatchQty.toLocaleString('en-IN')} {unit}
                   </span>
-                  <span className="text-[10px] text-gray-400 font-mono">
-                    ≈ {(totalBatchQty * conversionFactor).toLocaleString('en-IN')} {altUnit}
-                  </span>
+                  {altUnit && conversionFactor > 1 && (
+                    <span className="text-[10px] text-gray-400 font-mono">
+                      ≈ {(totalBatchQty * conversionFactor).toLocaleString('en-IN')} {altUnit}
+                    </span>
+                  )}
                 </div>
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-3 shadow-2xs">
                   <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">TOTAL VALUE</span>
@@ -1599,8 +1611,10 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                 </div>
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-3 shadow-2xs">
                   <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">AVERAGE RATE</span>
-                  <span className="text-base font-black text-gray-900 font-mono">₹{avgBatchRate} / {unit}</span>
-                  {altUnit && avgBatchRate > 0 && (
+                  <span className="text-base font-black text-gray-900 font-mono">
+                    ₹{avgBatchRate < 1 && avgBatchRate > 0 ? avgBatchRate.toFixed(4) : (avgBatchRate % 1 !== 0 ? avgBatchRate.toFixed(3) : avgBatchRate.toLocaleString('en-IN'))} / {unit}
+                  </span>
+                  {altUnit && conversionFactor > 1 && avgBatchRate > 0 && (
                     <span className="text-[10.5px] text-indigo-700 font-mono font-bold block mt-0.5">
                       ≈ ₹{(() => {
                         const r = convertRateToUom(avgBatchRate, unit, altUnit, sku);
@@ -1637,7 +1651,9 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                         <th className="p-3">SUPPLIER / SOURCE</th>
                         <th className="p-3">LOCATION</th>
                         <th className="p-3 text-right">QTY ({unit})</th>
-                        <th className="p-3 text-right">QTY ({altUnit})</th>
+                        {altUnit && conversionFactor > 1 && (
+                          <th className="p-3 text-right">QTY ({altUnit})</th>
+                        )}
                         <th className="p-3 text-right">RATE (₹/{unit})</th>
                         <th className="p-3 text-right">VALUE (₹)</th>
                         <th className="p-3 text-center">STATUS</th>
@@ -1670,11 +1686,13 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                               <MapPin className="w-3 h-3 text-blue-500 shrink-0" />
                               <span className="truncate max-w-[120px] text-[11px]">{b.shortLocPath || b.locationName}</span>
                             </td>
-                            <td className="p-3 text-right font-mono font-bold text-gray-900">{b.remainingQty}</td>
-                            <td className="p-3 text-right font-mono text-gray-500">{(b.remainingQty * conversionFactor).toLocaleString('en-IN')}</td>
+                            <td className="p-3 text-right font-mono font-bold text-gray-900">{b.remainingQty.toLocaleString('en-IN')}</td>
+                            {altUnit && conversionFactor > 1 && (
+                              <td className="p-3 text-right font-mono text-gray-500">{(b.remainingQty * conversionFactor).toLocaleString('en-IN')}</td>
+                            )}
                             <td className="p-3 text-right font-mono text-gray-900">
-                              <span className="font-bold">₹{b.rate}</span>
-                              {altUnit && b.rate > 0 && (
+                              <span className="font-bold">₹{b.rate < 1 && b.rate > 0 ? b.rate.toFixed(4) : (b.rate % 1 !== 0 ? b.rate.toFixed(3) : b.rate.toLocaleString('en-IN'))}</span>
+                              {altUnit && conversionFactor > 1 && b.rate > 0 && (
                                 <span className="text-[9.5px] text-indigo-600 block">
                                   {(() => {
                                     const r = convertRateToUom(b.rate, unit, altUnit, sku);

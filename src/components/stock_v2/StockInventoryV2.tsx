@@ -72,7 +72,7 @@ import StockTransferModal from './StockTransferModal';
 import StockAdjustmentModal from './StockAdjustmentModal';
 import { ManufacturingStepsModal } from './ManufacturingStepsModal';
 import UniversalPrintVoucherModal from '../ui/UniversalPrintVoucherModal';
-import { convertRateToUom, convertUom } from '../../utils/uomConversion';
+import { convertRateToUom, convertUom, isBoardSku } from '../../utils/uomConversion';
 
 export type StockTabType = 'overview' | 'products' | 'materials' | 'semi' | 'batches' | 'transfers' | 'adjustments' | 'warehouse';
 
@@ -2252,7 +2252,7 @@ export const StockInventoryV2: React.FC = () => {
                                       <div className={`font-mono font-black text-sm ${isNegative ? 'text-rose-600 bg-rose-50 border border-rose-300 px-2 py-0.5 rounded-md inline-block shadow-2xs' : 'text-gray-900'}`}>
                                         {isNegative ? `-${Math.abs(availStock).toLocaleString('en-IN')}` : availStock.toLocaleString('en-IN')}
                                       </div>
-                                      {sku.altUnit && sku.altUnitConversion && Number(sku.altUnitConversion) > 0 && (
+                                      {sku.altUnit && sku.altUnitConversion && Number(sku.altUnitConversion) > 0 && !isBoardSku(sku) && (
                                         <div className={`text-[10px] font-mono mt-0.5 ${isNegative ? 'text-rose-500 font-semibold' : 'text-gray-400'}`}>
                                           ≈ {convertUom(availStock, sku.unit || 'PCS', sku.altUnit, sku).toLocaleString('en-IN')} {sku.altUnit}
                                         </div>
@@ -2335,7 +2335,7 @@ export const StockInventoryV2: React.FC = () => {
                                   {formatCurrency(totalVal)}
                                 </div>
                                 {(() => {
-                                  const altRate = (sku.altUnit && sku.altUnit.toUpperCase() !== (sku.unit || '').toUpperCase())
+                                  const altRate = (sku.altUnit && sku.altUnit.toUpperCase() !== (sku.unit || '').toUpperCase() && !isBoardSku(sku))
                                     ? convertRateToUom(avgPrice, sku.unit || 'Unit', sku.altUnit, sku)
                                     : 0;
                                   const costLabel = (sku as any).costSource === 'slitting'

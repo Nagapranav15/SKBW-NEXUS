@@ -17,11 +17,20 @@ export interface SkuUomLike {
   conv?: number | string;
 }
 
+export function isBoardSku(sku?: any): boolean {
+  if (!sku) return false;
+  const cat = String(sku.category || sku.group || '').toLowerCase();
+  const name = String(sku.name || sku.title || '').toLowerCase();
+  const rule = String(sku.ruleType || '').toLowerCase();
+  return cat.includes('board') || name.includes('(board)') || rule.includes('board');
+}
+
 /**
  * Resolves the conversion factor from sku.altUnitConversion or alternate aliases (booksGbl, pcsPerGbl, conv).
  */
 export function getSkuConversionFactor(sku?: SkuUomLike | null): number {
   if (!sku) return 1;
+  if (isBoardSku(sku)) return 1;
   const factor = sku.altUnitConversion ?? sku.booksGbl ?? sku.pcsPerGbl ?? sku.conv;
   return parseConversionFactor(factor);
 }
