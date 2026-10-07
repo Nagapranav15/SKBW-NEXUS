@@ -637,12 +637,13 @@ exports.createCuttingSlip = async (req, res) => {
         : unitRate;
 
       const roundedAvg = Math.round(newAvgCost * 10000) / 10000;
+      const sheetPieceCost = isTargetUnitGbl && convFactor > 0 ? (roundedAvg / convFactor) : (costPerSheet || roundedAvg);
       targetSkuDoc.avgCost = roundedAvg;
       targetSkuDoc.costPrice = roundedAvg;
       targetSkuDoc.standardCost = roundedAvg;
       targetSkuDoc.avgRate = roundedAvg;
       targetSkuDoc.rate = roundedAvg;
-      targetSkuDoc.costPerPiece = Math.round(pieceCost * 10000) / 10000;
+      targetSkuDoc.costPerPiece = Math.round(sheetPieceCost * 10000) / 10000;
       await targetSkuDoc.save({ session });
     } catch (costErr) {
       console.error("Non-critical: Failed to update target SKU weighted average cost on cutting slip:", costErr);

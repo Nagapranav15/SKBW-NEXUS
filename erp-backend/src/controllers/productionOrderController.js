@@ -1326,16 +1326,13 @@ exports.getMaterialRates = async (req, res) => {
               const isGbl = skuUnitNorm === 'gbl';
               const convFactor = Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 2500);
 
-              const post4UpCost = Number(csSlip.costPer4UpPiece || (csSlip.effectiveCostPerSheet > 0 ? csSlip.effectiveCostPerSheet / 4 : 0));
-              let csRate = post4UpCost;
+              const sheetCost = Number(csSlip.effectiveCostPerSheet) || (Number(csSlip.totalInputCost) / Number(csSlip.actualSheets || 1));
+              let csRate = sheetCost;
               if (isReam) {
-                csRate = csSlip.effectiveCostPerReam || (csSlip.effectiveCostPerSheet * (csSlip.sheetsPerReam || 500));
+                csRate = csSlip.effectiveCostPerReam || (sheetCost * (csSlip.sheetsPerReam || 500));
               } else if (isPcs) {
-                // 4-UP PCS cost: Parent sheet cost / 4
-                csRate = post4UpCost;
+                csRate = sheetCost;
               } else if (isGbl) {
-                // Rate in GBL: Parent sheet cost * convFactor
-                const sheetCost = Number(csSlip.effectiveCostPerSheet) || (post4UpCost * 4);
                 csRate = sheetCost * (convFactor > 0 ? convFactor : 2500);
               }
               if (csRate > 0) {
@@ -1354,25 +1351,22 @@ exports.getMaterialRates = async (req, res) => {
           targetSku: sku._id,
           status: "Posted"
         }).sort({ createdAt: -1 }).lean();
-        if (lastSlip && (lastSlip.effectiveCostPerSheet > 0 || lastSlip.costPer4UpPiece > 0)) {
+        if (lastSlip && (lastSlip.effectiveCostPerSheet > 0 || lastSlip.totalInputCost > 0)) {
           const skuUnitNorm = (sku.unit || '').trim().toLowerCase();
           const isReam = skuUnitNorm.includes('ream');
           const isPcs = skuUnitNorm === 'pcs' || skuUnitNorm === 'piece' || skuUnitNorm === 'pieces';
           const isGbl = skuUnitNorm === 'gbl';
           const convFactor = Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 2500);
-          const post4UpPieceCost = Number(lastSlip.costPer4UpPiece || (lastSlip.effectiveCostPerSheet > 0 ? lastSlip.effectiveCostPerSheet / 4 : 0));
+          const sheetCost = Number(lastSlip.effectiveCostPerSheet) || (Number(lastSlip.totalInputCost) / Number(lastSlip.actualSheets || 1));
 
           if (isReam) {
-            cuttingSlipRate = lastSlip.effectiveCostPerReam || (lastSlip.effectiveCostPerSheet * (lastSlip.sheetsPerReam || 500));
+            cuttingSlipRate = lastSlip.effectiveCostPerReam || (sheetCost * (lastSlip.sheetsPerReam || 500));
           } else if (isPcs) {
-            // 4-UP PCS cost: Parent sheet cost / 4
-            cuttingSlipRate = Math.round(post4UpPieceCost * 10000) / 10000;
+            cuttingSlipRate = Math.round(sheetCost * 10000) / 10000;
           } else if (isGbl) {
-            // Rate in GBL: Parent sheet cost * convFactor
-            const sheetCost = Number(lastSlip.effectiveCostPerSheet) || (post4UpPieceCost * 4);
             cuttingSlipRate = Math.round((sheetCost * (convFactor > 0 ? convFactor : 2500)) * 10000) / 10000;
           } else {
-            cuttingSlipRate = post4UpPieceCost;
+            cuttingSlipRate = sheetCost;
           }
         }
       } catch (e) {
@@ -1473,15 +1467,10 @@ exports.getMaterialRates = async (req, res) => {
         if (f === t) return rateVal;
 
         if (f === 'GBL' && (t === 'PCS' || (skuAltUnit && t === skuAltUnit.toUpperCase()))) {
-          if (sku.costPerPiece > 0) return sku.costPerPiece;
-          const isSemiSheet = (sku.itemType === 'semi' || (sku.category || '').toLowerCase().includes('ruling') || (sku.category || '').toLowerCase().includes('index') || (sku.name || '').toLowerCase().includes('sheet'));
-          const divisor = isSemiSheet ? (skuConv * 4) : skuConv;
-          return divisor > 0 ? Math.round((rateVal / divisor) * 10000) / 10000 : rateVal;
+          return skuConv > 0 ? Math.round((rateVal / skuConv) * 10000) / 10000 : rateVal;
         }
         if ((f === 'PCS' || (skuAltUnit && f === skuAltUnit.toUpperCase())) && t === 'GBL') {
-          const isSemiSheet = (sku.itemType === 'semi' || (sku.category || '').toLowerCase().includes('ruling') || (sku.category || '').toLowerCase().includes('index') || (sku.name || '').toLowerCase().includes('sheet'));
-          const multiplier = isSemiSheet ? (skuConv * 4) : skuConv;
-          return multiplier > 0 ? Math.round((rateVal * multiplier) * 10000) / 10000 : rateVal;
+          return skuConv > 0 ? Math.round((rateVal * skuConv) * 10000) / 10000 : rateVal;
         }
         return rateVal;
       };
