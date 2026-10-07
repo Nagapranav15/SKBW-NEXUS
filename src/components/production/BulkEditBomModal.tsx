@@ -1921,6 +1921,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
       </div>,
       document.body
     )}
+    </>
   );
 };
 
