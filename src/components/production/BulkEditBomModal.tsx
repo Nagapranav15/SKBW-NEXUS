@@ -1312,6 +1312,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                   className="h-7 px-1.5 py-0.5 bg-white border border-slate-200 rounded-md text-[11px] font-semibold text-slate-800 cursor-pointer focus:outline-none"
                                 >
                                   <option value="Per BOM">Per BOM</option>
+                                  <option value="Per Ream">Per Ream</option>
                                   <option value="Per Piece">Per Piece</option>
                                   <option value="Per GBL">Per GBL</option>
                                 </select>

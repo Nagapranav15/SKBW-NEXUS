@@ -20,7 +20,7 @@ import { showToast } from '../ui/Toast';
 export interface AdditionalCostRow {
   id: string;
   costType: string;
-  basis: 'Per BOM' | 'Per GBL' | 'Per Piece' | string;
+  basis: 'Per BOM' | 'Per Ream' | 'Per GBL' | 'Per Piece' | string;
   amount: number | string;
   remarks?: string;
 }
@@ -104,7 +104,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
   const [quickCostOpenUpwards, setQuickCostOpenUpwards] = useState<boolean>(false);
   const [highlightedCostPresetIdx, setHighlightedCostPresetIdx] = useState<number>(0);
   const [newCostName, setNewCostName] = useState<string>('');
-  const [newCostBasis, setNewCostBasis] = useState<'Per BOM' | 'Per GBL' | 'Per Piece'>('Per BOM');
+  const [newCostBasis, setNewCostBasis] = useState<'Per BOM' | 'Per Ream' | 'Per GBL' | 'Per Piece'>('Per Ream');
   const [newCostRate, setNewCostRate] = useState<string>('');
   const costPresetMenuRef = useRef<HTMLDivElement>(null);
   const costPresetListRef = useRef<HTMLDivElement>(null);
@@ -954,7 +954,22 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
       };
     }
 
-    // 2. Per Piece (PCS): Rate * total pieces
+    // 2. Per Ream: Rate * total actual reams produced
+    if (b === 'per ream' || b.includes('ream') || b.includes('rm')) {
+      const spr = sheetsPerReam || 500;
+      const reams = numActualReams > 0 
+        ? numActualReams 
+        : (numActualSheets > 0 ? (numActualSheets / spr) : 1);
+      const cleanReams = Math.round(reams * 100) / 100;
+      const total = amt * cleanReams;
+      return {
+        total,
+        multiplier: cleanReams,
+        label: `${cleanReams.toLocaleString('en-IN', { maximumFractionDigits: 2 })} Reams`
+      };
+    }
+
+    // 3. Per Piece (PCS): Rate * total pieces
     if (b === 'per piece' || b.includes('piece') || b.includes('pcs')) {
       const pcs = totalProducedPieces > 0 ? totalProducedPieces : 1;
       const total = amt * pcs;
@@ -965,7 +980,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
       };
     }
 
-    // 3. Per GBL: Rate * total GBL produced
+    // 4. Per GBL: Rate * total GBL produced
     if (b === 'per gbl' || b.includes('gbl')) {
       const cleanGbl = totalProducedGbl > 0 ? Math.round(totalProducedGbl * 100) / 100 : 1;
       const total = amt * cleanGbl;
@@ -976,7 +991,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
       };
     }
 
-    // 4. Fallback (Flat)
+    // 5. Fallback (Flat)
     return {
       total: amt,
       multiplier: 1,
@@ -989,7 +1004,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
       const { total } = calculateAdditionalCostRow(row);
       return sum + total;
     }, 0);
-  }, [additionalCosts, numActualSheets, totalProducedPieces, totalProducedGbl]);
+  }, [additionalCosts, numActualSheets, numActualReams, totalProducedPieces, totalProducedGbl, sheetsPerReam]);
 
   // Landed cost allocation & accurate costing (Net Landed Cost = Total Reel Input Value + Total Additional Costs)
   const netProductionCost = useMemo(() => {
@@ -2209,11 +2224,11 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                               >
                                 <span className="font-semibold truncate">{p.name}</span>
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ml-2 ${
-                                  p.basis === 'Per GBL' || p.basis === 'Per Piece' || p.basis === 'Per BOM'
+                                  p.basis === 'Per GBL' || p.basis === 'Per Piece' || p.basis === 'Per BOM' || p.basis === 'Per Ream'
                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
                                     : 'bg-gray-100 text-gray-600'
                                 }`}>
-                                  {p.basis === 'Per GBL' ? `₹${p.defaultRate}/GBL` : p.basis === 'Per Piece' ? `₹${p.defaultRate}/PCS` : p.basis === 'Per BOM' ? `₹${p.defaultRate}/BOM` : `₹${p.defaultRate}`}
+                                  {p.basis === 'Per GBL' ? `₹${p.defaultRate}/GBL` : p.basis === 'Per Piece' ? `₹${p.defaultRate}/PCS` : p.basis === 'Per Ream' ? `₹${p.defaultRate}/Ream` : p.basis === 'Per BOM' ? `₹${p.defaultRate}/BOM` : `₹${p.defaultRate}`}
                                 </span>
                               </button>
                             );
@@ -2280,6 +2295,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                               className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-blue-500"
                             >
                               <option value="Per BOM">📦 Per BOM</option>
+                              <option value="Per Ream">📄 Per Ream</option>
                               <option value="Per Piece">⚡ Per Piece</option>
                               <option value="Per GBL">📦 Per GBL</option>
                             </select>
@@ -2537,6 +2553,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                     className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-blue-500"
                   >
                     <option value="Per BOM">📦 Per BOM</option>
+                    <option value="Per Ream">📄 Per Ream</option>
                     <option value="Per Piece">⚡ Per Piece</option>
                     <option value="Per GBL">📦 Per GBL</option>
                   </select>
@@ -2550,7 +2567,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                       className="w-16 text-right font-mono text-xs font-bold text-gray-800 bg-transparent focus:outline-none"
                     />
                     <span className="text-[10px] text-gray-500 font-semibold font-mono">
-                      {p.basis === 'Per GBL' ? '/GBL' : p.basis === 'Per Piece' ? '/PCS' : '/BOM'}
+                      {p.basis === 'Per GBL' ? '/GBL' : p.basis === 'Per Piece' ? '/PCS' : p.basis === 'Per Ream' ? '/Ream' : '/BOM'}
                     </span>
                   </div>
                   <button
@@ -2596,6 +2613,7 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                 className="px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-blue-500"
               >
                 <option value="Per BOM">📦 Per BOM</option>
+                <option value="Per Ream">📄 Per Ream</option>
                 <option value="Per Piece">⚡ Per Piece</option>
                 <option value="Per GBL">📦 Per GBL</option>
               </select>

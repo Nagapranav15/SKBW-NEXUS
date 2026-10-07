@@ -49,7 +49,7 @@ export interface DepartmentPreset {
 export interface PredefinedCost {
   id: string;
   name: string;
-  basis: 'Per BOM' | 'Per GBL' | 'Per Piece' | string;
+  basis: 'Per BOM' | 'Per Ream' | 'Per GBL' | 'Per Piece' | string;
   defaultRate: number;
   appliedAs?: string;
 }
@@ -190,6 +190,7 @@ const DEFAULT_DEPARTMENT_PRESETS: DepartmentPreset[] = buildCleanDepartmentPrese
 
 export const DEFAULT_PREDEFINED_COSTS: PredefinedCost[] = [
   { id: 'cost-printing', name: 'Cover Printing & Lamination (Job Work)', basis: 'Per Piece', defaultRate: 3 },
+  { id: 'cost-sheeting', name: 'Sheeting & Reel Cutting Charges', basis: 'Per Ream', defaultRate: 25 },
   { id: 'cost-elec', name: 'Electricity / Power Charges', basis: 'Per GBL', defaultRate: 25 },
   { id: 'cost-labour', name: 'Direct Labour / Helper Wages', basis: 'Per GBL', defaultRate: 35 },
   { id: 'cost-wire', name: 'Stitching Wire & Adhesive', basis: 'Per GBL', defaultRate: 15 },
@@ -1887,7 +1888,22 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       };
     }
 
-    // 2. Per Piece (PCS): Rate * total planned pieces to produce
+    // 2. Per Ream: Rate * total planned reams to produce
+    if (b === 'per ream' || b.includes('ream') || b.includes('rm')) {
+      const reamMat = materials.find(m => (m.uom || '').toLowerCase() === 'ream');
+      const reamQty = reamMat && Number(reamMat.requiredQty) > 0 
+        ? Number(reamMat.requiredQty) 
+        : (numPlannedQty > 0 ? numPlannedQty : 1);
+      const cleanReams = Math.round(reamQty * 100) / 100;
+      const total = amt * cleanReams;
+      return {
+        total,
+        multiplier: cleanReams,
+        label: `${cleanReams.toLocaleString('en-IN', { maximumFractionDigits: 2 })} Reams`
+      };
+    }
+
+    // 3. Per Piece (PCS): Rate * total planned pieces to produce
     if (b === 'per piece' || b.includes('piece') || b.includes('pcs')) {
       const qty = plannedPcs > 0 ? plannedPcs : (numPlannedQty > 0 ? numPlannedQty : 1);
       const total = amt * qty;
@@ -3696,11 +3712,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                               >
                                 <span className="font-semibold truncate">{p.name}</span>
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ml-2 ${
-                                  p.basis === 'Per GBL' || p.basis === 'Per Piece' || p.basis === 'Per BOM'
+                                  p.basis === 'Per GBL' || p.basis === 'Per Piece' || p.basis === 'Per BOM' || p.basis === 'Per Ream'
                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
                                     : 'bg-gray-100 text-gray-600'
                                 }`}>
-                                  {p.basis === 'Per GBL' ? `₹${p.defaultRate}/GBL` : p.basis === 'Per Piece' ? `₹${p.defaultRate}/PCS` : p.basis === 'Per BOM' ? `₹${p.defaultRate}/BOM` : `₹${p.defaultRate}`}
+                                  {p.basis === 'Per GBL' ? `₹${p.defaultRate}/GBL` : p.basis === 'Per Piece' ? `₹${p.defaultRate}/PCS` : p.basis === 'Per Ream' ? `₹${p.defaultRate}/Ream` : p.basis === 'Per BOM' ? `₹${p.defaultRate}/BOM` : `₹${p.defaultRate}`}
                                 </span>
                               </button>
                             );
@@ -3767,6 +3783,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                               className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-blue-500"
                             >
                               <option value="Per BOM">📦 Per BOM</option>
+                              <option value="Per Ream">📄 Per Ream</option>
                               <option value="Per Piece">⚡ Per Piece</option>
                               <option value="Per GBL">📦 Per GBL</option>
                             </select>
@@ -4205,6 +4222,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                       className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-blue-500"
                     >
                       <option value="Per BOM">📦 Per BOM</option>
+                      <option value="Per Ream">📄 Per Ream</option>
                       <option value="Per Piece">⚡ Per Piece</option>
                       <option value="Per GBL">📦 Per GBL</option>
                     </select>
@@ -4218,7 +4236,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         className="w-16 text-right font-mono text-xs font-bold text-gray-800 bg-transparent focus:outline-none"
                       />
                       <span className="text-[10px] text-gray-500 font-semibold font-mono">
-                        {p.basis === 'Per GBL' ? '/GBL' : p.basis === 'Per Piece' ? '/PCS' : '/BOM'}
+                        {p.basis === 'Per GBL' ? '/GBL' : p.basis === 'Per Piece' ? '/PCS' : p.basis === 'Per Ream' ? '/Ream' : '/BOM'}
                       </span>
                     </div>
                     <button
@@ -4264,6 +4282,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 cursor-pointer"
                 >
                   <option value="Per BOM">📦 Per BOM</option>
+                  <option value="Per Ream">📄 Per Ream</option>
                   <option value="Per Piece">⚡ Per Piece</option>
                   <option value="Per GBL">⚡ Per GBL</option>
                 </select>
