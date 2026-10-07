@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ClipboardList, Search, Download, X, Copy, Save, RefreshCw, Layers, Boxes, Package, Trash2,
   Settings, Plus, Tag, Receipt, Info, Sparkles, ChevronDown, Star, RotateCcw
@@ -1803,124 +1804,123 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
         </div>
       </div>
     </Modal>
-
-      {/* ── MANAGE PRESETS MODAL ── */}
-      {showManageCostModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowManageCostModal(false)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] z-10">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center">
-                  <Star className="w-4 h-4 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-gray-900">Manage Overhead Presets</h3>
-                  <p className="text-[10px] text-gray-500">Predefined overheads appear in the quick cost selector dropdown and sync across users.</p>
-                </div>
+    {showManageCostModal && typeof document !== 'undefined' && createPortal(
+      <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowManageCostModal(false)} />
+        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center">
+                <Star className="w-4 h-4 text-blue-600" />
               </div>
-              <button type="button" onClick={() => setShowManageCostModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 cursor-pointer">
-                <X className="w-4 h-4" />
-              </button>
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Manage Overhead Presets</h3>
+                <p className="text-[10px] text-gray-500">Predefined overheads sync across all users via company metadata.</p>
+              </div>
             </div>
+            <button type="button" onClick={() => setShowManageCostModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 cursor-pointer">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
 
-            {/* Preset List */}
-            <div className="flex-1 overflow-y-auto px-5 py-3 space-y-1.5">
-              {costPresets.length === 0 && (
-                <div className="py-8 text-center text-[12px] text-gray-400">No predefined overheads saved. Add one below or click Reset to Defaults.</div>
-              )}
-              {costPresets.map((p) => (
-                <div key={p.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-100 group hover:border-blue-200 transition-all">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-semibold text-gray-800 truncate">{p.name}</div>
-                    <div className="text-[10px] text-gray-400 font-mono">{p.basis} · ₹{p.defaultRate}</div>
-                  </div>
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ${
-                    ['Per GBL','Per Piece','Per BOM','Per Ream'].includes(p.basis)
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                      : 'bg-gray-100 text-gray-600'
-                  }`}>
-                    {p.basis === 'Per GBL' ? `/GBL` : p.basis === 'Per Piece' ? `/PCS` : p.basis === 'Per BOM' ? `/BOM` : p.basis === 'Per Ream' ? `/Ream` : `flat`}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleDeletePreset(p.id)}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-all cursor-pointer"
-                    title="Delete preset"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+          {/* Preset List */}
+          <div className="flex-1 overflow-y-auto px-5 py-3 space-y-1.5">
+            {costPresets.length === 0 && (
+              <div className="py-8 text-center text-[12px] text-gray-400">No predefined overheads saved. Add one below or click Reset to Defaults.</div>
+            )}
+            {costPresets.map((p) => (
+              <div key={p.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-100 group hover:border-blue-200 transition-all">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-gray-800 truncate">{p.name}</div>
+                  <div className="text-[10px] text-gray-400 font-mono">{p.basis} · ₹{p.defaultRate}</div>
                 </div>
-              ))}
-            </div>
-
-            {/* Add New Preset Form */}
-            <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50 space-y-2">
-              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Add New Preset</div>
-              <div className="flex gap-2 items-center flex-wrap">
-                <input
-                  type="text"
-                  value={newPresetName}
-                  onChange={e => setNewPresetName(e.target.value)}
-                  placeholder="e.g. Freight Charges"
-                  className="flex-1 min-w-0 h-8 px-2.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                  onKeyDown={e => e.key === 'Enter' && handleSaveNewPreset()}
-                />
-                <select
-                  value={newPresetBasis}
-                  onChange={e => setNewPresetBasis(e.target.value)}
-                  className="h-8 px-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                >
-                  <option value="Per BOM">📦 Per BOM</option>
-                  <option value="Per Piece">⚡ Per Piece</option>
-                  <option value="Per GBL">📦 Per GBL</option>
-                  <option value="Per Ream">📋 Per Ream</option>
-                </select>
-                <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 h-8">
-                  <span className="text-gray-400 text-xs font-bold">₹</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={newPresetRate}
-                    onChange={e => setNewPresetRate(e.target.value === '' ? '' : Number(e.target.value))}
-                    placeholder="Rate"
-                    className="w-20 bg-transparent text-xs font-bold font-mono text-gray-800 focus:outline-none"
-                    onKeyDown={e => e.key === 'Enter' && handleSaveNewPreset()}
-                  />
-                </div>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ${
+                  ['Per GBL','Per Piece','Per BOM','Per Ream'].includes(p.basis)
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {p.basis === 'Per GBL' ? `/GBL` : p.basis === 'Per Piece' ? `/PCS` : p.basis === 'Per BOM' ? `/BOM` : p.basis === 'Per Ream' ? `/Ream` : `flat`}
+                </span>
                 <button
                   type="button"
-                  onClick={handleSaveNewPreset}
-                  className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-sm"
+                  onClick={() => handleDeletePreset(p.id)}
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-all cursor-pointer"
+                  title="Delete preset"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  Save
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
-            </div>
+            ))}
+          </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
+          {/* Add New Preset */}
+          <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50 space-y-2">
+            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Add New Preset</div>
+            <div className="flex gap-2 items-center flex-wrap">
+              <input
+                type="text"
+                value={newPresetName}
+                onChange={e => setNewPresetName(e.target.value)}
+                placeholder="e.g. Freight Charges"
+                className="flex-1 min-w-0 h-8 px-2.5 bg-white border border-gray-200 rounded-lg text-xs font-medium focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                onKeyDown={e => e.key === 'Enter' && handleSaveNewPreset()}
+              />
+              <select
+                value={newPresetBasis}
+                onChange={e => setNewPresetBasis(e.target.value)}
+                className="h-8 px-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold cursor-pointer focus:ring-1 focus:ring-blue-500 focus:outline-none"
+              >
+                <option value="Per BOM">📦 Per BOM</option>
+                <option value="Per Piece">⚡ Per Piece</option>
+                <option value="Per GBL">📦 Per GBL</option>
+                <option value="Per Ream">📋 Per Ream</option>
+              </select>
+              <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 h-8">
+                <span className="text-gray-400 text-xs font-bold">₹</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={newPresetRate}
+                  onChange={e => setNewPresetRate(e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="Rate"
+                  className="w-20 bg-transparent text-xs font-bold font-mono focus:outline-none"
+                  onKeyDown={e => e.key === 'Enter' && handleSaveNewPreset()}
+                />
+              </div>
               <button
                 type="button"
-                onClick={handleResetPresets}
-                className="flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-red-600 font-semibold cursor-pointer transition-colors"
+                onClick={handleSaveNewPreset}
+                className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg flex items-center gap-1 cursor-pointer transition-all"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Reset to Defaults
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowManageCostModal(false)}
-                className="px-4 py-1.5 bg-gray-900 hover:bg-gray-800 text-white font-bold text-xs rounded-lg cursor-pointer transition-all"
-              >
-                Done
+                <Plus className="w-3.5 h-3.5" />
+                Save
               </button>
             </div>
           </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={handleResetPresets}
+              className="flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-red-600 font-semibold cursor-pointer transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Reset to Defaults
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowManageCostModal(false)}
+              className="px-4 py-1.5 bg-gray-900 hover:bg-gray-800 text-white font-bold text-xs rounded-lg cursor-pointer transition-all"
+            >
+              Done
+            </button>
+          </div>
         </div>
-      )}
-    </>
+      </div>,
+      document.body
+    )}
   );
 };
+
