@@ -235,16 +235,10 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
                       <td className="py-3 px-3 text-right font-mono">
                         {(() => {
                           const targetDoc = slip.targetSku as any;
-                          const tUnit = (slip.outputUnit || targetDoc?.unit || '').trim().toUpperCase();
+                          const tUnit = (targetDoc?.unit || '').trim().toUpperCase();
                           const conv = Number(targetDoc?.altUnitConversion || targetDoc?.booksGbl || targetDoc?.pcsPerGbl || 0);
                           const isGbl = tUnit === 'GBL' || tUnit.includes('BUNDLE') || tUnit.includes('BOX');
-                          const isSemi = targetDoc?.itemType === 'semi' ||
-                                         (targetDoc?.skuCode && targetDoc.skuCode.toUpperCase().startsWith('SM-')) ||
-                                         (targetDoc?.name && /sr|ur|index|board/i.test(targetDoc.name));
-                          const totalPcs = isSemi ? (slip.actualSheets * 4) : slip.actualSheets;
-                          const convertedQty = slip.outputQty !== undefined && slip.outputQty !== null && Number(slip.outputQty) > 0
-                            ? Number(slip.outputQty)
-                            : (isGbl && conv > 0 ? (totalPcs / conv) : null);
+                          const convertedQty = isGbl && conv > 0 ? (slip.actualSheets / conv) : null;
 
                           return (
                             <>
@@ -253,7 +247,6 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
                               </span>
                               <span className="text-[10px] text-slate-500 block">
                                 {slip.actualSheets?.toLocaleString()} Sheets ({slip.actualReams?.toFixed(2)} Reams)
-                                {isSemi && ` • ${(totalPcs).toLocaleString()} PCS`}
                               </span>
                               {slip.cutsCount ? (
                                 <span className="text-[9.5px] text-indigo-600 font-bold block">
@@ -286,16 +279,10 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
                       <td className="py-3 px-3 text-right font-mono text-[11px]">
                         {(() => {
                           const targetDoc = slip.targetSku as any;
-                          const tUnit = (slip.outputUnit || targetDoc?.unit || '').trim().toUpperCase();
+                          const tUnit = (targetDoc?.unit || '').trim().toUpperCase();
                           const conv = Number(targetDoc?.altUnitConversion || targetDoc?.booksGbl || targetDoc?.pcsPerGbl || 0);
                           const isGbl = tUnit === 'GBL' || tUnit.includes('BUNDLE') || tUnit.includes('BOX');
-                          const isSemi = targetDoc?.itemType === 'semi' ||
-                                         (targetDoc?.skuCode && targetDoc.skuCode.toUpperCase().startsWith('SM-')) ||
-                                         (targetDoc?.name && /sr|ur|index|board/i.test(targetDoc.name));
-                          const pieceRate = slip.costPer4UpPiece || (isSemi && slip.effectiveCostPerSheet ? slip.effectiveCostPerSheet / 4 : slip.effectiveCostPerSheet);
-                          const costPerTargetUnit = slip.unitRate !== undefined && slip.unitRate !== null && Number(slip.unitRate) > 0
-                            ? Number(slip.unitRate)
-                            : (isGbl && conv > 0 ? (pieceRate * conv) : null);
+                          const costPerTargetUnit = isGbl && conv > 0 ? (slip.effectiveCostPerSheet * conv) : null;
 
                           return (
                             <>
@@ -303,7 +290,7 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
                                 {costPerTargetUnit !== null ? `₹${costPerTargetUnit.toFixed(2)}/${tUnit}` : `₹${slip.effectiveCostPerSheet?.toFixed(2)}/sh`}
                               </div>
                               <div className="text-[9.5px] text-slate-400">
-                                {isSemi ? `₹${pieceRate.toFixed(2)}/pcs` : `₹${slip.effectiveCostPerSheet?.toFixed(2)}/sh`} • ₹{slip.effectiveCostPerReam?.toFixed(1)}/rm
+                                ₹{slip.effectiveCostPerSheet?.toFixed(2)}/sh • ₹{slip.effectiveCostPerReam?.toFixed(1)}/rm
                               </div>
                             </>
                           );

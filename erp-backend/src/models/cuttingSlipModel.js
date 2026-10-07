@@ -54,9 +54,6 @@ const cuttingSlipSchema = new mongoose.Schema({
   effectiveCostPerSheet: { type: Number, default: 0 },
   effectiveCostPerReam: { type: Number, default: 0 },
   costPer4UpPiece: { type: Number, default: 0 },
-  outputQty: { type: Number, default: 0 },
-  outputUnit: { type: String, default: "" },
-  unitRate: { type: Number, default: 0 },
 
   // Destination Godown
   destinationLocationId: { type: mongoose.Schema.Types.ObjectId, ref: 'WarehouseLocationV2', required: true },

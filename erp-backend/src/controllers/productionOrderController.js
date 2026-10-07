@@ -1334,8 +1334,9 @@ exports.getMaterialRates = async (req, res) => {
                 // 4-UP PCS cost: Parent sheet cost / 4
                 csRate = post4UpCost;
               } else if (isGbl) {
-                // Rate in GBL: (Parent sheet cost / 4) * convFactor
-                csRate = post4UpCost * (convFactor > 0 ? convFactor : 2500);
+                // Rate in GBL: Parent sheet cost * convFactor
+                const sheetCost = Number(csSlip.effectiveCostPerSheet) || (post4UpCost * 4);
+                csRate = sheetCost * (convFactor > 0 ? convFactor : 2500);
               }
               if (csRate > 0) {
                 b.rate = Math.round(csRate * 10000) / 10000;
@@ -1367,8 +1368,9 @@ exports.getMaterialRates = async (req, res) => {
             // 4-UP PCS cost: Parent sheet cost / 4
             cuttingSlipRate = Math.round(post4UpPieceCost * 10000) / 10000;
           } else if (isGbl) {
-            // Rate in GBL: (Parent sheet cost / 4) * convFactor
-            cuttingSlipRate = Math.round((post4UpPieceCost * (convFactor > 0 ? convFactor : 2500)) * 10000) / 10000;
+            // Rate in GBL: Parent sheet cost * convFactor
+            const sheetCost = Number(lastSlip.effectiveCostPerSheet) || (post4UpPieceCost * 4);
+            cuttingSlipRate = Math.round((sheetCost * (convFactor > 0 ? convFactor : 2500)) * 10000) / 10000;
           } else {
             cuttingSlipRate = post4UpPieceCost;
           }
@@ -1471,10 +1473,15 @@ exports.getMaterialRates = async (req, res) => {
         if (f === t) return rateVal;
 
         if (f === 'GBL' && (t === 'PCS' || (skuAltUnit && t === skuAltUnit.toUpperCase()))) {
-          return skuConv > 0 ? Math.round((rateVal / skuConv) * 10000) / 10000 : rateVal;
+          if (sku.costPerPiece > 0) return sku.costPerPiece;
+          const isSemiSheet = (sku.itemType === 'semi' || (sku.category || '').toLowerCase().includes('ruling') || (sku.category || '').toLowerCase().includes('index') || (sku.name || '').toLowerCase().includes('sheet'));
+          const divisor = isSemiSheet ? (skuConv * 4) : skuConv;
+          return divisor > 0 ? Math.round((rateVal / divisor) * 10000) / 10000 : rateVal;
         }
         if ((f === 'PCS' || (skuAltUnit && f === skuAltUnit.toUpperCase())) && t === 'GBL') {
-          return skuConv > 0 ? Math.round((rateVal * skuConv) * 10000) / 10000 : rateVal;
+          const isSemiSheet = (sku.itemType === 'semi' || (sku.category || '').toLowerCase().includes('ruling') || (sku.category || '').toLowerCase().includes('index') || (sku.name || '').toLowerCase().includes('sheet'));
+          const multiplier = isSemiSheet ? (skuConv * 4) : skuConv;
+          return multiplier > 0 ? Math.round((rateVal * multiplier) * 10000) / 10000 : rateVal;
         }
         return rateVal;
       };

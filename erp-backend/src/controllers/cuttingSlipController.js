@@ -526,34 +526,27 @@ exports.createCuttingSlip = async (req, res) => {
       0
     );
 
-    // In Cutting Slip, one parent sheet is converted into 4 book-size PCS (4-UP layout)
-    const actualBookPcs = Number(validActualSheets) * 4;
+    // In Cutting Slip, Reel-to-Sheet converts parent reels into validActualSheets parent sheets.
+    // 1 parent sheet yields 4 book-size pages (4-UP layout) in notebook production.
     const pieceCost = Number(costPer4UpPiece) || (validActualSheets > 0 ? (Number(totalInputCost || 0) / (validActualSheets * 4)) : 0);
 
-    let finalOutputQty = actualBookPcs;
-    let unitRate = pieceCost;
+    let finalOutputQty = validActualSheets;
+    let unitRate = validActualSheets > 0 ? Math.round((Number(totalInputCost || 0) / validActualSheets) * 10000) / 10000 : 0;
 
     if (isTargetUnitReam) {
       finalOutputQty = Number(resolvedActualReams) || (resolvedSheetsPerReam > 0 ? Number((validActualSheets / resolvedSheetsPerReam).toFixed(2)) : 0);
       unitRate = finalOutputQty > 0 ? Math.round((Number(totalInputCost || 0) / finalOutputQty) * 10000) / 10000 : 0;
     } else if (isTargetUnitGbl && convFactor > 0) {
-      // 1 GBL contains convFactor book-size PCS (e.g. 2,500 PCS / GBL)
-      finalOutputQty = Math.round((actualBookPcs / convFactor) * 10000) / 10000;
+      // 1 GBL contains convFactor parent sheets (e.g. 2,500 Sheets / GBL)
+      finalOutputQty = Math.round((validActualSheets / convFactor) * 10000) / 10000;
       unitRate = finalOutputQty > 0 ? Math.round((Number(totalInputCost || 0) / finalOutputQty) * 10000) / 10000 : 0;
     } else if (targetSkuDoc.altUnit && convFactor > 0 && !isTargetUnitPcs) {
-      finalOutputQty = convertAltToPrimary(Number(actualBookPcs), targetSkuDoc);
+      finalOutputQty = convertAltToPrimary(Number(validActualSheets), targetSkuDoc);
       unitRate = finalOutputQty > 0 ? Math.round((Number(totalInputCost || 0) / finalOutputQty) * 10000) / 10000 : 0;
     } else {
-      // Standard book-size PCS of semi-finished goods (post-4-UP)
-      finalOutputQty = actualBookPcs;
-      unitRate = pieceCost;
+      finalOutputQty = validActualSheets;
+      unitRate = validActualSheets > 0 ? Math.round((Number(totalInputCost || 0) / validActualSheets) * 10000) / 10000 : 0;
     }
-
-    // Persist final output quantity and rate to cutting slip record
-    cuttingSlip.outputQty = finalOutputQty;
-    cuttingSlip.outputUnit = targetSkuDoc.unit || (isTargetUnitReam ? "Reams" : "Sheets");
-    cuttingSlip.unitRate = unitRate;
-    await cuttingSlip.save({ session });
 
     const txNumIn = await Sequence.getNextSequence("IL", session);
     const ledgerIn = new InventoryLedger({

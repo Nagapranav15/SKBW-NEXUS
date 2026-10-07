@@ -754,45 +754,24 @@ export const StockInventoryV2: React.FC = () => {
           0
         );
 
-        const isSemi = targetSkuObj?.itemType === 'semi' ||
-                       matchedSkuDoc?.itemType === 'semi' ||
-                       (targetSkuObj?.skuCode && targetSkuObj.skuCode.toUpperCase().startsWith('SM-')) ||
-                       (matchedSkuDoc?.skuCode && matchedSkuDoc.skuCode.toUpperCase().startsWith('SM-')) ||
-                       (targetSkuObj?.name && /sr|ur|index|board/i.test(targetSkuObj.name)) ||
-                       (matchedSkuDoc?.name && /sr|ur|index|board/i.test(matchedSkuDoc.name));
-
         const actualSheets = Number(cs.actualSheets) || 0;
         const actualReams = Number(cs.actualReams) || 0;
         const totalNetCost = Number(cs.netProductionCost || cs.totalInputCost || 0);
 
-        // In 4-UP layout for semi-finished goods, 1 parent sheet produces 4 book-size pieces
-        const totalPcs = isSemi ? actualSheets * 4 : actualSheets;
-
-        let outQty = cs.outputQty !== undefined && cs.outputQty !== null && Number(cs.outputQty) > 0
-          ? Number(cs.outputQty)
-          : actualSheets;
-
-        if (cs.outputQty === undefined || cs.outputQty === null || Number(cs.outputQty) <= 0) {
-          if (isReam && actualReams > 0) {
-            outQty = actualReams;
-          } else if (isGbl && convFactor > 0) {
-            outQty = totalPcs / convFactor;
-          } else if ((targetSkuObj?.altUnit || matchedSkuDoc?.altUnit) && convFactor > 0) {
-            outQty = totalPcs / convFactor;
-          } else {
-            outQty = totalPcs;
-          }
+        let outQty = actualSheets;
+        if (isReam && actualReams > 0) {
+          outQty = actualReams;
+        } else if (isGbl && convFactor > 0) {
+          outQty = actualSheets / convFactor;
+        } else if ((targetSkuObj?.altUnit || matchedSkuDoc?.altUnit) && convFactor > 0) {
+          outQty = actualSheets / convFactor;
         }
 
         let unitRate = 0;
-        if (cs.unitRate !== undefined && cs.unitRate !== null && Number(cs.unitRate) > 0) {
-          unitRate = Number(cs.unitRate);
-        } else if (totalNetCost > 0 && outQty > 0) {
+        if (totalNetCost > 0 && outQty > 0) {
           unitRate = totalNetCost / outQty;
-        } else if (cs.costPer4UpPiece && isGbl && convFactor > 0) {
-          unitRate = Number(cs.costPer4UpPiece) * convFactor;
         } else if (cs.effectiveCostPerSheet && !isReam && !isGbl) {
-          unitRate = isSemi ? (Number(cs.effectiveCostPerSheet) / 4) : Number(cs.effectiveCostPerSheet);
+          unitRate = Number(cs.effectiveCostPerSheet);
         } else if (cs.effectiveCostPerReam && isReam) {
           unitRate = Number(cs.effectiveCostPerReam);
         }
