@@ -208,11 +208,17 @@ export const recordTransferV2 = async (transferData: {
   skuId: string;
   fromLocationId: string;
   toLocationId: string;
-  quantity: number;
+  quantity?: number;
   remarks?: string;
   company: string;
   batchNumber?: string;
   reels?: any[];
+  batches?: Array<{
+    batchNumber?: string;
+    quantity: number;
+    reels?: any[];
+    rate?: number;
+  }>;
 }): Promise<any> => {
   const response = await api.post('/v2/ledger/transfer', transferData);
   return response.data;

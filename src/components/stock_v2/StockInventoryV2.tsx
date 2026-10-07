@@ -1277,6 +1277,7 @@ export const StockInventoryV2: React.FC = () => {
                       onClick={() => {
                         setShowAddMenu(false);
                         setTransferInitialSku(null);
+                        setTransferInitialLocId(undefined);
                         setShowTransferModal(true);
                       }}
                       className="w-full px-3 py-2 text-left text-xs font-bold text-gray-800 hover:bg-blue-50 hover:text-blue-900 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
@@ -1852,6 +1853,7 @@ export const StockInventoryV2: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setTransferInitialSku(null);
+                  setTransferInitialLocId(undefined);
                   setShowTransferModal(true);
                 }}
                 className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"

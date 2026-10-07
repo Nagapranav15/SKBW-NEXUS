@@ -27,6 +27,32 @@ const toObjectId = (id) => {
   }
 };
 
+const getHierarchy = async (locId, companyId, session) => {
+  if (!locId) return { warehouseId: null, floorId: null, zoneId: null, locationId: null, doc: null };
+  const loc = await WarehouseLocationV2.findById(locId).session(session || null);
+  if (!loc) return { warehouseId: locId, floorId: locId, zoneId: locId, locationId: locId, doc: null };
+
+  const chain = [loc];
+  let curr = loc;
+  while (curr && curr.parentId) {
+    let parent = await WarehouseLocationV2.findOne({ _id: curr.parentId, company: companyId }).session(session || null);
+    if (!parent) parent = await WarehouseLocationV2.findById(curr.parentId).session(session || null);
+    if (!parent) break;
+    chain.unshift(parent);
+    curr = parent;
+  }
+  const factoryNode = chain.find(n => n.level === "Factory");
+  const floorNode = chain.find(n => n.level === "Floor");
+  const zoneNode = chain.find(n => n.level === "Zone");
+  const storageNode = chain.find(n => n.level === "Storage Location");
+
+  const warehouseId = factoryNode ? factoryNode._id : (chain[0]?._id || loc._id);
+  const floorId = floorNode ? floorNode._id : (chain[1]?._id || warehouseId);
+  const zoneId = zoneNode ? zoneNode._id : (chain[2]?._id || floorId);
+  const locationId = storageNode ? storageNode._id : loc._id;
+  return { warehouseId, floorId, zoneId, locationId, doc: loc };
+};
+
 // ── SKU MASTER V2 ─────────────────────────────────────────────────────────────
 
 exports.getSkus = async (req, res, next) => {
@@ -1725,13 +1751,11 @@ exports.recordTransfer = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const { skuId, fromLocationId, toLocationId, quantity, remarks, company, batchNumber, reels } = req.body;
+    const { skuId, fromLocationId, toLocationId, quantity, remarks, company, batchNumber, reels, batches } = req.body;
     if (!company) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ msg: "company is required" });
-    }
-    const transferQty = Number(quantity);
-    if (isNaN(transferQty) || transferQty <= 0) {
-      return res.status(400).json({ msg: "Transfer quantity must be a positive number" });
     }
 
     const companyObjId = toObjectId(company);
@@ -1739,80 +1763,89 @@ exports.recordTransfer = async (req, res, next) => {
     const fromLocObjId = toObjectId(fromLocationId);
     const toLocObjId = toObjectId(toLocationId);
 
+    if (!skuObjId) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ msg: "Valid SKU ID is required" });
+    }
+
+    if (!fromLocObjId || !toLocObjId) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ msg: "Source and destination locations are required" });
+    }
+
+    if (String(fromLocObjId) === String(toLocObjId)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ msg: "Source and destination locations cannot be identical" });
+    }
+
     // Resolve source SKU
-    const skuDoc = await SkuV2.findOne({ _id: skuObjId, company: companyObjId });
+    const skuDoc = await SkuV2.findOne({ _id: skuObjId, company: companyObjId }).session(session);
     if (!skuDoc) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({ msg: "SKU not found" });
     }
 
-    // Resolve source location hierarchy
-    const fromLocation = await WarehouseLocationV2.findOne({ _id: fromLocObjId, company: companyObjId });
-    if (!fromLocation) {
+    // Resolve source & destination hierarchies
+    const fromH = await getHierarchy(fromLocObjId, companyObjId, session);
+    const toH = await getHierarchy(toLocObjId, companyObjId, session);
+
+    if (!fromH.doc) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({ msg: "Source location not found" });
     }
-    const fromZone = await WarehouseLocationV2.findOne({ _id: fromLocation.parentId, company: companyObjId });
-    const fromFloor = fromZone ? await WarehouseLocationV2.findOne({ _id: fromZone.parentId, company: companyObjId }) : null;
-    const fromWarehouse = fromFloor ? await WarehouseLocationV2.findOne({ _id: fromFloor.parentId, company: companyObjId }) : null;
-
-    // Calculate source location's current balance from primary InventoryLedger
-    const matchCriteria = { 
-      skuId: skuObjId, 
-      locationId: fromLocObjId, 
-      company: companyObjId 
-    };
-    if (batchNumber) {
-      matchCriteria.batchNumber = batchNumber;
-    }
-
-    const sourceLedgerAgg = await InventoryLedger.aggregate([
-      { $match: matchCriteria },
-      {
-        $group: {
-          _id: null,
-          onHand: {
-            $sum: {
-              $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", { $subtract: [0, "$quantity"] }]
-            }
-          }
-        }
-      }
-    ]);
-
-    const sourceBalance = sourceLedgerAgg.length > 0 ? sourceLedgerAgg[0].onHand : 0;
-    if (sourceBalance < transferQty) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ msg: `Insufficient stock at source location. Available: ${sourceBalance} ${skuDoc.unit}` });
-    }
-
-    // Resolve destination location hierarchy
-    const destLocation = await WarehouseLocationV2.findOne({ _id: toLocObjId, company: companyObjId });
-    if (!destLocation) {
+    if (!toH.doc) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({ msg: "Destination location not found" });
     }
-    // Bypassed destination capacity limit constraint verification per user request
 
-    const toZone = await WarehouseLocationV2.findOne({ _id: destLocation.parentId, company: companyObjId });
-    const toFloor = toZone ? await WarehouseLocationV2.findOne({ _id: toZone.parentId, company: companyObjId }) : null;
-    const toWarehouse = toFloor ? await WarehouseLocationV2.findOne({ _id: toFloor.parentId, company: companyObjId }) : null;
-
-    // Calculate destination location's current balance
-    const destMatchCriteria = {
-      skuId: skuObjId,
-      locationId: toLocObjId,
-      company: companyObjId
-    };
-    if (batchNumber) {
-      destMatchCriteria.batchNumber = batchNumber;
+    // Prepare transfer items list (supports multiple batches or single batch)
+    let transferItems = [];
+    if (Array.isArray(batches) && batches.length > 0) {
+      transferItems = batches.map(b => ({
+        batchNumber: b.batchNumber || batchNumber || "UNKNOWN",
+        quantity: Number(b.quantity || 0),
+        reels: Array.isArray(b.reels) ? b.reels : [],
+        rate: Number(b.rate || skuDoc.avgCost || skuDoc.costPrice || skuDoc.standardCost || skuDoc.rate || 0)
+      })).filter(b => b.quantity > 0);
+    } else {
+      const transferQty = Number(quantity);
+      if (isNaN(transferQty) || transferQty <= 0) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ msg: "Transfer quantity must be a positive number" });
+      }
+      transferItems = [{
+        batchNumber: batchNumber || "UNKNOWN",
+        quantity: transferQty,
+        reels: Array.isArray(reels) ? reels : [],
+        rate: Number(skuDoc.avgCost || skuDoc.costPrice || skuDoc.standardCost || skuDoc.rate || 0)
+      }];
     }
-    const destLedgerAgg = await InventoryLedger.aggregate([
-      { $match: destMatchCriteria },
+
+    if (transferItems.length === 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ msg: "No items or quantities to transfer" });
+    }
+
+    const totalTransferQty = transferItems.reduce((acc, it) => acc + it.quantity, 0);
+
+    // Calculate source location's current balance from primary InventoryLedger
+    const sourceLedgerAgg = await InventoryLedger.aggregate([
+      {
+        $match: {
+          skuId: skuObjId,
+          locationId: fromLocObjId,
+          company: companyObjId,
+          status: { $ne: "Cancelled" }
+        }
+      },
       {
         $group: {
           _id: null,
@@ -1823,97 +1856,172 @@ exports.recordTransfer = async (req, res, next) => {
           }
         }
       }
-    ]);
-    const destBalance = destLedgerAgg.length > 0 ? destLedgerAgg[0].onHand : 0;
+    ]).session(session);
+
+    const sourceOverallBalance = sourceLedgerAgg.length > 0 ? sourceLedgerAgg[0].onHand : 0;
+    if (sourceOverallBalance < totalTransferQty - 0.0001) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ 
+        msg: `Insufficient stock at source location (${fromH.doc.name}). Available: ${sourceOverallBalance} ${skuDoc.unit || 'units'}, Requested: ${totalTransferQty} ${skuDoc.unit || 'units'}` 
+      });
+    }
+
+    // Verify each batch balance if specific batchNumbers are given (not "UNKNOWN")
+    for (const item of transferItems) {
+      if (item.batchNumber && item.batchNumber !== "UNKNOWN") {
+        const batchAgg = await InventoryLedger.aggregate([
+          {
+            $match: {
+              skuId: skuObjId,
+              locationId: fromLocObjId,
+              company: companyObjId,
+              batchNumber: item.batchNumber,
+              status: { $ne: "Cancelled" }
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              onHand: {
+                $sum: {
+                  $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", { $subtract: [0, "$quantity"] }]
+                }
+              }
+            }
+          }
+        ]).session(session);
+        const batchBalance = batchAgg.length > 0 ? batchAgg[0].onHand : 0;
+        if (batchBalance < item.quantity - 0.0001) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({
+            msg: `Insufficient stock for batch ${item.batchNumber} at ${fromH.doc.name}. Available: ${batchBalance}, Requested: ${item.quantity}`
+          });
+        }
+      }
+    }
+
+    // Calculate destination location's current balance
+    const destLedgerAgg = await InventoryLedger.aggregate([
+      {
+        $match: {
+          skuId: skuObjId,
+          locationId: toLocObjId,
+          company: companyObjId,
+          status: { $ne: "Cancelled" }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          onHand: {
+            $sum: {
+              $cond: [{ $eq: ["$direction", "IN"] }, "$quantity", { $subtract: [0, "$quantity"] }]
+            }
+          }
+        }
+      }
+    ]).session(session);
+    let currentDestBalance = destLedgerAgg.length > 0 ? destLedgerAgg[0].onHand : 0;
+    let currentSourceBalance = sourceOverallBalance;
 
     // Generate transaction references
     const referenceId = `TXF-${Date.now()}`;
-    const transactionNumberOut = await Sequence.getNextSequence("IL", session);
-    const transactionNumberIn = await Sequence.getNextSequence("IL", session);
+    const userId = req.user ? toObjectId(req.user.id || req.user._id) : null;
 
-    // 1. OUT entry at source in primary ledger
-    const primOut = new InventoryLedger({
-      transactionNumber: transactionNumberOut,
-      transactionType: "Transfer",
-      skuId: skuObjId,
-      quantity: transferQty,
-      unit: skuDoc.unit || "kg",
-      direction: "OUT",
-      referenceType: "StockTransfer",
-      referenceId,
-      batchNumber: batchNumber || "UNKNOWN",
-      warehouseId: fromWarehouse?._id || fromLocObjId,
-      floorId: fromFloor?._id || fromLocObjId,
-      zoneId: fromZone?._id || fromLocObjId,
-      locationId: fromLocObjId,
-      reels: reels || [],
-      remarks: remarks || `Transfer to ${destLocation.name}`,
-      createdBy: toObjectId(req.user.id),
-      company: companyObjId,
-      status: "Posted"
-    });
-    await primOut.save({ session });
+    // Process each transfer item
+    for (const item of transferItems) {
+      const transactionNumberOut = await Sequence.getNextSequence("IL", session);
+      const transactionNumberIn = await Sequence.getNextSequence("IL", session);
 
-    // 2. IN entry at destination in primary ledger
-    const primIn = new InventoryLedger({
-      transactionNumber: transactionNumberIn,
-      transactionType: "Transfer",
-      skuId: skuObjId,
-      quantity: transferQty,
-      unit: skuDoc.unit || "kg",
-      direction: "IN",
-      referenceType: "StockTransfer",
-      referenceId,
-      batchNumber: batchNumber || "UNKNOWN",
-      warehouseId: toWarehouse?._id || toLocObjId,
-      floorId: toFloor?._id || toLocObjId,
-      zoneId: toZone?._id || toLocObjId,
-      locationId: toLocObjId,
-      reels: reels || [],
-      remarks: remarks || `Transfer from ${fromLocation.name}`,
-      createdBy: toObjectId(req.user.id),
-      company: companyObjId,
-      status: "Posted"
-    });
-    await primIn.save({ session });
+      // 1. OUT entry at source in primary ledger
+      const primOut = new InventoryLedger({
+        transactionNumber: transactionNumberOut,
+        transactionType: "Transfer",
+        skuId: skuObjId,
+        quantity: item.quantity,
+        unit: skuDoc.unit || "kg",
+        direction: "OUT",
+        referenceType: "StockTransfer",
+        referenceId,
+        batchNumber: item.batchNumber,
+        warehouseId: fromH.warehouseId,
+        floorId: fromH.floorId,
+        zoneId: fromH.zoneId,
+        locationId: fromH.locationId,
+        reels: item.reels || [],
+        remarks: remarks || `Transfer to ${toH.doc.name}`,
+        createdBy: userId,
+        company: companyObjId,
+        status: "Posted"
+      });
+      await primOut.save({ session });
 
-    // 3. QtyOut entry at source in V2 audit ledger
-    const ledgerOut = new InventoryLedgerV2({
-      transactionType: "Location Transfer",
-      referenceId,
-      skuId: skuObjId,
-      locationId: fromLocObjId,
-      qtyOut: transferQty,
-      balanceAfter: sourceBalance - transferQty,
-      batchNumber,
-      reels,
-      company: companyObjId,
-      remarks: remarks || `Transfer to ${destLocation.name}`,
-      userId: toObjectId(req.user.id)
-    });
-    await ledgerOut.save({ session });
+      // 2. IN entry at destination in primary ledger
+      const primIn = new InventoryLedger({
+        transactionNumber: transactionNumberIn,
+        transactionType: "Transfer",
+        skuId: skuObjId,
+        quantity: item.quantity,
+        unit: skuDoc.unit || "kg",
+        direction: "IN",
+        referenceType: "StockTransfer",
+        referenceId,
+        batchNumber: item.batchNumber,
+        warehouseId: toH.warehouseId,
+        floorId: toH.floorId,
+        zoneId: toH.zoneId,
+        locationId: toH.locationId,
+        reels: item.reels || [],
+        remarks: remarks || `Transfer from ${fromH.doc.name}`,
+        createdBy: userId,
+        company: companyObjId,
+        status: "Posted"
+      });
+      await primIn.save({ session });
 
-    // 4. QtyIn entry at destination in V2 audit ledger
-    const ledgerIn = new InventoryLedgerV2({
-      transactionType: "Location Transfer",
-      referenceId,
-      skuId: skuObjId,
-      locationId: toLocObjId,
-      qtyIn: transferQty,
-      balanceAfter: destBalance + transferQty,
-      batchNumber,
-      reels,
-      company: companyObjId,
-      remarks: remarks || `Transfer from ${fromLocation.name}`,
-      userId: toObjectId(req.user.id)
-    });
-    await ledgerIn.save({ session });
+      currentSourceBalance -= item.quantity;
+      currentDestBalance += item.quantity;
+
+      // 3. QtyOut entry at source in V2 audit ledger
+      const ledgerOut = new InventoryLedgerV2({
+        transactionType: "Location Transfer",
+        referenceId,
+        skuId: skuObjId,
+        locationId: fromLocObjId,
+        qtyOut: item.quantity,
+        balanceAfter: currentSourceBalance,
+        batchNumber: item.batchNumber,
+        reels: item.reels || [],
+        company: companyObjId,
+        remarks: remarks || `Transfer to ${toH.doc.name}`,
+        userId: userId
+      });
+      await ledgerOut.save({ session });
+
+      // 4. QtyIn entry at destination in V2 audit ledger
+      const ledgerIn = new InventoryLedgerV2({
+        transactionType: "Location Transfer",
+        referenceId,
+        skuId: skuObjId,
+        locationId: toLocObjId,
+        qtyIn: item.quantity,
+        balanceAfter: currentDestBalance,
+        batchNumber: item.batchNumber,
+        reels: item.reels || [],
+        company: companyObjId,
+        remarks: remarks || `Transfer from ${fromH.doc.name}`,
+        userId: userId
+      });
+      await ledgerIn.save({ session });
+    }
 
     await session.commitTransaction();
     session.endSession();
 
     broadcast(companyObjId, { entity: "inventory", action: "transfer", referenceId });
-    res.status(201).json({ msg: "Transfer successful", referenceId });
+    res.status(201).json({ msg: "Transfer successful", referenceId, count: transferItems.length, totalQuantity: totalTransferQty });
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
