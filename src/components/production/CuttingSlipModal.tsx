@@ -2,15 +2,28 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   X, Scissors, Printer, CheckCircle2, AlertTriangle, 
   ArrowRight, Layers, Box, Scale, RefreshCw, FileText,
-  Activity, RotateCcw, Calculator, Search, Tag, ChevronDown, Check, Package, Sparkles
+  Activity, RotateCcw, Calculator, Search, Tag, ChevronDown, Check, Package, Sparkles,
+  Receipt, Plus, Trash2, Settings
 } from 'lucide-react';
 import Modal from '../ui/Modal';
 import { 
   SkuV2, WarehouseLocationV2, AvailableReelV2, 
-  getNextCuttingSlipNumberV2, getAvailableReelsV2, createCuttingSlipV2, CuttingSlipV2
+  getNextCuttingSlipNumberV2, getAvailableReelsV2, createCuttingSlipV2, CuttingSlipV2,
+  getMetadataV2, updateMetadataV2
 } from '../../api/mfgApiV2';
 import { getItemClassification } from '../../utils/skuClassification';
 import { LocationSelectPopup } from '../stock_v2/LocationSelectPopup';
+import { PredefinedCost, DEFAULT_PREDEFINED_COSTS } from './NewProductionOrderWizard';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
+import { showToast } from '../ui/Toast';
+
+export interface AdditionalCostRow {
+  id: string;
+  costType: string;
+  basis: 'Per BOM' | 'Per GBL' | 'Per Piece' | string;
+  amount: number | string;
+  remarks?: string;
+}
 
 interface CuttingSlipModalProps {
   isOpen: boolean;
@@ -83,6 +96,19 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
   const [actualSheetsInput, setActualSheetsInput] = useState<string>('');
   const [actualReamsInput, setActualReamsInput] = useState<string>('');
 
+  // ── 4. ADDITIONAL COSTS / OVERHEADS STATE (DYNAMIC & PRESETS) ──
+  const [additionalCosts, setAdditionalCosts] = useState<AdditionalCostRow[]>([]);
+  const [predefinedCosts, setPredefinedCosts] = useState<PredefinedCost[]>(DEFAULT_PREDEFINED_COSTS);
+  const [showManageCostModal, setShowManageCostModal] = useState<boolean>(false);
+  const [showQuickCostPresetMenu, setShowQuickCostPresetMenu] = useState<boolean>(false);
+  const [quickCostOpenUpwards, setQuickCostOpenUpwards] = useState<boolean>(false);
+  const [highlightedCostPresetIdx, setHighlightedCostPresetIdx] = useState<number>(0);
+  const [newCostName, setNewCostName] = useState<string>('');
+  const [newCostBasis, setNewCostBasis] = useState<'Per BOM' | 'Per GBL' | 'Per Piece'>('Per BOM');
+  const [newCostRate, setNewCostRate] = useState<string>('');
+  const costPresetMenuRef = useRef<HTMLDivElement>(null);
+  const costPresetListRef = useRef<HTMLDivElement>(null);
+
   // Print Mode State
   const [isPrintMode, setIsPrintMode] = useState(false);
 
@@ -102,10 +128,83 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
       if (reelDropdownRef.current && !reelDropdownRef.current.contains(e.target as Node)) {
         setShowReelDropdown(false);
       }
+      if (costPresetMenuRef.current && !costPresetMenuRef.current.contains(e.target as Node)) {
+        setShowQuickCostPresetMenu(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Synchronize predefined overhead presets from company metadata
+  useEffect(() => {
+    if (!companyId) return;
+    try {
+      const local = localStorage.getItem(`skbw_predefined_costs_${companyId}`);
+      if (local) {
+        setPredefinedCosts(JSON.parse(local));
+      }
+    } catch (e) {}
+
+    getMetadataV2(companyId).then(meta => {
+      if (meta?.additionalCostPresets && Array.isArray(meta.additionalCostPresets)) {
+        setPredefinedCosts(meta.additionalCostPresets);
+        try {
+          localStorage.setItem(`skbw_predefined_costs_${companyId}`, JSON.stringify(meta.additionalCostPresets));
+        } catch (e) {}
+      } else if (meta && meta.additionalCostPresets === undefined) {
+        setPredefinedCosts(DEFAULT_PREDEFINED_COSTS);
+        updateMetadataV2({ companyId, additionalCostPresets: DEFAULT_PREDEFINED_COSTS }).catch(() => {});
+      }
+    }).catch(err => {
+      console.error('Error fetching metadata presets in CuttingSlipModal:', err);
+    });
+  }, [companyId]);
+
+  useRealtimeSync(['metadata'], (event) => {
+    if (!companyId) return;
+    if (event?.data && Array.isArray(event.data.additionalCostPresets)) {
+      setPredefinedCosts(event.data.additionalCostPresets);
+      try {
+        localStorage.setItem(`skbw_predefined_costs_${companyId}`, JSON.stringify(event.data.additionalCostPresets));
+      } catch (e) {}
+    } else {
+      getMetadataV2(companyId).then(meta => {
+        if (meta?.additionalCostPresets && Array.isArray(meta.additionalCostPresets)) {
+          setPredefinedCosts(meta.additionalCostPresets);
+        }
+      }).catch(() => {});
+    }
+  });
+
+  // Keyboard shortcut Alt+P to toggle predefined overheads menu
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        setShowQuickCostPresetMenu(prev => !prev);
+      }
+      if (showQuickCostPresetMenu) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setHighlightedCostPresetIdx(prev => (prev + 1) % predefinedCosts.length);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setHighlightedCostPresetIdx(prev => (prev - 1 + predefinedCosts.length) % predefinedCosts.length);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (predefinedCosts[highlightedCostPresetIdx]) {
+            handleAddPredefinedCost(predefinedCosts[highlightedCostPresetIdx]);
+            setShowQuickCostPresetMenu(false);
+          }
+        } else if (e.key === 'Escape') {
+          setShowQuickCostPresetMenu(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showQuickCostPresetMenu, predefinedCosts, highlightedCostPresetIdx]);
 
   // ── SEMI-FINISHED GOODS FILTERED LIST (STRICTLY SEMI GOODS) ──
   const semiGoodSkus = useMemo(() => {
@@ -249,6 +348,21 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
     const rawReam = (sku as any).sheetsPerReam ?? (sku as any).standardSheets ?? sku.pages;
     const validReam = (rawReam && Number(rawReam) > 0 && Number(rawReam) <= 1000) ? Number(rawReam) : 500;
     setSheetsPerReamInput(String(validReam));
+
+    // Auto-pull additional costs / overheads accurately from target SKU BOM
+    if (Array.isArray((sku as any).additionalCosts) && (sku as any).additionalCosts.length > 0) {
+      setAdditionalCosts((sku as any).additionalCosts.map((c: any, i: number) => ({
+        id: c.id || `cost-bom-${Date.now()}-${i}`,
+        costType: c.costType || '',
+        basis: c.basis || 'Per BOM',
+        amount: c.amount ?? c.defaultRate ?? c.rate ?? 0,
+        remarks: c.remarks || ''
+      })));
+      showToast(`Loaded ${(sku as any).additionalCosts.length} overheads from ${sku.name || 'SKU'} BOM`, 'info');
+    } else {
+      setAdditionalCosts([]);
+    }
+
     setTargetSkuSearch('');
     setShowTargetDropdown(false);
   };
@@ -691,20 +805,105 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
     return Math.round((loss / theoreticalSheets) * 1000) / 10;
   }, [theoreticalSheets, numActualSheets]);
 
-  // Landed cost allocation & accurate costing (Net Cost = Total Reel Input Value)
-  const netProductionCost = useMemo(() => {
-    return totalInputCost;
-  }, [totalInputCost]);
+  // ── ADDITIONAL COSTS / OVERHEADS DYNAMIC CALCULATIONS & HANDLERS ──
+  const handleAddCost = () => {
+    setAdditionalCosts(prev => [
+      ...prev,
+      {
+        id: `cost-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        costType: '',
+        basis: 'Per BOM',
+        amount: ''
+      }
+    ]);
+  };
 
-  const effectiveCostPerSheet = useMemo(() => {
-    if (numActualSheets <= 0) return 0;
-    return Math.round((netProductionCost / numActualSheets) * 10000) / 10000;
-  }, [netProductionCost, numActualSheets]);
+  const handleDeleteCost = (id: string) => {
+    setAdditionalCosts(prev => prev.filter(c => c.id !== id));
+  };
 
-  const effectiveCostPerReam = useMemo(() => {
-    if (numActualReams <= 0) return 0;
-    return Math.round((netProductionCost / numActualReams) * 100) / 100;
-  }, [netProductionCost, numActualReams]);
+  const handleUpdateCost = (id: string, field: keyof AdditionalCostRow, value: any) => {
+    setAdditionalCosts(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
+  };
+
+  const handleAddPredefinedCost = (preset: PredefinedCost) => {
+    const newId = `cost-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    setAdditionalCosts(prev => [
+      ...prev,
+      {
+        id: newId,
+        costType: preset.name,
+        basis: preset.basis,
+        amount: preset.defaultRate
+      }
+    ]);
+    showToast(`Added "${preset.name}" overhead`, 'success');
+  };
+
+  const handleAddNewCostPreset = () => {
+    if (!newCostName.trim()) {
+      showToast('Please enter an overhead cost name', 'error');
+      return;
+    }
+    const rateNum = Number(newCostRate) || 0;
+    const newPreset: PredefinedCost = {
+      id: `cost-p-${Date.now()}`,
+      name: newCostName.trim(),
+      basis: newCostBasis,
+      defaultRate: rateNum,
+      appliedAs: newCostBasis
+    };
+    const updated = [...predefinedCosts, newPreset];
+    setPredefinedCosts(updated);
+    try {
+      localStorage.setItem(`skbw_predefined_costs_${companyId || 'default'}`, JSON.stringify(updated));
+    } catch (e) {}
+    if (companyId) {
+      updateMetadataV2({ companyId, additionalCostPresets: updated }).catch(e => console.error(e));
+    }
+    setNewCostName('');
+    setNewCostRate('');
+    showToast(`Added "${newPreset.name}" to predefined overheads`, 'success');
+  };
+
+  const handleUpdateCostPreset = (id: string, updates: Partial<PredefinedCost>) => {
+    const updated = predefinedCosts.map(c => {
+      if (c.id !== id) return c;
+      const merged = { ...c, ...updates };
+      if (updates.basis) merged.appliedAs = updates.basis;
+      return merged;
+    });
+    setPredefinedCosts(updated);
+    try {
+      localStorage.setItem(`skbw_predefined_costs_${companyId || 'default'}`, JSON.stringify(updated));
+    } catch (e) {}
+    if (companyId) {
+      updateMetadataV2({ companyId, additionalCostPresets: updated }).catch(e => console.error(e));
+    }
+  };
+
+  const handleDeleteCostPreset = (id: string) => {
+    const updated = predefinedCosts.filter(c => c.id !== id);
+    setPredefinedCosts(updated);
+    try {
+      localStorage.setItem(`skbw_predefined_costs_${companyId || 'default'}`, JSON.stringify(updated));
+    } catch (e) {}
+    if (companyId) {
+      updateMetadataV2({ companyId, additionalCostPresets: updated }).catch(e => console.error(e));
+    }
+    showToast('Predefined overhead deleted', 'info');
+  };
+
+  const handleResetCostPresets = () => {
+    setPredefinedCosts(DEFAULT_PREDEFINED_COSTS);
+    try {
+      localStorage.setItem(`skbw_predefined_costs_${companyId || 'default'}`, JSON.stringify(DEFAULT_PREDEFINED_COSTS));
+    } catch (e) {}
+    if (companyId) {
+      updateMetadataV2({ companyId, additionalCostPresets: DEFAULT_PREDEFINED_COSTS }).catch(e => console.error(e));
+    }
+    showToast('Reset predefined overheads to defaults', 'info');
+  };
 
   // Target SKU Unit and Conversion Factor
   const targetConvFactor = useMemo(() => {
@@ -728,29 +927,120 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
            (targetSkuDoc?.name && /sr|ur|index|board/i.test(targetSkuDoc.name));
   }, [targetSkuDoc]);
 
+  // Total Produced Pieces (for semi-finished, 1 parent sheet yields 4 book pieces)
+  const totalProducedPieces = useMemo(() => {
+    return isSemiFinished ? (numActualSheets * 4) : numActualSheets;
+  }, [isSemiFinished, numActualSheets]);
+
+  // Total Produced GBL
+  const totalProducedGbl = useMemo(() => {
+    if (targetConvFactor <= 0) return 0;
+    return Math.round((totalProducedPieces / targetConvFactor) * 10000) / 10000;
+  }, [totalProducedPieces, targetConvFactor]);
+
+  // Dynamic calculation for an additional cost row in paper-to-sheet conversion
+  const calculateAdditionalCostRow = (cost: { basis?: string; amount?: number | string }) => {
+    const amt = Number(cost.amount) || 0;
+    const b = (cost.basis || '').toLowerCase().trim();
+
+    // 1. Per BOM: Multiply with actual good sheets produced
+    if (b === 'per bom' || b.includes('bom') || b.includes('batch')) {
+      const sheets = numActualSheets > 0 ? numActualSheets : 1;
+      const total = amt * sheets;
+      return {
+        total,
+        multiplier: sheets,
+        label: `${sheets.toLocaleString()} Sheets`
+      };
+    }
+
+    // 2. Per Piece (PCS): Rate * total pieces
+    if (b === 'per piece' || b.includes('piece') || b.includes('pcs')) {
+      const pcs = totalProducedPieces > 0 ? totalProducedPieces : 1;
+      const total = amt * pcs;
+      return {
+        total,
+        multiplier: pcs,
+        label: `${pcs.toLocaleString('en-IN')} PCS`
+      };
+    }
+
+    // 3. Per GBL: Rate * total GBL produced
+    if (b === 'per gbl' || b.includes('gbl')) {
+      const cleanGbl = totalProducedGbl > 0 ? Math.round(totalProducedGbl * 100) / 100 : 1;
+      const total = amt * cleanGbl;
+      return {
+        total,
+        multiplier: cleanGbl,
+        label: `${totalProducedGbl > 0 ? totalProducedGbl.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : 1} GBL`
+      };
+    }
+
+    // 4. Fallback (Flat)
+    return {
+      total: amt,
+      multiplier: 1,
+      label: 'Flat'
+    };
+  };
+
+  const totalAdditionalCost = useMemo(() => {
+    return additionalCosts.reduce((sum, row) => {
+      const { total } = calculateAdditionalCostRow(row);
+      return sum + total;
+    }, 0);
+  }, [additionalCosts, numActualSheets, totalProducedPieces, totalProducedGbl]);
+
+  // Landed cost allocation & accurate costing (Net Landed Cost = Total Reel Input Value + Total Additional Costs)
+  const netProductionCost = useMemo(() => {
+    return totalInputCost + totalAdditionalCost;
+  }, [totalInputCost, totalAdditionalCost]);
+
+  const effectiveCostPerSheet = useMemo(() => {
+    if (numActualSheets <= 0) return 0;
+    return Math.round((netProductionCost / numActualSheets) * 10000) / 10000;
+  }, [netProductionCost, numActualSheets]);
+
+  const effectiveCostPerReam = useMemo(() => {
+    if (numActualReams <= 0) return 0;
+    return Math.round((netProductionCost / numActualReams) * 100) / 100;
+  }, [netProductionCost, numActualReams]);
+
+  const costPerPiece = useMemo(() => {
+    if (totalProducedPieces <= 0) return 0;
+    return Math.round((netProductionCost / totalProducedPieces) * 10000) / 10000;
+  }, [netProductionCost, totalProducedPieces]);
+
+  const costPer4UpPiece = costPerPiece;
+
+  const costPerGbl = useMemo(() => {
+    if (totalProducedGbl > 0) {
+      return Math.round((netProductionCost / totalProducedGbl) * 100) / 100;
+    }
+    if (targetConvFactor > 0 && costPerPiece > 0) {
+      return Math.round((costPerPiece * targetConvFactor) * 100) / 100;
+    }
+    return 0;
+  }, [netProductionCost, totalProducedGbl, targetConvFactor, costPerPiece]);
+
   const convertedTargetQty = useMemo(() => {
     if (numActualSheets <= 0) return 0;
     if (targetUnit.includes('REAM')) return numActualReams;
-    
-    // For semi-finished goods (SR/UR/Index/Board), 1 parent sheet produces 4 book-size pieces (4-UP)
-    const totalPcs = isSemiFinished ? numActualSheets * 4 : numActualSheets;
-
     if (targetConvFactor > 0 && (targetUnit === 'GBL' || targetUnit.includes('BUNDLE') || targetUnit.includes('BOX') || targetUnit.includes('CARTON'))) {
-      return Math.round((totalPcs / targetConvFactor) * 10000) / 10000;
+      return totalProducedGbl;
     }
-    return totalPcs;
-  }, [numActualSheets, numActualReams, targetUnit, targetConvFactor, isSemiFinished]);
+    return totalProducedPieces;
+  }, [numActualSheets, numActualReams, targetUnit, targetConvFactor, totalProducedGbl, totalProducedPieces]);
 
   const costPerTargetUnit = useMemo(() => {
-    if (convertedTargetQty <= 0) return 0;
-    return Math.round((netProductionCost / convertedTargetQty) * 10000) / 10000;
-  }, [netProductionCost, convertedTargetQty]);
-
-  // Semi-Finished 4-UP Book-Size Piece Cost (Parent Sheet Cost / 4)
-  const costPer4UpPiece = useMemo(() => {
-    if (effectiveCostPerSheet <= 0) return 0;
-    return Math.round((effectiveCostPerSheet / 4) * 10000) / 10000;
-  }, [effectiveCostPerSheet]);
+    if (targetUnit === 'GBL' || targetUnit.includes('BUNDLE') || targetUnit.includes('BOX') || targetUnit.includes('CARTON')) {
+      return costPerGbl;
+    }
+    if (targetUnit.includes('REAM')) {
+      return effectiveCostPerReam;
+    }
+    return effectiveCostPerSheet;
+  }, [targetUnit, costPerGbl, effectiveCostPerReam, effectiveCostPerSheet]);
 
   // Post Voucher
   const handleSubmit = async () => {
@@ -817,6 +1107,17 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
         coreCount: 0,
         coreRatePerPc: 0,
         totalScrapCredit: 0,
+        additionalCosts: additionalCosts.map(c => {
+          const { total } = calculateAdditionalCostRow(c);
+          return {
+            costType: c.costType || '',
+            basis: c.basis || 'Per BOM',
+            amount: Number(c.amount) || 0,
+            calculatedAmount: total,
+            remarks: c.remarks || ''
+          };
+        }),
+        totalAdditionalCost,
         netProductionCost,
         effectiveCostPerSheet,
         effectiveCostPerReam,
@@ -847,7 +1148,8 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <Modal
+    <>
+      <Modal
       isOpen={isOpen}
       onClose={onClose}
       size="max-w-[98vw] 2xl:max-w-[1760px]"
@@ -1828,6 +2130,207 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
               </div>
             </div>
 
+            {/* ── ADDITIONAL COSTS / OVERHEADS BLOCK (1:1 with NewProductionOrderWizard) ── */}
+            <div className="bg-white rounded-xl border border-blue-200 p-3 shadow-3xs space-y-2.5 shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                    <Receipt className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+                      Additional Costs / Overheads (Optional)
+                    </span>
+                    <p className="text-[10px] text-gray-500 font-medium">
+                      Direct labour, electricity, packaging, or machine sheeting charges
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {/* Preset Overhead Dropdown Button */}
+                  <div className="relative" ref={costPresetMenuRef}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const spaceBelow = window.innerHeight - rect.bottom;
+                        setQuickCostOpenUpwards(spaceBelow < 280 && rect.top > 280);
+                        setShowQuickCostPresetMenu(!showQuickCostPresetMenu);
+                        setHighlightedCostPresetIdx(0);
+                      }}
+                      className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100/80 text-blue-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-blue-200 shadow-3xs"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Add Preset Overhead</span>
+                      <ChevronDown className="w-3 h-3 text-blue-500" />
+                    </button>
+
+                    {showQuickCostPresetMenu && (
+                      <div 
+                        className={`absolute right-0 ${quickCostOpenUpwards ? 'bottom-full mb-1' : 'top-full mt-1'} w-80 max-h-[80vh] bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 text-xs divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100`}
+                        role="menu"
+                      >
+                        <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <span>Predefined Overheads</span>
+                            <kbd className="font-mono text-[9px] bg-gray-100 text-gray-600 px-1 py-0.5 rounded border border-gray-200">Alt+P</kbd>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowQuickCostPresetMenu(false);
+                              setShowManageCostModal(true);
+                            }}
+                            className="text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer font-bold"
+                          >
+                            <Settings className="w-3 h-3" />
+                            <span>Manage</span>
+                          </button>
+                        </div>
+                        <div className="max-h-56 overflow-y-auto py-1 scroll-smooth" ref={costPresetListRef}>
+                          {predefinedCosts.map((p, pIdx) => {
+                            const isSelected = pIdx === highlightedCostPresetIdx;
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => {
+                                  handleAddPredefinedCost(p);
+                                  setShowQuickCostPresetMenu(false);
+                                }}
+                                onMouseEnter={() => setHighlightedCostPresetIdx(pIdx)}
+                                className={`w-full px-3 py-1.5 text-left flex items-center justify-between group transition-colors cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-blue-100/90 text-blue-900 font-bold ring-1 ring-inset ring-blue-400'
+                                    : 'hover:bg-blue-50/70 text-gray-800'
+                                }`}
+                                role="menuitem"
+                              >
+                                <span className="font-semibold truncate">{p.name}</span>
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ml-2 ${
+                                  p.basis === 'Per GBL' || p.basis === 'Per Piece' || p.basis === 'Per BOM'
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                                    : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {p.basis === 'Per GBL' ? `₹${p.defaultRate}/GBL` : p.basis === 'Per Piece' ? `₹${p.defaultRate}/PCS` : p.basis === 'Per BOM' ? `₹${p.defaultRate}/BOM` : `₹${p.defaultRate}`}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="px-3 py-1 bg-gray-50 text-[10px] text-gray-500 flex items-center justify-between">
+                          <span>Use <kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold">↑</kbd><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold ml-0.5">↓</kbd></span>
+                          <span><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold">Enter</kbd> to add</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddCost}
+                    className="px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-all border border-gray-200 shadow-3xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Custom</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto border border-gray-200 rounded-xl custom-scrollbar max-h-48 overflow-y-auto">
+                <table className="w-full text-left border-collapse text-xs min-w-[560px]">
+                  <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none sticky top-0 bg-gray-50">
+                    <tr>
+                      <th className="py-1.5 px-3 w-8 text-center">#</th>
+                      <th className="py-1.5 px-3">COST TYPE</th>
+                      <th className="py-1.5 px-3 text-center w-36">CALC BASIS</th>
+                      <th className="py-1.5 px-3 text-right w-44">AMOUNT (₹)</th>
+                      <th className="py-1.5 px-3 text-center w-20">ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {additionalCosts.map((cost, cIdx) => {
+                      const costCalc = calculateAdditionalCostRow(cost);
+                      return (
+                        <tr key={cost.id} className="hover:bg-gray-50/60">
+                          <td className="py-1.5 px-3 text-center font-bold text-gray-400">{cIdx + 1}</td>
+                          <td className="py-1.5 px-3">
+                            <input
+                              type="text"
+                              list="cutting-overhead-presets"
+                              value={cost.costType}
+                              onChange={e => {
+                                const val = e.target.value;
+                                handleUpdateCost(cost.id, 'costType', val);
+                                const matched = predefinedCosts.find(p => p.name.toLowerCase() === val.toLowerCase());
+                                if (matched) {
+                                  handleUpdateCost(cost.id, 'basis', matched.basis as any);
+                                  handleUpdateCost(cost.id, 'amount', matched.defaultRate);
+                                }
+                              }}
+                              placeholder="e.g. Labour, Electricity, Sheeting Charge"
+                              className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                            />
+                          </td>
+                          <td className="py-1.5 px-3 text-center">
+                            <select
+                              value={cost.basis}
+                              onChange={e => handleUpdateCost(cost.id, 'basis', e.target.value as any)}
+                              className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-blue-500"
+                            >
+                              <option value="Per BOM">📦 Per BOM</option>
+                              <option value="Per Piece">⚡ Per Piece</option>
+                              <option value="Per GBL">📦 Per GBL</option>
+                            </select>
+                          </td>
+                          <td className="py-1.5 px-3 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={cost.amount}
+                              onChange={e => handleUpdateCost(cost.id, 'amount', e.target.value)}
+                              className="w-24 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-xs font-bold focus:ring-1 focus:ring-blue-500"
+                            />
+                            {Number(cost.amount) > 0 && (
+                              <div className="text-[10px] text-blue-600 font-mono font-bold text-right mt-0.5 whitespace-nowrap">
+                                = ₹{costCalc.total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                <span className="text-[9px] text-gray-400 font-sans font-normal ml-0.5">({costCalc.label})</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-1.5 px-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCost(cost.id)}
+                              className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                              title="Delete overhead"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {additionalCosts.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="py-3 text-center text-xs text-gray-400 italic bg-gray-50/30">
+                          No additional costs added. Click <strong className="text-blue-600 font-semibold cursor-pointer" onClick={() => setShowQuickCostPresetMenu(true)}>"Add Preset Overhead"</strong> above or select a target SKU with a BOM.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+                <datalist id="cutting-overhead-presets">
+                  {predefinedCosts.map(p => (
+                    <option key={p.id} value={p.name}>
+                      {p.basis} — ₹{p.defaultRate}
+                    </option>
+                  ))}
+                </datalist>
+              </div>
+            </div>
+
             {/* ── BOTTOM PANE: Costing Valuation & Landed Absorption ── */}
             <div className="bg-white p-2.5 rounded-xl border border-blue-200 shadow-3xs space-y-2 shrink-0">
               <div className="flex items-center justify-between text-xs">
@@ -1837,13 +2340,13 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                 </span>
                 <span className="text-[10px] text-blue-800 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 font-semibold flex items-center gap-1">
                   <Sparkles className="w-3 h-3 text-blue-600" />
-                  Formula: Landed Rate = Reel Input Value ÷ Good Sheets Produced
+                  Formula: Landed Rate = (Reel Input Value + Additional Costs) ÷ Good Sheets Produced
                 </span>
               </div>
 
               {/* Compact High-Contrast Costing Reconciliation Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 items-center text-xs">
-                {/* Card 1: Total Reel Input Value */}
+                {/* Card 1: Total Reel Input Value & Overheads */}
                 <div className="lg:col-span-3 bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-200 flex flex-col justify-between h-full">
                   <div>
                     <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
@@ -1853,8 +2356,15 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                       {totalInputWeight.toLocaleString('en-IN')} kg @ ₹{avgInputRatePerKg.toFixed(2)}/kg
                     </span>
                   </div>
-                  <div className="font-mono font-bold text-base text-emerald-700 mt-2">
-                    ₹{totalInputCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <div>
+                    <div className="font-mono font-bold text-base text-emerald-700 mt-2">
+                      ₹{totalInputCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                    {totalAdditionalCost > 0 && (
+                      <span className="text-[9.5px] font-mono text-emerald-800 block mt-0.5 font-semibold">
+                        + ₹{totalAdditionalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} overheads
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -1880,73 +2390,56 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
                     ₹{effectiveCostPerSheet.toFixed(3)} <span className="text-[10px] text-blue-700 font-normal">/ sheet</span>
                   </div>
                   <span className="text-[10px] text-blue-700 font-mono mt-0.5">
-                    (₹{totalInputCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })} ÷ {numActualSheets.toLocaleString()})
+                    (₹{netProductionCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ÷ {numActualSheets.toLocaleString()})
                   </span>
                 </div>
 
-                {/* Card 4: Converted Yield & Rate */}
+                {/* Card 4: Piece Yield & GBL Valuation (PCS Primarily, GBL Secondarily) */}
                 <div className="lg:col-span-3 bg-blue-900 text-white p-2.5 rounded-lg border border-blue-800 flex flex-col justify-between h-full shadow-3xs">
-                  {targetConvFactor > 0 && (targetUnit === 'GBL' || targetUnit.includes('BUNDLE') || targetUnit.includes('BOX') || targetUnit.includes('CARTON')) ? (
-                    <>
-                      <div>
-                        <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider block">
-                          Converted Yield ({targetUnit})
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider block">
+                        PIECE YIELD (PCS)
+                      </span>
+                      <span className="text-[9px] px-1.5 py-0.2 bg-blue-800 text-blue-200 rounded font-semibold border border-blue-700">
+                        PRIMARY
+                      </span>
+                    </div>
+                    <span className="text-[9.5px] text-blue-300 block truncate mt-0.5">
+                      {isSemiFinished ? '4-UP: 1 Sheet = 4 Book PCS' : '1 Sheet = 1 Unit'} • Yield: {totalProducedPieces.toLocaleString()} PCS
+                    </span>
+                  </div>
+
+                  {/* Primary Highlight Badge: ₹ / PCS */}
+                  <div className="my-1.5 px-2 py-1 bg-blue-800/90 rounded-md border border-blue-700/80 text-center font-mono">
+                    <span className="font-bold text-sm text-white block">
+                      ₹{costPerPiece.toFixed(4)} <span className="text-[10px] font-sans font-medium text-blue-200">/ PCS</span>
+                    </span>
+                  </div>
+
+                  {/* Secondary: GBL (or Reams fallback if no GBL conv factor) */}
+                  <div className="text-[10px] font-mono text-blue-200 bg-blue-950/60 px-2 py-1 rounded border border-blue-800/70 flex items-center justify-between">
+                    {targetConvFactor > 0 ? (
+                      <>
+                        <span className="truncate">
+                          Sec: <span className="text-white font-bold">{totalProducedGbl.toLocaleString('en-IN', { maximumFractionDigits: 2 })} GBL</span>
+                          <span className="text-[8.5px] text-blue-300 block font-sans">1 GBL = {targetConvFactor.toLocaleString()} PCS</span>
                         </span>
-                        <span className="text-[9.5px] text-blue-300 block truncate">
-                          {isSemiFinished ? '4-UP Pcs: 1 Sheet = 4 Pcs' : `1 ${targetUnit} = ${targetConvFactor} ${targetSkuDoc?.altUnit || 'Sheets'}`}
+                        <span className="font-bold text-emerald-300 ml-1 shrink-0">
+                          @ ₹{costPerGbl.toFixed(2)}/GBL
                         </span>
-                      </div>
-                      <div className="text-[10px] font-mono text-blue-200 mt-1">
-                        {isSemiFinished ? (
-                          <>{(numActualSheets * 4).toLocaleString()} pcs ÷ {targetConvFactor} = <span className="font-bold text-white">{convertedTargetQty} {targetUnit}</span></>
-                        ) : (
-                          <>{numActualSheets.toLocaleString()} ÷ {targetConvFactor} = <span className="font-bold text-white">{convertedTargetQty} {targetUnit}</span></>
-                        )}
-                      </div>
-                      <div className="mt-1 px-2 py-0.5 bg-blue-800/80 rounded border border-blue-700 text-center font-mono font-bold text-xs text-white">
-                        ₹{costPerTargetUnit.toFixed(2)} / {targetUnit}
-                        {costPer4UpPiece > 0 && (
-                          <span className="block text-[9.5px] text-blue-200 font-normal mt-0.5">
-                            (₹{costPer4UpPiece.toFixed(4)} / PCS)
-                          </span>
-                        )}
-                      </div>
-                    </>
-                  ) : isSemiFinished ? (
-                    <>
-                      <div>
-                        <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider block">
-                          Semi-Finished 4-UP ({targetUnit || 'PCS'})
+                      </>
+                    ) : (
+                      <>
+                        <span className="truncate">
+                          Sec: <span className="text-white font-bold">{numActualReams.toLocaleString()} Reams</span>
                         </span>
-                        <span className="text-[9.5px] text-blue-300 block">
-                          1 Parent Sheet = 4 Book PCS
+                        <span className="font-bold text-emerald-300 ml-1 shrink-0">
+                          @ ₹{effectiveCostPerReam.toFixed(2)}/Rm
                         </span>
-                      </div>
-                      <div className="text-[10px] font-mono text-blue-200 mt-1">
-                        Yield: <span className="font-bold text-white">{(numActualSheets * 4).toLocaleString()} PCS</span>
-                      </div>
-                      <div className="mt-1 px-2 py-0.5 bg-blue-800/80 rounded border border-blue-700 text-center font-mono font-bold text-xs text-white">
-                        ₹{costPer4UpPiece.toFixed(4)} / PCS
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <span className="text-[10px] font-bold text-blue-200 uppercase tracking-wider block">
-                          Sheet Yield ({targetUnit || 'Sheets'})
-                        </span>
-                        <span className="text-[9.5px] text-blue-300 block">
-                          Per sheet / piece yield
-                        </span>
-                      </div>
-                      <div className="text-[10px] font-mono text-blue-200 mt-1">
-                        Rate: <span className="font-bold text-white">₹{effectiveCostPerSheet.toFixed(3)} / sheet</span>
-                      </div>
-                      <div className="mt-1 px-2 py-0.5 bg-blue-800/80 rounded border border-blue-700 text-center font-mono font-bold text-xs text-white">
-                        ₹{effectiveCostPerSheet.toFixed(2)} per sheet
-                      </div>
-                    </>
-                  )}
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -2010,5 +2503,141 @@ export const CuttingSlipModal: React.FC<CuttingSlipModalProps> = ({
         )}
       </div>
     </Modal>
+
+    {/* ── MANAGE PREDEFINED OVERHEADS MODAL (1:1 with NewProductionOrderWizard) ── */}
+    {showManageCostModal && (
+      <Modal
+        isOpen={showManageCostModal}
+        onClose={() => setShowManageCostModal(false)}
+        title="Manage Predefined Production Overheads"
+        maxWidth="max-w-xl"
+      >
+        <div className="space-y-4 p-2 text-xs">
+          <p className="text-xs text-gray-500">
+            Predefined overheads appear in the quick cost selector dropdown and auto-suggest when typing cost names. Changes sync dynamically across all users.
+          </p>
+
+          {/* List */}
+          <div className="max-h-64 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-100">
+            {predefinedCosts.map(p => (
+              <div key={p.id} className="p-2.5 flex items-center justify-between gap-2.5 text-xs hover:bg-gray-50/80 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <input
+                    type="text"
+                    value={p.name}
+                    onChange={e => handleUpdateCostPreset(p.id, { name: e.target.value })}
+                    placeholder="Preset Name"
+                    className="w-full font-bold text-gray-800 bg-transparent border border-transparent hover:border-gray-200 focus:border-blue-400 focus:bg-white rounded-lg px-2 py-1 text-xs truncate transition-all"
+                  />
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <select
+                    value={p.basis}
+                    onChange={e => handleUpdateCostPreset(p.id, { basis: e.target.value as any })}
+                    className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="Per BOM">📦 Per BOM</option>
+                    <option value="Per Piece">⚡ Per Piece</option>
+                    <option value="Per GBL">📦 Per GBL</option>
+                  </select>
+                  <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-0.5">
+                    <span className="text-gray-400 text-xs font-bold">₹</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={p.defaultRate}
+                      onChange={e => handleUpdateCostPreset(p.id, { defaultRate: Number(e.target.value) || 0 })}
+                      className="w-16 text-right font-mono text-xs font-bold text-gray-800 bg-transparent focus:outline-none"
+                    />
+                    <span className="text-[10px] text-gray-500 font-semibold font-mono">
+                      {p.basis === 'Per GBL' ? '/GBL' : p.basis === 'Per Piece' ? '/PCS' : '/BOM'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteCostPreset(p.id)}
+                    className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                    title="Delete preset"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {predefinedCosts.length === 0 && (
+              <div className="py-6 text-center text-gray-400 italic">
+                No predefined overheads saved. Add one below or click Reset to Defaults.
+              </div>
+            )}
+          </div>
+
+          {/* Add new preset form */}
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleAddNewCostPreset();
+            }}
+            className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2"
+          >
+            <span className="text-[11px] font-bold text-blue-900 block uppercase tracking-wide">
+              + Add New Overhead Preset
+            </span>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={newCostName}
+                onChange={e => setNewCostName(e.target.value)}
+                placeholder="e.g. Sheeting Job Work, Extra Handling"
+                className="flex-1 px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+              />
+              <select
+                value={newCostBasis}
+                onChange={e => setNewCostBasis(e.target.value as any)}
+                className="px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="Per BOM">📦 Per BOM</option>
+                <option value="Per Piece">⚡ Per Piece</option>
+                <option value="Per GBL">📦 Per GBL</option>
+              </select>
+              <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-1">
+                <span className="text-gray-400 text-xs font-bold">₹</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={newCostRate}
+                  onChange={e => setNewCostRate(e.target.value)}
+                  placeholder="Rate"
+                  className="w-16 text-right font-mono text-xs font-bold text-gray-800 bg-transparent focus:outline-none"
+                />
+              </div>
+              <button
+                type="submit"
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors shrink-0 shadow-3xs"
+              >
+                Add
+              </button>
+            </div>
+          </form>
+
+          <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={handleResetCostPresets}
+              className="text-xs text-gray-500 hover:text-gray-700 underline cursor-pointer"
+            >
+              Reset to Defaults
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowManageCostModal(false)}
+              className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg text-xs font-bold cursor-pointer transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </Modal>
+    )}
+  </>
   );
 };

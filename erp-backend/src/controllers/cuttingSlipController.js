@@ -323,6 +323,8 @@ exports.createCuttingSlip = async (req, res) => {
       coreCount,
       coreRatePerPc,
       totalScrapCredit,
+      additionalCosts,
+      totalAdditionalCost,
       netProductionCost,
       destinationLocationId,
       machineName,
@@ -387,8 +389,24 @@ exports.createCuttingSlip = async (req, res) => {
       ? Number(sheetsPerReam)
       : 500;
 
-    // Accurate Costing: Reel Value ÷ Valid Actual Parent Sheets, then apply 4-UP once
+    // Accurate Costing: Reel Value + Total Additional Costs ÷ Valid Actual Parent Sheets, then apply 4-UP once
     const reelValue = Number(totalInputCost || 0);
+    const resolvedAdditionalCosts = Array.isArray(additionalCosts)
+      ? additionalCosts.map(c => ({
+          costType: c.costType || "",
+          basis: c.basis || "Per BOM",
+          amount: Number(c.amount || 0),
+          calculatedAmount: Number(c.calculatedAmount || 0),
+          remarks: c.remarks || ""
+        }))
+      : [];
+    const calculatedTotalAdditionalCost = Number(
+      totalAdditionalCost !== undefined && totalAdditionalCost !== null
+        ? totalAdditionalCost
+        : resolvedAdditionalCosts.reduce((acc, c) => acc + (c.calculatedAmount || 0), 0)
+    );
+    const totalLandedCost = reelValue + calculatedTotalAdditionalCost;
+
     const finalTheoreticalSheets = maxTheoSheets || Number(theoreticalSheets) || 0;
     const finalTheoreticalReams = resolvedSheetsPerReam > 0
       ? Number((finalTheoreticalSheets / resolvedSheetsPerReam).toFixed(2))
@@ -397,10 +415,10 @@ exports.createCuttingSlip = async (req, res) => {
       ? Number((validActualSheets / resolvedSheetsPerReam).toFixed(2))
       : 0;
     const effectiveCostPerSheet = validActualSheets > 0
-      ? reelValue / validActualSheets
+      ? totalLandedCost / validActualSheets
       : 0;
     const effectiveCostPerReam = resolvedActualReams > 0
-      ? reelValue / resolvedActualReams
+      ? totalLandedCost / resolvedActualReams
       : 0;
     const costPer4UpPiece = validActualSheets > 0
       ? Number((effectiveCostPerSheet / 4).toFixed(4))
@@ -447,7 +465,9 @@ exports.createCuttingSlip = async (req, res) => {
       coreCount: 0,
       coreRatePerPc: 0,
       totalScrapCredit: 0,
-      netProductionCost: reelValue,
+      additionalCosts: resolvedAdditionalCosts,
+      totalAdditionalCost: calculatedTotalAdditionalCost,
+      netProductionCost: totalLandedCost,
       effectiveCostPerSheet,
       effectiveCostPerReam,
       costPer4UpPiece,
@@ -528,24 +548,24 @@ exports.createCuttingSlip = async (req, res) => {
 
     // In Cutting Slip, Reel-to-Sheet converts parent reels into validActualSheets parent sheets.
     // 1 parent sheet yields 4 book-size pages (4-UP layout) in notebook production.
-    const pieceCost = Number(costPer4UpPiece) || (validActualSheets > 0 ? (Number(totalInputCost || 0) / (validActualSheets * 4)) : 0);
+    const pieceCost = Number(costPer4UpPiece) || (validActualSheets > 0 ? (totalLandedCost / (validActualSheets * 4)) : 0);
 
     let finalOutputQty = validActualSheets;
-    let unitRate = validActualSheets > 0 ? Math.round((Number(totalInputCost || 0) / validActualSheets) * 10000) / 10000 : 0;
+    let unitRate = validActualSheets > 0 ? Math.round((totalLandedCost / validActualSheets) * 10000) / 10000 : 0;
 
     if (isTargetUnitReam) {
       finalOutputQty = Number(resolvedActualReams) || (resolvedSheetsPerReam > 0 ? Number((validActualSheets / resolvedSheetsPerReam).toFixed(2)) : 0);
-      unitRate = finalOutputQty > 0 ? Math.round((Number(totalInputCost || 0) / finalOutputQty) * 10000) / 10000 : 0;
+      unitRate = finalOutputQty > 0 ? Math.round((totalLandedCost / finalOutputQty) * 10000) / 10000 : 0;
     } else if (isTargetUnitGbl && convFactor > 0) {
       // 1 GBL contains convFactor parent sheets (e.g. 2,500 Sheets / GBL)
       finalOutputQty = Math.round((validActualSheets / convFactor) * 10000) / 10000;
-      unitRate = finalOutputQty > 0 ? Math.round((Number(totalInputCost || 0) / finalOutputQty) * 10000) / 10000 : 0;
+      unitRate = finalOutputQty > 0 ? Math.round((totalLandedCost / finalOutputQty) * 10000) / 10000 : 0;
     } else if (targetSkuDoc.altUnit && convFactor > 0 && !isTargetUnitPcs) {
       finalOutputQty = convertAltToPrimary(Number(validActualSheets), targetSkuDoc);
-      unitRate = finalOutputQty > 0 ? Math.round((Number(totalInputCost || 0) / finalOutputQty) * 10000) / 10000 : 0;
+      unitRate = finalOutputQty > 0 ? Math.round((totalLandedCost / finalOutputQty) * 10000) / 10000 : 0;
     } else {
       finalOutputQty = validActualSheets;
-      unitRate = validActualSheets > 0 ? Math.round((Number(totalInputCost || 0) / validActualSheets) * 10000) / 10000 : 0;
+      unitRate = validActualSheets > 0 ? Math.round((totalLandedCost / validActualSheets) * 10000) / 10000 : 0;
     }
 
     const txNumIn = await Sequence.getNextSequence("IL", session);

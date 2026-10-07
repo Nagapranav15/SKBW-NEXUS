@@ -50,6 +50,8 @@ const cuttingSlipSchema = new mongoose.Schema({
   totalScrapCredit: { type: Number, default: 0 },
 
   // Landed Cost Allocation (Zero Discrepancy Costing)
+  additionalCosts: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  totalAdditionalCost: { type: Number, default: 0 },
   netProductionCost: { type: Number, default: 0 },
   effectiveCostPerSheet: { type: Number, default: 0 },
   effectiveCostPerReam: { type: Number, default: 0 },

@@ -580,6 +580,8 @@ export interface CuttingSlipV2 {
   coreCount: number;
   coreRatePerPc: number;
   totalScrapCredit: number;
+  additionalCosts?: any[];
+  totalAdditionalCost?: number;
   netProductionCost: number;
   effectiveCostPerSheet: number;
   effectiveCostPerReam: number;

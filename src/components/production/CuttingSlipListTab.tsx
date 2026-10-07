@@ -438,6 +438,9 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
             summaryRight={{
               rows: [
                 { label: 'Total Input Cost', value: `₹${slip.totalInputCost?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}` },
+                ...(slip.totalAdditionalCost && slip.totalAdditionalCost > 0 ? [
+                  { label: 'Overheads & Addnl Cost', value: `₹${slip.totalAdditionalCost?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }
+                ] : []),
                 { label: 'Net Production Cost', value: `₹${slip.netProductionCost?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}`, isGrandTotal: true },
               ]
             }}
