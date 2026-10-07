@@ -10,6 +10,8 @@ const metadataSchema = new mongoose.Schema({
   categoryCards: { type: Array, default: [] },
   standardizedSheets: { type: Array, default: [] },
   departmentPresets: { type: Array, default: [] },
+  additionalCostPresets: { type: Array, default: [] },
+  scrapPresets: { type: Array, default: [] },
   categoryFields: {
     type: Map,
     of: [String],

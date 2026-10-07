@@ -187,7 +187,8 @@ export const buildCleanDepartmentPresets = (locs: WarehouseLocationV2[]): Depart
 
 const DEFAULT_DEPARTMENT_PRESETS: DepartmentPreset[] = buildCleanDepartmentPresets([]);
 
-const DEFAULT_PREDEFINED_COSTS: PredefinedCost[] = [
+export const DEFAULT_PREDEFINED_COSTS: PredefinedCost[] = [
+  { id: 'cost-printing', name: 'Cover Printing & Lamination (Job Work)', basis: 'Per Piece', defaultRate: 3, appliedAs: 'Per Unit (PCS)' },
   { id: 'cost-elec', name: 'Electricity / Power Charges', basis: 'Per GBL', defaultRate: 25, appliedAs: 'Per Unit (GBL)' },
   { id: 'cost-labour', name: 'Direct Labour / Helper Wages', basis: 'Per GBL', defaultRate: 35, appliedAs: 'Per Unit (GBL)' },
   { id: 'cost-wire', name: 'Stitching Wire & Adhesive', basis: 'Per GBL', defaultRate: 15, appliedAs: 'Per Unit (GBL)' },
@@ -517,6 +518,22 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
               const freshDefaults = buildCleanDepartmentPresets(loadedWhLocs);
               setDepartmentPresets(freshDefaults);
               updateMetadataV2({ companyId, departmentPresets: freshDefaults }).catch(() => {});
+            }
+
+            // Sync Additional Cost / Overheads Presets from database so all systems have identical presets
+            const serverCosts = metaRes.value.additionalCostPresets;
+            let mergedCosts: PredefinedCost[] = DEFAULT_PREDEFINED_COSTS;
+            if (Array.isArray(serverCosts) && serverCosts.length > 0) {
+              const existingIds = new Set(serverCosts.map((c: any) => c.id || c.name));
+              const missingDefaults = DEFAULT_PREDEFINED_COSTS.filter(d => !existingIds.has(d.id) && !existingIds.has(d.name));
+              mergedCosts = [...serverCosts, ...missingDefaults];
+            }
+            setPredefinedCosts(mergedCosts);
+            try {
+              localStorage.setItem('skbw_predefined_costs_v2', JSON.stringify(mergedCosts));
+            } catch (e) {}
+            if (!Array.isArray(serverCosts) || serverCosts.length === 0 || serverCosts.length !== mergedCosts.length) {
+              updateMetadataV2({ companyId, additionalCostPresets: mergedCosts }).catch(() => {});
             }
           }
         }
@@ -1019,6 +1036,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     try {
       localStorage.setItem('skbw_predefined_costs_v2', JSON.stringify(updated));
     } catch (e) {}
+    if (companyId) {
+      updateMetadataV2({ companyId, additionalCostPresets: updated }).catch(e => console.error(e));
+    }
     setNewCostName('');
     setNewCostRate('');
     showToast(`Added "${newPreset.name}" to predefined overheads`, 'success');
@@ -1030,6 +1050,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     try {
       localStorage.setItem('skbw_predefined_costs_v2', JSON.stringify(updated));
     } catch (e) {}
+    if (companyId) {
+      updateMetadataV2({ companyId, additionalCostPresets: updated }).catch(e => console.error(e));
+    }
     showToast('Predefined overhead deleted', 'info');
   };
 
@@ -1126,7 +1149,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         const requiredQty = curPlannedQty > 0 
           ? Math.round(rawQty * scaleFactor * 1000) / 1000 
           : rawQty;
-        const rate = Number(raw.rate) || 0;
+        const rawRate = Number(raw.rate) || 0;
 
         // Resolve matching SKU to get skuId and stocking unit info
         const matchedSku = backendSkus.find(s => 
@@ -1154,6 +1177,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           resolvedUom = (matchedSku?.unit && matchedSku.unit.toUpperCase() !== 'GBL') ? matchedSku.unit : 'PCS';
         }
 
+        let initialRate = rawRate;
+        if (initialRate <= 0 && matchedSku) {
+          const skuBasePrice = Number((matchedSku as any).avgRate || (matchedSku as any).avgCost || matchedSku.costPrice || matchedSku.purchasePrice || matchedSku.standardCost || 0);
+          initialRate = convertRateToUom(skuBasePrice, matchedSku.unit || 'PCS', resolvedUom, matchedSku);
+        }
+
         return {
           id: `mat-${idx + 1}-${Date.now()}`,
           skuId: matchedSku?._id || raw.skuId,
@@ -1164,8 +1193,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           recipeQty: rawQty,
           sourceLocation: 'SKBW - Ground Floor',
           rateMode: globalRateMode,
-          rate,
-          amount: Math.round(requiredQty * rate * 100) / 100,
+          rate: initialRate,
+          amount: Math.round(requiredQty * initialRate * 100) / 100,
           basePerPiece: perPieceBasis
         };
       });
@@ -1334,64 +1363,42 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           (m.component && s.name?.toLowerCase().trim() === m.component.toLowerCase().trim())
         );
 
-        // Backend returns rates in the SKU's own primary stocking unit (rateInfo.unit = sku.unit).
-        // currentUom must be this material row's UOM (which, after the BOM loader fix, now
-        // equals matchedSku.unit for raw materials). So skuStockingUnit === currentUom → no conversion.
-        // Use rateInfo's own unit/altUnit/altUnitConversion for conversion (the raw material's own
-        // conversion data), never the finished good's conversion factor.
-        const skuStockingUnit = rateInfo.unit || matchedSku?.unit || 'PCS';
-        const currentUom = m.uom || matchedSku?.unit || 'PCS';
+        // Rate from backend is expressed in rateInfo.unit (which corresponds to targetUom)
+        const rateUnit = (rateInfo.unit || matchedSku?.unit || 'PCS').trim().toUpperCase();
+        const currentUom = (m.uom || matchedSku?.unit || 'PCS').trim().toUpperCase();
 
-        // Build a conversion descriptor using this raw material's own conversion data
-        // (from rateInfo, which the backend explicitly returns per SKU).
         const rateConvSku = {
-          unit: rateInfo.unit || matchedSku?.unit,
+          unit: rateInfo.stockingUnit || rateInfo.unit || matchedSku?.unit,
           altUnit: rateInfo.altUnit || matchedSku?.altUnit,
           altUnitConversion: rateInfo.altUnitConversion ?? matchedSku?.altUnitConversion,
           altUnitDirection: rateInfo.altUnitDirection || matchedSku?.altUnitDirection
         };
 
-        // Backend returns rates in skuStockingUnit (e.g. ₹10.61 / PCS for a PCS-stocked raw board)
         const rawProdRate = Number(rateInfo.productionRate) || 0;
         const rawLastProdRate = Number(rateInfo.lastProductionRate) || 0;
         const rawAvgRate = Number(rateInfo.avgRate) || 0;
         const rawFifoRate = Number(rateInfo.fifoRate) || 0;
         const rawStandardRate = Number(rateInfo.standardRate) || 0;
 
-        const isSemiOrProduct = (matchedSku && (getItemClassification(matchedSku) === 'semi' || getItemClassification(matchedSku) === 'products')) ||
-                                (m.code && (m.code.toUpperCase().startsWith('SM-') || m.code.toUpperCase().startsWith('FG-'))) ||
-                                (matchedSku?.skuCode && (matchedSku.skuCode.toUpperCase().startsWith('SM-') || matchedSku.skuCode.toUpperCase().startsWith('FG-')));
+        // Fallback directly from stock inventory data on matchedSku if backend rate is 0
+        const fallbackSkuPrice = Number((matchedSku as any)?.avgRate || (matchedSku as any)?.avgCost || matchedSku?.costPrice || matchedSku?.purchasePrice || matchedSku?.standardCost || 0);
+        const convertedFallbackRate = fallbackSkuPrice > 0 ? convertRateToUom(fallbackSkuPrice, matchedSku?.unit || 'PCS', currentUom, rateConvSku) : 0;
 
-        const isRawItem = !isSemiOrProduct && (
-                          (matchedSku && getItemClassification(matchedSku) === 'materials') ||
-                          (m.code && m.code.toUpperCase().startsWith('RM-')) ||
-                          (matchedSku?.category && /sheet|paper|reel/i.test(matchedSku.category)) ||
-                          (m.component && /reel/i.test(m.component)));
-
-        // For raw materials, purchase rates are natively per actual unit (PCS/sheet/KG) and NEVER per GBL.
-        // Never convert or divide a raw material's purchase rate using GBL conversion!
-        const shouldBypassGblConversion = isRawItem && (
-          skuStockingUnit.toUpperCase() === 'GBL' ||
-          (rateConvSku.altUnitConversion && Number(rateConvSku.altUnitConversion) > 1 && currentUom.toUpperCase() === 'PCS')
-        );
-
-        // Convert rates to currentUom only if stocking unit differs from BOM UOM and not bypassed.
-        // Use rateConvSku (this raw material's own conversion) NOT the finished good's.
-        const convertedAvgRate = shouldBypassGblConversion
-          ? rawAvgRate
-          : (rawAvgRate > 0 ? convertRateToUom(rawAvgRate, skuStockingUnit, currentUom, rateConvSku) : 0);
-        const convertedFifoRate = shouldBypassGblConversion
-          ? rawFifoRate
-          : (rawFifoRate > 0 ? convertRateToUom(rawFifoRate, skuStockingUnit, currentUom, rateConvSku) : 0);
-        const convertedProdRate = shouldBypassGblConversion
-          ? rawProdRate
-          : (rawProdRate > 0 ? convertRateToUom(rawProdRate, skuStockingUnit, currentUom, rateConvSku) : 0);
-        const convertedLastProdRate = shouldBypassGblConversion
-          ? rawLastProdRate
-          : (rawLastProdRate > 0 ? convertRateToUom(rawLastProdRate, skuStockingUnit, currentUom, rateConvSku) : 0);
-        const convertedStandardRate = shouldBypassGblConversion
-          ? rawStandardRate
-          : (rawStandardRate > 0 ? convertRateToUom(rawStandardRate, skuStockingUnit, currentUom, rateConvSku) : 0);
+        const convertedAvgRate = rawAvgRate > 0
+          ? (rateUnit === currentUom ? rawAvgRate : convertRateToUom(rawAvgRate, rateUnit, currentUom, rateConvSku))
+          : convertedFallbackRate;
+        const convertedFifoRate = rawFifoRate > 0
+          ? (rateUnit === currentUom ? rawFifoRate : convertRateToUom(rawFifoRate, rateUnit, currentUom, rateConvSku))
+          : convertedFallbackRate;
+        const convertedProdRate = rawProdRate > 0
+          ? (rateUnit === currentUom ? rawProdRate : convertRateToUom(rawProdRate, rateUnit, currentUom, rateConvSku))
+          : 0;
+        const convertedLastProdRate = rawLastProdRate > 0
+          ? (rateUnit === currentUom ? rawLastProdRate : convertRateToUom(rawLastProdRate, rateUnit, currentUom, rateConvSku))
+          : 0;
+        const convertedStandardRate = rawStandardRate > 0
+          ? (rateUnit === currentUom ? rawStandardRate : convertRateToUom(rawStandardRate, rateUnit, currentUom, rateConvSku))
+          : convertedFallbackRate;
 
         const mode = modeToApply || m.rateMode || globalRateMode;
         let finalRate = m.rate;
@@ -4113,6 +4120,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   try {
                     localStorage.setItem('skbw_predefined_costs_v2', JSON.stringify(DEFAULT_PREDEFINED_COSTS));
                   } catch (e) {}
+                  if (companyId) {
+                    updateMetadataV2({ companyId, additionalCostPresets: DEFAULT_PREDEFINED_COSTS }).catch(e => console.error(e));
+                  }
                   showToast('Reset to default predefined overheads', 'info');
                 }}
                 className="text-[11px] font-bold text-gray-500 hover:text-gray-700 cursor-pointer"

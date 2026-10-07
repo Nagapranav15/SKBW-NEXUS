@@ -287,6 +287,8 @@ export interface MetadataV2 {
   categoryFields?: Record<string, string[]>;
   standardizedSheets?: { id: string; name: string; w: string; l: string }[];
   departmentPresets?: any[];
+  additionalCostPresets?: any[];
+  scrapPresets?: any[];
 }
 
 export const getMetadataV2 = async (companyId: string): Promise<MetadataV2> => {
@@ -307,6 +309,8 @@ export const updateMetadataV2 = async (metadataData: {
   categoryFields?: Record<string, string[]>;
   standardizedSheets?: { id: string; name: string; w: string; l: string }[];
   departmentPresets?: any[];
+  additionalCostPresets?: any[];
+  scrapPresets?: any[];
 }): Promise<MetadataV2> => {
   const response = await api.post('/v2/metadata', metadataData);
   return response.data;

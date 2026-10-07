@@ -12,6 +12,7 @@ import { AdditionalCostRow, ProfitPricingState, calculateCosting, formatInr } fr
 import { showToast } from '../ui/Toast';
 import { getItemClassification } from '../../utils/skuClassification';
 import { convertRateToUom } from '../../utils/uomConversion';
+import { DEFAULT_PREDEFINED_COSTS } from './NewProductionOrderWizard';
 import * as XLSX from 'xlsx';
 
 export interface BomRecipeItem {
@@ -296,22 +297,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
       let effectiveRate = rawRate;
       const skuUnit = matchedSku?.unit || '';
       const itemUom = item.uom || '';
-      const isSemiOrProduct = (matchedSku && (getItemClassification(matchedSku) === 'semi' || getItemClassification(matchedSku) === 'products')) ||
-                            (item.skuCode && (item.skuCode.toUpperCase().startsWith('SM-') || item.skuCode.toUpperCase().startsWith('FG-'))) ||
-                            (matchedSku?.skuCode && (matchedSku.skuCode.toUpperCase().startsWith('SM-') || matchedSku.skuCode.toUpperCase().startsWith('FG-')));
-
-      const isRaw = !isSemiOrProduct && (
-                    (matchedSku && getItemClassification(matchedSku) === 'materials') ||
-                    (item.skuCode && item.skuCode.toUpperCase().startsWith('RM-')) ||
-                    (matchedSku?.category && /sheet|paper|reel/i.test(matchedSku.category)) ||
-                    (item.name && /reel/i.test(item.name)));
-
-      const shouldBypassGbl = isRaw && (
-        skuUnit.toUpperCase() === 'GBL' ||
-        (matchedSku?.altUnitConversion && Number(matchedSku.altUnitConversion) > 1 && itemUom.toUpperCase() === 'PCS')
-      );
-
-      if (!shouldBypassGbl && rawRate > 0 && skuUnit && itemUom && skuUnit.trim().toLowerCase() !== itemUom.trim().toLowerCase()) {
+      if (rawRate > 0 && skuUnit && itemUom && skuUnit.trim().toLowerCase() !== itemUom.trim().toLowerCase()) {
         effectiveRate = convertRateToUom(rawRate, skuUnit, itemUom, matchedSku);
       }
 
@@ -1243,14 +1229,33 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                               <td className="py-1.5 px-2">
                                 <input
                                   type="text"
+                                  list="bulk-edit-cost-presets"
                                   value={cost.costType}
                                   onChange={e => {
                                     const val = e.target.value;
-                                    setActiveAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, costType: val } : c));
+                                    const matched = DEFAULT_PREDEFINED_COSTS.find(p => p.name.toLowerCase() === val.toLowerCase());
+                                    if (matched) {
+                                      setActiveAdditionalCosts(prev => prev.map(c => c.id === cost.id ? {
+                                        ...c,
+                                        costType: matched.name,
+                                        calcBasis: matched.basis,
+                                        amount: matched.defaultRate,
+                                        appliedAs: matched.appliedAs
+                                      } : c));
+                                    } else {
+                                      setActiveAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, costType: val } : c));
+                                    }
                                   }}
-                                  placeholder="e.g. Index Printing, Labour"
+                                  placeholder="e.g. Cover Printing & Lamination, Labour"
                                   className="w-full h-7 px-2 py-0.5 bg-white border border-slate-200 rounded-md text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-amber-500 focus:outline-none"
                                 />
+                                <datalist id="bulk-edit-cost-presets">
+                                  {DEFAULT_PREDEFINED_COSTS.map(p => (
+                                    <option key={p.id} value={p.name}>
+                                      {p.basis} — ₹{p.defaultRate}
+                                    </option>
+                                  ))}
+                                </datalist>
                               </td>
                               <td className="py-1.5 px-1.5 text-center">
                                 <select

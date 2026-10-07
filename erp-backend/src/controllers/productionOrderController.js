@@ -1326,14 +1326,14 @@ exports.getMaterialRates = async (req, res) => {
               const isGbl = skuUnitNorm === 'gbl';
               const convFactor = Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 2500);
 
-              const sheetCost = Number(csSlip.effectiveCostPerSheet) || (Number(csSlip.totalInputCost) / Number(csSlip.actualSheets || 1));
-              let csRate = sheetCost;
+              const fourUpCost = Number(csSlip.costPer4UpPiece) || ((Number(csSlip.effectiveCostPerSheet) || (Number(csSlip.totalInputCost) / Number(csSlip.actualSheets || 1))) / 4);
+              let csRate = fourUpCost;
               if (isReam) {
-                csRate = csSlip.effectiveCostPerReam || (sheetCost * (csSlip.sheetsPerReam || 500));
+                csRate = fourUpCost * (csSlip.sheetsPerReam || 500);
               } else if (isPcs) {
-                csRate = sheetCost;
+                csRate = fourUpCost;
               } else if (isGbl) {
-                csRate = sheetCost * (convFactor > 0 ? convFactor : 2500);
+                csRate = fourUpCost * (convFactor > 0 ? convFactor : 2500);
               }
               if (csRate > 0) {
                 b.rate = Math.round(csRate * 10000) / 10000;
@@ -1351,22 +1351,22 @@ exports.getMaterialRates = async (req, res) => {
           targetSku: sku._id,
           status: "Posted"
         }).sort({ createdAt: -1 }).lean();
-        if (lastSlip && (lastSlip.effectiveCostPerSheet > 0 || lastSlip.totalInputCost > 0)) {
+        if (lastSlip && (lastSlip.effectiveCostPerSheet > 0 || lastSlip.totalInputCost > 0 || lastSlip.costPer4UpPiece > 0)) {
           const skuUnitNorm = (sku.unit || '').trim().toLowerCase();
           const isReam = skuUnitNorm.includes('ream');
           const isPcs = skuUnitNorm === 'pcs' || skuUnitNorm === 'piece' || skuUnitNorm === 'pieces';
           const isGbl = skuUnitNorm === 'gbl';
           const convFactor = Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 2500);
-          const sheetCost = Number(lastSlip.effectiveCostPerSheet) || (Number(lastSlip.totalInputCost) / Number(lastSlip.actualSheets || 1));
+          const fourUpCost = Number(lastSlip.costPer4UpPiece) || ((Number(lastSlip.effectiveCostPerSheet) || (Number(lastSlip.totalInputCost) / Number(lastSlip.actualSheets || 1))) / 4);
 
           if (isReam) {
-            cuttingSlipRate = lastSlip.effectiveCostPerReam || (sheetCost * (lastSlip.sheetsPerReam || 500));
+            cuttingSlipRate = fourUpCost * (lastSlip.sheetsPerReam || 500);
           } else if (isPcs) {
-            cuttingSlipRate = Math.round(sheetCost * 10000) / 10000;
+            cuttingSlipRate = Math.round(fourUpCost * 10000) / 10000;
           } else if (isGbl) {
-            cuttingSlipRate = Math.round((sheetCost * (convFactor > 0 ? convFactor : 2500)) * 10000) / 10000;
+            cuttingSlipRate = Math.round((fourUpCost * (convFactor > 0 ? convFactor : 2500)) * 10000) / 10000;
           } else {
-            cuttingSlipRate = sheetCost;
+            cuttingSlipRate = fourUpCost;
           }
         }
       } catch (e) {
@@ -1450,11 +1450,9 @@ exports.getMaterialRates = async (req, res) => {
 
       const effectiveRate = avgRate > 0 ? avgRate : (productionRate > 0 ? productionRate : (lastProductionRate > 0 ? lastProductionRate : standardRate));
 
-      const skuStockingUnit = (isRawMat && ((sku.unit || '').toUpperCase() === 'GBL' || !sku.unit)) 
-        ? 'PCS' 
-        : (sku.unit || 'PCS');
-      const skuAltUnit = isRawMat ? '' : (sku.altUnit || '');
-      const skuConv = isRawMat ? 1 : Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 1);
+      const skuStockingUnit = (sku.unit || 'PCS').trim().toUpperCase();
+      const skuAltUnit = (sku.altUnit || '').trim().toUpperCase();
+      const skuConv = Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 1);
 
       // Target UOM present in the BOM (e.g. PCS, GBL, KG, Ream)
       const targetUom = (itemInput && itemInput.uom) ? itemInput.uom.trim().toUpperCase() : skuStockingUnit.toUpperCase();
@@ -1471,6 +1469,14 @@ exports.getMaterialRates = async (req, res) => {
         }
         if ((f === 'PCS' || (skuAltUnit && f === skuAltUnit.toUpperCase())) && t === 'GBL') {
           return skuConv > 0 ? Math.round((rateVal * skuConv) * 10000) / 10000 : rateVal;
+        }
+        if (f.includes('REAM') && (t === 'PCS' || t === 'SHEET' || t === 'SHEETS')) {
+          const reamSheets = skuConv > 0 ? skuConv : 500;
+          return Math.round((rateVal / reamSheets) * 10000) / 10000;
+        }
+        if ((f === 'PCS' || f === 'SHEET' || f === 'SHEETS') && t.includes('REAM')) {
+          const reamSheets = skuConv > 0 ? skuConv : 500;
+          return Math.round((rateVal * reamSheets) * 10000) / 10000;
         }
         return rateVal;
       };
