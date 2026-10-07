@@ -49,7 +49,7 @@ export interface DepartmentPreset {
 export interface PredefinedCost {
   id: string;
   name: string;
-  basis: 'Per BOM' | 'Per GBL' | 'Per Piece' | string;
+  basis: 'Per BOM' | 'Per GBL' | 'Per Piece' | 'Per Ream' | string;
   defaultRate: number;
   appliedAs?: string;
 }
@@ -195,7 +195,8 @@ export const DEFAULT_PREDEFINED_COSTS: PredefinedCost[] = [
   { id: 'cost-wire', name: 'Stitching Wire & Adhesive', basis: 'Per GBL', defaultRate: 15 },
   { id: 'cost-machine', name: 'Machine Running & Tooling', basis: 'Per BOM', defaultRate: 350 },
   { id: 'cost-pack', name: 'Packaging & Shrink Wrap', basis: 'Per GBL', defaultRate: 20 },
-  { id: 'cost-handling', name: 'Internal Handling & Shifting', basis: 'Per GBL', defaultRate: 10 }
+  { id: 'cost-handling', name: 'Internal Handling & Shifting', basis: 'Per GBL', defaultRate: 10 },
+  { id: 'cost-sheeting', name: 'Sheeting & Reel Cutting Charges', basis: 'Per Ream', defaultRate: 18 },
 ];
 
 export interface ScrapPreset {
@@ -1887,7 +1888,29 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       };
     }
 
-    // 2. Per Piece (PCS): Rate * total planned pieces to produce
+    // 2. Per Ream: Rate * number of reams (500 sheets per ream)
+    if (b === 'per ream' || b.includes('ream')) {
+      const SHEETS_PER_REAM = 500;
+      // Try to derive sheet count from BOM material or planned qty
+      const primaryBomMat = materials.find(m => {
+        const u = (m.uom || '').toLowerCase();
+        return Number(m.requiredQty) > 0 && (u === 'ream' || u === 'sheets' || u === 'pcs');
+      }) || materials.find(m => Number(m.requiredQty) > 0) || materials[0];
+      const rawSheets = primaryBomMat && (primaryBomMat.uom || '').toLowerCase() === 'ream'
+        ? Number(primaryBomMat.requiredQty)  // already in reams
+        : (primaryBomMat && Number(primaryBomMat.requiredQty) > 0
+          ? Number(primaryBomMat.requiredQty) / SHEETS_PER_REAM
+          : (numPlannedQty > 0 ? numPlannedQty / SHEETS_PER_REAM : 1));
+      const reams = Math.max(1, Math.round(rawSheets * 100) / 100);
+      const total = amt * reams;
+      return {
+        total,
+        multiplier: reams,
+        label: `${reams.toLocaleString('en-IN', { maximumFractionDigits: 2 })} Reams`
+      };
+    }
+
+    // 3. Per Piece (PCS): Rate * total planned pieces to produce
     if (b === 'per piece' || b.includes('piece') || b.includes('pcs')) {
       const qty = plannedPcs > 0 ? plannedPcs : (numPlannedQty > 0 ? numPlannedQty : 1);
       const total = amt * qty;
@@ -1898,7 +1921,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       };
     }
 
-    // 3. Per GBL: Rate * total planned GBL to produce
+    // 4. Per GBL: Rate * total planned GBL to produce
     if (b === 'per gbl' || b.includes('gbl')) {
       const qty = plannedGbl > 0 ? plannedGbl : (conversionFactor > 0 && plannedPcs > 0 ? plannedPcs / conversionFactor : 1);
       const cleanQty = Math.round(qty * 100) / 100;
@@ -1910,7 +1933,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
       };
     }
 
-    // 4. Fallback (Flat)
+    // 5. Fallback (Flat)
     return {
       total: amt,
       multiplier: 1,
@@ -3696,11 +3719,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                               >
                                 <span className="font-semibold truncate">{p.name}</span>
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ml-2 ${
-                                  p.basis === 'Per GBL' || p.basis === 'Per Piece' || p.basis === 'Per BOM'
+                                  p.basis === 'Per GBL' || p.basis === 'Per Piece' || p.basis === 'Per BOM' || p.basis === 'Per Ream'
                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
                                     : 'bg-gray-100 text-gray-600'
                                 }`}>
-                                  {p.basis === 'Per GBL' ? `₹${p.defaultRate}/GBL` : p.basis === 'Per Piece' ? `₹${p.defaultRate}/PCS` : p.basis === 'Per BOM' ? `₹${p.defaultRate}/BOM` : `₹${p.defaultRate}`}
+                                  {p.basis === 'Per GBL' ? `₹${p.defaultRate}/GBL` : p.basis === 'Per Piece' ? `₹${p.defaultRate}/PCS` : p.basis === 'Per BOM' ? `₹${p.defaultRate}/BOM` : p.basis === 'Per Ream' ? `₹${p.defaultRate}/Ream` : `₹${p.defaultRate}`}
                                 </span>
                               </button>
                             );
@@ -3769,6 +3792,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                               <option value="Per BOM">📦 Per BOM</option>
                               <option value="Per Piece">⚡ Per Piece</option>
                               <option value="Per GBL">📦 Per GBL</option>
+                              <option value="Per Ream">📋 Per Ream</option>
                             </select>
                           </td>
                           <td className="py-2 px-3 text-right">
@@ -4207,6 +4231,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                       <option value="Per BOM">📦 Per BOM</option>
                       <option value="Per Piece">⚡ Per Piece</option>
                       <option value="Per GBL">📦 Per GBL</option>
+                      <option value="Per Ream">📋 Per Ream</option>
                     </select>
                     <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-0.5">
                       <span className="text-gray-400 text-xs font-bold">₹</span>
@@ -4265,7 +4290,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                 >
                   <option value="Per BOM">📦 Per BOM</option>
                   <option value="Per Piece">⚡ Per Piece</option>
-                  <option value="Per GBL">⚡ Per GBL</option>
+                  <option value="Per GBL">📦 Per GBL</option>
+                  <option value="Per Ream">📋 Per Ream</option>
                 </select>
                 <div className="flex gap-1">
                   <input
