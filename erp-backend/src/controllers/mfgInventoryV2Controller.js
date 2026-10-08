@@ -313,6 +313,10 @@ exports.createSku = async (req, res, next) => {
       batchYieldQty: req.body.batchYieldQty !== undefined ? Number(req.body.batchYieldQty) : (req.body.recipeYieldQty !== undefined ? Number(req.body.recipeYieldQty) : 1),
       batchYieldUnit: req.body.batchYieldUnit || req.body.recipeYieldUnit || req.body.unit || "",
       processSteps: req.body.processSteps || [],
+      costPrice: req.body.costPrice !== undefined ? Number(req.body.costPrice) : (req.body.standardCost !== undefined ? Number(req.body.standardCost) : (req.body.avgRate !== undefined ? Number(req.body.avgRate) : undefined)),
+      standardCost: req.body.standardCost !== undefined ? Number(req.body.standardCost) : (req.body.costPrice !== undefined ? Number(req.body.costPrice) : (req.body.avgRate !== undefined ? Number(req.body.avgRate) : undefined)),
+      avgCost: req.body.avgCost !== undefined ? Number(req.body.avgCost) : (req.body.costPrice !== undefined ? Number(req.body.costPrice) : undefined),
+      avgRate: req.body.avgRate !== undefined ? Number(req.body.avgRate) : (req.body.costPrice !== undefined ? Number(req.body.costPrice) : undefined),
       company: toObjectId(company),
       createdBy: req.user?.id ? toObjectId(req.user.id) : undefined
     });
@@ -512,6 +516,20 @@ exports.updateSku = async (req, res, next) => {
     if (req.body.minStockLevel !== undefined) sku.minStockLevel = req.body.minStockLevel !== '' && req.body.minStockLevel !== null ? Number(req.body.minStockLevel) : undefined;
     if (req.body.reorderLevel !== undefined) sku.reorderLevel = req.body.reorderLevel !== '' && req.body.reorderLevel !== null ? Number(req.body.reorderLevel) : undefined;
     if (req.body.preferredVendor !== undefined) sku.preferredVendor = req.body.preferredVendor || "";
+
+    const updatedCostRate = req.body.costPrice !== undefined ? Number(req.body.costPrice) :
+      (req.body.standardCost !== undefined ? Number(req.body.standardCost) :
+      (req.body.avgCost !== undefined ? Number(req.body.avgCost) :
+      (req.body.avgRate !== undefined ? Number(req.body.avgRate) :
+      (req.body.rate !== undefined ? Number(req.body.rate) : undefined))));
+
+    if (updatedCostRate !== undefined && !isNaN(updatedCostRate)) {
+      sku.costPrice = updatedCostRate;
+      sku.standardCost = updatedCostRate;
+      sku.avgCost = updatedCostRate;
+      sku.avgRate = updatedCostRate;
+    }
+
     if (req.body.initialLocationId !== undefined) {
       sku.initialLocationId = req.body.initialLocationId;
       sku.initialLocation = req.body.initialLocationId;
@@ -1011,6 +1029,10 @@ exports.bulkImportSkus = async (req, res, next) => {
         defaultLocation: "SKBW",
         reorderLevel: item.reorderLevel !== undefined && item.reorderLevel !== null && item.reorderLevel !== '' ? Number(item.reorderLevel) : undefined,
         status: item.status || "Active",
+        costPrice: item.costPrice !== undefined ? Number(item.costPrice) : (item.standardCost !== undefined ? Number(item.standardCost) : (item.rate !== undefined ? Number(item.rate) : (item.purchasePrice !== undefined ? Number(item.purchasePrice) : undefined))),
+        standardCost: item.standardCost !== undefined ? Number(item.standardCost) : (item.costPrice !== undefined ? Number(item.costPrice) : (item.rate !== undefined ? Number(item.rate) : (item.purchasePrice !== undefined ? Number(item.purchasePrice) : undefined))),
+        avgCost: item.avgCost !== undefined ? Number(item.avgCost) : (item.costPrice !== undefined ? Number(item.costPrice) : undefined),
+        avgRate: item.avgRate !== undefined ? Number(item.avgRate) : (item.costPrice !== undefined ? Number(item.costPrice) : undefined),
         company: companyObjId,
         createdBy: req.user?.id ? toObjectId(req.user.id) : undefined
       };

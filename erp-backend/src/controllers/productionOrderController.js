@@ -1460,17 +1460,29 @@ exports.getMaterialRates = async (req, res) => {
       // Target UOM present in the BOM (e.g. PCS, GBL, KG, Ream)
       const targetUom = (itemInput && itemInput.uom) ? itemInput.uom.trim().toUpperCase() : skuStockingUnit.toUpperCase();
 
-      // Convert rate between stocking unit and BOM target UOM
+      // Convert rate between stocking unit and BOM target UOM with Board rate-unit detection
       const convertRate = (rateVal, fromUom, toUom) => {
-        if (!rateVal || rateVal <= 0 || !fromUom || !toUom) return rateVal || 0;
-        const f = fromUom.trim().toUpperCase();
+        if (!rateVal || rateVal <= 0 || !toUom) return rateVal || 0;
         const t = toUom.trim().toUpperCase();
+        let f = (fromUom || '').trim().toUpperCase();
+
+        // Smart rate unit detection for Board items:
+        // A rate > 80 for a Board item (with conv factor 100-250) is expressed per GBL (e.g. ₹1,560.80/GBL),
+        // whereas a rate <= 80 is expressed per sheet (e.g. ₹15.61/PCS).
+        if (isBoard && skuConv > 1) {
+          if (rateVal > 80 && f !== 'GBL') {
+            f = 'GBL';
+          } else if (rateVal <= 80 && f !== 'PCS' && f !== 'PIECE' && f !== 'PIECES') {
+            f = 'PCS';
+          }
+        }
+
         if (f === t) return rateVal;
 
-        if (f === 'GBL' && (t === 'PCS' || (skuAltUnit && t === skuAltUnit.toUpperCase()))) {
+        if (f === 'GBL' && (t === 'PCS' || t === 'PIECE' || t === 'PIECES' || (skuAltUnit && t === skuAltUnit.toUpperCase()))) {
           return skuConv > 0 ? Math.round((rateVal / skuConv) * 10000) / 10000 : rateVal;
         }
-        if ((f === 'PCS' || (skuAltUnit && f === skuAltUnit.toUpperCase())) && t === 'GBL') {
+        if ((f === 'PCS' || f === 'PIECE' || f === 'PIECES' || (skuAltUnit && f === skuAltUnit.toUpperCase())) && t === 'GBL') {
           return skuConv > 0 ? Math.round((rateVal * skuConv) * 10000) / 10000 : rateVal;
         }
         if (f.includes('REAM') && (t === 'PCS' || t === 'SHEET' || t === 'SHEETS')) {
