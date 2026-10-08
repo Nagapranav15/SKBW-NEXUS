@@ -60,7 +60,7 @@ import {
 import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
 import { ManufacturingStepsModal } from './ManufacturingStepsModal';
-import { convertPrimaryToAlt, convertRateToUom, getSkuConversionFactor } from '../../utils/uomConversion';
+import { convertPrimaryToAlt, convertRateToUom, convertUom, getSkuConversionFactor, getSkuEffectiveUnits } from '../../utils/uomConversion';
 
 export type ItemDrawerTab = 'overview' | 'locations' | 'batches' | 'reels' | 'movements' | 'reservations';
 
@@ -549,10 +549,10 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
   }, [sku]);
 
   // Summary Metrics
-  const unit = isBoardItem ? 'PCS' : (sku?.unit || 'GBL');
-  const altUnit = sku?.altUnit || '';
-  // Use actual SKU master altUnitConversion
-  const conversionFactor = getSkuConversionFactor(sku);
+  const effUnits = getSkuEffectiveUnits(sku);
+  const unit = effUnits.unit;
+  const altUnit = effUnits.altUnit;
+  const conversionFactor = effUnits.conversionFactor;
 
   const totalStock = summary ? summary.onHand : (Number((sku as any)?.preparedStock ?? (sku as any)?.onHand ?? (sku as any)?.presentStock) || 0);
   const reservedStock = (summary && summary.reserved !== undefined && summary.reserved > 0) ? summary.reserved : (Number((sku as any)?.reserved) || 0);
@@ -561,10 +561,10 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
   const stockValue = summary ? summary.stockValue : (totalStock * (Number((sku as any)?.avgRate) || 0));
   const avgRate = (summary && summary.avgRate > 0) ? summary.avgRate : (Number((sku as any)?.avgRate) || (totalStock > 0 ? Math.round(stockValue / totalStock) : 0));
 
-  // Direction-aware conversion: use convertPrimaryToAlt if sku has altUnitConversion
-  const availablePcs = sku && sku.altUnitConversion ? convertPrimaryToAlt(availableStock, sku) : availableStock * conversionFactor;
-  const reservedPcs = sku && sku.altUnitConversion ? convertPrimaryToAlt(reservedStock, sku) : reservedStock * conversionFactor;
-  const inProcessPcs = sku && sku.altUnitConversion ? convertPrimaryToAlt(inProcessStock, sku) : inProcessStock * conversionFactor;
+  // Direction-aware conversion: convert primary stock unit to altUnit
+  const availablePcs = altUnit ? convertUom(availableStock, unit, altUnit, sku) : availableStock;
+  const reservedPcs = altUnit ? convertUom(reservedStock, unit, altUnit, sku) : reservedStock;
+  const inProcessPcs = altUnit ? convertUom(inProcessStock, unit, altUnit, sku) : inProcessStock;
 
   // Format Currency
   const formatCurrency = (amount: number) => {

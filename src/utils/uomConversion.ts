@@ -214,35 +214,64 @@ export function parseConversionFactor(rawFactor?: number | string): number {
  * Case 2 (Primary = PCS, Alt = GBL, Factor = 200):
  *   1 GBL = 200 PCS -> 200 PCS / 200 = 1 GBL; 100 PCS / 200 = 0.5 GBL
  */
+export interface EffectiveSkuUnits {
+  unit: string;
+  altUnit: string;
+  conversionFactor: number;
+}
+
+/**
+ * Returns canonical, normalized primary & alternate units and conversion factor for any SKU.
+ * Enforces Board SKUs primary unit = PCS, alternate unit = GBL.
+ */
+export function getSkuEffectiveUnits(sku?: any): EffectiveSkuUnits {
+  if (!sku) return { unit: 'PCS', altUnit: '', conversionFactor: 1 };
+
+  const isBoard = isBoardSku(sku);
+  let unit = (sku.unit || '').trim();
+  let altUnit = (sku.altUnit || '').trim();
+  const conversionFactor = getSkuConversionFactor(sku);
+
+  if (isBoard) {
+    unit = 'PCS';
+    if (!altUnit || altUnit.toUpperCase() === 'PCS') {
+      altUnit = 'GBL';
+    }
+  } else {
+    if (!unit) unit = 'PCS';
+    if (altUnit.toUpperCase() === unit.toUpperCase()) {
+      altUnit = '';
+    }
+  }
+
+  return { unit, altUnit, conversionFactor };
+}
+
 export function convertPrimaryToAlt(primaryQty: number, sku?: SkuUomLike | null): number {
-  const factor = getSkuConversionFactor(sku);
-  if (!sku || !sku.altUnit || factor <= 0) return primaryQty;
-  const direction = getUomDirection(sku.unit, sku.altUnit, sku.altUnitDirection);
+  const eff = getSkuEffectiveUnits(sku);
+  const factor = eff.conversionFactor;
+  if (!sku || !eff.altUnit || factor <= 0) return primaryQty;
+  const direction = getUomDirection(eff.unit, eff.altUnit, sku.altUnitDirection);
 
   let result: number;
   if (direction === 'PRIMARY_TO_ALT') {
-    // 1 Primary = Factor * Alt
+    // 1 Primary = Factor * Alt -> Primary * Factor = Alt
     result = primaryQty * factor;
   } else {
     // 1 Alt = Factor * Primary -> Primary / Factor = Alt
     result = primaryQty / factor;
   }
-  return roundUomQty(result);
+  return roundUomQty(result, 8);
 }
 
 /**
  * Converts quantity from Alternative Unit to Primary (Stock/Ledger) Unit.
- * 
- * Case 1 (Primary = GBL, Alt = PCS, Factor = 200):
- *   1 GBL = 200 PCS -> 200 PCS / 200 = 1 GBL; 100 PCS / 200 = 0.5 GBL
- * 
- * Case 2 (Primary = PCS, Alt = GBL, Factor = 200):
- *   1 GBL = 200 PCS -> 1 GBL * 200 = 200 PCS; 2 GBL * 200 = 400 PCS
  */
 export function convertAltToPrimary(altQty: number, sku?: SkuUomLike | null): number {
-  const factor = getSkuConversionFactor(sku);
-  if (!sku || !sku.altUnit || factor <= 0) return altQty;
-  const direction = getUomDirection(sku.unit, sku.altUnit, sku.altUnitDirection);
+  const eff = getSkuEffectiveUnits(sku);
+  const factor = eff.conversionFactor;
+  if (!sku || !eff.altUnit || factor <= 0) return altQty;
+  const direction = getUomDirection(eff.unit, eff.altUnit, sku.altUnitDirection);
 
   let result: number;
   if (direction === 'PRIMARY_TO_ALT') {
@@ -268,16 +297,17 @@ export function convertUom(
   const normFrom = normalizeUnit(fromUnit);
   const normTo = normalizeUnit(toUnit);
 
-  // If units are identical, no conversion needed (prevents double conversion)
+  // If units are identical, no conversion needed
   if (normFrom === normTo || !normFrom || !normTo) {
     return qty;
   }
 
-  const factor = getSkuConversionFactor(sku);
+  const eff = getSkuEffectiveUnits(sku);
+  const factor = eff.conversionFactor;
   if (!sku || factor <= 0) return qty;
 
-  const normPrimary = normalizeUnit(sku.unit);
-  const normAlt = normalizeUnit(sku.altUnit);
+  const normPrimary = normalizeUnit(eff.unit);
+  const normAlt = normalizeUnit(eff.altUnit);
 
   // Exact matching against primary & alt
   if (normPrimary && normAlt) {
@@ -289,7 +319,7 @@ export function convertUom(
     }
   }
 
-  // Fallback: rank-based / semantic matching if one unit is aggregate (GBL, REAM) and other is discrete (PCS, SHEET)
+  // Fallback: rank-based / semantic matching
   const fromRank = getUnitRank(fromUnit);
   const toRank = getUnitRank(toUnit);
 
