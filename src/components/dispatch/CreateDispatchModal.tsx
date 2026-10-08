@@ -6,7 +6,7 @@ import {
   ChevronDown, Building, RefreshCw, Check
 } from 'lucide-react';
 import { SalesOrderV2, updateSalesOrderV2 } from '../../api/salesOrderApiV2';
-import { createDeliveryChallan, updateDeliveryChallan } from '../../api/deliveryChallanApi';
+import { createDeliveryChallan, updateDeliveryChallan, getNextDeliveryChallanNumber } from '../../api/deliveryChallanApi';
 import { saveCustomSalesOrder } from '../../utils/salesOrderStorage';
 import { getBalancesV2, getSkusV2, getWarehouseHierarchyV2, WarehouseLocationV2 } from '../../api/mfgApiV2';
 import { getParties } from '../../api/partyApi';
@@ -154,13 +154,39 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     return matched ? String(matched._id) : '';
   }, [activeLocModalRow, availableSkus]);
 
-  // DC Number
+  // DC / DO Number
+  const [fetchedDcNumber, setFetchedDcNumber] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (editingChallan?.dcNumber) {
+      setFetchedDcNumber(editingChallan.dcNumber);
+      return;
+    }
+    const compId = selectedCompany?._id;
+    getNextDeliveryChallanNumber(compId).then(seq => {
+      if (seq) setFetchedDcNumber(seq);
+    }).catch(() => {
+      const cKey = `skbw_delivery_challans_${compId || 'default'}`;
+      const stored = JSON.parse(localStorage.getItem(cKey) || '[]');
+      let maxNum = 0;
+      stored.forEach((c: any) => {
+        if (c.dcNumber) {
+          const match = c.dcNumber.match(/^(?:DO|DC)-?([0-9]+)$/i);
+          if (match && match[1]) {
+            const num = parseInt(match[1], 10);
+            if (num > maxNum) maxNum = num;
+          }
+        }
+      });
+      setFetchedDcNumber(`DO-${String(maxNum + 1).padStart(3, '0')}`);
+    });
+  }, [isOpen, editingChallan, selectedCompany?._id]);
+
   const dcNumber = useMemo(() => {
     if (editingChallan?.dcNumber) return editingChallan.dcNumber;
-    const y = new Date().getFullYear();
-    const r = Math.floor(1000 + Math.random() * 9000);
-    return `DC-${y}-${r}`;
-  }, [editingChallan]);
+    return fetchedDcNumber || 'DO-001';
+  }, [editingChallan, fetchedDcNumber]);
 
   // Helper to compute stock at a specific location or its descendants
   const computeLocationStock = (

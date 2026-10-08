@@ -607,7 +607,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
               </label>
               <input
                 type="text"
-                placeholder="e.g. DC-2026-6467"
+                placeholder="e.g. DO-001"
                 value={dispatchNo}
                 onChange={e => setDispatchNo(e.target.value)}
                 className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl font-mono font-bold text-gray-900 focus:outline-blue-500"

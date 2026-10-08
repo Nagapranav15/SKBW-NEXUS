@@ -30,7 +30,7 @@ export const ViewDeliveryChallanModal: React.FC<ViewDeliveryChallanModalProps> =
           <div className="flex items-center gap-2">
             <span className="text-xs font-black uppercase tracking-wider text-gray-500">Delivery Challan</span>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-blue-50 text-blue-700 border border-blue-200">
-              {challan.dcNumber || 'DC-2026-0001'}
+              {challan.dcNumber || 'DO-001'}
             </span>
           </div>
           <div className="flex items-center gap-2">

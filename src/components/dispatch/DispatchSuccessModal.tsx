@@ -19,7 +19,7 @@ export const DispatchSuccessModal: React.FC<DispatchSuccessModalProps> = ({
 }) => {
   if (!isOpen || !challan) return null;
 
-  const dcNumber = challan.dcNumber || challan._id || 'DSP-0001';
+  const dcNumber = challan.dcNumber || challan._id || 'DO-001';
   const orderNumber = challan.orderNumber || '—';
   const dateStr = challan.date || challan.dispatchDate || new Date().toLocaleDateString('en-GB');
   const status = challan.fulfillmentStatus || (challan.status === 'dispatched' ? 'Fully Dispatched' : 'Partially Dispatched');

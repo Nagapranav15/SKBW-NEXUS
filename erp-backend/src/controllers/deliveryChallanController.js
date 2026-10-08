@@ -5,7 +5,7 @@ const InventoryLedgerV2 = require("../models/inventoryLedgerV2Model");
 const SkuV2 = require("../models/skuV2Model");
 const WarehouseLocationV2 = require("../models/warehouseLocationV2Model");
 const SalesOrderV2 = require("../models/salesOrderV2Model");
-const { getNextSequenceNumber } = require("../utils/sequenceManager");
+const { getNextSequenceNumber, peekNextSequenceNumber, syncSequenceNumber } = require("../utils/sequenceManager");
 const { broadcast } = require("../utils/realtimeService");
 
 const toObjectId = (id) => {
@@ -420,15 +420,28 @@ exports.getDeliveryChallanById = async (req, res) => {
   }
 };
 
+exports.getNextNumber = async (req, res) => {
+  try {
+    const companyId = req.query.companyId || req.query.company || req.user?.company;
+    const nextNumber = await peekNextSequenceNumber("DO", companyId);
+    res.json({ dcNumber: nextNumber });
+  } catch (err) {
+    console.error("getNextNumber error:", err);
+    res.status(500).json({ error: "Failed to generate dispatch number" });
+  }
+};
+
 exports.createDeliveryChallan = async (req, res) => {
   try {
     let dcNumber = req.body.dcNumber;
-    if (!dcNumber || !dcNumber.trim()) {
-      dcNumber = await getNextSequenceNumber("DC", req.body.company);
+    if (!dcNumber || !dcNumber.trim() || dcNumber.startsWith("DO-TEMP-")) {
+      dcNumber = await getNextSequenceNumber("DO", req.body.company);
     } else {
       const exists = await DeliveryChallan.findOne({ dcNumber, company: req.body.company });
       if (exists) {
-        dcNumber = await getNextSequenceNumber("DC", req.body.company);
+        dcNumber = await getNextSequenceNumber("DO", req.body.company);
+      } else {
+        await syncSequenceNumber("DO", req.body.company, dcNumber);
       }
     }
 

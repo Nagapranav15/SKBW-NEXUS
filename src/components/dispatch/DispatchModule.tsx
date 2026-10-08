@@ -1415,7 +1415,7 @@ export const DispatchModule: React.FC = () => {
                   sortedChallansList.map((ch, idx) => (
                     <tr key={ch._id || idx} className="hover:bg-blue-50/30 transition-colors">
                       <td className="py-3.5 px-4 font-mono font-bold text-blue-600 whitespace-nowrap">
-                        {ch.dcNumber || `DC-${idx + 1}`}
+                        {ch.dcNumber || `DO-${String(idx + 1).padStart(3, '0')}`}
                       </td>
                       <td className="py-3.5 px-4 font-medium text-gray-700 whitespace-nowrap font-mono">
                         {ch.date || '—'}

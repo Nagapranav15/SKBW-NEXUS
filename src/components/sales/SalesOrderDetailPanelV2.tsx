@@ -459,7 +459,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
           items: activeOrder.items,
           date: new Date().toISOString().slice(0, 10),
           status: 'dispatched',
-          dcNumber: `DC-${activeOrder.orderNumber}`
+          dcNumber: `DO-${activeOrder.orderNumber.replace(/^SO-?/i, '')}`
         });
         if (dcRes?.data) {
           setDeliveryChallans(prev => [dcRes.data, ...prev]);

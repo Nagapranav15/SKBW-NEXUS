@@ -39,7 +39,7 @@ const DeliveryChallan: React.FC = () => {
     finally { setLoading(false); }
   };
 
-  const generateDCNumber = () => `DC-${new Date().getFullYear()}-${(challans.length + 1).toString().padStart(4, '0')}`;
+  const generateDCNumber = () => `DO-${(challans.length + 1).toString().padStart(3, '0')}`;
 
   const handleOrderSelect = (orderId: string) => {
     const order = orders.find((o: any) => o._id === orderId);

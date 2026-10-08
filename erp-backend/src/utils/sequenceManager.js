@@ -80,12 +80,14 @@ function getEntityConfig(entityType) {
     }
 
     case "DC":
+    case "DO":
     case "DeliveryChallan":
+    case "DispatchOrder":
       modelName = "DeliveryChallan";
       queryField = "dcNumber";
-      matchRegex = /^DC-(?:(?:[0-9]{4})-)?([0-9]+)$/i;
-      padLength = 4;
-      formatCode = (seq) => `DC-${String(seq).padStart(Math.max(4, String(seq).length), "0")}`;
+      matchRegex = /^(?:DO|DC)-(?:(?:[0-9]{4})-)?([0-9]+)$/i;
+      padLength = 3;
+      formatCode = (seq) => `DO-${String(seq).padStart(Math.max(3, String(seq).length), "0")}`;
       break;
 
     case "QT":
