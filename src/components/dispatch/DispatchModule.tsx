@@ -339,7 +339,13 @@ export const DispatchModule: React.FC = () => {
         }
       });
 
-      setSalesOrders(combined);
+      const companyFilteredOrders = combined.filter((o: any) => {
+        if (!companyId) return true;
+        const oComp = String(o.company?._id || o.company || '');
+        return !oComp || oComp === String(companyId);
+      });
+
+      setSalesOrders(companyFilteredOrders);
 
       // 2. Fetch Live Stock Balances & SKU Master Data
       try {
@@ -396,6 +402,7 @@ export const DispatchModule: React.FC = () => {
         if (companyId) {
           const cRes = await getDeliveryChallans(companyId).catch(() => null);
           if (cRes?.data && Array.isArray(cRes.data)) challans = cRes.data;
+          else if (Array.isArray(cRes)) challans = cRes;
         }
         const localKey = `skbw_delivery_challans_${companyId || 'default'}`;
         const localChallans = JSON.parse(localStorage.getItem(localKey) || '[]');
@@ -406,7 +413,12 @@ export const DispatchModule: React.FC = () => {
             }
           });
         }
-        setDeliveryChallansList(challans);
+        const companyFilteredChallans = challans.filter((c: any) => {
+          if (!companyId) return true;
+          const cComp = String(c.company?._id || c.company || c.companyId || '');
+          return !cComp || cComp === String(companyId);
+        });
+        setDeliveryChallansList(companyFilteredChallans);
       } catch (cErr) {
         console.warn('Challans fetch error:', cErr);
       }
@@ -420,6 +432,11 @@ export const DispatchModule: React.FC = () => {
   };
 
   useEffect(() => {
+    setSalesOrders([]);
+    setDeliveryChallansList([]);
+    setSelectedOrderIds(new Set());
+    setExpandedOrderIds(new Set());
+    setLiveStockMap(new Map());
     fetchData(true);
   }, [selectedCompany?._id]);
 
@@ -456,7 +473,7 @@ export const DispatchModule: React.FC = () => {
     });
 
     if (pendingOrders.length === 0) {
-      return FALLBACK_SEED_ORDERS;
+      return [];
     }
 
     return pendingOrders.map((o, idx) => {
