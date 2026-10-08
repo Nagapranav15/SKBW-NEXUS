@@ -63,7 +63,7 @@ const SalesOrders: React.FC = () => {
 
   // Filters State
   const [search, setSearch] = useState('');
-  const [dateRangeFilter, setDateRangeFilter] = useState<string>('sep_2026'); // Matches screenshot '01/09/2026 - 30/09/2026'
+  const [dateRangeFilter, setDateRangeFilter] = useState<string>('all');
 
   // Initialize statusFilter from URL param or localStorage to preserve on refresh
   const getInitialTab = (): string => {
@@ -571,7 +571,7 @@ const SalesOrders: React.FC = () => {
     setStatusFilter('all');
     setRegionFilter('all');
     setAgentFilter('all');
-    setDateRangeFilter('sep_2026');
+    setDateRangeFilter('all');
     showToast('Filters reset to default', 'info');
   };
 
@@ -1870,22 +1870,31 @@ const SalesOrders: React.FC = () => {
                 );
               })}
 
-              {sortedOrders.length === 0 && !loading && (
+              {loading ? (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-gray-400 italic">
+                  <td colSpan={12} className="py-20 text-center">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <div className="w-9 h-9 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                      <p className="text-xs font-bold text-gray-600 uppercase tracking-wider">Loading Sales Orders...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : sortedOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={12} className="py-16 text-center text-gray-400 italic">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <FileText className="w-8 h-8 text-gray-300" />
                       <p className="font-semibold text-gray-500">No Sales Orders found matching your criteria</p>
                       <button
                         onClick={handleResetFilters}
-                        className="text-blue-600 hover:underline font-bold text-xs mt-1"
+                        className="text-blue-600 hover:underline font-bold text-xs mt-1 cursor-pointer"
                       >
                         Reset all filters
                       </button>
                     </div>
                   </td>
                 </tr>
-              )}
+              ) : null}
             </tbody>
           </table>
         </div>

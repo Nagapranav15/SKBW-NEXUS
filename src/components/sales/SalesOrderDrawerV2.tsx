@@ -350,7 +350,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   const shipToRef = useRef<HTMLDivElement>(null);
 
   // Items State (Empty by default when new)
-  const [availableSkus, setAvailableSkus] = useState<SkuV2[]>(MASTER_PRODUCT_SKUS);
+  const [availableSkus, setAvailableSkus] = useState<SkuV2[]>([]);
+  const [isDataLoading, setIsDataLoading] = useState(false);
   const [stockMap, setStockMap] = useState<Map<string, number>>(new Map());
   const [stockCostings, setStockCostings] = useState<StockCostingData | null>(null);
   const [activeItemDropdownIdx, setActiveItemDropdownIdx] = useState<number | null>(null);
@@ -524,6 +525,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   useEffect(() => {
     if (!isOpen) return;
 
+    setIsDataLoading(true);
+
     // ── Helper: extract a usable array from any API response shape ──
     const extractParties = (res: any): any[] => {
       if (!res) return [];
@@ -666,6 +669,9 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       })
       .catch(err => {
         console.error('Data fetch error:', err);
+      })
+      .finally(() => {
+        setIsDataLoading(false);
       });
 
     if (!editOrder) {
@@ -1869,31 +1875,40 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                   {/* Customer Dropdown Popover */}
                   {showCustomerDropdown && (
                     <div ref={customerDropdownListRef} className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-64 overflow-y-auto divide-y divide-gray-50 p-1">
-                      {filteredCustomers.slice(0, 200).map((c, idx) => (
-                        <div
-                          key={c._id || `${c.firmName}-${idx}`}
-                          onClick={() => handleSelectCustomer(c)}
-                          onMouseEnter={() => setHighlightedCustomerIdx(idx)}
-                          className={`p-2.5 cursor-pointer rounded-lg transition-colors flex items-center justify-between ${
-                            highlightedCustomerIdx === idx ? 'bg-blue-100/90 text-blue-900 font-bold border border-blue-200' : 'hover:bg-blue-50/70'
-                          }`}
-                        >
-                          <div>
-                            <div className="font-bold text-gray-900 text-xs">{c.firmName || c.ownerName || c.contactName}</div>
-                            <div className="text-[10px] text-gray-400">{c.city ? `${c.city}, ` : ''}{c.state || ''}</div>
-                          </div>
-                          <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
-                            {c.phone || c.mobile || 'Select'}
-                          </span>
+                      {isDataLoading && customersList.length === 0 ? (
+                        <div className="p-4 text-center text-gray-500 flex items-center justify-center gap-2">
+                          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                          <span className="text-xs font-semibold">Loading customers...</span>
                         </div>
-                      ))}
-                      {filteredCustomers.length > 200 && (
-                        <div className="p-2 text-center text-gray-400 text-[10px] bg-gray-50 rounded-lg">
-                          Showing first 200 of {filteredCustomers.length} customers. Type in the search box to find specific customer.
-                        </div>
-                      )}
-                      {filteredCustomers.length === 0 && (
-                        <div className="p-3 text-center text-gray-400 italic">No customers found</div>
+                      ) : (
+                        <>
+                          {filteredCustomers.slice(0, 200).map((c, idx) => (
+                            <div
+                              key={c._id || `${c.firmName}-${idx}`}
+                              onClick={() => handleSelectCustomer(c)}
+                              onMouseEnter={() => setHighlightedCustomerIdx(idx)}
+                              className={`p-2.5 cursor-pointer rounded-lg transition-colors flex items-center justify-between ${
+                                highlightedCustomerIdx === idx ? 'bg-blue-100/90 text-blue-900 font-bold border border-blue-200' : 'hover:bg-blue-50/70'
+                              }`}
+                            >
+                              <div>
+                                <div className="font-bold text-gray-900 text-xs">{c.firmName || c.ownerName || c.contactName}</div>
+                                <div className="text-[10px] text-gray-400">{c.city ? `${c.city}, ` : ''}{c.state || ''}</div>
+                              </div>
+                              <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
+                                {c.phone || c.mobile || 'Select'}
+                              </span>
+                            </div>
+                          ))}
+                          {filteredCustomers.length > 200 && (
+                            <div className="p-2 text-center text-gray-400 text-[10px] bg-gray-50 rounded-lg">
+                              Showing first 200 of {filteredCustomers.length} customers. Type in the search box to find specific customer.
+                            </div>
+                          )}
+                          {filteredCustomers.length === 0 && (
+                            <div className="p-3 text-center text-gray-400 italic">No customers found</div>
+                          )}
+                        </>
                       )}
                     </div>
                   )}
@@ -2611,64 +2626,73 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                               ref={(el) => { productDropdownRefMap.current[idx] = el; }} 
                               className="absolute left-3 top-full mt-1 w-[560px] max-w-[92vw] bg-white border border-gray-200 rounded-xl shadow-2xl z-[99999] max-h-64 overflow-y-auto divide-y divide-gray-100 p-1"
                             >
-                              {filteredProductSkus.map((s, sIdx) => {
-                                const isInactive = (s.status || '').toLowerCase() === 'inactive';
-                                const definedConv = Number(s.altUnitConversion || s.booksGbl || (s as any).pcsPerGbl || 0);
-                                const isHighlighted = (highlightedProductIdxMap[idx] ?? 0) === sIdx;
-                                const costing = getSkuCosting(s, stockCostings);
+                              {isDataLoading && availableSkus.length === 0 ? (
+                                <div className="p-4 text-center text-gray-500 flex items-center justify-center gap-2">
+                                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                  <span className="text-xs font-semibold">Loading product items...</span>
+                                </div>
+                              ) : (
+                                <>
+                                  {filteredProductSkus.map((s, sIdx) => {
+                                    const isInactive = (s.status || '').toLowerCase() === 'inactive';
+                                    const definedConv = Number(s.altUnitConversion || s.booksGbl || (s as any).pcsPerGbl || 0);
+                                    const isHighlighted = (highlightedProductIdxMap[idx] ?? 0) === sIdx;
+                                    const costing = getSkuCosting(s, stockCostings);
 
-                                return (
-                                  <div
-                                    key={s._id}
-                                    onClick={() => handleSelectProduct(idx, s)}
-                                    onMouseEnter={() => setHighlightedProductIdxMap(prev => ({ ...prev, [idx]: sIdx }))}
-                                    className={`p-2.5 cursor-pointer rounded-lg text-xs flex justify-between items-center transition-colors ${
-                                      isHighlighted ? 'bg-blue-100/90 font-bold border border-blue-200' : 'hover:bg-blue-50/80'
-                                    }`}
-                                  >
-                                    <div className="flex-1 min-w-0 pr-3">
-                                      <div className="font-bold text-gray-900 truncate">{s.name}</div>
-                                      <div className="flex items-center gap-2 mt-0.5">
-                                        <span className="text-[10px] text-gray-400 font-mono">{s.skuCode}</span>
-                                        <span className="text-[10px] text-gray-300">•</span>
-                                        <span className="text-[10px] text-gray-500">{s.category || 'Finished Goods'}</span>
-                                        {definedConv > 0 && (
-                                          <>
+                                    return (
+                                      <div
+                                        key={s._id}
+                                        onClick={() => handleSelectProduct(idx, s)}
+                                        onMouseEnter={() => setHighlightedProductIdxMap(prev => ({ ...prev, [idx]: sIdx }))}
+                                        className={`p-2.5 cursor-pointer rounded-lg text-xs flex justify-between items-center transition-colors ${
+                                          isHighlighted ? 'bg-blue-100/90 font-bold border border-blue-200' : 'hover:bg-blue-50/80'
+                                        }`}
+                                      >
+                                        <div className="flex-1 min-w-0 pr-3">
+                                          <div className="font-bold text-gray-900 truncate">{s.name}</div>
+                                          <div className="flex items-center gap-2 mt-0.5">
+                                            <span className="text-[10px] text-gray-400 font-mono">{s.skuCode}</span>
                                             <span className="text-[10px] text-gray-300">•</span>
-                                            <span className="text-[10px] font-semibold text-indigo-600">{definedConv} Pcs/GBL</span>
-                                          </>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 shrink-0">
-                                      {/* Sweet Dynamic Costing Pill */}
-                                      <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gradient-to-r from-slate-50 via-indigo-50/40 to-purple-50/40 border border-indigo-100/90 shadow-xs">
-                                        <div className="flex items-center gap-1">
-                                          <span className="text-[11.5px] font-black text-slate-800 tracking-tight font-mono">{costing.formattedGbl}</span>
-                                          <span className="text-[8px] font-black uppercase px-1 py-0.5 rounded bg-indigo-100/90 text-indigo-700 tracking-wider">GBL</span>
+                                            <span className="text-[10px] text-gray-500">{s.category || 'Finished Goods'}</span>
+                                            {definedConv > 0 && (
+                                              <>
+                                                <span className="text-[10px] text-gray-300">•</span>
+                                                <span className="text-[10px] font-semibold text-indigo-600">{definedConv} Pcs/GBL</span>
+                                              </>
+                                            )}
+                                          </div>
                                         </div>
-                                        <span className="text-indigo-200 text-[10px]">•</span>
-                                        <div className="flex items-center gap-1">
-                                          <span className="text-[11px] font-bold text-slate-600 tracking-tight font-mono">{costing.formattedPcs}</span>
-                                          <span className="text-[8px] font-bold uppercase px-1 py-0.5 rounded bg-slate-200/80 text-slate-600 tracking-wider">Pcs</span>
-                                        </div>
-                                      </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                          {/* Sweet Dynamic Costing Pill */}
+                                          <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gradient-to-r from-slate-50 via-indigo-50/40 to-purple-50/40 border border-indigo-100/90 shadow-xs">
+                                            <div className="flex items-center gap-1">
+                                              <span className="text-[11.5px] font-black text-slate-800 tracking-tight font-mono">{costing.formattedGbl}</span>
+                                              <span className="text-[8px] font-black uppercase px-1 py-0.5 rounded bg-indigo-100/90 text-indigo-700 tracking-wider">GBL</span>
+                                            </div>
+                                            <span className="text-indigo-200 text-[10px]">•</span>
+                                            <div className="flex items-center gap-1">
+                                              <span className="text-[11px] font-bold text-slate-600 tracking-tight font-mono">{costing.formattedPcs}</span>
+                                              <span className="text-[8px] font-bold uppercase px-1 py-0.5 rounded bg-slate-200/80 text-slate-600 tracking-wider">Pcs</span>
+                                            </div>
+                                          </div>
 
-                                      {/* Cute Active / Inactive Badge with glowing dot */}
-                                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[9.5px] font-extrabold uppercase rounded-lg border shadow-xs transition-all ${
-                                        isInactive
-                                          ? 'bg-gradient-to-r from-amber-50 to-orange-50 text-amber-800 border-amber-200/90'
-                                          : 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-800 border-emerald-200/90'
-                                      }`}>
-                                        <span className={`w-1.5 h-1.5 rounded-full ${isInactive ? 'bg-amber-500' : 'bg-emerald-500 ring-2 ring-emerald-300/60'}`} />
-                                        {s.status || 'Active'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                              {filteredProductSkus.length === 0 && (
-                                <div className="p-3 text-center text-gray-400 italic">No products found</div>
+                                          {/* Cute Active / Inactive Badge with glowing dot */}
+                                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[9.5px] font-extrabold uppercase rounded-lg border shadow-xs transition-all ${
+                                            isInactive
+                                              ? 'bg-gradient-to-r from-amber-50 to-orange-50 text-amber-800 border-amber-200/90'
+                                              : 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-800 border-emerald-200/90'
+                                          }`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${isInactive ? 'bg-amber-500' : 'bg-emerald-500 ring-2 ring-emerald-300/60'}`} />
+                                            {s.status || 'Active'}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                  {filteredProductSkus.length === 0 && (
+                                    <div className="p-3 text-center text-gray-400 italic">No products found</div>
+                                  )}
+                                </>
                               )}
                             </div>
                           )}
