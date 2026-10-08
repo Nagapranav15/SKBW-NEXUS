@@ -42,6 +42,8 @@ interface SkuProductionRequirement {
   shortfallGbl: number;
   earliestDueDate: string;
   orderCount: number;
+  isMixedBundle?: boolean;
+  components?: any[];
   orders: Array<{
     orderId: string;
     orderNumber: string;
@@ -252,11 +254,15 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
 
     pendingOrders.forEach(o => {
       (o.items || []).forEach((item, idx) => {
-        const code = (item.skuCode || `SKU-${idx}`).toUpperCase().trim();
-        const name = item.itemName || code;
-        const key = code || name;
+        const rawCode = (item.skuCode || '').trim();
+        const rawName = (item.itemName || '').trim();
+        const code = (rawCode || rawName || `ITEM-${idx + 1}`).toUpperCase();
+        const name = (rawName || rawCode || code).toUpperCase();
+        const key = (rawName || rawCode || code).toUpperCase();
+
         const comps = (item as any).components || [];
-        const packPcs = ((item as any).isMixedBundle && comps.length > 0)
+        const isMixedBundle = !!(item as any).isMixedBundle || comps.length > 0;
+        const packPcs = (isMixedBundle && comps.length > 0)
           ? comps.reduce((sum: number, c: any) => sum + (Number(c.quantity) || 0), 0)
           : 0;
         const pcsPerGbl = (packPcs > 0 && (!item.pcsPerGbl || item.pcsPerGbl === 1 || item.pcsPerGbl === 100))
@@ -265,14 +271,18 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
         const rawCat = (item as any).category || (item as any).stockCategory || categoryMap.get(code.toLowerCase()) || categoryMap.get(name.toLowerCase()) || '';
         const category = rawCat || (code.includes('112P') || name.toUpperCase().includes('112P') ? 'FINISHED GOODS' : '');
 
-        const orderedPcs = Number(item.quantity) || 0;
-        const orderedGbl = (item.gbl && packPcs > 0 && item.gbl === packPcs && (item.pcsPerGbl === 1 || !item.pcsPerGbl))
-          ? 1
-          : (item.gbl || Math.ceil(orderedPcs / pcsPerGbl));
+        let orderedGbl = Number(item.gbl) || 0;
+        let orderedPcs = Number(item.quantity) || 0;
+        if (orderedGbl > 0 && orderedPcs === 0) {
+          orderedPcs = orderedGbl * pcsPerGbl;
+        } else if (orderedPcs > 0 && orderedGbl === 0) {
+          orderedGbl = Math.ceil(orderedPcs / pcsPerGbl);
+        }
+
         const dispatchedPcs = Number(item.dispatchedQty) || 0;
         const dispatchedGbl = Math.floor(dispatchedPcs / pcsPerGbl);
         const pendingPcs = Math.max(0, orderedPcs - dispatchedPcs);
-        const pendingGbl = Math.ceil(pendingPcs / pcsPerGbl);
+        const pendingGbl = Math.max(0, orderedGbl - dispatchedGbl);
 
         // Fetch live warehouse stock dynamically from inventory
         let stockInHandPcs = 0;
@@ -318,6 +328,8 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
             shortfallGbl: 0,
             earliestDueDate: o.promisedDate || o.orderDate || '',
             orderCount: 0,
+            isMixedBundle,
+            components: comps.length > 0 ? [...comps] : undefined,
             orders: [],
             productionStatus: 'Shortfall'
           });
@@ -331,6 +343,18 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
         req.balancePendingPcs += pendingPcs;
         req.balancePendingGbl += pendingGbl;
         req.orderCount += 1;
+
+        if (isMixedBundle) req.isMixedBundle = true;
+        if (comps.length > 0) {
+          if (!req.components) req.components = [];
+          comps.forEach((c: any) => {
+            const exists = req.components!.some((ex: any) =>
+              (ex.name && c.name && ex.name.toUpperCase() === c.name.toUpperCase()) ||
+              (ex.skuCode && c.skuCode && ex.skuCode.toUpperCase() === c.skuCode.toUpperCase())
+            );
+            if (!exists) req.components!.push(c);
+          });
+        }
 
         if (o.promisedDate && (!req.earliestDueDate || o.promisedDate < req.earliestDueDate)) {
           req.earliestDueDate = o.promisedDate;
@@ -1247,6 +1271,13 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
       };
 
       let grandTotalPendingGbl = 0;
+      const mixedSummaryMap = new Map<string, {
+        itemName: string;
+        orderCount: number;
+        totalPendingGbl: number;
+        totalPendingPcs: number;
+        components: any[];
+      }>();
 
       const orderBlocksHtml = filteredCustomerOrders.map(order => {
         const refDateStr = (order as any).dueDate || order.promisedDate || order.orderDate;
@@ -1254,9 +1285,28 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
         const diffDays = Math.max(0, Math.floor((today.getTime() - refDateObj.getTime()) / (1000 * 60 * 60 * 24)));
         const items = order.items || [];
         const totalPendingGbl = items.reduce((sum, item) => {
-          const pcsPerGbl = item.pcsPerGbl || 100;
-          const pendingPcs = Math.max(0, (item.quantity || 0) - (item.dispatchedQty || 0));
-          return sum + Math.ceil(pendingPcs / pcsPerGbl);
+          const comps = (item as any).components || [];
+          const packPcs = ((item as any).isMixedBundle && comps.length > 0)
+            ? comps.reduce((s: number, c: any) => s + (Number(c.quantity) || 0), 0)
+            : 0;
+          const pcsPerGbl = (packPcs > 0 && (!item.pcsPerGbl || item.pcsPerGbl === 1 || item.pcsPerGbl === 100))
+            ? packPcs
+            : (item.pcsPerGbl || packPcs || 100);
+
+          let orderedGbl = Number(item.gbl) || 0;
+          let orderedPcs = Number(item.quantity) || 0;
+          if (orderedGbl > 0 && orderedPcs === 0) {
+            orderedPcs = orderedGbl * pcsPerGbl;
+          } else if (orderedPcs > 0 && orderedGbl === 0) {
+            orderedGbl = Math.ceil(orderedPcs / pcsPerGbl);
+          }
+
+          const dispatchedPcs = Number(item.dispatchedQty) || 0;
+          const dispatchedGbl = Math.floor(dispatchedPcs / pcsPerGbl);
+          const pendingPcs = Math.max(0, orderedPcs - dispatchedPcs);
+          const pendingGbl = Math.max(0, orderedGbl - dispatchedGbl);
+
+          return sum + pendingGbl;
         }, 0);
         grandTotalPendingGbl += totalPendingGbl;
 
@@ -1277,36 +1327,102 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
         `;
 
         const itemRows = items.map(item => {
-          const pcsPerGbl = item.pcsPerGbl || 100;
-          const pendingPcs = Math.max(0, (item.quantity || 0) - (item.dispatchedQty || 0));
-          const pendingGbl = item.gbl || Math.ceil(pendingPcs / pcsPerGbl);
-
           const comps = (item as any).components || [];
-          const compRows = comps.map((c: any) => `
+          const desc = (item as any).description || (item as any).remarks || (item as any).notes || '';
+          const packPcs = ((item as any).isMixedBundle && comps.length > 0)
+            ? comps.reduce((sum: number, c: any) => sum + (Number(c.quantity) || 0), 0)
+            : 0;
+          const pcsPerGbl = (packPcs > 0 && (!item.pcsPerGbl || item.pcsPerGbl === 1 || item.pcsPerGbl === 100))
+            ? packPcs
+            : (item.pcsPerGbl || packPcs || 100);
+
+          let orderedGbl = Number(item.gbl) || 0;
+          let orderedPcs = Number(item.quantity) || 0;
+          if (orderedGbl > 0 && orderedPcs === 0) {
+            orderedPcs = orderedGbl * pcsPerGbl;
+          } else if (orderedPcs > 0 && orderedGbl === 0) {
+            orderedGbl = Math.ceil(orderedPcs / pcsPerGbl);
+          }
+
+          const dispatchedPcs = Number(item.dispatchedQty) || 0;
+          const dispatchedGbl = Math.floor(dispatchedPcs / pcsPerGbl);
+          const pendingPcs = Math.max(0, orderedPcs - dispatchedPcs);
+          const pendingGbl = Math.max(0, orderedGbl - dispatchedGbl);
+
+          const itemNameUpper = (item.itemName || item.skuCode || '').toUpperCase().trim();
+          const isLooseOrMixed = itemNameUpper.includes('LOOSE') ||
+                                 itemNameUpper.includes('LOSSE') ||
+                                 itemNameUpper.includes('MIXED') ||
+                                 (item as any).isMixedBundle ||
+                                 comps.length > 0;
+
+          if (isLooseOrMixed) {
+            const key = itemNameUpper || 'MIXED STOCK / LOOSE BOOKS';
+            if (!mixedSummaryMap.has(key)) {
+              mixedSummaryMap.set(key, {
+                itemName: key,
+                orderCount: 0,
+                totalPendingGbl: 0,
+                totalPendingPcs: 0,
+                components: comps.length > 0 ? [...comps] : []
+              });
+            }
+            const m = mixedSummaryMap.get(key)!;
+            m.orderCount += 1;
+            m.totalPendingGbl += pendingGbl;
+            m.totalPendingPcs += pendingPcs;
+            if (comps.length > 0 && m.components.length === 0) {
+              m.components = [...comps];
+            }
+          }
+
+          const compRows = comps.map((c: any) => {
+            const cQtyPcs = Number(c.quantity) || 1;
+            const cPcsPerGbl = Number(c.pcsPerGbl) || 100;
+            const cEqGbl = cQtyPcs > 0 ? +(cQtyPcs / cPcsPerGbl).toFixed(1) : 0;
+            const gblText = cEqGbl > 0 ? ` (${cEqGbl} GBL equivalent)` : '';
+            return `
+              <tr class="item-sub-row component-sub-row">
+                <td class="col-date"></td>
+                <td class="col-customer">
+                  <div class="component-item-text">&bull; ${(c.name || c.skuCode || '').toUpperCase()} — ${cQtyPcs} ${c.uom || 'PCS'}${gblText}</div>
+                </td>
+                <td class="col-orderno"></td>
+                <td class="col-pending"></td>
+                <td class="col-overdue"></td>
+              </tr>
+            `;
+          }).join('');
+
+          const descRow = desc ? `
             <tr class="item-sub-row component-sub-row">
               <td class="col-date"></td>
               <td class="col-customer">
-                <div class="component-item-text">&bull; ${(c.name || c.skuCode || '').toUpperCase()} (${c.quantity || 1} ${c.uom || 'PCS'})</div>
+                <div class="component-item-text">&bull; DETAILS: ${desc.toUpperCase()}</div>
               </td>
               <td class="col-orderno"></td>
               <td class="col-pending"></td>
               <td class="col-overdue"></td>
             </tr>
-          `).join('');
+          ` : '';
 
           return `
             <tr class="item-sub-row">
               <td class="col-date"></td>
               <td class="col-customer">
-                <div class="item-name-text">${(item.itemName || item.skuCode || '').toUpperCase()}</div>
+                <div class="item-name-text" style="${isLooseOrMixed ? 'font-weight: 800; color: #1e3a8a;' : ''}">
+                  ${itemNameUpper}
+                  ${isLooseOrMixed ? ' <span style="font-size:7.5pt; font-weight:600; color:#2563eb;">(MIXED / LOOSE STOCK)</span>' : ''}
+                </div>
               </td>
               <td class="col-orderno"></td>
               <td class="col-pending">
-                <div class="item-qty-text">${pendingGbl} GBL</div>
+                <div class="item-qty-text" style="${isLooseOrMixed ? 'font-weight: 800; color: #1e3a8a;' : ''}">${pendingGbl} GBL</div>
               </td>
               <td class="col-overdue"></td>
             </tr>
             ${compRows}
+            ${descRow}
           `;
         }).join('');
 
@@ -1317,6 +1433,67 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
           </tbody>
         `;
       }).join('');
+
+      // Build Mixed Stock & Loose Books Summary Section HTML
+      let mixedSummaryHtml = '';
+      if (mixedSummaryMap.size > 0) {
+        let totalMixedGblSum = 0;
+        let totalMixedPcsSum = 0;
+        let idxCounter = 1;
+
+        const summaryRows = Array.from(mixedSummaryMap.values()).map(m => {
+          totalMixedGblSum += m.totalPendingGbl;
+          totalMixedPcsSum += m.totalPendingPcs;
+
+          const compListStr = m.components.length > 0 ? m.components.map(c => `
+            <div style="font-size: 7.8pt; color: #475569; font-style: italic; margin-top: 2px; padding-left: 8px;">
+              &bull; ${(c.name || c.skuCode || '').toUpperCase()} (${c.quantity || 1} ${c.uom || 'PCS'})
+            </div>
+          `).join('') : '';
+
+          return `
+            <tr>
+              <td style="text-align: center; font-weight: 600; color: #475569;">${idxCounter++}</td>
+              <td style="text-align: left; font-weight: 700; color: #1e3a8a;">
+                <div>${m.itemName}</div>
+                ${compListStr}
+              </td>
+              <td style="text-align: center; font-weight: 600;">${m.orderCount} order${m.orderCount > 1 ? 's' : ''}</td>
+              <td style="text-align: center; font-weight: 700;">${m.totalPendingPcs.toLocaleString()} PCS</td>
+              <td style="text-align: center; font-weight: 800; color: #1e3a8a;">${m.totalPendingGbl} GBL</td>
+            </tr>
+          `;
+        }).join('');
+
+        mixedSummaryHtml = `
+          <div style="margin-top: 22px; page-break-inside: avoid !important; break-inside: avoid !important;">
+            <div style="background-color: #1e3a8a; color: #ffffff; padding: 6px 12px; font-weight: 800; font-size: 9.5pt; border-radius: 4px 4px 0 0; text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">
+              Mixed Stock & Loose Books Summary
+            </div>
+            <table class="report-table" style="border-top: none;">
+              <thead>
+                <tr>
+                  <th style="width: 6%;">#</th>
+                  <th style="width: 48%; text-align: left;">Mixed Stock / Bundle Particulars</th>
+                  <th style="width: 14%;">Orders</th>
+                  <th style="width: 16%;">Pending Pcs</th>
+                  <th style="width: 16%;">Pending GBL</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${summaryRows}
+              </tbody>
+              <tfoot>
+                <tr class="total-row">
+                  <td colspan="3" class="total-label">TOTAL MIXED STOCK GBL</td>
+                  <td class="total-value">${totalMixedPcsSum.toLocaleString()} PCS</td>
+                  <td class="total-value">${totalMixedGblSum} GBL</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        `;
+      }
 
       html = `
         <!DOCTYPE html>
@@ -1554,6 +1731,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
               </tr>
             </tfoot>
           </table>
+          ${mixedSummaryHtml}
           <div class="continued-text">continued ...</div>
         </body>
         </html>
@@ -1610,10 +1788,27 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
         const badgeCss = getBrandBadgeStyle(brandName);
         const currentIdx = itemIndexCounter++;
 
+        const comps = req.components || [];
+        const compSubHtml = comps.length > 0 ? comps.map((c: any) => `
+          <div style="font-size: 7.8pt; color: #475569; font-style: italic; margin-top: 2px; padding-left: 10px;">
+            &bull; ${(c.name || c.skuCode || '').toUpperCase()} (${c.quantity || 1} ${c.uom || 'PCS'})
+          </div>
+        `).join('') : '';
+
+        const isLooseOrMixed = req.skuName.toUpperCase().includes('LOOSE') ||
+                               req.skuName.toUpperCase().includes('LOSSE') ||
+                               req.isMixedBundle ||
+                               comps.length > 0;
+
         return `
           <tr class="item-row">
             <td class="col-num">${currentIdx}</td>
-            <td class="col-item-name">${req.skuName.toUpperCase()}</td>
+            <td class="col-item-name">
+              <div style="${isLooseOrMixed ? 'font-weight: 700; color: #0f172a;' : ''}">
+                ${req.skuName.toUpperCase()}
+              </div>
+              ${compSubHtml}
+            </td>
             <td class="col-brand">
               <span class="brand-badge" style="${badgeCss}">${brandName}</span>
             </td>
@@ -1872,6 +2067,74 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
               </tr>
             </tfoot>
           </table>
+          ${(() => {
+            const prodMixedItems = filteredRequirements.filter(req => 
+              req.skuName.toUpperCase().includes('LOOSE') ||
+              req.skuName.toUpperCase().includes('LOSSE') ||
+              req.skuName.toUpperCase().includes('MIXED') ||
+              req.isMixedBundle ||
+              (req.components && req.components.length > 0)
+            );
+
+            if (prodMixedItems.length === 0) return '';
+            let totalProdMixedGbl = 0;
+            let totalProdMixedPcs = 0;
+            let pIdx = 1;
+
+            const summaryRows = prodMixedItems.map(req => {
+              totalProdMixedGbl += req.balancePendingGbl;
+              totalProdMixedPcs += req.balancePendingPcs;
+
+              const comps = req.components || [];
+              const compListStr = comps.length > 0 ? comps.map(c => `
+                <div style="font-size: 7.8pt; color: #475569; font-style: italic; margin-top: 2px; padding-left: 8px;">
+                  &bull; ${(c.name || c.skuCode || '').toUpperCase()} (${c.quantity || 1} ${c.uom || 'PCS'})
+                </div>
+              `).join('') : '';
+
+              return `
+                <tr>
+                  <td style="text-align: center; font-weight: 600; color: #475569;">${pIdx++}</td>
+                  <td style="text-align: left; font-weight: 700; color: #1e3a8a;">
+                    <div>${req.skuName.toUpperCase()}</div>
+                    ${compListStr}
+                  </td>
+                  <td style="text-align: center; font-weight: 600;">${req.orderCount} order${req.orderCount > 1 ? 's' : ''}</td>
+                  <td style="text-align: center; font-weight: 700;">${req.balancePendingPcs.toLocaleString()} PCS</td>
+                  <td style="text-align: center; font-weight: 800; color: #1e3a8a;">${req.balancePendingGbl} GBL</td>
+                </tr>
+              `;
+            }).join('');
+
+            return `
+              <div style="margin-top: 22px; page-break-inside: avoid !important; break-inside: avoid !important;">
+                <div style="background-color: #1e3a8a; color: #ffffff; padding: 6px 12px; font-weight: 800; font-size: 9.5pt; border-radius: 4px 4px 0 0; text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">
+                  Mixed Stock & Loose Books Summary
+                </div>
+                <table class="report-table" style="border-top: none;">
+                  <thead>
+                    <tr>
+                      <th style="width: 6%;">#</th>
+                      <th style="width: 48%; text-align: left;">Mixed Stock / Bundle Particulars</th>
+                      <th style="width: 14%;">Orders</th>
+                      <th style="width: 16%;">Pending Pcs</th>
+                      <th style="width: 16%;">Pending GBL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${summaryRows}
+                  </tbody>
+                  <tfoot>
+                    <tr class="grand-total-row">
+                      <td colspan="3" class="total-label">TOTAL MIXED STOCK GBL</td>
+                      <td class="total-val-pcs">${totalProdMixedPcs.toLocaleString()} PCS</td>
+                      <td class="total-val-gbl">${totalProdMixedGbl} GBL</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            `;
+          })()}
         </body>
         </html>
       `;
