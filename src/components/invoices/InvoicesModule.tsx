@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 import { useAuth } from '../../context/AuthContext';
 import { SalesInvoice, getInvoices, getLocalInvoices, deleteInvoice } from '../../api/invoiceApi';
 import { getDeliveryChallans, deleteDeliveryChallan } from '../../api/deliveryChallanApi';
+import { getSkusV2 } from '../../api/mfgApiV2';
 import { DispatchDeliveryRecord } from './invoiceSampleData';
 import { CreateInvoiceModal } from './CreateInvoiceModal';
 import { InvoiceSuccessModal } from './InvoiceSuccessModal';
@@ -128,20 +129,27 @@ export const InvoicesModule: React.FC = () => {
   }, []);
 
   // Fetch real invoices and deliveries from backend & local storage
+  // Fetch real invoices and deliveries from backend & local storage with Parallel Loading & Dynamic Pricing
   const loadData = async (showLoadingSpinner = true) => {
     if (showLoadingSpinner) setIsLoading(true);
     try {
       const companyId = selectedCompany?._id;
 
-      // 1. Fetch real sales invoices
-      let realInvoices: SalesInvoice[] = [];
-      try {
-        const apiInvs = await getInvoices(companyId);
-        if (Array.isArray(apiInvs)) realInvoices = apiInvs;
-      } catch (err) {
-        console.warn('API getInvoices fallback to local:', err);
-      }
+      // Parallel fetch to eliminate waterfall loading & improve speed significantly
+      const [apiInvs, challanRes, skusRes] = await Promise.all([
+        getInvoices(companyId).catch((err) => {
+          console.warn('API getInvoices fallback to local:', err);
+          return [] as SalesInvoice[];
+        }),
+        getDeliveryChallans(companyId).catch((err) => {
+          console.warn('API getDeliveryChallans fallback:', err);
+          return null;
+        }),
+        getSkusV2(companyId).catch(() => [])
+      ]);
 
+      // 1. Process sales invoices
+      const realInvoices = Array.isArray(apiInvs) ? apiInvs : [];
       const localInvs = getLocalInvoices(companyId);
       const invoiceMap = new Map<string, SalesInvoice>();
       [...localInvs, ...realInvoices].forEach(inv => {
@@ -152,17 +160,27 @@ export const InvoicesModule: React.FC = () => {
       const allInvoices = Array.from(invoiceMap.values());
       setInvoicesList(allInvoices);
 
-      // 2. Fetch real delivery challans
-      let rawChallans: any[] = [];
-      try {
-        const challanRes = await getDeliveryChallans(companyId);
-        if (Array.isArray(challanRes?.data)) {
-          rawChallans = challanRes.data;
-        } else if (Array.isArray(challanRes)) {
-          rawChallans = challanRes;
+      // 2. Build SKU Master price map for 100% dynamic rate resolution
+      const skuPriceMap = new Map<string, number>();
+      const rawSkus = Array.isArray(skusRes) ? skusRes : [];
+      rawSkus.forEach((s: any) => {
+        const sId = String(s._id || s.id || '');
+        const code = (s.skuCode || '').toLowerCase().trim();
+        const name = (s.name || '').toLowerCase().trim();
+        const price = Number(s.sellingPrice || s.price || s.rate || s.unitPrice || 0);
+        if (price > 0) {
+          if (sId) skuPriceMap.set(sId, price);
+          if (code) skuPriceMap.set(code, price);
+          if (name) skuPriceMap.set(name, price);
         }
-      } catch (err) {
-        console.warn('API getDeliveryChallans fallback:', err);
+      });
+
+      // 3. Process delivery challans
+      let rawChallans: any[] = [];
+      if (Array.isArray(challanRes?.data)) {
+        rawChallans = challanRes.data;
+      } else if (Array.isArray(challanRes)) {
+        rawChallans = challanRes;
       }
 
       const cKey = `skbw_delivery_challans_${companyId || 'default'}`;
@@ -174,7 +192,7 @@ export const InvoicesModule: React.FC = () => {
       });
       const combinedChallans = Array.from(challanMap.values());
 
-      // 3. Map real delivery challans to DispatchDeliveryRecord
+      // 4. Map delivery challans dynamically
       const mappedDeliveries: DispatchDeliveryRecord[] = combinedChallans.map((ch: any) => {
         const dcNo = getSafeText(ch.dcNumber || ch.dispatchNo);
         const chId = toSafeString(ch._id);
@@ -204,8 +222,11 @@ export const InvoicesModule: React.FC = () => {
         const items = Array.isArray(ch.items) ? ch.items.map((it: any, idx: number) => {
           const gbl = Number(it.deliveredQty || it.quantity || it.orderedQty || 0);
           const pcs = Number(it.deliveredPcs || it.pcs || gbl * 100);
-          const rate = Number(it.price || it.rate || it.unitPrice || 0);
-          const amount = Number(it.total || (gbl * rate) || 0);
+          const itemCodeKey = (it.skuCode || it.itemCode || '').toLowerCase().trim();
+          const itemNameKey = (it.itemName || it.description || '').toLowerCase().trim();
+          const masterPrice = skuPriceMap.get(itemCodeKey) || skuPriceMap.get(itemNameKey) || 0;
+          const rate = Number(it.price || it.rate || it.unitPrice || masterPrice || 0);
+          const amount = Number(it.total || (gbl > 0 ? gbl * rate : pcs * rate) || 0);
           return {
             itemCode: getSafeText(it.skuCode || it.itemCode, `FG-${String(idx + 1).padStart(3, '0')}`),
             itemName: getSafeText(it.itemName || it.description, 'Stationery Item'),
@@ -220,6 +241,7 @@ export const InvoicesModule: React.FC = () => {
 
         const totalGbl = Number(ch.totalGbl) || items.reduce((s, it) => s + it.dispatchedGbl, 0);
         const totalPcs = Number(ch.totalPcs) || items.reduce((s, it) => s + it.dispatchedPcs, 0);
+        const dynamicCalculatedAmount = items.reduce((s, it) => s + (it.amount || 0), 0);
 
         let invStatus: 'Not Invoiced' | 'Partially Invoiced' | 'Invoiced' = 'Not Invoiced';
         if (matchedInv) {
@@ -285,7 +307,7 @@ export const InvoicesModule: React.FC = () => {
           invoiceStatus: invStatus,
           invoiceNumber: matchedInv?.invoiceNumber,
           invoiceDate: matchedInv?.invoiceDate,
-          invoiceAmount: matchedInv?.grandTotal,
+          invoiceAmount: matchedInv?.grandTotal ?? (dynamicCalculatedAmount > 0 ? dynamicCalculatedAmount : undefined),
           days: daysElapsed,
           billToAddress: parsedBillTo,
           shipToAddress: parsedShipTo,

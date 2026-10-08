@@ -285,7 +285,17 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
       const rows: InvoiceItemRow[] = (activeDispatch.items || []).map((it, idx) => {
         const qtyGbl = Number(it.dispatchedGbl) || 1;
         const pcsPerGbl = Number((it as any).pcsPerGbl) || Math.round(Number(it.dispatchedPcs || 0) / qtyGbl) || 100;
-        const rate = Number(it.rate) || 0;
+        
+        const itemCodeKey = (it.itemCode || (it as any).skuCode || '').toLowerCase().trim();
+        const itemNameKey = (it.itemName || (it as any).description || '').toLowerCase().trim();
+        const matchedSku = availableSkus.find(s => {
+          const c = (s.skuCode || '').toLowerCase().trim();
+          const n = (s.name || '').toLowerCase().trim();
+          return (itemCodeKey && c === itemCodeKey) || (itemNameKey && n === itemNameKey);
+        });
+        const masterRate = matchedSku ? Number(matchedSku.sellingPrice || matchedSku.price || matchedSku.rate || 0) : 0;
+        const rate = Number(it.rate || (it as any).price || (it as any).unitPrice || masterRate || 0);
+
         const taxable = qtyGbl * rate;
         const gstRate = 12; // Standard stationery GST
         const gstAmount = taxable * (gstRate / 100);
