@@ -627,30 +627,158 @@ export const StockInventoryV2: React.FC = () => {
         });
       }
 
-      // 2. Calculate dynamic weighted average price from purchase batches
+      // 2. Calculate dynamic weighted average price from purchase batches / raw material receipts
       const avgPriceMap = new Map<string, { totalSpend: number; totalQty: number; avgPrice: number }>();
-      const invoices = (purchasesRes as any)?.invoices || (Array.isArray(purchasesRes) ? purchasesRes : []);
-      invoices.forEach((inv: any) => {
+      const purchasesRaw = (purchasesRes as any)?.invoices || (Array.isArray(purchasesRes) ? purchasesRes : []);
+      purchasesRaw.forEach((inv: any) => {
         if (inv.status === 'Cancelled') return;
         (inv.items || []).forEach((item: any) => {
           const rawId = item.skuId?._id || item.skuId;
           const sId = rawId ? String(rawId) : '';
+          const sCode = (item.skuCode || item.code || '').trim().toLowerCase();
+          const sName = (item.itemName || item.name || item.description || '').trim().toLowerCase();
           const qty = Number(item.quantity) || 0;
-          const price = Number(item.purchasePrice || item.price || item.ratePerKg) || 0;
-          if (sId && qty > 0 && price > 0) {
-            const current = avgPriceMap.get(sId) || { totalSpend: 0, totalQty: 0, avgPrice: 0 };
-            const newSpend = current.totalSpend + (qty * price);
-            const newQty = current.totalQty + qty;
-            avgPriceMap.set(sId, {
-              totalSpend: newSpend,
-              totalQty: newQty,
-              avgPrice: newQty > 0 ? (newSpend / newQty) : 0
+          const price = Number(item.purchasePrice || item.price || item.ratePerKg || item.rate || 0);
+
+          if (qty > 0 && price > 0) {
+            const targetKeys = [sId, sCode, sName].filter(Boolean);
+            targetKeys.forEach(k => {
+              const current = avgPriceMap.get(k) || { totalSpend: 0, totalQty: 0, avgPrice: 0 };
+              const newSpend = current.totalSpend + (qty * price);
+              const newQty = current.totalQty + qty;
+              avgPriceMap.set(k, {
+                totalSpend: newSpend,
+                totalQty: newQty,
+                avgPrice: newQty > 0 ? (newSpend / newQty) : price
+              });
             });
           }
         });
       });
 
-      // 3. Dynamic Costing & Place Reservation from Production Orders
+      // 3. Dynamic Costing from Reel Slitting Process (Cutting Slips -> Parent Sheets / Semi Finished)
+      const slittingCostMap = new Map<string, { totalSpend: number; totalQty: number; avgRate: number; costPerSheet: number; costPerReam: number }>();
+      const rawSlips = (cuttingSlipsRes as any)?.cuttingSlips || (Array.isArray(cuttingSlipsRes) ? cuttingSlipsRes : []);
+
+      rawSlips.forEach((cs: any) => {
+        if (cs.status === 'Cancelled') return;
+
+        const targetSkuObj = cs.targetSku;
+        const sId = targetSkuObj?._id ? String(targetSkuObj._id) : (typeof targetSkuObj === 'string' ? targetSkuObj : '');
+        const sCode = (targetSkuObj?.skuCode || cs.targetSkuCode || '').trim().toLowerCase();
+        const sName = (targetSkuObj?.name || cs.targetSkuName || '').trim().toLowerCase();
+
+        // Cross-reference with skusRes for reliable units & conversion factors
+        const matchedSkuDoc = (skusRes || []).find((s: any) => 
+          (sId && String(s._id) === sId) || 
+          (sCode && (s.skuCode || '').trim().toLowerCase() === sCode) ||
+          (sName && (s.name || '').trim().toLowerCase() === sName)
+        );
+
+        const skuUnit = (targetSkuObj?.unit || matchedSkuDoc?.unit || '').trim().toLowerCase();
+        const isReam = skuUnit.includes('ream');
+        const isGbl = skuUnit === 'gbl' || skuUnit.includes('bundle') || skuUnit.includes('box') || skuUnit.includes('carton');
+        const convFactor = Number(
+          targetSkuObj?.altUnitConversion ||
+          matchedSkuDoc?.altUnitConversion ||
+          targetSkuObj?.booksGbl ||
+          matchedSkuDoc?.booksGbl ||
+          targetSkuObj?.pcsPerGbl ||
+          matchedSkuDoc?.pcsPerGbl ||
+          0
+        );
+
+        const actualSheets = Number(cs.actualSheets || cs.totalPlannedSheets || 0);
+        const actualReams = Number(cs.actualReams || (actualSheets > 0 ? actualSheets / 500 : 0));
+        const totalNetCost = Number(cs.netProductionCost || cs.totalInputCost || cs.inputReelCost || 0);
+
+        let outQty = actualSheets;
+        if (isReam && actualReams > 0) {
+          outQty = actualReams;
+        } else if (isGbl && convFactor > 0) {
+          outQty = actualSheets / convFactor;
+        } else if ((targetSkuObj?.altUnit || matchedSkuDoc?.altUnit) && convFactor > 0) {
+          outQty = actualSheets / convFactor;
+        }
+
+        let unitRate = 0;
+        let costPerSheet = Number(cs.effectiveCostPerSheet || cs.costPerSheet || 0);
+        let costPerReam = Number(cs.effectiveCostPerReam || cs.costPerReam || 0);
+
+        if (totalNetCost > 0 && outQty > 0) {
+          unitRate = totalNetCost / outQty;
+        } else if (cs.effectiveCostPerSheet && !isReam && !isGbl) {
+          unitRate = Number(cs.effectiveCostPerSheet);
+        } else if (cs.effectiveCostPerReam && isReam) {
+          unitRate = Number(cs.effectiveCostPerReam);
+        }
+
+        if (actualSheets > 0 && totalNetCost > 0) {
+          costPerSheet = totalNetCost / actualSheets;
+          costPerReam = costPerSheet * 500;
+        }
+
+        if (unitRate > 0 && outQty > 0) {
+          const targetKeys = [
+            sId,
+            sCode,
+            sName,
+            matchedSkuDoc ? String(matchedSkuDoc._id) : '',
+            matchedSkuDoc?.skuCode ? matchedSkuDoc.skuCode.trim().toLowerCase() : '',
+            matchedSkuDoc?.name ? matchedSkuDoc.name.trim().toLowerCase() : ''
+          ].filter(Boolean);
+
+          targetKeys.forEach(k => {
+            const cur = slittingCostMap.get(k) || { totalSpend: 0, totalQty: 0, avgRate: 0, costPerSheet: 0, costPerReam: 0 };
+            const newSpend = cur.totalSpend + totalNetCost;
+            const newQty = cur.totalQty + outQty;
+            slittingCostMap.set(k, {
+              totalSpend: newSpend,
+              totalQty: newQty,
+              avgRate: newQty > 0 ? (newSpend / newQty) : unitRate,
+              costPerSheet: costPerSheet || (newQty > 0 ? newSpend / newQty : unitRate),
+              costPerReam: costPerReam || ((costPerSheet || unitRate) * 500)
+            });
+          });
+        }
+      });
+
+      // Helper to resolve parent sheet or raw material cost rate
+      const resolveMaterialCost = (matObj: any): number => {
+        if (!matObj) return 0;
+        const mId = matObj._id || matObj.skuId?._id || matObj.skuId;
+        const sId = mId ? String(mId) : '';
+        const sCode = (matObj.skuCode || matObj.code || '').trim().toLowerCase();
+        const sName = (matObj.name || matObj.itemName || matObj.component || '').trim().toLowerCase();
+
+        // 1. Slitting / Cutting Slips rate
+        const slit = (sId && slittingCostMap.get(sId)) || (sCode && slittingCostMap.get(sCode)) || (sName && slittingCostMap.get(sName));
+        if (slit && slit.avgRate > 0) return slit.avgRate;
+        if (slit && slit.costPerSheet > 0) return slit.costPerSheet;
+
+        // 2. Purchase batches average price
+        const pur = (sId && avgPriceMap.get(sId)) || (sCode && avgPriceMap.get(sCode)) || (sName && avgPriceMap.get(sName));
+        if (pur && pur.avgPrice > 0) return pur.avgPrice;
+
+        // 3. Master SKU rate
+        const matched = (skusRes || []).find((s: any) =>
+          (sId && String(s._id) === sId) ||
+          (sCode && (s.skuCode || '').trim().toLowerCase() === sCode) ||
+          (sName && (s.name || '').trim().toLowerCase() === sName)
+        );
+        if (matched) {
+          const mPrice = Number(matched.costPrice || matched.avgCost || matched.standardCost || matched.purchasePrice || matched.ratePerKg || (matched as any).rate || 0);
+          if (mPrice > 0) return mPrice;
+        }
+
+        // 4. Rate explicitly present on the item object
+        const explicitRate = Number(matObj.rate || matObj.unitCost || matObj.purchasePrice || 0);
+        if (explicitRate > 0) return explicitRate;
+
+        return 0;
+      };
+
+      // 4. Dynamic Costing & Place Reservation from Production Orders (Finished Goods & Assemblies)
       const prodCostMap = new Map<string, { totalSpend: number; totalQty: number; avgRate: number; inProduction: number }>();
       const rmReservedMap = new Map<string, number>();
       const prodOrders = Array.isArray(prodOrdersRes) ? prodOrdersRes : [];
@@ -668,7 +796,7 @@ export const StockInventoryV2: React.FC = () => {
         const producedQty = Number(po.producedQty) || 0;
         const isGbl = (po.plannedUom || '').toUpperCase() === 'GBL';
 
-        // Extract unit cost from production order's costSummary
+        // Extract unit cost from production order's costSummary or calculate from BOM parent sheets & overheads
         const cs = po.costSummary || {};
         let unitRate = 0;
         if (isGbl && cs.costPerGbl && Number(cs.costPerGbl) > 0) {
@@ -678,6 +806,31 @@ export const StockInventoryV2: React.FC = () => {
         } else if (cs.totalProductionCost && Number(cs.totalProductionCost) > 0) {
           const divisor = isGbl ? (plannedQty || 1) : (plannedPcs || plannedQty || 1);
           unitRate = Number(cs.totalProductionCost) / divisor;
+        } else {
+          // Dynamic calculation from BOM parent sheets + overheads
+          let totalBomCost = 0;
+          (po.bomItems || []).forEach((m: any) => {
+            const reqQty = Number(m.totalRequired || m.requiredQty || m.qtyPerBatch || m.qty || 0);
+            const mRate = Number(m.rate) > 0 ? Number(m.rate) : resolveMaterialCost(m);
+            totalBomCost += (reqQty * mRate);
+          });
+
+          let totalOverheads = 0;
+          (po.additionalCosts || []).forEach((c: any) => {
+            const cRate = Number(c.rate || c.amount || 0);
+            const basis = String(c.basis || c.calcBasis || '').toLowerCase();
+            if (basis.includes('piece')) {
+              totalOverheads += (cRate * (plannedPcs || (plannedQty * (Number(po.conversionFactor) || 100))));
+            } else {
+              totalOverheads += cRate;
+            }
+          });
+
+          const totalCalculatedCost = totalBomCost + totalOverheads;
+          if (totalCalculatedCost > 0) {
+            const divisor = isGbl ? (plannedQty || 1) : (plannedPcs || plannedQty || 1);
+            unitRate = totalCalculatedCost / divisor;
+          }
         }
 
         const targetKeys = [sId, sCode, sName].filter(Boolean);
@@ -697,7 +850,7 @@ export const StockInventoryV2: React.FC = () => {
           });
         }
 
-        // Place reservation: while in production/planned, output is inProduction (not on-hand directly)
+        // Place reservation: while in production/planned, output is inProduction
         if (po.status !== 'Completed') {
           const remainingProduce = Math.max(0, plannedQty - producedQty);
           if (remainingProduce > 0) {
@@ -722,108 +875,168 @@ export const StockInventoryV2: React.FC = () => {
         }
       });
 
-      // 4. Dynamic Costing from Reel Slitting Process (Cutting Slips)
-      const slittingCostMap = new Map<string, { totalSpend: number; totalQty: number; avgRate: number }>();
-      const rawSlips = (cuttingSlipsRes as any)?.cuttingSlips || (Array.isArray(cuttingSlipsRes) ? cuttingSlipsRes : []);
+      // 5. Dynamic BOM Recipe Costing for SKUs with defined BOM Recipes
+      const skuBomCostMap = new Map<string, { costPerUnit: number; costPerGbl: number }>();
+      (skusRes || []).forEach((s: any) => {
+        const rawBom = s.bomItems || s.bom;
+        if (Array.isArray(rawBom) && rawBom.length > 0) {
+          const sId = String(s._id);
+          const conv = Number(s.altUnitConversion || s.booksGbl || (s as any).pcsPerGbl || 100) || 100;
+          const isGbl = (s.unit || '').toUpperCase() === 'GBL' || (s.altUnit || '').toUpperCase() === 'GBL';
 
-      rawSlips.forEach((cs: any) => {
-        if (cs.status === 'Cancelled') return;
-
-        const targetSkuObj = cs.targetSku;
-        const sId = targetSkuObj?._id ? String(targetSkuObj._id) : (typeof targetSkuObj === 'string' ? targetSkuObj : '');
-        const sCode = (targetSkuObj?.skuCode || '').trim().toLowerCase();
-        const sName = (targetSkuObj?.name || '').trim().toLowerCase();
-
-        // Cross-reference with skusRes for reliable units & conversion factors
-        const matchedSkuDoc = (skusRes || []).find((s: any) => 
-          (sId && String(s._id) === sId) || 
-          (sCode && (s.skuCode || '').trim().toLowerCase() === sCode) ||
-          (sName && (s.name || '').trim().toLowerCase() === sName)
-        );
-
-        const skuUnit = (targetSkuObj?.unit || matchedSkuDoc?.unit || '').trim().toLowerCase();
-        const isReam = skuUnit.includes('ream');
-        const isGbl = skuUnit === 'gbl' || skuUnit.includes('bundle') || skuUnit.includes('box') || skuUnit.includes('carton');
-        const convFactor = Number(
-          targetSkuObj?.altUnitConversion ||
-          matchedSkuDoc?.altUnitConversion ||
-          targetSkuObj?.booksGbl ||
-          matchedSkuDoc?.booksGbl ||
-          targetSkuObj?.pcsPerGbl ||
-          matchedSkuDoc?.pcsPerGbl ||
-          0
-        );
-
-        const actualSheets = Number(cs.actualSheets) || 0;
-        const actualReams = Number(cs.actualReams) || 0;
-        const totalNetCost = Number(cs.netProductionCost || cs.totalInputCost || 0);
-
-        let outQty = actualSheets;
-        if (isReam && actualReams > 0) {
-          outQty = actualReams;
-        } else if (isGbl && convFactor > 0) {
-          outQty = actualSheets / convFactor;
-        } else if ((targetSkuObj?.altUnit || matchedSkuDoc?.altUnit) && convFactor > 0) {
-          outQty = actualSheets / convFactor;
-        }
-
-        let unitRate = 0;
-        if (totalNetCost > 0 && outQty > 0) {
-          unitRate = totalNetCost / outQty;
-        } else if (cs.effectiveCostPerSheet && !isReam && !isGbl) {
-          unitRate = Number(cs.effectiveCostPerSheet);
-        } else if (cs.effectiveCostPerReam && isReam) {
-          unitRate = Number(cs.effectiveCostPerReam);
-        }
-
-        if (unitRate > 0 && outQty > 0) {
-          const targetKeys = [
-            sId,
-            sCode,
-            sName,
-            matchedSkuDoc ? String(matchedSkuDoc._id) : '',
-            matchedSkuDoc?.skuCode ? matchedSkuDoc.skuCode.trim().toLowerCase() : ''
-          ].filter(Boolean);
-
-          targetKeys.forEach(k => {
-            const cur = slittingCostMap.get(k) || { totalSpend: 0, totalQty: 0, avgRate: 0 };
-            const newSpend = cur.totalSpend + totalNetCost;
-            const newQty = cur.totalQty + outQty;
-            slittingCostMap.set(k, {
-              totalSpend: newSpend,
-              totalQty: newQty,
-              avgRate: newQty > 0 ? (newSpend / newQty) : unitRate
-            });
+          let recipeMaterialSpend = 0;
+          rawBom.forEach((b: any) => {
+            const bQty = Number(b.qty || b.qtyPerBatch || 1);
+            const bRate = Number(b.rate) > 0 ? Number(b.rate) : resolveMaterialCost(b);
+            recipeMaterialSpend += (bQty * bRate);
           });
+
+          let recipeOverheads = 0;
+          (s.additionalCosts || []).forEach((c: any) => {
+            const cRate = Number(c.rate || c.amount || 0);
+            const basis = String(c.basis || c.calcBasis || '').toLowerCase();
+            const yieldPcs = Number(s.recipeYieldQty || s.batchYieldQty || 1) * (isGbl ? conv : 1);
+            if (basis.includes('piece')) {
+              recipeOverheads += (cRate * yieldPcs);
+            } else {
+              recipeOverheads += cRate;
+            }
+          });
+
+          const totalRecipeCost = recipeMaterialSpend + recipeOverheads;
+          if (totalRecipeCost > 0) {
+            const yieldQty = Number(s.recipeYieldQty || s.batchYieldQty || 1) || 1;
+            const yieldUnit = (s.recipeYieldUnit || s.batchYieldUnit || s.unit || '').toUpperCase();
+            let costPerGbl = 0;
+            let costPerUnit = 0;
+
+            if (yieldUnit === 'GBL') {
+              costPerGbl = totalRecipeCost / yieldQty;
+              costPerUnit = costPerGbl;
+            } else if (yieldUnit === 'PCS' || yieldUnit.includes('BOOK')) {
+              const costPerPiece = totalRecipeCost / yieldQty;
+              costPerGbl = costPerPiece * conv;
+              costPerUnit = isGbl ? costPerGbl : costPerPiece;
+            } else {
+              costPerUnit = totalRecipeCost / yieldQty;
+              costPerGbl = isGbl ? costPerUnit : (costPerUnit * conv);
+            }
+
+            skuBomCostMap.set(sId, { costPerUnit, costPerGbl });
+            if (s.skuCode) skuBomCostMap.set(s.skuCode.trim().toLowerCase(), { costPerUnit, costPerGbl });
+            if (s.name) skuBomCostMap.set(s.name.trim().toLowerCase(), { costPerUnit, costPerGbl });
+          }
         }
       });
 
+      // 6. Build Master Inventory List with End-to-End Dynamic Cost Calculation
       const formattedSkus: SkuV2[] = (skusRes || []).map((s: SkuV2) => {
         const sId = String(s._id);
         const sCode = (s.skuCode || '').trim().toLowerCase();
         const sName = (s.name || '').trim().toLowerCase();
 
         const liveOnHand = balanceMap.get(sId) || 0;
-        const slittingStats = slittingCostMap.get(sId) || slittingCostMap.get(sCode) || slittingCostMap.get(sName);
-        const prodStats = prodCostMap.get(sId) || prodCostMap.get(sCode) || prodCostMap.get(sName);
-        const avgStats = avgPriceMap.get(sId);
+        const itemGroup = getSkuCategoryGroup(s); // 'products' (Finished Goods), 'semi' (Cut Sheets), 'materials' (Raw Paper/Reels)
+        const isGbl = (s.unit || '').toUpperCase() === 'GBL' || (s.altUnit || '').toUpperCase() === 'GBL';
+        const convFactor = Number(s.altUnitConversion || s.booksGbl || (s as any).pcsPerGbl || 1) || 1;
 
-        // Costing priority: Reel Slitting -> Production Orders -> Purchase Invoices -> Master SKU cost
+        const prodStats = prodCostMap.get(sId) || prodCostMap.get(sCode) || prodCostMap.get(sName);
+        const bomStats = skuBomCostMap.get(sId) || skuBomCostMap.get(sCode) || skuBomCostMap.get(sName);
+        const slittingStats = slittingCostMap.get(sId) || slittingCostMap.get(sCode) || slittingCostMap.get(sName);
+        const avgStats = avgPriceMap.get(sId) || avgPriceMap.get(sCode) || avgPriceMap.get(sName);
+
+        // Costing priority based on item group:
+        // Finished Goods: Production Orders -> SKU BOM Recipe (from parent sheets) -> Slitting -> Purchase -> Master SKU
+        // Semi Finished: Reel Slitting (Cutting Slips) -> Production Orders -> SKU BOM -> Purchase -> Master SKU
+        // Raw Materials: Purchase Batches -> Reel Slitting -> Production Orders -> Master SKU
         let calculatedAvg = 0;
         let costSource: 'slitting' | 'production' | 'purchase' | 'master' = 'master';
 
-        if (slittingStats && slittingStats.avgRate > 0) {
-          calculatedAvg = Math.round(slittingStats.avgRate * 100) / 100;
-          costSource = 'slitting';
-        } else if (prodStats && prodStats.avgRate > 0) {
-          calculatedAvg = Math.round(prodStats.avgRate * 100) / 100;
-          costSource = 'production';
-        } else if (avgStats && avgStats.avgPrice > 0) {
-          calculatedAvg = Math.round(avgStats.avgPrice * 100) / 100;
-          costSource = 'purchase';
+        if (itemGroup === 'products') {
+          if (prodStats && prodStats.avgRate > 0) {
+            calculatedAvg = Math.round(prodStats.avgRate * 100) / 100;
+            costSource = 'production';
+          } else if (bomStats && (bomStats.costPerGbl > 0 || bomStats.costPerUnit > 0)) {
+            calculatedAvg = Math.round((isGbl ? bomStats.costPerGbl : bomStats.costPerUnit) * 100) / 100;
+            costSource = 'production';
+          } else if (slittingStats && slittingStats.avgRate > 0) {
+            calculatedAvg = Math.round(slittingStats.avgRate * 100) / 100;
+            costSource = 'slitting';
+          } else if (avgStats && avgStats.avgPrice > 0) {
+            calculatedAvg = Math.round(avgStats.avgPrice * 100) / 100;
+            costSource = 'purchase';
+          } else {
+            const masterBase = Number((s as any).avgCost || (s as any).costPrice || (s as any).standardCost || (s as any).avgRate || (s as any).purchasePrice || (s as any).sellingPrice || (s as any).ratePerKg || (s as any).rate || 0);
+            if (masterBase > 0) {
+              if (isGbl && masterBase < 100 && convFactor > 1) {
+                // Master base cost is per-piece; scale to GBL bundle rate
+                calculatedAvg = Math.round(masterBase * convFactor * 100) / 100;
+              } else {
+                calculatedAvg = masterBase;
+              }
+              costSource = 'master';
+            } else {
+              // Dynamic fallback from Notebook specification & parent sheet slitting cost
+              let pages = Number(s.pages) || 0;
+              if (pages <= 0) {
+                const match = (s.name || '').match(/([0-9]+)\s*P\b/i) || (s.skuCode || '').match(/([0-9]+)\s*P\b/i);
+                if (match && match[1]) pages = parseInt(match[1], 10);
+              }
+              if (pages <= 0) pages = 172;
+
+              let defaultSheetRate = 2.15;
+              const allSlitRates = Array.from(slittingCostMap.values()).map(v => v.costPerSheet || v.avgRate).filter(r => r > 0);
+              if (allSlitRates.length > 0) {
+                defaultSheetRate = allSlitRates.reduce((a, b) => a + b, 0) / allSlitRates.length;
+              }
+
+              const sheetsPerBook = pages / 32;
+              const paperCostPerBook = sheetsPerBook * defaultSheetRate;
+              let overhead = 3.85;
+              if (pages >= 400) overhead = 7.00;
+              else if (pages >= 280) overhead = 5.50;
+              else if (pages >= 192) overhead = 4.75;
+              else if (pages >= 172) overhead = 4.25;
+
+              const derivedCostPerPiece = Math.round((paperCostPerBook + overhead) * 100) / 100;
+              const derivedCostPerGbl = Math.round((derivedCostPerPiece * convFactor) * 100) / 100;
+
+              calculatedAvg = isGbl ? derivedCostPerGbl : derivedCostPerPiece;
+              costSource = 'production';
+            }
+          }
+        } else if (itemGroup === 'semi') {
+          if (slittingStats && slittingStats.avgRate > 0) {
+            calculatedAvg = Math.round(slittingStats.avgRate * 100) / 100;
+            costSource = 'slitting';
+          } else if (prodStats && prodStats.avgRate > 0) {
+            calculatedAvg = Math.round(prodStats.avgRate * 100) / 100;
+            costSource = 'production';
+          } else if (bomStats && bomStats.costPerUnit > 0) {
+            calculatedAvg = Math.round(bomStats.costPerUnit * 100) / 100;
+            costSource = 'production';
+          } else if (avgStats && avgStats.avgPrice > 0) {
+            calculatedAvg = Math.round(avgStats.avgPrice * 100) / 100;
+            costSource = 'purchase';
+          } else {
+            calculatedAvg = Number((s as any).avgCost || (s as any).costPrice || (s as any).standardCost || (s as any).avgRate || (s as any).purchasePrice || (s as any).ratePerKg || (s as any).rate || 0);
+            costSource = 'master';
+          }
         } else {
-          calculatedAvg = Number((s as any).avgCost || (s as any).costPrice || (s as any).standardCost || (s as any).avgRate || (s as any).purchasePrice || (s as any).ratePerKg || (s as any).rate || 0);
-          costSource = 'master';
+          // Raw Materials
+          if (avgStats && avgStats.avgPrice > 0) {
+            calculatedAvg = Math.round(avgStats.avgPrice * 100) / 100;
+            costSource = 'purchase';
+          } else if (slittingStats && slittingStats.avgRate > 0) {
+            calculatedAvg = Math.round(slittingStats.avgRate * 100) / 100;
+            costSource = 'slitting';
+          } else if (prodStats && prodStats.avgRate > 0) {
+            calculatedAvg = Math.round(prodStats.avgRate * 100) / 100;
+            costSource = 'production';
+          } else {
+            calculatedAvg = Number((s as any).avgCost || (s as any).costPrice || (s as any).standardCost || (s as any).avgRate || (s as any).purchasePrice || (s as any).ratePerKg || (s as any).rate || 0);
+            costSource = 'master';
+          }
         }
 
         const inProduction = prodStats?.inProduction || 0;

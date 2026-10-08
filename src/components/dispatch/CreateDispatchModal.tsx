@@ -560,8 +560,32 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
         chosenLocStockPcs = totalStock.pcs;
       }
 
-      const hasStock = (chosenLocStockGbl >= pendingGbl && pendingGbl > 0) ||
-                       (chosenLocStockPcs >= pendingPcs && pendingPcs > 0);
+      const matchedSku = availableSkus.find(s => 
+        (idKey && String(s._id) === idKey) ||
+        (codeKey && (s.skuCode || '').toLowerCase().trim() === codeKey) ||
+        (nameKey && (s.name || '').toLowerCase().trim() === nameKey)
+      );
+
+      // Auto-populate price from Sales Order item or SKU Master
+      let autoPrice = Number(
+        (item as any).unitPrice ??
+        (item as any).price ??
+        (item as any).rate ??
+        (item as any).sellingPrice ??
+        (item as any).ratePerGbl ??
+        0
+      );
+
+      if (autoPrice <= 0 && matchedSku) {
+        autoPrice = Number(
+          (matchedSku as any).sellingPrice ??
+          (matchedSku as any).rate ??
+          (matchedSku as any).costPrice ??
+          (matchedSku as any).avgRate ??
+          (matchedSku as any).avgCost ??
+          0
+        );
+      }
 
       return {
         key: item._id || `item-${idx}`,
@@ -580,7 +604,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
         skuId: rawSkuId,
         skuCode: item.skuCode,
         category: (item as any).category || '',
-        unitPrice: Number(item.unitPrice) || 0,
+        unitPrice: autoPrice,
         locationId: (item as any).locationId || chosenLocId,
         locationName: (item as any).locationName || chosenLocName,
         stockOnHandGbl: chosenLocStockGbl,
@@ -591,7 +615,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     });
 
     setItemRows(rows);
-  }, [activeOrder, modalStockMap, skuLocationStockMap, allStorageLocations, dispatchMode, isEditing]);
+  }, [activeOrder, modalStockMap, skuLocationStockMap, allStorageLocations, availableSkus, dispatchMode, isEditing]);
 
   // Sync dispatch qty when type changes in order mode
   useEffect(() => {
@@ -695,8 +719,17 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
   const handleSelectSkuForDirectRow = (key: string, selectedSku: any) => {
     if (!selectedSku) return;
 
-    const pcsPerGbl = Number(selectedSku.altUnitConversion || selectedSku.booksGbl || 100) || 100;
-    const price = Number(selectedSku.sellingPrice || selectedSku.rate || selectedSku.purchasePrice || 0);
+    const pcsPerGbl = Number(selectedSku.altUnitConversion || selectedSku.booksGbl || (selectedSku as any).pcsPerGbl || 100) || 100;
+    const price = Number(
+      selectedSku.sellingPrice ??
+      selectedSku.rate ??
+      (selectedSku as any).ratePerGbl ??
+      selectedSku.costPrice ??
+      (selectedSku as any).avgRate ??
+      (selectedSku as any).avgCost ??
+      selectedSku.purchasePrice ??
+      0
+    );
     const sId = String(selectedSku._id);
     const cKey = (selectedSku.skuCode || '').toLowerCase().trim();
     const nKey = (selectedSku.name || '').toLowerCase().trim();
@@ -1365,19 +1398,20 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
 
                           {/* ── Unit Rate Column ── */}
                           <td className="py-3 px-3 text-right font-mono">
-                            <div className="inline-flex items-center gap-1">
-                              <span className="text-[10px] text-slate-400">₹</span>
+                            <div className="inline-flex items-center gap-1 justify-end">
+                              <span className="text-[10px] font-bold text-slate-400">₹</span>
                               <input
                                 type="number"
                                 min={0}
                                 step="any"
-                                value={row.unitPrice || ''}
-                                placeholder="0"
+                                value={row.unitPrice !== undefined && row.unitPrice !== null ? row.unitPrice : ''}
+                                placeholder="0.00"
                                 onChange={e => {
-                                  const p = Number(e.target.value);
+                                  const val = e.target.value;
+                                  const p = val === '' ? 0 : Number(val);
                                   setItemRows(prev => prev.map(r => r.key === row.key ? { ...r, unitPrice: p } : r));
                                 }}
-                                className="w-18 h-8 px-2 border border-slate-200 rounded-lg text-right font-mono text-slate-900 bg-white focus:outline-none focus:border-blue-500 text-xs shadow-2xs"
+                                className="w-24 h-8 px-2 border border-slate-300 rounded-lg text-right font-mono font-bold text-slate-800 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 text-xs shadow-2xs transition-all"
                               />
                             </div>
                           </td>
