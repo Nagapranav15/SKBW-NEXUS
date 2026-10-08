@@ -987,131 +987,8 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
       }
 
       if (viewMode === 'customer_view') {
-        // ══════════════════════════════════════════════════════════════
-        // PDF REPORT 1: PENDING SALES ORDER (CUSTOMER ORDER WISE)
-        // ══════════════════════════════════════════════════════════════
-        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        let curY = 15;
-        let curPage = 1;
-
-        // Centered Header
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(14);
-        doc.text(companyName, 105, curY, { align: 'center' });
-        curY += 6;
-        doc.setFontSize(12);
-        doc.text('Pending Sales Order', 105, curY, { align: 'center' });
-        const titleW = doc.getTextWidth('Pending Sales Order');
-        doc.setLineWidth(0.3);
-        doc.line(105 - titleW / 2, curY + 0.8, 105 + titleW / 2, curY + 0.8);
-        curY += 7;
-
-        // Date range
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8.5);
-        doc.text(dateRange, 195, curY, { align: 'right' });
-        curY += 3;
-
-        const renderOrderTableHeader = () => {
-          doc.setLineWidth(0.2);
-          doc.line(15, curY, 195, curY);
-          curY += 3.5;
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(8);
-          doc.text('Date', 16, curY);
-          doc.text('Ledger Name', 40, curY);
-          doc.text('Order No', 135, curY);
-          doc.text('Pending Qty', 168, curY, { align: 'right' });
-          doc.text('OverDue Days', 193, curY, { align: 'right' });
-          curY += 2;
-          doc.line(15, curY, 195, curY);
-          curY += 4;
-        };
-
-        renderOrderTableHeader();
-
-        let grandTotalPendingGbl = 0;
-
-        filteredCustomerOrders.forEach(order => {
-          const orderDateObj = order.orderDate ? new Date(order.orderDate) : today;
-          const diffDays = Math.max(0, Math.floor((today.getTime() - orderDateObj.getTime()) / (1000 * 60 * 60 * 24)));
-          const items = order.items || [];
-          const totalPendingGbl = items.reduce((sum, item) => {
-            const pcsPerGbl = item.pcsPerGbl || 100;
-            const pendingPcs = Math.max(0, (item.quantity || 0) - (item.dispatchedQty || 0));
-            return sum + Math.ceil(pendingPcs / pcsPerGbl);
-          }, 0);
-          grandTotalPendingGbl += totalPendingGbl;
-
-          if (curY + 12 + items.length * 4 > 275) {
-            doc.setFont('helvetica', 'italic');
-            doc.setFontSize(8);
-            doc.text('continued ...', 195, 285, { align: 'right' });
-            doc.addPage();
-            curPage++;
-            curY = 15;
-            renderOrderTableHeader();
-          }
-
-          // Main Order Row
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(8);
-          doc.text(formatReportDate(order.orderDate), 16, curY);
-          doc.setFont('helvetica', 'bold');
-          doc.text((order.customerName || '—').toUpperCase(), 40, curY);
-          doc.setFont('helvetica', 'normal');
-          doc.text(order.orderNumber || '—', 135, curY);
-          doc.setFont('helvetica', 'bold');
-          doc.text(`${totalPendingGbl} GBL`, 168, curY, { align: 'right' });
-          doc.setFont('helvetica', 'normal');
-          doc.text(`( ${diffDays} days)`, 193, curY, { align: 'right' });
-          curY += 4.2;
-
-          // Indented Items
-          items.forEach(item => {
-            const pcsPerGbl = item.pcsPerGbl || 100;
-            const pendingPcs = Math.max(0, (item.quantity || 0) - (item.dispatchedQty || 0));
-            const pendingGbl = item.gbl || Math.ceil(pendingPcs / pcsPerGbl);
-
-            if (curY > 275) {
-              doc.setFont('helvetica', 'italic');
-              doc.setFontSize(8);
-              doc.text('continued ...', 195, 285, { align: 'right' });
-              doc.addPage();
-              curPage++;
-              curY = 15;
-              renderOrderTableHeader();
-            }
-
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(7.8);
-            doc.text((item.itemName || item.skuCode || '—').toUpperCase(), 45, curY);
-            doc.text(`${pendingGbl} GBL`, 168, curY, { align: 'right' });
-            curY += 3.8;
-          });
-
-          doc.setDrawColor(210, 210, 210);
-          doc.line(15, curY, 195, curY);
-          doc.setDrawColor(0, 0, 0);
-          curY += 2;
-        });
-
-        // Total row
-        if (curY > 270) {
-          doc.addPage();
-          curY = 15;
-        }
-        doc.line(15, curY, 195, curY);
-        curY += 4.5;
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8.5);
-        doc.text('TOTAL', 135, curY);
-        doc.text(`${grandTotalPendingGbl} GBL`, 168, curY, { align: 'right' });
-        curY += 2;
-        doc.line(15, curY, 195, curY);
-
-        doc.save(`Pending_Sales_Order_${new Date().toISOString().slice(0, 10)}.pdf`);
-        showToast('Exported Pending Sales Order PDF successfully', 'success');
+        handlePrint();
+        return;
       } else {
         // ══════════════════════════════════════════════════════════════
         // PDF REPORT 2: STOCK CATEGORY OUTSTANDINGS (PRODUCTION VIEW)
@@ -1348,6 +1225,27 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
       // ══════════════════════════════════════════════════════════════
       // REPORT 1: PENDING SALES ORDER (CUSTOMER ORDER WISE VIEW)
       // ══════════════════════════════════════════════════════════════
+      const companyPhone = selectedCompany?.phone || '9988776655';
+      const companyGstin = selectedCompany?.gstin || '37ABCDE1234F1Z5';
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const printDateStr = `${String(today.getDate()).padStart(2, '0')}-${months[today.getMonth()]}-${today.getFullYear()}`;
+      const printTimeStr = today.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      const getCityStateStr = (order: any) => {
+        if (order.city && order.region) return `${order.city}, ${order.region}`;
+        if (order.city) return order.city;
+        if (order.region) return order.region;
+
+        const custName = order.customerName || '';
+        const match = custName.match(/\(([^)]+)\)/);
+        if (match && match[1]) {
+          const extractedCity = match[1].trim();
+          const formattedCity = extractedCity.charAt(0).toUpperCase() + extractedCity.slice(1).toLowerCase();
+          return `${formattedCity}, Telangana`;
+        }
+        return 'Andhra Pradesh';
+      };
+
       let grandTotalPendingGbl = 0;
 
       const orderRowsHtml = filteredCustomerOrders.map(order => {
@@ -1361,26 +1259,36 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
         }, 0);
         grandTotalPendingGbl += totalPendingGbl;
 
+        const formattedDate = formatReportDate(order.orderDate);
+        const cityState = getCityStateStr(order);
+
         const mainRow = `
           <tr class="order-main-row">
-            <td class="col-date">${formatReportDate(order.orderDate)}</td>
-            <td class="col-ledger-main">${order.customerName}</td>
-            <td class="col-orderno">${order.orderNumber}</td>
-            <td class="col-pending-main">${totalPendingGbl} GBL</td>
-            <td class="col-overdue">( ${diffDays} days)</td>
+            <td class="col-date">${formattedDate}</td>
+            <td class="col-customer">
+              <div class="customer-name">${order.customerName || '—'}</div>
+              <div class="city-state">${cityState}</div>
+            </td>
+            <td class="col-orderno">${order.orderNumber || '—'}</td>
+            <td class="col-pending">${totalPendingGbl} GBL</td>
+            <td class="col-overdue">${diffDays} days</td>
           </tr>
         `;
 
-        const itemRows = items.map(item => {
+        const itemRows = items.map((item, idx) => {
           const pcsPerGbl = item.pcsPerGbl || 100;
           const pendingPcs = Math.max(0, (item.quantity || 0) - (item.dispatchedQty || 0));
           const pendingGbl = item.gbl || Math.ceil(pendingPcs / pcsPerGbl);
           return `
-            <tr class="order-item-row">
+            <tr class="item-sub-row">
               <td class="col-date"></td>
-              <td class="col-ledger-item">${item.itemName || item.skuCode}</td>
+              <td class="col-customer">
+                <div class="item-name-text">${idx + 1}. ${(item.itemName || item.skuCode || '').toUpperCase()}</div>
+              </td>
               <td class="col-orderno"></td>
-              <td class="col-pending-item">${pendingGbl} GBL</td>
+              <td class="col-pending">
+                <div class="item-qty-text">${pendingGbl} GBL</div>
+              </td>
               <td class="col-overdue"></td>
             </tr>
           `;
@@ -1396,85 +1304,207 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
           <title>Pending Sales Order</title>
           <style>
             @media print {
-              @page { size: A4 portrait; margin: 10mm 12mm 12mm 12mm; }
+              @page { size: A4 portrait; margin: 8mm 10mm 10mm 10mm; }
               body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-              .page-break { page-break-after: always; }
             }
             body {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-              color: #000;
-              margin: 20px;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+              color: #0f172a;
+              margin: 12px;
               background: #fff;
             }
-            .header-wrap { text-align: center; margin-bottom: 4px; }
-            .company-name { font-size: 15pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
-            .report-title { font-size: 13.5pt; font-weight: bold; text-decoration: underline; margin-top: 3px; }
-            .date-range-bar { text-align: right; font-size: 9.5pt; font-weight: bold; margin-top: 8px; margin-bottom: 4px; }
-            table.tally-table {
+
+            .top-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              margin-bottom: 8px;
+            }
+            .company-title {
+              font-size: 15pt;
+              font-weight: 800;
+              color: #0f172a;
+              text-transform: uppercase;
+              letter-spacing: 0.3px;
+            }
+            .company-subtext {
+              font-size: 8.5pt;
+              color: #334155;
+              margin-top: 2px;
+              line-height: 1.35;
+            }
+
+            .meta-info-table {
+              font-size: 8.5pt;
+              color: #334155;
+              border-collapse: collapse;
+            }
+            .meta-info-table td {
+              padding: 1px 4px;
+            }
+            .meta-label {
+              font-weight: normal;
+              color: #475569;
+            }
+            .meta-val {
+              font-weight: 600;
+              color: #0f172a;
+            }
+
+            .banner-box {
+              background-color: #eff6ff;
+              border: 1px solid #bfdbfe;
+              border-radius: 6px;
+              text-align: center;
+              padding: 6px 12px;
+              margin-top: 6px;
+              margin-bottom: 10px;
+            }
+            .banner-title {
+              font-size: 14pt;
+              font-weight: 800;
+              color: #1e3a8a;
+              margin: 0;
+              letter-spacing: 0.2px;
+            }
+            .banner-subtitle {
+              font-size: 8.8pt;
+              font-weight: 600;
+              color: #1e40af;
+              margin-top: 2px;
+            }
+
+            table.report-table {
               width: 100%;
               border-collapse: collapse;
-              border: 1px solid #000;
-              font-size: 9pt;
+              font-size: 8.5pt;
+              border: 1px solid #94a3b8;
             }
-            table.tally-table thead th {
-              border: 1px solid #000;
-              padding: 4px 6px;
-              font-weight: bold;
+            table.report-table th {
+              background-color: #f1f5f9;
+              color: #0f172a;
+              font-weight: 700;
+              border: 1px solid #94a3b8;
+              padding: 6px 8px;
               text-align: center;
-              background: #fff;
               line-height: 1.2;
             }
-            table.tally-table td {
-              border-right: 1px solid #000;
-              padding: 2px 6px;
-            }
-            table.tally-table td:last-child {
-              border-right: none;
-            }
-            .order-main-row td {
-              border-top: 1px solid #000;
-              padding-top: 4px;
+            table.report-table td {
+              border: 1px solid #cbd5e1;
+              padding: 4px 8px;
               vertical-align: top;
             }
-            .order-item-row td {
-              padding-top: 1.5px;
-              padding-bottom: 1.5px;
-              vertical-align: top;
+
+            .col-date { width: 13%; text-align: center; font-size: 8.5pt; font-weight: 500; }
+            .col-customer { width: 47%; text-align: left; }
+            .col-orderno { width: 12%; text-align: center; font-weight: 700; font-size: 8.8pt; }
+            .col-pending { width: 14%; text-align: center; font-weight: 800; font-size: 8.8pt; }
+            .col-overdue { width: 14%; text-align: center; font-weight: 800; color: #dc2626; font-size: 8.8pt; }
+
+            .order-main-row {
+              background-color: #ffffff;
             }
-            .col-date { width: 12%; text-align: left; }
-            .col-ledger-main { width: 48%; text-align: left; font-weight: bold; text-transform: uppercase; }
-            .col-ledger-item { width: 48%; text-align: left; padding-left: 20px !important; text-transform: uppercase; }
-            .col-orderno { width: 12%; text-align: left; }
-            .col-pending-main { width: 14%; text-align: right; font-weight: bold; white-space: nowrap; }
-            .col-pending-item { width: 14%; text-align: right; white-space: nowrap; }
-            .col-overdue { width: 14%; text-align: center; white-space: nowrap; }
+            .customer-name {
+              font-weight: 800;
+              color: #0f172a;
+              font-size: 8.8pt;
+              text-transform: uppercase;
+            }
+            .city-state {
+              font-size: 8pt;
+              color: #475569;
+              margin-top: 1px;
+            }
+
+            .item-sub-row {
+              background-color: #ffffff;
+            }
+            .item-name-text {
+              padding-left: 14px;
+              font-size: 8.2pt;
+              color: #334155;
+              text-transform: uppercase;
+              margin-top: 1px;
+            }
+            .item-qty-text {
+              text-align: center;
+              font-size: 8.2pt;
+              color: #334155;
+            }
+
             .total-row td {
-              border-top: 1px solid #000;
-              border-bottom: 1px solid #000;
-              font-weight: bold;
-              padding: 4px 6px;
+              background-color: #eff6ff;
+              border-top: 2px solid #94a3b8;
+              border-bottom: 2px solid #94a3b8;
+              font-weight: 800;
+              padding: 6px 8px;
             }
-            .continued-footer {
+            .total-label {
               text-align: right;
-              font-size: 8.5pt;
-              margin-top: 6px;
+              font-weight: 800;
+              color: #1e3a8a;
+              letter-spacing: 1px;
+              font-size: 9.5pt;
+            }
+            .total-value {
+              text-align: center;
+              font-weight: 800;
+              color: #1e3a8a;
+              font-size: 9.5pt;
+            }
+
+            .continued-text {
+              text-align: right;
+              font-size: 8pt;
               font-style: italic;
+              color: #64748b;
+              margin-top: 6px;
             }
           </style>
         </head>
         <body>
-          <div class="header-wrap">
-            <div class="company-name">${companyName}</div>
-            <div class="report-title">Pending Sales Order</div>
+          <div class="top-header">
+            <div>
+              <div class="company-title">${companyName}</div>
+              <div class="company-subtext">${companyAddress}</div>
+              <div class="company-subtext">Phone: ${companyPhone} &nbsp;|&nbsp; GSTIN: ${companyGstin}</div>
+            </div>
+            <div>
+              <table class="meta-info-table">
+                <tr>
+                  <td class="meta-label">Date</td>
+                  <td>:</td>
+                  <td class="meta-val">${printDateStr}</td>
+                </tr>
+                <tr>
+                  <td class="meta-label">Page</td>
+                  <td>:</td>
+                  <td class="meta-val">1 of 2</td>
+                </tr>
+                <tr>
+                  <td class="meta-label">Time</td>
+                  <td>:</td>
+                  <td class="meta-val">${printTimeStr}</td>
+                </tr>
+              </table>
+            </div>
           </div>
-          <div class="date-range-bar">${dateRange}</div>
-          <table class="tally-table">
+
+          <div class="banner-box">
+            <div class="banner-title">Pending Sales Order</div>
+            <div class="banner-subtitle">${dateRange}</div>
+          </div>
+
+          <table class="report-table">
             <thead>
               <tr>
-                <th style="width: 12%;">Date</th>
-                <th style="width: 48%;">Ledger Name</th>
+                <th style="width: 13%;">Date</th>
+                <th style="width: 47%;">
+                  Customer (Ledger Name)<br/>
+                  <span style="font-weight: 400; font-size: 7.8pt; color: #475569;">City, State</span>
+                </th>
                 <th style="width: 12%;">Order No</th>
-                <th style="width: 14%;">Pending<br/>Qty</th>
+                <th style="width: 14%;">Pending Qty<br/>(GBL)</th>
                 <th style="width: 14%;">OverDue<br/>Days</th>
               </tr>
             </thead>
@@ -1483,13 +1513,13 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
             </tbody>
             <tfoot>
               <tr class="total-row">
-                <td colspan="3" style="text-align: right; letter-spacing: 1px;">TOTAL</td>
-                <td style="text-align: right; white-space: nowrap;">${grandTotalPendingGbl} GBL</td>
+                <td colspan="3" class="total-label">TOTAL</td>
+                <td class="total-value">${grandTotalPendingGbl} GBL</td>
                 <td></td>
               </tr>
             </tfoot>
           </table>
-          <div class="continued-footer">continued ...</div>
+          <div class="continued-text">continued ...</div>
         </body>
         </html>
       `;
