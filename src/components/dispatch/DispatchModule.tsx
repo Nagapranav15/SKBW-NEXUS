@@ -17,6 +17,31 @@ import { ViewDeliveryChallanModal } from './ViewDeliveryChallanModal';
 import { DispatchOrderDetailModal } from './DispatchOrderDetailModal';
 import { showToast } from '../ui/Toast';
 
+// Safe string converter to prevent 'Cannot convert object to primitive value'
+export const toSafeString = (val: any): string => {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (typeof val === 'object') {
+    if (val._id) return toSafeString(val._id);
+    if (val.id) return toSafeString(val.id);
+    if (val.name) return toSafeString(val.name);
+    if (val.skuCode) return toSafeString(val.skuCode);
+    try {
+      if (typeof val.toString === 'function') {
+        const str = val.toString();
+        if (str !== '[object Object]') return str;
+      }
+    } catch {}
+    try {
+      return JSON.stringify(val);
+    } catch {
+      return '';
+    }
+  }
+  return '';
+};
+
 // Formatted Order Model for Dispatch View
 export interface DispatchRowOrder {
   _id: string;
@@ -341,8 +366,8 @@ export const DispatchModule: React.FC = () => {
 
       const companyFilteredOrders = combined.filter((o: any) => {
         if (!companyId) return true;
-        const oComp = String(o.company?._id || o.company || '');
-        return !oComp || oComp === String(companyId);
+        const oComp = toSafeString(o.company?._id || o.company);
+        return !oComp || oComp === toSafeString(companyId);
       });
 
       setSalesOrders(companyFilteredOrders);
@@ -361,13 +386,13 @@ export const DispatchModule: React.FC = () => {
 
         bList.forEach((b: any) => {
           const rawId = b.skuId || b.sku?._id;
-          const sId = rawId ? String((rawId as any)._id || rawId) : '';
+          const sId = toSafeString((rawId as any)?._id || rawId);
           const qty = Number(b.onHand) || Number(b.quantity) || 0;
           if (sId) skuPcsMap.set(sId, (skuPcsMap.get(sId) || 0) + qty);
         });
 
         sList.forEach((s: any) => {
-          const sId = String(s._id || s.id || '');
+          const sId = toSafeString(s._id || s.id);
           const code = (s.skuCode || '').toLowerCase().trim();
           const name = (s.name || '').toLowerCase().trim();
           const pcsPerGbl = Number(s.altUnitConversion || s.booksGbl || 100) || 100;
@@ -415,8 +440,8 @@ export const DispatchModule: React.FC = () => {
         }
         const companyFilteredChallans = challans.filter((c: any) => {
           if (!companyId) return true;
-          const cComp = String(c.company?._id || c.company || c.companyId || '');
-          return !cComp || cComp === String(companyId);
+          const cComp = toSafeString(c.company?._id || c.company || c.companyId);
+          return !cComp || cComp === toSafeString(companyId);
         });
         setDeliveryChallansList(companyFilteredChallans);
       } catch (cErr) {
@@ -456,8 +481,8 @@ export const DispatchModule: React.FC = () => {
   const orderChallansMap = useMemo(() => {
     const map = new Map<string, any[]>();
     deliveryChallansList.forEach(ch => {
-      const keyId = ch.orderId ? String(ch.orderId) : '';
-      const keyNum = ch.orderNumber ? String(ch.orderNumber) : '';
+      const keyId = toSafeString(ch.orderId);
+      const keyNum = toSafeString(ch.orderNumber);
       if (keyId) {
         if (!map.has(keyId)) map.set(keyId, []);
         map.get(keyId)!.push(ch);
