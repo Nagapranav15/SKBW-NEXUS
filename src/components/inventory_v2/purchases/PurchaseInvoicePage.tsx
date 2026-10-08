@@ -1690,19 +1690,7 @@ const PurchaseInvoicePage: React.FC = () => {
           }));
         }
       } else if (isFg) {
-        let totalPcs = qty;
-        if (selectedSku?.altUnit && selectedSku?.altUnitConversion) {
-          const normAlt = (selectedSku.altUnit || '').toUpperCase();
-          const normPri = (selectedSku.unit || '').toUpperCase();
-          if (normAlt === 'PCS' || normAlt === 'PC' || normAlt === 'NOS' || normAlt === 'NO' || normAlt === 'BOOK' || normAlt === 'BOOKS') {
-            totalPcs = Number(item.altQuantity) || convertPrimaryToAlt(qty, selectedSku);
-          } else if (normPri === 'PCS' || normPri === 'PC' || normPri === 'NOS' || normPri === 'NO' || normPri === 'BOOK' || normPri === 'BOOKS') {
-            totalPcs = qty;
-          } else {
-            totalPcs = Number(item.altQuantity) || qty;
-          }
-        }
-        itemTotalPrice = totalPcs * price;
+        itemTotalPrice = qty * price;
       }
 
       validatedItems.push({
@@ -2161,19 +2149,7 @@ const PurchaseInvoicePage: React.FC = () => {
     }
 
     if (isFg) {
-      let totalPcs = Number(item.quantity) || 0;
-      if (sku?.altUnit && sku?.altUnitConversion) {
-        const normAlt = (sku.altUnit || '').toUpperCase();
-        const normPri = (sku.unit || '').toUpperCase();
-        if (normAlt === 'PCS' || normAlt === 'PC' || normAlt === 'NOS' || normAlt === 'NO' || normAlt === 'BOOK' || normAlt === 'BOOKS') {
-          totalPcs = Number(item.altQuantity) || convertPrimaryToAlt(Number(item.quantity) || 0, sku);
-        } else if (normPri === 'PCS' || normPri === 'PC' || normPri === 'NOS' || normPri === 'NO' || normPri === 'BOOK' || normPri === 'BOOKS') {
-          totalPcs = Number(item.quantity) || 0;
-        } else {
-          totalPcs = Number(item.altQuantity) || Number(item.quantity) || 0;
-        }
-      }
-      return totalPcs * price;
+      return (Number(item.quantity) || 0) * price;
     }
 
     return (Number(item.quantity) || 0) * price;
@@ -3496,8 +3472,8 @@ const PurchaseInvoicePage: React.FC = () => {
                           }
                         }
 
-                        const rateLabel = isFg ? 'RATE / PCS (₹)' : `RATE / ${unitLabel} (₹)`;
-                        const itemAmount = isFg ? (totalPcs * (Number(item.purchasePrice) || 0)) : ((Number(item.quantity) || 0) * (Number(item.purchasePrice) || 0));
+                        const rateLabel = `RATE / ${unitLabel} (₹)`;
+                        const itemAmount = (Number(item.quantity) || 0) * (Number(item.purchasePrice) || 0);
 
                         return (
                           <>
@@ -3722,7 +3698,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                   const splitPcs = isFg && selectedSku?.altUnit && selectedSku?.altUnitConversion 
                                     ? convertPrimaryToAlt(splitSheets, selectedSku) 
                                     : splitSheets;
-                                  const splitAmount = splitPcs * (Number(item.purchasePrice) || 0);
+                                  const splitAmount = splitSheets * (Number(item.purchasePrice) || 0);
 
                                   return (
                                     <tr key={sIdx} className="hover:bg-blue-50/30 transition-colors">
@@ -3821,10 +3797,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                                getItemType(selectedSku) === 'products' || 
                                                (selectedSku?.unit || '').toUpperCase() === 'GBL' || 
                                                (selectedSku?.altUnit || '').toUpperCase() === 'GBL';
-                                  const lotPcs = isFg && selectedSku?.altUnit && selectedSku?.altUnitConversion 
-                                    ? convertPrimaryToAlt(totalAllocated, selectedSku) 
-                                    : totalAllocated;
-                                  return `₹${(lotPcs * (Number(item.purchasePrice) || 0)).toLocaleString('en-IN')}`;
+                                  return `₹${(totalAllocated * (Number(item.purchasePrice) || 0)).toLocaleString('en-IN')}`;
                                 })()}
                               </span>
                             </div>
@@ -4337,9 +4310,9 @@ const PurchaseInvoicePage: React.FC = () => {
                             {hasSheets && !hasReels ? 'Reams' : hasReels && !hasSheets ? 'Reels' : hasFg && !hasReels && !hasSheets ? 'GBL' : 'Units'}
                           </th>
                           <th className="px-3 py-2.5 text-right">{hasFg && !hasReels && !hasSheets ? 'Total Units' : 'Total KG'}</th>
-                          <th className="px-3 py-2.5 text-right">{hasFg && !hasReels && !hasSheets ? 'Rate/PCS (₹)' : 'Rate/KG (₹)'}</th>
+                          <th className="px-3 py-2.5 text-right">{hasFg && !hasReels && !hasSheets ? 'Rate/GBL (₹)' : 'Rate/KG (₹)'}</th>
                           <th className="px-3 py-2.5 text-right">Mat Amount (₹)</th>
-                          <th className="px-3 py-2.5 text-right">{hasFg && !hasReels && !hasSheets ? 'Landed Rate/PCS (₹)' : 'Landed Rate/KG (₹)'}</th>
+                          <th className="px-3 py-2.5 text-right">{hasFg && !hasReels && !hasSheets ? 'Landed Rate/GBL (₹)' : 'Landed Rate/KG (₹)'}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 text-gray-700 font-medium">
