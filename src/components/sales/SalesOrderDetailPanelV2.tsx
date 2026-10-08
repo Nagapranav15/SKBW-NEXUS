@@ -256,16 +256,135 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
   const lastOrderVal = custObj?.lastOrderDate ? fmtDate(custObj.lastOrderDate) : fmtDate(activeOrder.orderDate);
   const customerGroup = custObj?.group || custObj?.category || 'Regular';
 
-  // Totals
-  const itemsTotal = (activeOrder.items || []).reduce((s, i) => s + (i.totalAmount || 0), 0);
+  // Helper to resolve SKU master rate when unitPrice is 0 or missing
+  const getItemMasterRate = (item: any): number => {
+    if (item.unitPrice && Number(item.unitPrice) > 0) return Number(item.unitPrice);
+    if (item.rate && Number(item.rate) > 0) return Number(item.rate);
+    
+    if (!loadedSkus || loadedSkus.length === 0) return 0;
+
+    const skuId = item.skuId || item.sku?._id || (typeof item.sku === 'string' ? item.sku : '');
+    const rawCode = (item.skuCode || '').toLowerCase().trim();
+    const rawName = (item.itemName || item.name || '').toLowerCase().trim();
+
+    const matched = loadedSkus.find((s: any) => {
+      const sId = String(s._id || s.id || '');
+      if (skuId && sId === String(skuId)) return true;
+      const sCode = (s.skuCode || '').toLowerCase().trim();
+      if (rawCode && sCode && sCode === rawCode) return true;
+      const sName = (s.name || '').toLowerCase().trim();
+      if (rawName && sName && sName === rawName) return true;
+      return false;
+    });
+
+    if (!matched) return 0;
+    return Number(matched.sellingPrice || matched.price || matched.rate || matched.unitPrice || matched.salesPrice || matched.mrp || 0);
+  };
+
+  const isItemInMaster = (item: any): boolean => {
+    if (!loadedSkus || loadedSkus.length === 0) return true;
+    const skuId = item.skuId || item.sku?._id || (typeof item.sku === 'string' ? item.sku : '');
+    const rawCode = (item.skuCode || '').toLowerCase().trim();
+    const rawName = (item.itemName || item.name || '').toLowerCase().trim();
+
+    return loadedSkus.some((s: any) => {
+      const sId = String(s._id || s.id || '');
+      if (skuId && sId === String(skuId)) return true;
+      const sCode = (s.skuCode || '').toLowerCase().trim();
+      if (rawCode && sCode && sCode === rawCode) return true;
+      const sName = (s.name || '').toLowerCase().trim();
+      if (rawName && sName && sName === rawName) return true;
+      return false;
+    });
+  };
+
+  const resolveItemComponents = (item: any, order?: SalesOrderV2) => {
+    if (Array.isArray(item.components) && item.components.length > 0) return item.components;
+    if (Array.isArray(item.mixedItems) && item.mixedItems.length > 0) return item.mixedItems;
+    if (Array.isArray(item.subItems) && item.subItems.length > 0) return item.subItems;
+
+    const itemNameUpper = (item.itemName || item.skuCode || '').toUpperCase().trim();
+    const isLooseOrMixed = itemNameUpper.includes('LOOSE') ||
+                           itemNameUpper.includes('LOSSE') ||
+                           itemNameUpper.includes('MIXED') ||
+                           !!item.isMixedBundle;
+
+    if (isLooseOrMixed && order && Array.isArray(order.items)) {
+      const otherItems = order.items.filter(other => {
+        const otherName = (other.itemName || other.skuCode || '').toUpperCase().trim();
+        return other !== item &&
+               !otherName.includes('LOOSE') &&
+               !otherName.includes('LOSSE') &&
+               !otherName.includes('MIXED');
+      });
+
+      if (otherItems.length > 0) {
+        const pcsPerGbl = item.pcsPerGbl || 100;
+        const totalPcsInBundle = (Number(item.gbl) || 1) * pcsPerGbl;
+        const pcsPerComponent = Math.floor(totalPcsInBundle / otherItems.length);
+
+        return otherItems.map(other => {
+          const name = (other.itemName || other.skuCode || '').toUpperCase().trim();
+          return {
+            name,
+            skuCode: other.skuCode || '',
+            quantity: pcsPerComponent,
+            pcsPerGbl: other.pcsPerGbl || 100,
+            uom: other.uom || 'PCS',
+            rate: other.unitPrice || 0
+          };
+        });
+      }
+    }
+
+    return [];
+  };
+
+  const resolveItemPricing = (item: any) => {
+    const masterRate = getItemMasterRate(item);
+    const rawRate = item.unitPrice > 0 ? item.unitPrice : (item.rate > 0 ? item.rate : masterRate);
+    const pcsPerGbl = Number(item.pcsPerGbl) || 100;
+    const totalPcs = Number(item.quantity) || (Number(item.gbl) ? Number(item.gbl) * pcsPerGbl : 0);
+    const gbl = Number(item.gbl) || (totalPcs > 0 && pcsPerGbl > 0 ? Math.ceil(totalPcs / pcsPerGbl) : 0);
+
+    let ratePerPcs = 0;
+    let totalAmount = 0;
+
+    if (rawRate > 0) {
+      if (pcsPerGbl > 1 && rawRate > (pcsPerGbl / 2)) {
+        // rawRate is per GBL (e.g. 1916.00 for 100 pcs)
+        ratePerPcs = rawRate / pcsPerGbl;
+        totalAmount = (gbl > 0 ? gbl * rawRate : totalPcs * ratePerPcs);
+      } else {
+        // rawRate is already per PCS (e.g. 19.16)
+        ratePerPcs = rawRate;
+        totalAmount = totalPcs * ratePerPcs;
+      }
+    } else if (item.totalAmount > 0 && totalPcs > 0) {
+      totalAmount = item.totalAmount;
+      ratePerPcs = item.totalAmount / totalPcs;
+    }
+
+    return {
+      ratePerPcs,
+      totalAmount,
+      hasMasterMatch: isItemInMaster(item)
+    };
+  };
+
+  // Totals with Per-Pcs Rate Resolution
+  const itemsTotal = (activeOrder.items || []).reduce((s, i) => {
+    const { totalAmount } = resolveItemPricing(i);
+    return s + (totalAmount || 0);
+  }, 0);
   const chargesTotal = (activeOrder.otherCharges || []).reduce((s, c) => s + (c.amount || 0), 0);
   const subtotal = itemsTotal + chargesTotal;
   const discAmount = activeOrder.discountAmount || 0;
-  const grandTotal = activeOrder.grandTotal || (subtotal - discAmount);
+  const grandTotal = subtotal - discAmount;
 
   // Payment Tracking
   const paidAmountVal = Number(activeOrder.paidAmount || 0);
-  const balanceDueVal = activeOrder.balanceDue !== undefined ? Number(activeOrder.balanceDue) : Math.max(0, grandTotal - paidAmountVal);
+  const balanceDueVal = Math.max(0, grandTotal - paidAmountVal);
   const paymentStatusVal = activeOrder.paymentStatus || (balanceDueVal <= 0 && grandTotal > 0 ? 'Paid' : (paidAmountVal > 0 ? 'Partially Paid' : 'Unpaid'));
 
   // Status badge
@@ -1124,29 +1243,41 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                       : itemStatus === 'Partial' ? 'bg-amber-50 text-amber-700 border-amber-200'
                       : 'bg-gray-100 text-gray-600 border-gray-200';
 
+                    const { ratePerPcs, totalAmount, hasMasterMatch } = resolveItemPricing(item);
+                    const looseComps = resolveItemComponents(item, activeOrder);
+
                     return (
                       <tr key={idx} className="hover:bg-blue-50/20 transition-colors">
                         <td className="px-3 py-2.5 text-center text-gray-500 font-bold">{idx + 1}</td>
                         <td className="px-3 py-2.5">
                           <div className="font-bold text-gray-900">{item.itemName}</div>
                           <div className="text-[10px] text-gray-400 font-mono">{item.skuCode}</div>
-                          {item.isMixedBundle && item.components && item.components.length > 0 && (
+                          {looseComps && looseComps.length > 0 && (
                             <div className="mt-1.5 p-2 bg-indigo-50/70 rounded-lg border border-indigo-100 text-[11px] space-y-1">
                               <span className="font-bold text-indigo-900 flex items-center gap-1 text-[10px] uppercase">
                                 <Layers className="w-3 h-3 text-indigo-600" />
-                                <span>Mixed Pack Breakdown ({item.components.length} items):</span>
+                                <span>Loose Books / Mixed Stock Breakdown ({looseComps.length} items):</span>
                               </span>
                               <div className="space-y-0.5 pl-1.5 border-l-2 border-indigo-300">
-                                {item.components.map((comp, cIdx) => (
-                                  <div key={comp.componentId || cIdx} className="flex items-center justify-between text-gray-700">
-                                    <span className="font-medium">
-                                      {cIdx === 0 ? '①' : cIdx === 1 ? '②' : cIdx === 2 ? '③' : `${cIdx + 1}.`} {comp.name}
-                                    </span>
-                                    <span className="font-mono text-gray-500">
-                                      {comp.quantity} pcs × ₹{Number(comp.rate).toFixed(2)} = <strong className="text-gray-900">₹{Number(comp.amount).toFixed(2)}</strong>
-                                    </span>
-                                  </div>
-                                ))}
+                                {looseComps.map((comp: any, cIdx: number) => {
+                                  const compName = comp.name || comp.itemName || comp.skuCode || `Item ${cIdx + 1}`;
+                                  const compQty = comp.quantity || comp.pcs || 0;
+                                  const compPcsPerGbl = comp.pcsPerGbl || 100;
+                                  const compGbl = compPcsPerGbl > 0 ? (compQty / compPcsPerGbl).toFixed(1) : undefined;
+                                  const compMasterRate = getItemMasterRate({ itemName: compName, skuCode: comp.skuCode, unitPrice: comp.rate });
+                                  const compRatePerPcs = compMasterRate > 0 && compPcsPerGbl > 1 && compMasterRate > compPcsPerGbl / 2 ? compMasterRate / compPcsPerGbl : compMasterRate;
+
+                                  return (
+                                    <div key={comp.componentId || cIdx} className="flex items-center justify-between text-gray-700">
+                                      <span className="font-medium">
+                                        • {compName}
+                                      </span>
+                                      <span className="font-mono text-gray-600 text-[10px]">
+                                        {compQty} pcs {compGbl ? `(${compGbl} GBL)` : ''} {compRatePerPcs > 0 ? `× ₹${compRatePerPcs.toFixed(2)}/pc` : ''}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
@@ -1159,8 +1290,12 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                         <td className="px-3 py-2.5 text-center font-bold font-mono text-gray-900">{gbl || '—'}</td>
                         <td className="px-3 py-2.5 text-center font-mono text-gray-700">{pcsPerGbl || '—'}</td>
                         <td className="px-3 py-2.5 text-center font-black font-mono text-gray-900">{item.quantity.toLocaleString('en-IN')}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-gray-800">₹{(item.unitPrice || 0).toFixed(2)}</td>
-                        <td className="px-3 py-2.5 text-right font-bold font-mono text-gray-900">₹{(item.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td className="px-3 py-2.5 text-right font-mono text-gray-800">
+                          {ratePerPcs > 0 ? `₹${ratePerPcs.toFixed(2)}` : (hasMasterMatch ? '₹0.00' : '—')}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-bold font-mono text-gray-900">
+                          {totalAmount > 0 ? `₹${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : (hasMasterMatch ? '₹0.00' : '—')}
+                        </td>
                         <td className="px-3 py-2.5 text-center">
                           <span className="font-bold text-gray-700 font-mono">{(item as any).producedQty || 0}</span>
                         </td>
