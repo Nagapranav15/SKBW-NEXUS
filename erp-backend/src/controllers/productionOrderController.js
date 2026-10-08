@@ -1227,6 +1227,8 @@ exports.getMaterialRates = async (req, res) => {
       const isManufactured = (sku.itemType === 'semi' || sku.itemType === 'products') ||
                             (sku.skuCode && (sku.skuCode.toUpperCase().startsWith('SM-') || sku.skuCode.toUpperCase().startsWith('FG-')));
 
+      const isBoard = (sku.category && /board/i.test(sku.category)) || (sku.group && /board/i.test(sku.group)) || (sku.name && /board/i.test(sku.name));
+
       const isRawMat = !isManufactured && (
         (sku.itemType === 'materials') || 
         (sku.skuCode && sku.skuCode.toUpperCase().startsWith('RM-')) || 
@@ -1240,8 +1242,8 @@ exports.getMaterialRates = async (req, res) => {
         const altUnit = (sku.altUnit || '').trim().toLowerCase();
         const convFactor = Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 1);
 
-        // Never divide or convert raw materials using GBL conversion
-        if (!isRawMat && inUom !== skuUnit && convFactor > 0) {
+        // Never divide or convert raw materials or board items using GBL conversion
+        if (!isRawMat && !isBoard && inUom !== skuUnit && convFactor > 0) {
           if (inUom === altUnit || inUom === 'pcs' || inUom === 'pieces' || inUom === 'pc') {
             reqQty = reqQty / convFactor;
           } else if (skuUnit === 'pcs' || skuUnit === 'pieces' || skuUnit === 'pc') {
@@ -1268,7 +1270,7 @@ exports.getMaterialRates = async (req, res) => {
 
         for (const po of prodOrders) {
           const cs = po.costSummary || {};
-          const isGbl = (sku.unit || '').toUpperCase() === 'GBL' || (po.plannedUom || '').toUpperCase() === 'GBL';
+          const isGbl = !isBoard && ((sku.unit || '').toUpperCase() === 'GBL' || (po.plannedUom || '').toUpperCase() === 'GBL');
           let unitRate = 0;
           if (isGbl && cs.costPerGbl && Number(cs.costPerGbl) > 0) {
             unitRate = Number(cs.costPerGbl);
@@ -1450,9 +1452,10 @@ exports.getMaterialRates = async (req, res) => {
 
       const effectiveRate = avgRate > 0 ? avgRate : (productionRate > 0 ? productionRate : (lastProductionRate > 0 ? lastProductionRate : standardRate));
 
-      const skuStockingUnit = (sku.unit || 'PCS').trim().toUpperCase();
+      const skuStockingUnit = isBoard ? 'PCS' : (sku.unit || 'PCS').trim().toUpperCase();
       const skuAltUnit = (sku.altUnit || '').trim().toUpperCase();
-      const skuConv = Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 1);
+      const rawConv = Number(sku.altUnitConversion || sku.conv || sku.booksGbl || sku.pcsPerGbl || 1);
+      const skuConv = isBoard ? (rawConv >= 500 ? 250 : (rawConv > 1 ? rawConv : 250)) : rawConv;
 
       // Target UOM present in the BOM (e.g. PCS, GBL, KG, Ream)
       const targetUom = (itemInput && itemInput.uom) ? itemInput.uom.trim().toUpperCase() : skuStockingUnit.toUpperCase();
@@ -1489,16 +1492,9 @@ exports.getMaterialRates = async (req, res) => {
       let finalWeightRate = convertRate(fifoResult.weightedRate, skuStockingUnit, targetUom);
       let finalLastProdRate = convertRate(lastProductionRate > 0 ? lastProductionRate : 0, skuStockingUnit, targetUom);
 
-      // ── Batch-cost multiplier for manufactured semi-finished items (boards, etc.) ──
-      // These items are produced in small batches (e.g. 4 boards per run). In a finished-goods
-      // BOM, "1 PCS of board" means "1 production run of boards", so the rate should be the
-      // full batch cost, NOT the per-individual-piece cost.
-      // Applies only when:
-      //   • The item is manufactured (semi/product code), not purchased
-      //   • recipeYieldQty is small (≤ 20) – distinguishes boards (yield=4) from ruled sheets (yield=500-2000)
-      //   • No cutting-slip rate exists (cutting-slip items are already priced per individual piece)
+      // ── Batch-cost multiplier for manufactured semi-finished items ──
       const recipeYieldQty = Number(sku.recipeYieldQty || sku.batchYieldQty || 1);
-      const isBatchPricedItem = isManufactured && recipeYieldQty > 1 && recipeYieldQty <= 20 && cuttingSlipRate <= 0;
+      const isBatchPricedItem = !isBoard && isManufactured && recipeYieldQty > 1 && recipeYieldQty <= 20 && cuttingSlipRate <= 0;
       if (isBatchPricedItem) {
         finalStdRate  = Math.round(finalStdRate  * recipeYieldQty * 10000) / 10000;
         finalProdRate = Math.round(finalProdRate * recipeYieldQty * 10000) / 10000;

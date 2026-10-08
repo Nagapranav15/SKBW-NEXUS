@@ -13,7 +13,8 @@ import {
   Settings,
   Database,
   Building2,
-  ChevronLeft, 
+  ChevronLeft,
+  ChevronRight,
   Factory,
   Truck,
   FileText

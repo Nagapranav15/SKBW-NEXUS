@@ -72,7 +72,7 @@ import StockTransferModal from './StockTransferModal';
 import StockAdjustmentModal from './StockAdjustmentModal';
 import { ManufacturingStepsModal } from './ManufacturingStepsModal';
 import UniversalPrintVoucherModal from '../ui/UniversalPrintVoucherModal';
-import { convertRateToUom, convertUom, isBoardSku } from '../../utils/uomConversion';
+import { convertRateToUom, convertUom, isBoardSku, getSkuConversionFactor } from '../../utils/uomConversion';
 
 export type StockTabType = 'overview' | 'products' | 'materials' | 'semi' | 'batches' | 'transfers' | 'adjustments' | 'warehouse';
 
@@ -2252,9 +2252,9 @@ export const StockInventoryV2: React.FC = () => {
                                       <div className={`font-mono font-black text-sm ${isNegative ? 'text-rose-600 bg-rose-50 border border-rose-300 px-2 py-0.5 rounded-md inline-block shadow-2xs' : 'text-gray-900'}`}>
                                         {isNegative ? `-${Math.abs(availStock).toLocaleString('en-IN')}` : availStock.toLocaleString('en-IN')}
                                       </div>
-                                      {sku.altUnit && sku.altUnitConversion && Number(sku.altUnitConversion) > 0 && !isBoardSku(sku) && (
+                                      {sku.altUnit && getSkuConversionFactor(sku) > 0 && (
                                         <div className={`text-[10px] font-mono mt-0.5 ${isNegative ? 'text-rose-500 font-semibold' : 'text-gray-400'}`}>
-                                          ≈ {convertUom(availStock, sku.unit || 'PCS', sku.altUnit, sku).toLocaleString('en-IN')} {sku.altUnit}
+                                          ≈ {convertUom(availStock, isBoardSku(sku) ? 'PCS' : (sku.unit || 'PCS'), sku.altUnit, sku).toLocaleString('en-IN')} {sku.altUnit}
                                         </div>
                                       )}
                                     </>
@@ -2283,7 +2283,7 @@ export const StockInventoryV2: React.FC = () => {
                             {columnsConfig.find(c => c.id === 'unit')?.visible !== false && (
                               <td className="px-4 py-3 text-center whitespace-nowrap">
                                 <span className="font-bold text-gray-800 text-xs px-2 py-0.5 bg-slate-100 rounded">
-                                  {sku.unit || 'Pcs'}
+                                  {isBoardSku(sku) ? 'PCS' : (sku.unit || 'Pcs')}
                                 </span>
                               </td>
                             )}
@@ -2292,7 +2292,7 @@ export const StockInventoryV2: React.FC = () => {
                               <td className="px-4 py-3 text-center whitespace-nowrap">
                                 {sku.altUnit ? (
                                   <span className="font-mono text-[11px] text-indigo-700 font-bold bg-indigo-50/70 px-2 py-0.5 rounded border border-indigo-100">
-                                    {sku.altUnit} {sku.altUnitConversion ? `(1:${sku.altUnitConversion})` : ''}
+                                    {sku.altUnit} {getSkuConversionFactor(sku) ? `(1:${getSkuConversionFactor(sku)})` : ''}
                                   </span>
                                 ) : (
                                   <span className="text-gray-400 text-xs">—</span>
@@ -2335,9 +2335,16 @@ export const StockInventoryV2: React.FC = () => {
                                   {formatCurrency(totalVal)}
                                 </div>
                                 {(() => {
-                                  const altRate = (sku.altUnit && sku.altUnit.toUpperCase() !== (sku.unit || '').toUpperCase() && !isBoardSku(sku))
-                                    ? convertRateToUom(avgPrice, sku.unit || 'Unit', sku.altUnit, sku)
+                                  const isBoard = isBoardSku(sku);
+                                  const primUnit = isBoard ? 'PCS' : (sku.unit || 'Unit');
+                                  const altUnitName = isBoard
+                                    ? ((sku.altUnit && sku.altUnit.toUpperCase() !== 'PCS') ? sku.altUnit : ((sku.unit && sku.unit.toUpperCase() !== 'PCS') ? sku.unit : ''))
+                                    : (sku.altUnit && sku.altUnit.toUpperCase() !== primUnit.toUpperCase() ? sku.altUnit : '');
+
+                                  const altRate = altUnitName
+                                    ? convertRateToUom(avgPrice, primUnit, altUnitName, sku)
                                     : 0;
+
                                   const costLabel = (sku as any).costSource === 'slitting'
                                     ? 'Slitting '
                                     : (sku as any).costSource === 'production' 
@@ -2348,20 +2355,20 @@ export const StockInventoryV2: React.FC = () => {
                                     <div 
                                       className="text-[10px] font-mono text-gray-500 mt-0.5 flex flex-col items-end"
                                       title={(sku as any).costSource === 'slitting'
-                                        ? `Dynamic unit costing from Reel Slitting: ₹${avgPrice.toFixed(4)}/${sku.unit || 'Unit'}`
+                                        ? `Dynamic unit costing from Reel Slitting: ₹${avgPrice.toFixed(4)}/${primUnit}`
                                         : (sku as any).costSource === 'production' 
-                                        ? `Dynamic unit costing from Production Orders: ₹${avgPrice.toFixed(4)}/${sku.unit || 'Unit'}`
+                                        ? `Dynamic unit costing from Production Orders: ₹${avgPrice.toFixed(4)}/${primUnit}`
                                         : (sku as any).costSource === 'purchase'
-                                        ? `Average purchase cost across batch entries: ₹${avgPrice.toFixed(4)}/${sku.unit || 'Unit'}`
-                                        : `Master item unit cost: ₹${avgPrice.toFixed(4)}/${sku.unit || 'Unit'}`}
+                                        ? `Average purchase cost across batch entries: ₹${avgPrice.toFixed(4)}/${primUnit}`
+                                        : `Master item unit cost: ₹${avgPrice.toFixed(4)}/${primUnit}`}
                                     >
                                       <span>
                                         <span className="text-gray-400 font-sans">{costLabel}</span>
-                                        ₹{avgPrice < 1 && avgPrice > 0 ? avgPrice.toFixed(4) : avgPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{sku.unit || 'Unit'}
+                                        ₹{avgPrice < 1 && avgPrice > 0 ? avgPrice.toFixed(4) : avgPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{primUnit}
                                       </span>
                                       {altRate > 0 && (
                                         <span className="text-indigo-600 font-semibold text-[9.5px]">
-                                          (₹{altRate < 1 ? altRate.toFixed(4) : altRate.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{sku.altUnit})
+                                          (₹{altRate < 1 ? altRate.toFixed(4) : altRate.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{altUnitName})
                                         </span>
                                       )}
                                     </div>

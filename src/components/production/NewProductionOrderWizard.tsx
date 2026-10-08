@@ -18,7 +18,7 @@ import { ProfitPricingState } from '../../utils/costingUtils';
 import { CuttingSlipModal } from './CuttingSlipModal';
 import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
-import { convertRateToUom, convertUom } from '../../utils/uomConversion';
+import { convertRateToUom, convertUom, isBoardSku } from '../../utils/uomConversion';
 import { getItemClassification } from '../../utils/skuClassification';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 export interface NewProductionOrderWizardProps {
@@ -1272,7 +1272,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                 (raw.skuCode && (raw.skuCode.toUpperCase().startsWith('SM-') || raw.skuCode.toUpperCase().startsWith('FG-'))) ||
                                 (raw.code && (raw.code.toUpperCase().startsWith('SM-') || raw.code.toUpperCase().startsWith('FG-')));
 
-        const isBoardItem = (matchedSku && ((matchedSku.category || (matchedSku as any).group || '').toLowerCase().includes('board') || (matchedSku.name || '').toLowerCase().includes('(board)'))) || (raw.name && /board/i.test(raw.name));
+        const isBoardItem = isBoardSku(matchedSku) || isBoardSku(raw);
 
         const isRawItem = !isSemiOrProduct && (
                           (matchedSku && getItemClassification(matchedSku) === 'materials') ||
@@ -1281,15 +1281,13 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                           (matchedSku?.category && /sheet|paper|reel/i.test(matchedSku.category)) ||
                           (raw.name && /reel/i.test(raw.name)));
 
-        let resolvedUom = raw.uom || matchedSku?.unit || raw.unit || 'PCS';
-        if ((isRawItem || isBoardItem) && (resolvedUom.toUpperCase() === 'GBL' || !resolvedUom || isBoardItem)) {
-          resolvedUom = (matchedSku?.unit && matchedSku.unit.toUpperCase() !== 'GBL') ? matchedSku.unit : 'PCS';
-        }
+        let resolvedUom = isBoardItem ? 'PCS' : (raw.uom || matchedSku?.unit || raw.unit || 'PCS');
 
         let initialRate = rawRate;
         if (initialRate <= 0 && matchedSku) {
           const skuBasePrice = Number((matchedSku as any).avgRate || (matchedSku as any).avgCost || matchedSku.costPrice || matchedSku.purchasePrice || matchedSku.standardCost || 0);
-          initialRate = convertRateToUom(skuBasePrice, matchedSku.unit || 'PCS', resolvedUom, matchedSku);
+          let baseUnit = isBoardItem ? 'PCS' : (matchedSku.unit || 'PCS');
+          initialRate = isBoardItem ? skuBasePrice : convertRateToUom(skuBasePrice, baseUnit, resolvedUom, matchedSku);
         }
 
         return {
@@ -1487,15 +1485,19 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         const convertedAvgRate = rawAvgRate > 0
           ? (rateUnit === currentUom ? rawAvgRate : convertRateToUom(rawAvgRate, rateUnit, currentUom, rateConvSku))
           : convertedFallbackRate;
+
         const convertedFifoRate = rawFifoRate > 0
           ? (rateUnit === currentUom ? rawFifoRate : convertRateToUom(rawFifoRate, rateUnit, currentUom, rateConvSku))
           : convertedFallbackRate;
+
         const convertedProdRate = rawProdRate > 0
           ? (rateUnit === currentUom ? rawProdRate : convertRateToUom(rawProdRate, rateUnit, currentUom, rateConvSku))
           : 0;
+
         const convertedLastProdRate = rawLastProdRate > 0
           ? (rateUnit === currentUom ? rawLastProdRate : convertRateToUom(rawLastProdRate, rateUnit, currentUom, rateConvSku))
           : 0;
+
         const convertedStandardRate = rawStandardRate > 0
           ? (rateUnit === currentUom ? rawStandardRate : convertRateToUom(rawStandardRate, rateUnit, currentUom, rateConvSku))
           : convertedFallbackRate;
@@ -1689,8 +1691,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   };
 
   const handleSelectMaterialSku = (rowId: string, sku: SkuV2) => {
-    const defaultRate = Number(sku.purchasePrice || (sku as any).standardCost || (sku as any).costPrice || 0);
-    const uomVal = (sku.unit || 'PCS').toUpperCase().trim();
+    const isBoardItem = isBoardSku(sku);
+    const uomVal = isBoardItem ? 'PCS' : (sku.unit || 'PCS').toUpperCase().trim();
 
     setMaterials(prev => {
       const updated = prev.map(row => {
@@ -2049,7 +2051,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
     }
 
     // Stock is stored in the SKU's primary stocking unit (e.g. GBL for RM-027, KG for reels, PCS for books)
-    const uom = (matchedSku?.unit || m.uom || 'PCS').trim();
+    const isBoardItem = isBoardSku(matchedSku) || isBoardSku(m);
+    const uom = isBoardItem ? 'PCS' : (matchedSku?.unit || m.uom || 'PCS').trim();
     const reqQty = Number(m.requiredQty) || 0;
     const reqUom = (m.uom || uom).trim();
 
@@ -3197,14 +3200,15 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             {(row.component || row.code) && (() => {
                               const { stockQty, uom, isAvailable, matchedSku } = getLiveStockForMaterial(row);
                               const isZero = stockQty <= 0;
-                              const conv = Number(matchedSku?.altUnitConversion || (matchedSku as any)?.booksGbl || (matchedSku as any)?.pcsPerGbl || 0);
-                              const normUom = (uom || '').toUpperCase();
-                              const altUom = (matchedSku?.altUnit || '').toUpperCase();
+                              const isBoardMat = isBoardSku(matchedSku) || isBoardSku(row);
+                              const conv = isBoardMat ? 1 : Number(matchedSku?.altUnitConversion || (matchedSku as any)?.booksGbl || (matchedSku as any)?.pcsPerGbl || 0);
+                              const normUom = isBoardMat ? 'PCS' : (uom || '').toUpperCase();
+                              const altUom = isBoardMat ? '' : (matchedSku?.altUnit || '').toUpperCase();
                               let altStockStr = '';
-                              if (normUom === 'GBL' && conv > 0) {
+                              if (!isBoardMat && normUom === 'GBL' && conv > 0) {
                                 const altVal = stockQty * conv;
                                 altStockStr = `≈ ${altVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })} ${altUom || 'PCS'}`;
-                              } else if ((normUom === 'PCS' || normUom === 'SHEETS') && conv > 0) {
+                              } else if (!isBoardMat && (normUom === 'PCS' || normUom === 'SHEETS') && conv > 0) {
                                 const altVal = stockQty / conv;
                                 altStockStr = `≈ ${altVal < 1 ? altVal.toFixed(3) : altVal.toLocaleString('en-IN', { maximumFractionDigits: 3 })} ${altUom || 'GBL'}`;
                               }
@@ -3218,11 +3222,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                   <span className={`font-mono font-bold ${
                                     isAvailable && !isZero ? 'text-emerald-700' : !isZero ? 'text-amber-700' : 'text-rose-700'
                                   }`}>
-                                    {formatStockQty(stockQty)} {uom}
+                                    {formatStockQty(stockQty)} {normUom}
                                   </span>
                                   {altStockStr && (
                                     <span className="text-gray-400 font-mono text-[9px] font-medium">
-                                      ({altStockStr})
+                                      {altStockStr}
                                     </span>
                                   )}
                                 </div>
@@ -3568,14 +3572,15 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   const { stockQty, uom, isAvailable, matchedSku } = getLiveStockForMaterial(m);
                   const isZero = stockQty <= 0;
                   const displayName = m.component || m.code || `Item ${idx + 1}`;
-                  const conv = Number(matchedSku?.altUnitConversion || (matchedSku as any)?.booksGbl || (matchedSku as any)?.pcsPerGbl || 0);
-                  const normUom = (uom || '').toUpperCase();
-                  const altUom = (matchedSku?.altUnit || '').toUpperCase();
+                  const isBoardMat = isBoardSku(matchedSku) || isBoardSku(m);
+                  const conv = isBoardMat ? 1 : Number(matchedSku?.altUnitConversion || (matchedSku as any)?.booksGbl || (matchedSku as any)?.pcsPerGbl || 0);
+                  const normUom = isBoardMat ? 'PCS' : (uom || '').toUpperCase();
+                  const altUom = isBoardMat ? '' : (matchedSku?.altUnit || '').toUpperCase();
                   let altStockStr = '';
-                  if (normUom === 'GBL' && conv > 0) {
+                  if (!isBoardMat && normUom === 'GBL' && conv > 0) {
                     const altVal = stockQty * conv;
                     altStockStr = `≈ ${altVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })} ${altUom || 'PCS'}`;
-                  } else if ((normUom === 'PCS' || normUom === 'SHEETS') && conv > 0) {
+                  } else if (!isBoardMat && (normUom === 'PCS' || normUom === 'SHEETS') && conv > 0) {
                     const altVal = stockQty / conv;
                     altStockStr = `≈ ${altVal < 1 ? altVal.toFixed(3) : altVal.toLocaleString('en-IN', { maximumFractionDigits: 3 })} ${altUom || 'GBL'}`;
                   }

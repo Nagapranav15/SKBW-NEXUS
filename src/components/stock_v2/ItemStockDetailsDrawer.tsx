@@ -60,7 +60,7 @@ import {
 import Modal from '../ui/Modal';
 import { showToast } from '../ui/Toast';
 import { ManufacturingStepsModal } from './ManufacturingStepsModal';
-import { convertPrimaryToAlt, convertRateToUom } from '../../utils/uomConversion';
+import { convertPrimaryToAlt, convertRateToUom, getSkuConversionFactor } from '../../utils/uomConversion';
 
 export type ItemDrawerTab = 'overview' | 'locations' | 'batches' | 'reels' | 'movements' | 'reservations';
 
@@ -549,10 +549,10 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
   }, [sku]);
 
   // Summary Metrics
-  const unit = isBoardItem ? (sku?.unit && sku.unit.toUpperCase() !== 'GBL' ? sku.unit : 'PCS') : (sku?.unit || 'GBL');
-  const altUnit = isBoardItem ? '' : (sku?.altUnit || 'PCS');
-  // Use actual SKU master altUnitConversion — no hardcoded fallback
-  const conversionFactor = isBoardItem ? 1 : (Number(sku?.altUnitConversion) || 0);
+  const unit = isBoardItem ? 'PCS' : (sku?.unit || 'GBL');
+  const altUnit = sku?.altUnit || '';
+  // Use actual SKU master altUnitConversion
+  const conversionFactor = getSkuConversionFactor(sku);
 
   const totalStock = summary ? summary.onHand : (Number((sku as any)?.preparedStock ?? (sku as any)?.onHand ?? (sku as any)?.presentStock) || 0);
   const reservedStock = (summary && summary.reserved !== undefined && summary.reserved > 0) ? summary.reserved : (Number((sku as any)?.reserved) || 0);

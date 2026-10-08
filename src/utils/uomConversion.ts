@@ -20,9 +20,10 @@ export interface SkuUomLike {
 export function isBoardSku(sku?: any): boolean {
   if (!sku) return false;
   const cat = String(sku.category || sku.group || '').toLowerCase();
-  const name = String(sku.name || sku.title || '').toLowerCase();
+  const name = String(sku.name || sku.title || sku.component || sku.itemName || '').toLowerCase();
   const rule = String(sku.ruleType || '').toLowerCase();
-  return cat.includes('board') || name.includes('(board)') || rule.includes('board');
+  const code = String(sku.skuCode || sku.code || '').toLowerCase();
+  return cat.includes('board') || name.includes('board') || rule.includes('board') || code.includes('board');
 }
 
 /**
@@ -30,9 +31,8 @@ export function isBoardSku(sku?: any): boolean {
  */
 export function getSkuConversionFactor(sku?: SkuUomLike | null): number {
   if (!sku) return 1;
-  if (isBoardSku(sku)) return 1;
-  const factor = sku.altUnitConversion ?? sku.booksGbl ?? sku.pcsPerGbl ?? sku.conv;
-  return parseConversionFactor(factor);
+  const rawFactor = sku.altUnitConversion ?? sku.booksGbl ?? sku.pcsPerGbl ?? sku.conv;
+  return parseConversionFactor(rawFactor);
 }
 
 /**
