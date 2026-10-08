@@ -1248,7 +1248,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
 
       let grandTotalPendingGbl = 0;
 
-      const orderRowsHtml = filteredCustomerOrders.map(order => {
+      const orderBlocksHtml = filteredCustomerOrders.map(order => {
         const refDateStr = (order as any).dueDate || order.promisedDate || order.orderDate;
         const refDateObj = refDateStr ? new Date(refDateStr) : today;
         const diffDays = Math.max(0, Math.floor((today.getTime() - refDateObj.getTime()) / (1000 * 60 * 60 * 24)));
@@ -1276,15 +1276,29 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
           </tr>
         `;
 
-        const itemRows = items.map((item, idx) => {
+        const itemRows = items.map(item => {
           const pcsPerGbl = item.pcsPerGbl || 100;
           const pendingPcs = Math.max(0, (item.quantity || 0) - (item.dispatchedQty || 0));
           const pendingGbl = item.gbl || Math.ceil(pendingPcs / pcsPerGbl);
+
+          const comps = (item as any).components || [];
+          const compRows = comps.map((c: any) => `
+            <tr class="item-sub-row component-sub-row">
+              <td class="col-date"></td>
+              <td class="col-customer">
+                <div class="component-item-text">&bull; ${(c.name || c.skuCode || '').toUpperCase()} (${c.quantity || 1} ${c.uom || 'PCS'})</div>
+              </td>
+              <td class="col-orderno"></td>
+              <td class="col-pending"></td>
+              <td class="col-overdue"></td>
+            </tr>
+          `).join('');
+
           return `
             <tr class="item-sub-row">
               <td class="col-date"></td>
               <td class="col-customer">
-                <div class="item-name-text">${idx + 1}. ${(item.itemName || item.skuCode || '').toUpperCase()}</div>
+                <div class="item-name-text">${(item.itemName || item.skuCode || '').toUpperCase()}</div>
               </td>
               <td class="col-orderno"></td>
               <td class="col-pending">
@@ -1292,10 +1306,16 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
               </td>
               <td class="col-overdue"></td>
             </tr>
+            ${compRows}
           `;
         }).join('');
 
-        return mainRow + itemRows;
+        return `
+          <tbody class="customer-order-block">
+            ${mainRow}
+            ${itemRows}
+          </tbody>
+        `;
       }).join('');
 
       html = `
@@ -1417,6 +1437,15 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
               margin-top: 1px;
             }
 
+            tbody.customer-order-block {
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+            }
+            tr.order-main-row, tr.item-sub-row {
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+            }
+
             .item-sub-row {
               background-color: #ffffff;
             }
@@ -1425,6 +1454,13 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
               font-size: 8.2pt;
               color: #334155;
               text-transform: uppercase;
+              margin-top: 1px;
+            }
+            .component-item-text {
+              padding-left: 28px;
+              font-size: 7.8pt;
+              color: #475569;
+              font-style: italic;
               margin-top: 1px;
             }
             .item-qty-text {
@@ -1509,9 +1545,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                 <th style="width: 14%;">OverDue<br/>Days</th>
               </tr>
             </thead>
-            <tbody>
-              ${orderRowsHtml}
-            </tbody>
+            ${orderBlocksHtml}
             <tfoot>
               <tr class="total-row">
                 <td colspan="3" class="total-label">TOTAL</td>
