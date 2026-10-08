@@ -20,6 +20,7 @@ import {
 } from '../../api/salesOrderApiV2';
 import { MOCK_SALES_ORDERS_V2 } from './salesOrderSampleData';
 import { saveCustomSalesOrder } from '../../utils/salesOrderStorage';
+import { fetchStockCostings, getSkuCosting, StockCostingData } from '../../utils/inventoryCosting';
 
 import { showToast } from '../ui/Toast';
 
@@ -351,6 +352,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   // Items State (Empty by default when new)
   const [availableSkus, setAvailableSkus] = useState<SkuV2[]>(MASTER_PRODUCT_SKUS);
   const [stockMap, setStockMap] = useState<Map<string, number>>(new Map());
+  const [stockCostings, setStockCostings] = useState<StockCostingData | null>(null);
   const [activeItemDropdownIdx, setActiveItemDropdownIdx] = useState<number | null>(null);
   const [rowSearchTerms, setRowSearchTerms] = useState<{ [key: number]: string }>({});
 
@@ -555,9 +557,16 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       ? getBalancesV2(companyId).catch(() => [])
       : Promise.resolve([]);
 
-    Promise.all([fetchSkus, fetchBalances, fetchCustomers, fetchTransporters])
-      .then(([skus, balances, partiesRes, transportersRes]) => {
+    const fetchCostings = companyId
+      ? fetchStockCostings(companyId).catch(() => null)
+      : Promise.resolve(null);
+
+    Promise.all([fetchSkus, fetchBalances, fetchCustomers, fetchTransporters, fetchCostings])
+      .then(([skus, balances, partiesRes, transportersRes, costingsRes]) => {
         try {
+          if (costingsRes) {
+            setStockCostings(costingsRes);
+          }
           // ── SKUs: only use products for this company ──
           const rawSkus: SkuV2[] = Array.isArray(skus) ? skus : [];
 
@@ -2596,16 +2605,17 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                             </div>
                           </div>
 
-                          {/* SKU Dropdown: Shows ALL products from Item Master with Active/Inactive status */}
+                          {/* SKU Dropdown: Shows ALL products from Item Master with Active/Inactive status & dynamic costing */}
                           {isDropdownActive && (
                             <div 
                               ref={(el) => { productDropdownRefMap.current[idx] = el; }} 
-                              className="absolute left-3 top-full mt-1 w-[460px] bg-white border border-gray-200 rounded-xl shadow-2xl z-[99999] max-h-64 overflow-y-auto divide-y divide-gray-100 p-1"
+                              className="absolute left-3 top-full mt-1 w-[560px] max-w-[92vw] bg-white border border-gray-200 rounded-xl shadow-2xl z-[99999] max-h-64 overflow-y-auto divide-y divide-gray-100 p-1"
                             >
                               {filteredProductSkus.map((s, sIdx) => {
                                 const isInactive = (s.status || '').toLowerCase() === 'inactive';
                                 const definedConv = Number(s.altUnitConversion || s.booksGbl || (s as any).pcsPerGbl || 0);
                                 const isHighlighted = (highlightedProductIdxMap[idx] ?? 0) === sIdx;
+                                const costing = getSkuCosting(s, stockCostings);
 
                                 return (
                                   <div
@@ -2630,7 +2640,19 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                         )}
                                       </div>
                                     </div>
-                                    <div className="flex items-center gap-1.5 shrink-0">
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      {/* Dynamic Costing directly to the left of Active tag */}
+                                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100/90 border border-slate-200/80 text-right">
+                                        <div className="flex items-baseline gap-0.5">
+                                          <span className="text-[11px] font-black text-slate-800 tracking-tight">{costing.formattedGbl}</span>
+                                          <span className="text-[8.5px] font-bold text-slate-500">/GBL</span>
+                                        </div>
+                                        <span className="text-slate-300 text-[10px]">•</span>
+                                        <div className="flex items-baseline gap-0.5">
+                                          <span className="text-[10.5px] font-bold text-slate-600 tracking-tight">{costing.formattedPcs}</span>
+                                          <span className="text-[8px] font-medium text-slate-400">/Pcs</span>
+                                        </div>
+                                      </div>
                                       <span className={`px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border ${
                                         isInactive
                                           ? 'bg-amber-50 text-amber-700 border-amber-200'
@@ -3570,7 +3592,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                           {/* Searchable Dropdown Popup Menu */}
                           {isDropdownOpen && (
-                            <div className="absolute left-2 top-full mt-1 w-[320px] bg-white border border-slate-200 rounded-xl shadow-xl z-[99999] max-h-48 overflow-y-auto divide-y divide-slate-100 p-1 animate-in fade-in zoom-in-95 duration-100">
+                            <div className="absolute left-2 top-full mt-1 w-[460px] max-w-[90vw] bg-white border border-slate-200 rounded-xl shadow-xl z-[99999] max-h-48 overflow-y-auto divide-y divide-slate-100 p-1 animate-in fade-in zoom-in-95 duration-100">
                               <div className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-400 flex justify-between items-center bg-slate-50 rounded mb-0.5">
                                 <span>ITEM MASTER</span>
                                 <span>{filteredSkus.length} Items</span>
@@ -3583,6 +3605,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                 filteredSkus.slice(0, 30).map((s) => {
                                   const isInactive = (s.status || '').toLowerCase() === 'inactive';
                                   const pcsPerGblVal = Number(s.altUnitConversion || s.booksGbl || (s as any).pcsPerGbl || 0);
+                                  const costing = getSkuCosting(s, stockCostings);
 
                                   return (
                                     <div
@@ -3624,11 +3647,23 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                           )}
                                         </div>
                                       </div>
-                                      <span className={`px-1.5 py-0.2 rounded text-[8.5px] font-bold uppercase shrink-0 ${
-                                        isInactive ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'
-                                      }`}>
-                                        {s.status || 'Active'}
-                                      </span>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        {/* Dynamic Costing directly to the left of Active tag */}
+                                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-right">
+                                          <span className="text-[9.5px] font-bold text-slate-800">
+                                            {costing.formattedGbl}<span className="text-[8px] text-slate-500 font-normal">/GBL</span>
+                                          </span>
+                                          <span className="text-slate-300 text-[8.5px]">•</span>
+                                          <span className="text-[9px] font-semibold text-slate-600">
+                                            {costing.formattedPcs}<span className="text-[7.5px] text-slate-400 font-normal">/Pcs</span>
+                                          </span>
+                                        </div>
+                                        <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-bold uppercase shrink-0 border ${
+                                          isInactive ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                        }`}>
+                                          {s.status || 'Active'}
+                                        </span>
+                                      </div>
                                     </div>
                                   );
                                 })

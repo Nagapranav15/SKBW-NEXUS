@@ -197,11 +197,145 @@ export const fetchStockCostings = async (companyId: string): Promise<StockCostin
       });
     }
 
+    // 5. Process SKU BOM Recipes (Computed dynamic standard unit cost from raw materials/sheets)
+    skus.forEach((s: any) => {
+      const rawBom = s.bomItems || s.bom;
+      if (Array.isArray(rawBom) && rawBom.length > 0) {
+        const sId = toSafeString(s._id);
+        const sCode = (s.skuCode || '').trim().toLowerCase();
+        const sName = (s.name || '').trim().toLowerCase();
+
+        // If rate is already determined from live Production Orders, keep production order rate
+        if (sId && ratesMap.get(sId)?.source === 'production') return;
+
+        let recipeMaterialSpend = 0;
+        rawBom.forEach((b: any) => {
+          const bQty = Number(b.qty || b.qtyPerBatch || 1);
+          const bSkuId = toSafeString(b.skuId?._id || b.skuId);
+          const bCode = (b.skuCode || b.code || '').trim().toLowerCase();
+          const bRateInfo = (bSkuId && ratesMap.get(bSkuId)) || (bCode && ratesMap.get(bCode));
+          const bRate = Number(b.rate) > 0 ? Number(b.rate) : (bRateInfo?.rate || Number(b.price || 0));
+          recipeMaterialSpend += (bQty * bRate);
+        });
+
+        let recipeOverheads = 0;
+        (s.additionalCosts || []).forEach((c: any) => {
+          const cRate = Number(c.rate || c.amount || 0);
+          recipeOverheads += cRate;
+        });
+
+        const totalRecipeCost = recipeMaterialSpend + recipeOverheads;
+        if (totalRecipeCost > 0) {
+          const yieldQty = Number(s.recipeYieldQty || s.batchYieldQty || 1) || 1;
+          const unitRate = totalRecipeCost / yieldQty;
+          const effectiveRate = Math.round(unitRate * 100) / 100;
+          const entry = { rate: effectiveRate, source: 'production' as const };
+          if (sId && !ratesMap.has(sId)) ratesMap.set(sId, entry);
+          if (sCode && !ratesMap.has(sCode)) ratesMap.set(sCode, entry);
+          if (sName && !ratesMap.has(sName)) ratesMap.set(sName, entry);
+        }
+      }
+    });
+
     return { ratesMap, stockMap, skuMap, skus };
   } catch (err) {
     console.error('Failed to fetch stock costings from backend:', err);
     return { ratesMap, stockMap, skuMap, skus: [] };
   }
+};
+
+export interface SkuCostingResult {
+  costGbl: number;
+  costPcs: number;
+  formattedGbl: string;
+  formattedPcs: string;
+  hasCost: boolean;
+  source?: 'production' | 'purchase_invoice' | 'sku_master' | 'manual';
+}
+
+/**
+ * Resolves dynamic cost in both GBL and PCS for any SKU item
+ */
+export const getSkuCosting = (
+  sku: any,
+  costings: StockCostingData | null
+): SkuCostingResult => {
+  if (!sku) {
+    return {
+      costGbl: 0,
+      costPcs: 0,
+      formattedGbl: '₹0.00',
+      formattedPcs: '₹0.00',
+      hasCost: false,
+    };
+  }
+
+  const sId = toSafeString(sku._id);
+  const sCode = (sku.skuCode || '').trim().toLowerCase();
+  const sName = (sku.name || '').trim().toLowerCase();
+  const conv = Math.max(1, Number(sku.altUnitConversion || sku.booksGbl || (sku as any).pcsPerGbl || 1));
+  const isGbl = (sku.unit || sku.uom || sku.altUnit || '').toUpperCase() === 'GBL';
+
+  let resolvedRate = 0;
+  let source: SkuCostingResult['source'] = undefined;
+
+  if (costings) {
+    const rateInfo = (sId && costings.ratesMap.get(sId)) ||
+      (sCode && costings.ratesMap.get(sCode)) ||
+      (sName && costings.ratesMap.get(sName));
+
+    if (rateInfo && rateInfo.rate > 0) {
+      resolvedRate = rateInfo.rate;
+      source = rateInfo.source;
+    }
+  }
+
+  if (resolvedRate <= 0) {
+    const masterBase = Number(
+      sku.costPrice ||
+      sku.avgCost ||
+      sku.costPerPiece ||
+      sku.standardCost ||
+      sku.valuationRate ||
+      sku.avgRate ||
+      sku.purchasePrice ||
+      sku.rate ||
+      sku.price ||
+      sku.sellingPrice ||
+      0
+    );
+    if (masterBase > 0) {
+      resolvedRate = masterBase;
+      source = 'sku_master';
+    }
+  }
+
+  let costGbl = 0;
+  let costPcs = 0;
+
+  if (resolvedRate > 0) {
+    if (isGbl) {
+      costGbl = resolvedRate;
+      costPcs = costGbl / conv;
+    } else {
+      // Typically rates for products in notebooks can be per piece or per GBL
+      // If unit is PCS / Books, base is PCS
+      costPcs = resolvedRate;
+      costGbl = costPcs * conv;
+    }
+  }
+
+  const roundedGbl = Math.round(costGbl * 100) / 100;
+  const roundedPcs = Math.round(costPcs * 100) / 100;
+
+  return {
+    costGbl: roundedGbl,
+    costPcs: roundedPcs,
+    formattedGbl: `₹${roundedGbl.toFixed(2)}`,
+    formattedPcs: `₹${roundedPcs.toFixed(2)}`,
+    hasCost: roundedGbl > 0 || roundedPcs > 0,
+    source,
+  };
 };
 
 /**
