@@ -583,19 +583,21 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
           skuId: matchedBoardSku?._id
         });
 
-        // 3. Stitching Wire
+        // 3. Stitching Wire (Only include if explicitly created in SKU Master)
         const matchedWireSku = loadedSkus.find(s => 
           (s.category && /wire|stitching/i.test(s.category)) ||
           (s.name && /wire/i.test(s.name))
         );
-        components.push({
-          name: matchedWireSku?.name || 'Stitching Wire (No. 24)',
-          code: matchedWireSku?.skuCode || 'RM-WIRE-24',
-          category: matchedWireSku?.category || 'Consumables',
-          uom: matchedWireSku?.unit || 'KG',
-          perBookBasis: 0.0005,
-          skuId: matchedWireSku?._id
-        });
+        if (matchedWireSku) {
+          components.push({
+            name: matchedWireSku.name,
+            code: matchedWireSku.skuCode || 'RM-WIRE-24',
+            category: matchedWireSku.category || 'Consumables',
+            uom: matchedWireSku.unit || 'KG',
+            perBookBasis: 0.0005,
+            skuId: matchedWireSku._id
+          });
+        }
       }
 
       // Distribute requirements across components and pending customer orders
