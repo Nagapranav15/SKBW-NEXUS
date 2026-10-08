@@ -1528,56 +1528,66 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
       // ══════════════════════════════════════════════════════════════
       // REPORT 2: STOCK CATEGORY OUTSTANDINGS (PRODUCTION VIEW)
       // ══════════════════════════════════════════════════════════════
+      const companyPhone = selectedCompany?.phone || '9988776655';
+      const companyEmail = selectedCompany?.email || 'SKBW.VIJAYAWADA@GMAIL.COM';
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const printDateStr = `${String(today.getDate()).padStart(2, '0')}-${months[today.getMonth()]}-${today.getFullYear()}`;
+      const printTimeStr = today.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
       const totalPendingGbl = kpis.totalPendingGbl;
       const totalPendingPcs = kpis.totalPendingPcs;
 
-      const categorizedMap = new Map<string, typeof filteredRequirements>();
-      const uncategorizedItems: typeof filteredRequirements = [];
+      const resolveItemBrand = (itemName: string, rawBrand?: string) => {
+        if (rawBrand && rawBrand.trim()) return rawBrand.trim();
+        const name = itemName.toUpperCase();
+        if (name.includes('COLLEGE STYLE') || name.includes('COLLEGE')) return 'College Style';
+        if (name.includes('VIDYA SAGAR') || name.includes('VIDYASAGAR')) return 'Vidyasagar';
+        if (name.includes('HYPER')) return 'Hyper';
+        if (name.includes('AKSHAY')) return 'Akshay';
+        if (name.includes('BHAGAVAN') || name.includes('NANDHI')) return 'Bhagavan Nandi';
+        if (name.includes('GALAXY')) return 'Galaxy';
+        if (name.includes('WHITESPACE')) return 'Whitespace';
+        if (name.includes('BALAJI')) return 'Balaji';
+        if (name.includes('MIRACLE')) return 'Miracle';
+        if (name.includes('BEST FRIEND')) return 'Best Friend';
+        if (name.includes('AKHIL')) return 'Akhil';
+        return 'Various';
+      };
 
-      filteredRequirements.forEach(req => {
-        const cat = req.category || (req.skuCode?.toUpperCase().includes('112P') ? 'FINISHED GOODS' : '');
-        if (cat) {
-          if (!categorizedMap.has(cat)) categorizedMap.set(cat, []);
-          categorizedMap.get(cat)!.push(req);
-        } else {
-          uncategorizedItems.push(req);
-        }
-      });
+      const getBrandBadgeStyle = (brandName: string) => {
+        const b = brandName.toLowerCase();
+        if (b.includes('college')) return 'background-color: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe;';
+        if (b.includes('vidyasagar') || b.includes('vidya')) return 'background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a;';
+        if (b.includes('hyper')) return 'background-color: #fae8ff; color: #86198f; border: 1px solid #f5d0fe;';
+        if (b.includes('akshay')) return 'background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0;';
+        if (b.includes('bhagavan') || b.includes('nandi')) return 'background-color: #ffe4e6; color: #9f1239; border: 1px solid #fecdd3;';
+        if (b.includes('galaxy')) return 'background-color: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff;';
+        if (b.includes('whitespace')) return 'background-color: #e0f2fe; color: #075985; border: 1px solid #bae6fd;';
+        if (b.includes('balaji')) return 'background-color: #ffedd5; color: #9a3412; border: 1px solid #fed7aa;';
+        if (b.includes('miracle')) return 'background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1;';
+        if (b.includes('best friend')) return 'background-color: #fce7f3; color: #9d174d; border: 1px solid #fbcfe8;';
+        if (b.includes('akhil')) return 'background-color: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;';
+        return 'background-color: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;';
+      };
 
-      let groupedRowsHtml = '';
+      let itemIndexCounter = 1;
+      const itemRowsHtml = filteredRequirements.map((req) => {
+        const brandName = resolveItemBrand(req.skuName, (req as any).brand);
+        const badgeCss = getBrandBadgeStyle(brandName);
+        const currentIdx = itemIndexCounter++;
 
-      categorizedMap.forEach((items, catName) => {
-        const catGbl = items.reduce((s, i) => s + i.balancePendingGbl, 0);
-        const catPcs = items.reduce((s, i) => s + i.balancePendingPcs, 0);
-
-        groupedRowsHtml += `
-          <tr class="cat-row">
-            <td class="col-item-cat">${catName.toUpperCase()}</td>
-            <td class="col-qty-cat">${catGbl} GBL</td>
-            <td class="col-alt-cat">(${catPcs.toLocaleString()} PCS)</td>
-          </tr>
-        `;
-
-        items.forEach(req => {
-          groupedRowsHtml += `
-            <tr class="cat-item-row">
-              <td class="col-item-indented">${req.skuName.toUpperCase()}</td>
-              <td class="col-qty-indented">${req.balancePendingGbl} GBL</td>
-              <td class="col-alt-indented">(${req.balancePendingPcs.toLocaleString()} PCS)</td>
-            </tr>
-          `;
-        });
-      });
-
-      uncategorizedItems.forEach(req => {
-        groupedRowsHtml += `
+        return `
           <tr class="item-row">
-            <td class="col-item-direct">${req.skuName.toUpperCase()}</td>
-            <td class="col-qty-direct">${req.balancePendingGbl} GBL</td>
-            <td class="col-alt-direct">(${req.balancePendingPcs.toLocaleString()} PCS)</td>
+            <td class="col-num">${currentIdx}</td>
+            <td class="col-item-name">${req.skuName.toUpperCase()}</td>
+            <td class="col-brand">
+              <span class="brand-badge" style="${badgeCss}">${brandName}</span>
+            </td>
+            <td class="col-qty-gbl">${req.balancePendingGbl}</td>
+            <td class="col-qty-pcs">${req.balancePendingPcs.toLocaleString()}</td>
           </tr>
         `;
-      });
+      }).join('');
 
       html = `
         <!DOCTYPE html>
@@ -1586,165 +1596,245 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
           <title>Stock Category Outstandings</title>
           <style>
             @media print {
-              @page { size: A4 portrait; margin: 12mm 14mm 12mm 14mm; }
+              @page { size: A4 portrait; margin: 8mm 10mm 10mm 10mm; }
               body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             }
             body {
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-              color: #000;
-              margin: 15px;
+              color: #0f172a;
+              margin: 12px;
               background: #fff;
             }
-            .header-wrap { text-align: center; line-height: 1.35; }
-            .company-name { font-size: 13.5pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
-            .company-address { font-size: 8.5pt; font-weight: normal; margin-top: 2px; }
-            .company-email { font-size: 8.5pt; font-weight: normal; margin-top: 1px; }
-            .category-subtitle { font-size: 9pt; margin-top: 5px; }
-            .report-title { font-size: 12pt; font-weight: bold; margin-top: 2px; }
-            .date-range { font-size: 8.5pt; font-weight: bold; margin-top: 2px; }
-            
-            .sub-info-bar {
+
+            .top-header {
               display: flex;
-              justify-content: flex-end;
-              text-align: right;
-              font-size: 8pt;
-              margin-top: 8px;
-              margin-bottom: 2px;
+              justify-content: space-between;
+              align-items: flex-start;
+              margin-bottom: 8px;
             }
-            .sub-info-right {
-              text-align: right;
+            .company-title {
+              font-size: 15pt;
+              font-weight: 800;
+              color: #0f172a;
+              text-transform: uppercase;
+              letter-spacing: 0.3px;
             }
-            .page-no {
+            .company-subtext {
               font-size: 8.5pt;
+              color: #334155;
+              margin-top: 2px;
+              line-height: 1.35;
             }
-            .outstanding-title {
+
+            .meta-info-table {
               font-size: 8.5pt;
-              text-decoration: underline;
+              color: #334155;
+              border-collapse: collapse;
+            }
+            .meta-info-table td {
+              padding: 1px 4px;
+            }
+            .meta-label {
+              font-weight: normal;
+              color: #475569;
+            }
+            .meta-val {
+              font-weight: 600;
+              color: #0f172a;
+            }
+
+            .banner-container {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              background-color: #eff6ff;
+              border: 1px solid #bfdbfe;
+              border-radius: 6px;
+              padding: 8px 14px;
+              margin-top: 6px;
+              margin-bottom: 10px;
+            }
+            .banner-center {
+              text-align: center;
+              flex: 1;
+            }
+            .banner-title {
+              font-size: 14pt;
+              font-weight: 800;
+              color: #1e3a8a;
+              margin: 0;
+              letter-spacing: 0.2px;
+            }
+            .banner-subtitle {
+              font-size: 9.5pt;
+              font-weight: 600;
+              color: #1e40af;
+              margin-top: 2px;
+            }
+            .banner-dates {
+              font-size: 8.8pt;
+              font-weight: 600;
+              color: #1e40af;
               margin-top: 1px;
             }
 
-            table.tally-table {
+            .category-badge-box {
+              background-color: #ffffff;
+              border: 1px solid #bfdbfe;
+              border-radius: 6px;
+              padding: 4px 10px;
+              text-align: center;
+            }
+            .cat-badge-label {
+              font-size: 7.5pt;
+              color: #64748b;
+            }
+            .cat-badge-val {
+              font-size: 8.5pt;
+              font-weight: 700;
+              color: #1e3a8a;
+            }
+
+            .category-header-bar {
+              background-color: #dbeafe;
+              border: 1px solid #93c5fd;
+              border-radius: 6px 6px 0 0;
+              padding: 6px 12px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              font-weight: 800;
+              color: #1e3a8a;
+              font-size: 9.5pt;
+            }
+
+            table.report-table {
               width: 100%;
               border-collapse: collapse;
               font-size: 8.5pt;
-              margin-top: 2px;
+              border: 1px solid #94a3b8;
             }
-            table.tally-table thead {
-              border-top: 1px solid #000;
-              border-bottom: 1px solid #000;
+            table.report-table th {
+              background-color: #f1f5f9;
+              color: #0f172a;
+              font-weight: 700;
+              border: 1px solid #94a3b8;
+              padding: 6px 8px;
+              text-align: center;
+              line-height: 1.2;
             }
-            table.tally-table th {
-              padding: 2.5px 6px;
-              background: #fff;
-              font-weight: bold;
-              border: none;
-            }
-            .th-particulars {
-              width: 64%;
-              text-align: left;
-              letter-spacing: 2px;
+            table.report-table td {
+              border: 1px solid #cbd5e1;
+              padding: 4px 8px;
               vertical-align: middle;
             }
-            .th-pending-title {
-              text-align: right;
-              padding-bottom: 0px;
-            }
-            .th-qty {
-              text-align: right;
-              width: 16%;
-              font-weight: normal;
-              padding-top: 0px;
-            }
-            .th-alt {
-              text-align: right;
-              width: 20%;
-              font-weight: normal;
-              padding-top: 0px;
-            }
 
-            table.tally-table td {
-              padding: 1.5px 6px;
-              border: none;
-            }
-            .cat-row td {
-              font-weight: bold;
-              padding-top: 4px;
-            }
-            .col-item-cat {
-              text-transform: uppercase;
-            }
-            .col-qty-cat, .col-alt-cat {
-              text-align: right;
-              font-weight: bold;
-            }
-            .cat-item-row td {
-              font-style: italic;
-            }
-            .col-item-indented {
-              padding-left: 20px !important;
-              text-transform: uppercase;
-            }
-            .col-qty-indented, .col-alt-indented {
-              text-align: right;
-            }
-            .col-item-direct {
-              text-transform: uppercase;
-            }
-            .col-qty-direct, .col-alt-direct {
-              text-align: right;
+            .col-num { width: 5%; text-align: center; font-weight: 600; color: #64748b; }
+            .col-item-name { width: 47%; text-align: left; font-weight: 700; color: #0f172a; text-transform: uppercase; }
+            .col-brand { width: 20%; text-align: center; }
+            .col-qty-gbl { width: 14%; text-align: center; font-weight: 800; color: #0f172a; font-size: 9pt; }
+            .col-qty-pcs { width: 14%; text-align: center; font-weight: 500; color: #334155; font-size: 8.8pt; }
+
+            .brand-badge {
+              display: inline-block;
+              padding: 2px 8px;
+              border-radius: 12px;
+              font-size: 7.8pt;
+              font-weight: 700;
             }
 
             .grand-total-row td {
-              border-top: 1px solid #000;
-              border-bottom: 3px double #000;
-              font-weight: bold;
-              padding: 3.5px 6px;
+              background-color: #eff6ff;
+              border-top: 2px solid #94a3b8;
+              border-bottom: 2px solid #94a3b8;
+              font-weight: 800;
+              padding: 6px 8px;
             }
-            .col-total-title {
-              letter-spacing: 3px;
-              font-weight: bold;
+            .total-label {
+              text-align: left;
+              font-weight: 800;
+              color: #1e3a8a;
+              letter-spacing: 0.5px;
+              font-size: 9.5pt;
             }
-            .col-total-qty, .col-total-alt {
-              text-align: right;
-              font-weight: bold;
+            .total-val-gbl {
+              text-align: center;
+              font-weight: 800;
+              color: #1e3a8a;
+              font-size: 10pt;
+            }
+            .total-val-pcs {
+              text-align: center;
+              font-weight: 800;
+              color: #1e3a8a;
+              font-size: 10pt;
             }
           </style>
         </head>
         <body>
-          <div class="header-wrap">
-            <div class="company-name">${companyName}</div>
-            <div class="company-address">${companyAddress}</div>
-            <div class="company-email">E-Mail : ${companyEmail}</div>
-            <div class="category-subtitle">All Stock Categories</div>
-            <div class="report-title">Stock Category Outstandings</div>
-            <div class="date-range">${dateRange}</div>
-          </div>
-          <div class="sub-info-bar">
-            <div></div>
-            <div class="sub-info-right">
-              <div class="page-no">Page 1</div>
-              <div class="outstanding-title">Sales Orders Outstanding</div>
+          <div class="top-header">
+            <div>
+              <div class="company-title">${companyName}</div>
+              <div class="company-subtext">${companyAddress}</div>
+              <div class="company-subtext">Phone: ${companyPhone} &nbsp;|&nbsp; E-Mail: ${companyEmail}</div>
+            </div>
+            <div>
+              <table class="meta-info-table">
+                <tr>
+                  <td class="meta-label">Date</td>
+                  <td>:</td>
+                  <td class="meta-val">${printDateStr}</td>
+                </tr>
+                <tr>
+                  <td class="meta-label">Time</td>
+                  <td>:</td>
+                  <td class="meta-val">${printTimeStr}</td>
+                </tr>
+                <tr>
+                  <td class="meta-label">Page</td>
+                  <td>:</td>
+                  <td class="meta-val">1 of 2</td>
+                </tr>
+              </table>
             </div>
           </div>
-          <table class="tally-table">
+
+          <div class="banner-container">
+            <div style="width: 100px;"></div>
+            <div class="banner-center">
+              <div class="banner-title">Stock Category Outstandings</div>
+              <div class="banner-subtitle">Sales Orders Outstanding</div>
+              <div class="banner-dates">${dateRange}</div>
+            </div>
+            <div class="category-badge-box">
+              <div class="cat-badge-label">Stock Category</div>
+              <div class="cat-badge-val">All Stock Categories</div>
+            </div>
+          </div>
+
+          <div class="category-header-bar">
+            <div>FINISHED GOODS</div>
+            <div>Total: ${totalPendingGbl} GBL (${totalPendingPcs.toLocaleString()} PCS)</div>
+          </div>
+
+          <table class="report-table">
             <thead>
               <tr>
-                <th class="th-particulars" rowspan="2">P a r t i c u l a r s</th>
-                <th class="th-pending-title" colspan="2">Pending Orders</th>
-              </tr>
-              <tr>
-                <th class="th-qty">Quantity</th>
-                <th class="th-alt">(Alt. Units)</th>
+                <th style="width: 5%;">#</th>
+                <th style="width: 47%;">Item Name</th>
+                <th style="width: 20%;">Brand</th>
+                <th style="width: 14%;">Pending Qty<br/>GBL</th>
+                <th style="width: 14%;">Pending Qty<br/>PCS (Alt. UOM)</th>
               </tr>
             </thead>
             <tbody>
-              ${groupedRowsHtml}
+              ${itemRowsHtml}
             </tbody>
             <tfoot>
               <tr class="grand-total-row">
-                <td class="col-total-title">G r a n d &nbsp; T o t a l</td>
-                <td class="col-total-qty">${totalPendingGbl} GBL</td>
-                <td class="col-total-alt">(${totalPendingPcs.toLocaleString()} PCS)</td>
+                <td colspan="3" class="total-label">GRAND TOTAL</td>
+                <td class="total-val-gbl">${totalPendingGbl} GBL</td>
+                <td class="total-val-pcs">${totalPendingPcs.toLocaleString()} PCS</td>
               </tr>
             </tfoot>
           </table>
