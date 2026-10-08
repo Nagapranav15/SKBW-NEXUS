@@ -2249,14 +2249,23 @@ export const StockInventoryV2: React.FC = () => {
                                   const availStock = Number((sku as any).availableStock ?? onHand ?? 0);
                                   const isNegative = availStock < 0;
                                   const eff = getSkuEffectiveUnits(sku);
-                                  const altQty = eff.altUnit && eff.conversionFactor > 0 ? convertUom(availStock, eff.unit, eff.altUnit, sku) : 0;
+
+                                  let primaryQty = availStock;
+                                  let altQty = 0;
+
+                                  if (eff.unit.toUpperCase() === 'GBL' && eff.altUnit.toUpperCase() === 'PCS' && eff.conversionFactor > 1 && Math.abs(availStock) >= eff.conversionFactor) {
+                                    primaryQty = convertUom(availStock, 'PCS', 'GBL', sku);
+                                    altQty = availStock;
+                                  } else {
+                                    altQty = eff.altUnit && eff.conversionFactor > 0 ? convertUom(availStock, eff.unit, eff.altUnit, sku) : 0;
+                                  }
 
                                   return (
                                     <>
                                       <div className={`font-mono font-black text-sm ${isNegative ? 'text-rose-600 bg-rose-50 border border-rose-300 px-2 py-0.5 rounded-md inline-block shadow-2xs' : 'text-gray-900'}`}>
-                                        {isNegative ? `-${Math.abs(availStock).toLocaleString('en-IN')}` : availStock.toLocaleString('en-IN')}
+                                        {isNegative ? `-${Math.abs(primaryQty).toLocaleString('en-IN')}` : primaryQty.toLocaleString('en-IN')}
                                       </div>
-                                      {eff.altUnit && eff.conversionFactor > 0 && altQty !== availStock && (
+                                      {eff.altUnit && eff.conversionFactor > 0 && altQty !== primaryQty && (
                                         <div className={`text-[10px] font-mono mt-0.5 ${isNegative ? 'text-rose-500 font-semibold' : 'text-gray-400'}`}>
                                           ≈ {altQty < 0 ? `-${Math.abs(altQty).toLocaleString('en-IN')}` : altQty.toLocaleString('en-IN')} {eff.altUnit}
                                         </div>
@@ -2343,11 +2352,15 @@ export const StockInventoryV2: React.FC = () => {
                                 </div>
                                 {(() => {
                                   const eff = getSkuEffectiveUnits(sku);
-                                  const primUnit = eff.unit;
-                                  const altUnitName = eff.altUnit;
+                                  const isBoard = isBoardSku(sku);
 
-                                  const altRate = altUnitName
-                                    ? convertRateToUom(avgPrice, primUnit, altUnitName, sku)
+                                  // For rate display: base rate is per sheet (PCS) for Board items
+                                  const primRateUnit = isBoard ? 'PCS' : eff.unit;
+                                  const altRateUnit = isBoard ? 'GBL' : eff.altUnit;
+
+                                  const rateInPrim = avgPrice;
+                                  const rateInAlt = altRateUnit
+                                    ? convertRateToUom(avgPrice, primRateUnit, altRateUnit, sku)
                                     : 0;
 
                                   const costLabel = (sku as any).costSource === 'slitting'
@@ -2360,20 +2373,20 @@ export const StockInventoryV2: React.FC = () => {
                                     <div 
                                       className="text-[10px] font-mono text-gray-500 mt-0.5 flex flex-col items-end"
                                       title={(sku as any).costSource === 'slitting'
-                                        ? `Dynamic unit costing from Reel Slitting: ₹${avgPrice.toFixed(4)}/${primUnit}`
+                                        ? `Dynamic unit costing from Reel Slitting: ₹${rateInPrim.toFixed(4)}/${primRateUnit}`
                                         : (sku as any).costSource === 'production' 
-                                        ? `Dynamic unit costing from Production Orders: ₹${avgPrice.toFixed(4)}/${primUnit}`
+                                        ? `Dynamic unit costing from Production Orders: ₹${rateInPrim.toFixed(4)}/${primRateUnit}`
                                         : (sku as any).costSource === 'purchase'
-                                        ? `Average purchase cost across batch entries: ₹${avgPrice.toFixed(4)}/${primUnit}`
-                                        : `Master item unit cost: ₹${avgPrice.toFixed(4)}/${primUnit}`}
+                                        ? `Average purchase cost across batch entries: ₹${rateInPrim.toFixed(4)}/${primRateUnit}`
+                                        : `Master item unit cost: ₹${rateInPrim.toFixed(4)}/${primRateUnit}`}
                                     >
                                       <span>
                                         <span className="text-gray-400 font-sans">{costLabel}</span>
-                                        ₹{avgPrice < 1 && avgPrice > 0 ? avgPrice.toFixed(4) : avgPrice.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{primUnit}
+                                        ₹{rateInPrim < 1 && rateInPrim > 0 ? rateInPrim.toFixed(4) : rateInPrim.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{primRateUnit}
                                       </span>
-                                      {altRate > 0 && altRate !== avgPrice && (
+                                      {rateInAlt > 0 && rateInAlt !== rateInPrim && (
                                         <span className="text-indigo-600 font-semibold text-[9.5px]">
-                                          (₹{altRate < 1 ? altRate.toFixed(4) : altRate.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{altUnitName})
+                                          (₹{rateInAlt < 1 ? rateInAlt.toFixed(4) : rateInAlt.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{altRateUnit})
                                         </span>
                                       )}
                                     </div>

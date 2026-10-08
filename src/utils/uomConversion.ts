@@ -225,17 +225,16 @@ export interface EffectiveSkuUnits {
  * Enforces Board SKUs primary unit = PCS, alternate unit = GBL.
  */
 export function getSkuEffectiveUnits(sku?: any): EffectiveSkuUnits {
-  if (!sku) return { unit: 'PCS', altUnit: '', conversionFactor: 1 };
+  if (!sku) return { unit: 'GBL', altUnit: 'PCS', conversionFactor: 1 };
 
-  const isBoard = isBoardSku(sku);
   let unit = (sku.unit || '').trim();
   let altUnit = (sku.altUnit || '').trim();
   const conversionFactor = getSkuConversionFactor(sku);
 
-  if (isBoard) {
-    unit = 'PCS';
-    if (!altUnit || altUnit.toUpperCase() === 'PCS') {
-      altUnit = 'GBL';
+  if (isBoardSku(sku)) {
+    if (!unit) unit = 'GBL';
+    if (!altUnit || altUnit.toUpperCase() === unit.toUpperCase()) {
+      altUnit = unit.toUpperCase() === 'GBL' ? 'PCS' : 'GBL';
     }
   } else {
     if (!unit) unit = 'PCS';
