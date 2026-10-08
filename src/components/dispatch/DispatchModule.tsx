@@ -4,7 +4,7 @@ import {
   Truck, Package, CheckCircle2, Clock, AlertCircle,
   Search, Filter, RefreshCw, ChevronDown,
   Phone, MapPin, Download, Eye, Plus, ArrowUpDown, ChevronLeft, ChevronRight,
-  Printer, X, ArrowUp, ArrowDown, Calendar, Edit3, Trash2
+  Printer, X, ArrowUp, ArrowDown, Calendar, Edit3, Trash2, RotateCcw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../../context/AuthContext';
@@ -854,10 +854,12 @@ export const DispatchModule: React.FC = () => {
     setIsCreateModalOpen(true);
   };
 
-  // Delete Delivery Challan
-  const handleDeleteChallan = async (challan: any) => {
+  // Revert / Delete Delivery Challan: Reverses stock and sends sales order back to pending
+  const handleRevertChallan = async (challan: any) => {
     const dcNo = challan.dcNumber || 'this delivery challan';
-    if (!window.confirm(`Are you sure you want to delete Delivery Challan ${dcNo}? This action will remove the dispatch record and restore pending inventory quantities.`)) {
+    const soRef = challan.orderNumber && challan.orderNumber !== 'DIRECT' ? ` (Linked to SO: ${challan.orderNumber})` : '';
+    
+    if (!window.confirm(`Are you sure you want to REVERT Delivery Challan ${dcNo}${soRef}?\n\nThis will:\n1. Cancel this delivery challan record\n2. Reverse and restore inventory stock back to warehouse\n3. Send the Sales Order back to Pending status.`)) {
       return;
     }
 
@@ -896,7 +898,7 @@ export const DispatchModule: React.FC = () => {
           const revertedOrder: SalesOrderV2 = {
             ...targetSO,
             items: updatedItems,
-            fulfillmentStatus: allPending ? 'Unfulfilled' : someDispatched ? 'Partially Dispatched' : 'Fulfilled',
+            fulfillmentStatus: allPending ? 'Pending' : someDispatched ? 'Partially Dispatched' : 'Fulfilled',
             status: allPending ? 'Confirmed' : someDispatched ? 'Partially Delivered' : 'Delivered'
           };
 
@@ -914,15 +916,24 @@ export const DispatchModule: React.FC = () => {
       const filtered = stored.filter((c: any) => c._id !== challan._id && c.dcNumber !== challan.dcNumber);
       localStorage.setItem(cKey, JSON.stringify(filtered));
 
+      // Close modal if open
+      if (activeChallan && (activeChallan._id === challan._id || activeChallan.dcNumber === challan.dcNumber)) {
+        setIsChallanModalOpen(false);
+        setActiveChallan(null);
+      }
+
       window.dispatchEvent(new CustomEvent('stock_balance_changed'));
       window.dispatchEvent(new CustomEvent('sales_order_updated'));
-      showToast(`Delivery Challan ${dcNo} deleted successfully`, 'success');
+      window.dispatchEvent(new CustomEvent('inventory_updated'));
+      showToast(`Delivery Challan ${dcNo} reverted successfully! Stock restored and Sales Order returned to Pending.`, 'success');
       fetchData(false);
     } catch (err) {
-      console.error('Failed to delete delivery challan:', err);
-      showToast('Failed to delete delivery challan', 'error');
+      console.error('Failed to revert delivery challan:', err);
+      showToast('Failed to revert delivery challan', 'error');
     }
   };
+
+  const handleDeleteChallan = handleRevertChallan;
 
   // Quick Instant Full Dispatch
   const handleQuickFullDispatch = (orderRow: DispatchRowOrder) => {
@@ -1532,13 +1543,23 @@ export const DispatchModule: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1.5">
+                          {/* Revert Delivery Challan */}
+                          <button
+                            onClick={() => handleRevertChallan(ch)}
+                            className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 rounded-lg transition-all flex items-center gap-1 cursor-pointer border border-rose-200/80 shadow-2xs hover:scale-105 active:scale-95 text-xs font-bold"
+                            title="Revert Delivery Challan (Restores Inventory Stock & Returns Sales Order to Pending)"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Revert</span>
+                          </button>
+
                           {/* Edit Dispatch - accessible in Challan History only */}
                           <button
                             onClick={() => handleEditChallan(ch)}
-                            className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 rounded-lg transition-all flex items-center justify-center cursor-pointer border border-amber-200/80 shadow-2xs hover:scale-105 active:scale-95"
+                            className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 rounded-lg transition-all flex items-center justify-center cursor-pointer border border-amber-200/80 shadow-2xs hover:scale-105 active:scale-95"
                             title="Edit Delivery Challan"
                           >
-                            <Edit3 className="w-4 h-4 text-amber-600" />
+                            <Edit3 className="w-3.5 h-3.5 text-amber-600" />
                           </button>
 
                           {/* Print DC */}
@@ -1547,10 +1568,10 @@ export const DispatchModule: React.FC = () => {
                               setActiveChallan(ch);
                               setIsChallanModalOpen(true);
                             }}
-                            className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 rounded-lg transition-all flex items-center justify-center cursor-pointer border border-blue-200/80 shadow-2xs hover:scale-105 active:scale-95"
+                            className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 rounded-lg transition-all flex items-center justify-center cursor-pointer border border-blue-200/80 shadow-2xs hover:scale-105 active:scale-95"
                             title="Print Delivery Challan"
                           >
-                            <Printer className="w-4 h-4 text-blue-600" />
+                            <Printer className="w-3.5 h-3.5 text-blue-600" />
                           </button>
                         </div>
                       </td>
@@ -2161,6 +2182,7 @@ export const DispatchModule: React.FC = () => {
             setActiveChallan(null);
           }}
           challan={activeChallan}
+          onRevert={handleRevertChallan}
         />
       )}
 

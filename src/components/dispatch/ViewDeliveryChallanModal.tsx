@@ -1,17 +1,19 @@
 import React from 'react';
-import { X, Printer, Download, Truck, Calendar, MapPin, Phone, Building, CheckCircle2 } from 'lucide-react';
+import { X, Printer, Download, Truck, Calendar, MapPin, Phone, Building, CheckCircle2, RotateCcw } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyUtils';
 
 export interface ViewDeliveryChallanModalProps {
   isOpen: boolean;
   onClose: () => void;
   challan: any;
+  onRevert?: (challan: any) => void;
 }
 
 export const ViewDeliveryChallanModal: React.FC<ViewDeliveryChallanModalProps> = ({
   isOpen,
   onClose,
-  challan
+  challan,
+  onRevert
 }) => {
   if (!isOpen || !challan) return null;
 
@@ -34,6 +36,16 @@ export const ViewDeliveryChallanModal: React.FC<ViewDeliveryChallanModalProps> =
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {onRevert && (
+              <button
+                onClick={() => onRevert(challan)}
+                className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95"
+                title="Revert Delivery Challan & Restore Stock"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                Revert Challan
+              </button>
+            )}
             <button
               onClick={handlePrint}
               className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
