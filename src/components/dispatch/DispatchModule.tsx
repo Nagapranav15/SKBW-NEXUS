@@ -440,6 +440,18 @@ export const DispatchModule: React.FC = () => {
     fetchData(true);
   }, [selectedCompany?._id]);
 
+  useEffect(() => {
+    const handleSync = () => {
+      fetchData(false);
+    };
+    window.addEventListener('stock_balance_changed', handleSync);
+    window.addEventListener('sales_order_updated', handleSync);
+    return () => {
+      window.removeEventListener('stock_balance_changed', handleSync);
+      window.removeEventListener('sales_order_updated', handleSync);
+    };
+  }, [selectedCompany?._id]);
+
   // Lookup map: Challans by Sales Order
   const orderChallansMap = useMemo(() => {
     const map = new Map<string, any[]>();
@@ -902,6 +914,47 @@ export const DispatchModule: React.FC = () => {
     setIsCreateModalOpen(false);
     setEditingChallan(null);
     setIsChallanModalOpen(true);
+
+    if (challan) {
+      setDeliveryChallansList(prev => [
+        challan,
+        ...prev.filter(c => c._id !== challan._id && c.dcNumber !== challan.dcNumber)
+      ]);
+
+      if (challan.orderId || (challan.orderNumber && challan.orderNumber !== 'DIRECT')) {
+        setSalesOrders(prev =>
+          prev.map(so => {
+            const isMatch = (challan.orderId && String(so._id) === String(challan.orderId)) ||
+                            (challan.orderNumber && so.orderNumber === challan.orderNumber);
+            if (!isMatch) return so;
+
+            const updatedItems = (so.items || []).map(soItem => {
+              const matchedDcItem = (challan.items || []).find((ci: any) =>
+                (ci.skuId && String(ci.skuId) === String(soItem.skuId)) ||
+                (ci.skuCode && ci.skuCode === soItem.skuCode) ||
+                (ci.itemName && ci.itemName === soItem.itemName)
+              );
+              if (!matchedDcItem) return soItem;
+              const delGbl = Number(matchedDcItem.deliveredQty || 0);
+              return {
+                ...soItem,
+                dispatchedQty: (Number(soItem.dispatchedQty) || 0) + delGbl
+              };
+            });
+
+            const allFulfilled = updatedItems.every(i => (Number(i.dispatchedQty) || 0) >= (Number(i.quantity) || 0));
+            const someDispatched = updatedItems.some(i => (Number(i.dispatchedQty) || 0) > 0);
+
+            return {
+              ...so,
+              items: updatedItems,
+              fulfillmentStatus: allFulfilled ? 'Fulfilled' : someDispatched ? 'Partially Dispatched' : so.fulfillmentStatus,
+              status: allFulfilled ? 'Delivered' : someDispatched ? 'Partially Delivered' : so.status
+            };
+          })
+        );
+      }
+    }
     fetchData(false);
   };
 

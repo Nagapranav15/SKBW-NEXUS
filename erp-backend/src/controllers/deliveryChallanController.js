@@ -84,8 +84,14 @@ async function getDefaultLocationHierarchy(companyId, preferredLocationId) {
 
 async function postDispatchInventory(challan, userId) {
   if (!challan || !challan.items || challan.items.length === 0) return;
-  const companyObjId = toObjectId(challan.company);
-  if (!companyObjId) return;
+  let companyObjId = toObjectId(challan.company);
+  if (!companyObjId) {
+    const Company = mongoose.models.Company;
+    if (Company) {
+      const firstComp = await Company.findOne().lean();
+      if (firstComp) companyObjId = firstComp._id;
+    }
+  }
 
   for (const item of challan.items) {
     const qtyGbl = Number(item.deliveredQty || 0);
@@ -102,26 +108,21 @@ async function postDispatchInventory(challan, userId) {
       sku = await SkuV2.findById(item.itemId);
     }
     if (!sku && item.skuCode) {
-      sku = await SkuV2.findOne({ company: companyObjId, skuCode: item.skuCode });
+      if (companyObjId) sku = await SkuV2.findOne({ company: companyObjId, skuCode: item.skuCode });
       if (!sku) sku = await SkuV2.findOne({ skuCode: item.skuCode });
     }
     if (!sku && item.itemName) {
       const cleanName = item.itemName.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      sku = await SkuV2.findOne({
-        company: companyObjId,
-        $or: [
-          { name: item.itemName },
-          { name: new RegExp(`^${cleanName}$`, "i") },
-          { skuCode: item.itemName }
-        ]
-      });
+      const nameRegex = new RegExp(`^${cleanName}$`, "i");
+      if (companyObjId) {
+        sku = await SkuV2.findOne({
+          company: companyObjId,
+          $or: [{ name: item.itemName }, { name: nameRegex }, { skuCode: item.itemName }]
+        });
+      }
       if (!sku) {
         sku = await SkuV2.findOne({
-          $or: [
-            { name: item.itemName },
-            { name: new RegExp(`^${cleanName}$`, "i") },
-            { skuCode: item.itemName }
-          ]
+          $or: [{ name: item.itemName }, { name: nameRegex }, { skuCode: item.itemName }]
         });
       }
     }
@@ -164,7 +165,7 @@ async function postDispatchInventory(challan, userId) {
         remainingToDeduct = 0;
       } else {
         // 2. Otherwise find locations with positive stock for this SKU to deduct from actual stock locations
-        const stockLocs = await InventoryLedger.aggregate([
+        const stockLocs = companyObjId ? await InventoryLedger.aggregate([
           {
             $match: {
               company: companyObjId,
@@ -189,7 +190,7 @@ async function postDispatchInventory(challan, userId) {
           },
           { $match: { onHand: { $gt: 0 } } },
           { $sort: { onHand: -1 } }
-        ]);
+        ]) : [];
 
         if (stockLocs && stockLocs.length > 0) {
           for (const loc of stockLocs) {
@@ -225,9 +226,9 @@ async function postDispatchInventory(challan, userId) {
 
         let txNum;
         try {
-          txNum = await getNextSequenceNumber("IL", companyObjId);
+          txNum = await getNextSequenceNumber("TRX", companyObjId);
         } catch (e) {
-          txNum = `DISP-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+          txNum = `TRX-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
         }
 
         // 1. Post to primary InventoryLedger (direction: "OUT" dynamically deducts stock from balance)
@@ -244,11 +245,11 @@ async function postDispatchInventory(challan, userId) {
           floorId: batch.floorId || batch.warehouseId || batch.locationId,
           zoneId: batch.zoneId || batch.floorId || batch.locationId,
           locationId: batch.locationId,
-          remarks: `Sales Dispatch to ${challan.customerName || 'Customer'} via DC #${challan.dcNumber}`,
-          createdBy: toObjectId(userId),
+          remarks: `Sales Dispatch to ${challan.customerName || 'Customer'} via DO #${challan.dcNumber}`,
+          createdBy: toObjectId(userId) || companyObjId,
           status: "Posted",
-          company: companyObjId
-        });
+          company: companyObjId || sku.company
+        }).catch(err => console.error("Error creating InventoryLedger on DC dispatch:", err));
 
         // 2. Post to InventoryLedgerV2 for secondary ledger audit
         await InventoryLedgerV2.create({
@@ -260,9 +261,9 @@ async function postDispatchInventory(challan, userId) {
           qtyIn: 0,
           qtyOut: batch.quantity,
           balanceAfter: 0,
-          company: companyObjId,
-          remarks: `Dispatched DC #${challan.dcNumber}`,
-          userId: toObjectId(userId)
+          company: companyObjId || sku.company,
+          remarks: `Dispatched DO #${challan.dcNumber}`,
+          userId: toObjectId(userId) || companyObjId
         }).catch(e => console.error("Error creating InventoryLedgerV2 on DC dispatch:", e));
       }
 
@@ -275,38 +276,75 @@ async function postDispatchInventory(challan, userId) {
 
     // 3. Update Sales Order dispatchedQty to release reservation
     if (challan.orderId || challan.orderNumber) {
-      const orderQuery = { company: companyObjId };
-      if (challan.orderId && mongoose.Types.ObjectId.isValid(String(challan.orderId))) {
-        orderQuery._id = toObjectId(challan.orderId);
-      } else if (challan.orderNumber) {
-        orderQuery.orderNumber = challan.orderNumber;
+      const orderQueries = [];
+      const orderObjId = toObjectId(challan.orderId);
+      if (orderObjId) orderQueries.push({ _id: orderObjId });
+      if (challan.orderNumber && challan.orderNumber !== 'DIRECT') {
+        orderQueries.push({ orderNumber: challan.orderNumber });
+        orderQueries.push({ orderNumber: new RegExp(`^${challan.orderNumber}$`, "i") });
       }
 
-      const salesOrder = await SalesOrderV2.findOne(orderQuery);
-      if (salesOrder && salesOrder.items) {
-        let updated = false;
-        salesOrder.items.forEach(soItem => {
-          const isMatch = (soItem.skuId && String(soItem.skuId) === String(sku._id)) ||
-                          (soItem.skuCode && soItem.skuCode === sku.skuCode) ||
-                          (soItem.itemName && soItem.itemName === item.itemName) ||
-                          (soItem.description && soItem.description === item.itemName);
-          if (isMatch) {
-            soItem.dispatchedQty = (Number(soItem.dispatchedQty) || 0) + (isSkuGbl ? finalQty : (qtyGbl || Math.ceil(finalQty / pcsPerGbl)));
-            updated = true;
-          }
-        });
+      for (const orderQuery of orderQueries) {
+        // A. Update in SalesOrderV2
+        const salesOrder = await SalesOrderV2.findOne(orderQuery);
+        if (salesOrder && salesOrder.items) {
+          let updated = false;
+          salesOrder.items.forEach(soItem => {
+            const isMatch = (soItem.skuId && String(soItem.skuId) === String(sku._id)) ||
+                            (soItem.skuCode && soItem.skuCode === sku.skuCode) ||
+                            (item.skuCode && soItem.skuCode === item.skuCode) ||
+                            (soItem.itemName && soItem.itemName === item.itemName) ||
+                            (soItem.description && soItem.description === item.itemName);
+            if (isMatch) {
+              soItem.dispatchedQty = (Number(soItem.dispatchedQty) || 0) + (isSkuGbl ? finalQty : (qtyGbl || Math.ceil(finalQty / pcsPerGbl)));
+              updated = true;
+            }
+          });
 
-        if (updated) {
-          const totalOrdered = salesOrder.items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
-          const totalDispatched = salesOrder.items.reduce((s, i) => s + (Number(i.dispatchedQty) || 0), 0);
-          if (totalDispatched >= totalOrdered) {
-            salesOrder.fulfillmentStatus = "Fulfilled";
-            salesOrder.status = "Delivered";
-          } else if (totalDispatched > 0) {
-            salesOrder.fulfillmentStatus = "Partially Dispatched";
-            salesOrder.status = "Partially Delivered";
+          if (updated) {
+            const totalOrdered = salesOrder.items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
+            const totalDispatched = salesOrder.items.reduce((s, i) => s + (Number(i.dispatchedQty) || 0), 0);
+            if (totalDispatched >= totalOrdered) {
+              salesOrder.fulfillmentStatus = "Fulfilled";
+              salesOrder.status = "Delivered";
+            } else if (totalDispatched > 0) {
+              salesOrder.fulfillmentStatus = "Partially Dispatched";
+              salesOrder.status = "Partially Delivered";
+            }
+            await salesOrder.save().catch(() => {});
           }
-          await salesOrder.save();
+        }
+
+        // B. Update in legacy SalesOrder if present
+        const LegacySO = mongoose.models.SalesOrder;
+        if (LegacySO) {
+          const legacyOrder = await LegacySO.findOne(orderQuery);
+          if (legacyOrder && legacyOrder.items) {
+            let updatedLeg = false;
+            legacyOrder.items.forEach(soItem => {
+              const isMatch = (soItem.skuId && String(soItem.skuId) === String(sku._id)) ||
+                              (soItem.skuCode && soItem.skuCode === sku.skuCode) ||
+                              (item.skuCode && soItem.skuCode === item.skuCode) ||
+                              (soItem.itemName && soItem.itemName === item.itemName) ||
+                              (soItem.description && soItem.description === item.itemName);
+              if (isMatch) {
+                soItem.dispatchedQty = (Number(soItem.dispatchedQty) || 0) + (isSkuGbl ? finalQty : (qtyGbl || Math.ceil(finalQty / pcsPerGbl)));
+                updatedLeg = true;
+              }
+            });
+            if (updatedLeg) {
+              const totalOrdered = legacyOrder.items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
+              const totalDispatched = legacyOrder.items.reduce((s, i) => s + (Number(i.dispatchedQty) || 0), 0);
+              if (totalDispatched >= totalOrdered) {
+                legacyOrder.fulfillmentStatus = "Fulfilled";
+                legacyOrder.status = "Delivered";
+              } else if (totalDispatched > 0) {
+                legacyOrder.fulfillmentStatus = "Partially Dispatched";
+                legacyOrder.status = "Partially Delivered";
+              }
+              await legacyOrder.save().catch(() => {});
+            }
+          }
         }
       }
     }
@@ -398,9 +436,14 @@ async function reverseDispatchInventory(challan) {
 
 exports.getDeliveryChallans = async (req, res) => {
   try {
-    const { companyId } = req.query;
+    const companyId = req.query.companyId || req.query.company || req.user?.company;
     const filter = {};
-    if (companyId) filter.company = companyId;
+    if (companyId) {
+      const objId = toObjectId(companyId);
+      filter.$or = objId
+        ? [{ company: objId }, { company: String(companyId) }]
+        : [{ company: companyId }];
+    }
     if (req.query.status) filter.status = req.query.status;
 
     const challans = await DeliveryChallan.find(filter).sort({ createdAt: -1 });
@@ -433,19 +476,25 @@ exports.getNextNumber = async (req, res) => {
 
 exports.createDeliveryChallan = async (req, res) => {
   try {
+    const compId = req.body.company || req.query.companyId || req.user?.company;
+    const compObjId = toObjectId(compId);
     let dcNumber = req.body.dcNumber;
     if (!dcNumber || !dcNumber.trim() || dcNumber.startsWith("DO-TEMP-")) {
-      dcNumber = await getNextSequenceNumber("DO", req.body.company);
+      dcNumber = await getNextSequenceNumber("DO", compObjId || compId);
     } else {
-      const exists = await DeliveryChallan.findOne({ dcNumber, company: req.body.company });
+      const exists = await DeliveryChallan.findOne({ dcNumber, company: compObjId || compId });
       if (exists) {
-        dcNumber = await getNextSequenceNumber("DO", req.body.company);
+        dcNumber = await getNextSequenceNumber("DO", compObjId || compId);
       } else {
-        await syncSequenceNumber("DO", req.body.company, dcNumber);
+        await syncSequenceNumber("DO", compObjId || compId, dcNumber);
       }
     }
 
-    const payload = { ...req.body, dcNumber };
+    const payload = {
+      ...req.body,
+      company: compObjId || compId,
+      dcNumber
+    };
     if (!payload.date || !String(payload.date).trim()) {
       payload.date = new Date().toISOString().split("T")[0];
     }

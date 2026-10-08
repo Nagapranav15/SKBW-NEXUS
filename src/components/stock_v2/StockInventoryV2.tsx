@@ -874,11 +874,21 @@ export const StockInventoryV2: React.FC = () => {
   }, [selectedCompany?._id, loadAuxiliaryData]);
 
   // Real-time synchronization when any user updates stock, warehouse locations, orders, or invoices
-  useRealtimeSync(['inventory', 'warehouse_location', 'production_order', 'purchase_invoice'], () => {
+  useRealtimeSync(['inventory', 'warehouse_location', 'production_order', 'purchase_invoice', 'delivery_challan'], () => {
     if (selectedCompany?._id) {
       loadAuxiliaryData(false);
     }
   });
+
+  useEffect(() => {
+    const handleStockChanged = () => {
+      if (selectedCompany?._id) {
+        loadAuxiliaryData(false);
+      }
+    };
+    window.addEventListener('stock_balance_changed', handleStockChanged);
+    return () => window.removeEventListener('stock_balance_changed', handleStockChanged);
+  }, [selectedCompany?._id, loadAuxiliaryData]);
 
   // Lazy-load ledger entries on-demand when transfers or adjustments tab is clicked
   useEffect(() => {

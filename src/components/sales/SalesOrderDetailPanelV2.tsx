@@ -484,6 +484,8 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
       saveCustomSalesOrder(updatedOrder, compId);
       setLocalOrder(updatedOrder);
       if (onOrderUpdated) onOrderUpdated(updatedOrder);
+      window.dispatchEvent(new CustomEvent('stock_balance_changed'));
+      window.dispatchEvent(new CustomEvent('sales_order_updated'));
       showToast(`Delivery Challan created & Order ${activeOrder.orderNumber} marked as Dispatched!`, 'success');
     } catch (err: any) {
       showToast(err.message || 'Failed to dispatch order', 'error');

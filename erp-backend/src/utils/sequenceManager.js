@@ -69,11 +69,12 @@ function getEntityConfig(entityType) {
       break;
 
     case "TRX":
+    case "IL":
     case "InventoryLedger": {
       modelName = "InventoryLedger";
       queryField = "transactionNumber";
       const monthShort = new Date().toLocaleString("en-US", { month: "short" }).toUpperCase();
-      matchRegex = new RegExp(`^TRX-${monthShort}-([0-9]+)$`, "i");
+      matchRegex = new RegExp(`^(?:TRX|IL)-${monthShort}-([0-9]+)$`, "i");
       padLength = 3;
       formatCode = (seq) => `TRX-${monthShort}-${String(seq).padStart(Math.max(3, String(seq).length), "0")}`;
       break;
