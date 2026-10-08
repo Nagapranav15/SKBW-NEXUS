@@ -587,6 +587,9 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
         );
       }
 
+      const hasStock = (chosenLocStockGbl >= pendingGbl && pendingGbl > 0) ||
+                       (chosenLocStockPcs >= pendingPcs && pendingPcs > 0);
+
       return {
         key: item._id || `item-${idx}`,
         itemCode: item.skuCode || `FG-${String(idx + 1).padStart(3, '0')}`,
