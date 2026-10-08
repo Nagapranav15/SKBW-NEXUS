@@ -1249,8 +1249,9 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
       let grandTotalPendingGbl = 0;
 
       const orderRowsHtml = filteredCustomerOrders.map(order => {
-        const orderDateObj = order.orderDate ? new Date(order.orderDate) : today;
-        const diffDays = Math.max(0, Math.floor((today.getTime() - orderDateObj.getTime()) / (1000 * 60 * 60 * 24)));
+        const refDateStr = (order as any).dueDate || order.promisedDate || order.orderDate;
+        const refDateObj = refDateStr ? new Date(refDateStr) : today;
+        const diffDays = Math.max(0, Math.floor((today.getTime() - refDateObj.getTime()) / (1000 * 60 * 60 * 24)));
         const items = order.items || [];
         const totalPendingGbl = items.reduce((sum, item) => {
           const pcsPerGbl = item.pcsPerGbl || 100;
