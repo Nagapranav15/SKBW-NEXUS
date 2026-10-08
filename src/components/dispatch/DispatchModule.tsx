@@ -12,6 +12,7 @@ import { getSalesOrdersV2, SalesOrderV2, updateSalesOrderV2 } from '../../api/sa
 import { getCustomSalesOrders, saveCustomSalesOrder } from '../../utils/salesOrderStorage';
 import { getBalancesV2, getSkusV2 } from '../../api/mfgApiV2';
 import { getDeliveryChallans, deleteDeliveryChallan } from '../../api/deliveryChallanApi';
+import { getInvoices, deleteInvoice, deleteLocalInvoice } from '../../api/invoiceApi';
 import { CreateDispatchModal } from './CreateDispatchModal';
 import { ViewDeliveryChallanModal } from './ViewDeliveryChallanModal';
 import { DispatchOrderDetailModal } from './DispatchOrderDetailModal';
@@ -860,10 +861,35 @@ export const DispatchModule: React.FC = () => {
 
   const executeRevertChallan = async (challan: any) => {
     const dcNo = challan.dcNumber || 'this delivery challan';
+    const companyId = selectedCompany?._id;
+    const targetOrderId = challan.orderId || challan.orderNumber;
 
     try {
-      const companyId = selectedCompany?._id;
+      // 1. Delete linked Sales Tax Invoices for this challan or linked Sales Order
+      try {
+        const invoices = await getInvoices(companyId);
+        const linkedInvoices = invoices.filter(inv =>
+          (inv.dispatchNumber && inv.dispatchNumber === challan.dcNumber) ||
+          (inv.dispatchId && String(inv.dispatchId) === String(challan._id)) ||
+          (targetOrderId && targetOrderId !== 'DIRECT' && (
+            (inv.orderId && String(inv.orderId) === String(targetOrderId)) ||
+            (inv.orderNumber && inv.orderNumber === targetOrderId)
+          ))
+        );
 
+        for (const inv of linkedInvoices) {
+          if (inv._id) {
+            try {
+              await deleteInvoice(inv._id, companyId);
+            } catch (_) {}
+          }
+          deleteLocalInvoice(inv.invoiceNumber, companyId);
+        }
+      } catch (invErr) {
+        console.warn('Failed to clean up linked invoices:', invErr);
+      }
+
+      // 2. Delete backend Delivery Challan record
       if (challan._id) {
         try {
           await deleteDeliveryChallan(challan._id);
@@ -872,8 +898,7 @@ export const DispatchModule: React.FC = () => {
         }
       }
 
-      // Revert sales order dispatched quantities if linked to an SO
-      const targetOrderId = challan.orderId || challan.orderNumber;
+      // 3. Revert sales order dispatched quantities and status back to Pending
       if (targetOrderId && targetOrderId !== 'DIRECT') {
         const targetSO = salesOrders.find(o => o._id === targetOrderId || o.orderNumber === targetOrderId);
         if (targetSO) {
@@ -888,7 +913,7 @@ export const DispatchModule: React.FC = () => {
               const revertedQty = Math.max(0, (Number(soItem.dispatchedQty) || 0) - delivered);
               return { ...soItem, dispatchedQty: revertedQty };
             }
-            return soItem;
+            return { ...soItem, dispatchedQty: 0 };
           });
 
           const allPending = updatedItems.every(i => (Number(i.dispatchedQty) || 0) === 0);
@@ -907,7 +932,7 @@ export const DispatchModule: React.FC = () => {
         }
       }
 
-      // Update state and localStorage
+      // 4. Update local delivery challans state and localStorage
       setDeliveryChallansList(prev => prev.filter(c => c._id !== challan._id && c.dcNumber !== challan.dcNumber));
       const cKey = `skbw_delivery_challans_${companyId || 'default'}`;
       const stored = JSON.parse(localStorage.getItem(cKey) || '[]');
@@ -920,10 +945,13 @@ export const DispatchModule: React.FC = () => {
         setActiveChallan(null);
       }
 
+      // Broadcast events to sync across modules
+      window.dispatchEvent(new CustomEvent('invoice_created'));
+      window.dispatchEvent(new CustomEvent('delivery_challan_created'));
       window.dispatchEvent(new CustomEvent('stock_balance_changed'));
       window.dispatchEvent(new CustomEvent('sales_order_updated'));
       window.dispatchEvent(new CustomEvent('inventory_updated'));
-      showToast(`Delivery Challan ${dcNo} reverted successfully! Stock restored and Sales Order returned to Pending.`, 'success');
+      showToast(`Delivery Challan ${dcNo} reverted! Stock restored, linked invoices deleted, and Sales Order sent to Pending.`, 'success');
       fetchData(false);
     } catch (err) {
       console.error('Failed to revert delivery challan:', err);
