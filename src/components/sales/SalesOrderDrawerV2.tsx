@@ -2641,23 +2641,26 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0">
-                                      {/* Dynamic Costing directly to the left of Active tag */}
-                                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100/90 border border-slate-200/80 text-right">
-                                        <div className="flex items-baseline gap-0.5">
-                                          <span className="text-[11px] font-black text-slate-800 tracking-tight">{costing.formattedGbl}</span>
-                                          <span className="text-[8.5px] font-bold text-slate-500">/GBL</span>
+                                      {/* Sweet Dynamic Costing Pill */}
+                                      <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gradient-to-r from-slate-50 via-indigo-50/40 to-purple-50/40 border border-indigo-100/90 shadow-xs">
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-[11.5px] font-black text-slate-800 tracking-tight font-mono">{costing.formattedGbl}</span>
+                                          <span className="text-[8px] font-black uppercase px-1 py-0.5 rounded bg-indigo-100/90 text-indigo-700 tracking-wider">GBL</span>
                                         </div>
-                                        <span className="text-slate-300 text-[10px]">•</span>
-                                        <div className="flex items-baseline gap-0.5">
-                                          <span className="text-[10.5px] font-bold text-slate-600 tracking-tight">{costing.formattedPcs}</span>
-                                          <span className="text-[8px] font-medium text-slate-400">/Pcs</span>
+                                        <span className="text-indigo-200 text-[10px]">•</span>
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-[11px] font-bold text-slate-600 tracking-tight font-mono">{costing.formattedPcs}</span>
+                                          <span className="text-[8px] font-bold uppercase px-1 py-0.5 rounded bg-slate-200/80 text-slate-600 tracking-wider">Pcs</span>
                                         </div>
                                       </div>
-                                      <span className={`px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border ${
+
+                                      {/* Cute Active / Inactive Badge with glowing dot */}
+                                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[9.5px] font-extrabold uppercase rounded-lg border shadow-xs transition-all ${
                                         isInactive
-                                          ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                          ? 'bg-gradient-to-r from-amber-50 to-orange-50 text-amber-800 border-amber-200/90'
+                                          : 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-800 border-emerald-200/90'
                                       }`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${isInactive ? 'bg-amber-500' : 'bg-emerald-500 ring-2 ring-emerald-300/60'}`} />
                                         {s.status || 'Active'}
                                       </span>
                                     </div>
@@ -3648,19 +3651,26 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                         </div>
                                       </div>
                                       <div className="flex items-center gap-1.5 shrink-0">
-                                        {/* Dynamic Costing directly to the left of Active tag */}
-                                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-right">
-                                          <span className="text-[9.5px] font-bold text-slate-800">
-                                            {costing.formattedGbl}<span className="text-[8px] text-slate-500 font-normal">/GBL</span>
-                                          </span>
-                                          <span className="text-slate-300 text-[8.5px]">•</span>
-                                          <span className="text-[9px] font-semibold text-slate-600">
-                                            {costing.formattedPcs}<span className="text-[7.5px] text-slate-400 font-normal">/Pcs</span>
-                                          </span>
+                                        {/* Sweet Dynamic Costing Pill */}
+                                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gradient-to-r from-slate-50 via-indigo-50/40 to-purple-50/40 border border-indigo-100/90 shadow-xs">
+                                          <div className="flex items-center gap-0.5">
+                                            <span className="text-[10px] font-black text-slate-800 tracking-tight font-mono">{costing.formattedGbl}</span>
+                                            <span className="text-[7.5px] font-black uppercase px-0.8 py-0.2 rounded bg-indigo-100/90 text-indigo-700 tracking-wide">GBL</span>
+                                          </div>
+                                          <span className="text-indigo-200 text-[8px]">•</span>
+                                          <div className="flex items-center gap-0.5">
+                                            <span className="text-[9.5px] font-bold text-slate-600 tracking-tight font-mono">{costing.formattedPcs}</span>
+                                            <span className="text-[7.5px] font-bold uppercase px-0.8 py-0.2 rounded bg-slate-200/80 text-slate-600 tracking-wide">Pcs</span>
+                                          </div>
                                         </div>
-                                        <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-bold uppercase shrink-0 border ${
-                                          isInactive ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+
+                                        {/* Cute Active / Inactive Badge with glowing dot */}
+                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8.5px] font-extrabold uppercase shrink-0 border shadow-xs ${
+                                          isInactive 
+                                            ? 'bg-gradient-to-r from-amber-50 to-orange-50 text-amber-800 border-amber-200/90' 
+                                            : 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-800 border-emerald-200/90'
                                         }`}>
+                                          <span className={`w-1.5 h-1.5 rounded-full ${isInactive ? 'bg-amber-500' : 'bg-emerald-500 ring-2 ring-emerald-300/60'}`} />
                                           {s.status || 'Active'}
                                         </span>
                                       </div>
