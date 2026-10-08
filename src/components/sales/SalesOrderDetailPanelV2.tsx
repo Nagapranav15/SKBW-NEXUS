@@ -1008,164 +1008,160 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
           )}
 
           {/* ── ROW 1: Three info cards ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
 
             {/* Card 1: Customer Details */}
-            <div className="border border-gray-200 rounded-xl p-4 bg-white">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
-                  <User className="w-3.5 h-3.5 text-blue-600" />
-                  Customer Details
-                </div>
-              </div>
-
-              <div className="space-y-2.5">
-                <div>
-                  <div className="text-[10px] text-gray-400 font-medium mb-0.5">Customer Name</div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-black text-gray-900 text-sm">{activeOrder.customerName}</span>
-                    <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-[10px] font-bold">
-                      {activeOrder.orderType || 'Credit'}
-                    </span>
-                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[10px] font-bold">
-                      {customerGroup}
-                    </span>
+            <div className="border border-slate-200/90 rounded-2xl p-4 bg-white shadow-3xs flex flex-col justify-between hover:border-slate-300 transition-all">
+              <div>
+                <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                    <div className="w-6 h-6 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                      <User className="w-3.5 h-3.5" />
+                    </div>
+                    Customer Details
                   </div>
+                  <span className="px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200/80 rounded-full text-[10px] font-bold">
+                    {customerGroup}
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 py-2 border-y border-gray-100">
+                <div className="space-y-2.5">
                   <div>
-                    <div className="text-[10px] text-gray-400">Credit Limit</div>
-                    <div className="font-bold text-gray-800">{creditLimitVal}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-gray-400">Outstanding</div>
-                    <div className="font-bold text-rose-700">{outstandingVal}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-gray-400">Last Order</div>
-                    <div className="font-bold text-gray-800">{lastOrderVal}</div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-[10px] text-gray-400 mb-0.5">Mobile / WhatsApp</div>
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-3 h-3 text-gray-400" />
-                    <span className="font-bold text-gray-900">{activeOrder.customerPhone || custObj?.phone || custObj?.mobile || '—'}</span>
-                    {(activeOrder.customerPhone || custObj?.phone) && (
-                      <button onClick={handleWhatsApp} title="Open WhatsApp" className="cursor-pointer">
-                        <WhatsAppIcon className="w-4 h-4 text-emerald-500 hover:text-emerald-600" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {billingAddrStr !== '—' && (
-                  <div>
-                    <div className="text-[10px] text-gray-400 mb-0.5">Address</div>
-                    <div className="flex items-start gap-1.5">
-                      <MapPin className="w-3 h-3 text-gray-400 mt-0.5 shrink-0" />
-                      <span className="text-gray-700 leading-snug">{billingAddrStr}</span>
+                    <div className="text-[9.5px] uppercase font-bold tracking-wider text-slate-400 mb-0.5">Customer Name</div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-black text-slate-900 text-sm">{activeOrder.customerName || '—'}</span>
+                      <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-full text-[10px] font-bold">
+                        {activeOrder.orderType || 'Credit'}
+                      </span>
                     </div>
                   </div>
-                )}
+
+                  <div className="grid grid-cols-3 gap-1.5 py-2 px-2.5 bg-slate-50/80 rounded-xl border border-slate-150/70">
+                    <div>
+                      <div className="text-[9.5px] uppercase font-bold text-slate-400">Credit Limit</div>
+                      <div className="font-bold text-slate-800 text-[11px] mt-0.5">{creditLimitVal}</div>
+                    </div>
+                    <div>
+                      <div className="text-[9.5px] uppercase font-bold text-slate-400">Outstanding</div>
+                      <div className="font-bold text-rose-600 text-[11px] mt-0.5">{outstandingVal}</div>
+                    </div>
+                    <div>
+                      <div className="text-[9.5px] uppercase font-bold text-slate-400">Last Order</div>
+                      <div className="font-bold text-slate-800 text-[11px] mt-0.5">{lastOrderVal}</div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[9.5px] uppercase font-bold text-slate-400 mb-0.5">Mobile / WhatsApp</div>
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="font-bold text-slate-900 text-[11px]">{activeOrder.customerPhone || custObj?.phone || custObj?.mobile || '—'}</span>
+                      {(activeOrder.customerPhone || custObj?.phone) && (
+                        <button onClick={handleWhatsApp} title="Open WhatsApp" className="cursor-pointer hover:scale-105 transition-transform">
+                          <WhatsAppIcon className="w-4 h-4 text-emerald-500 hover:text-emerald-600" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {billingAddrStr !== '—' && (
+                    <div>
+                      <div className="text-[9.5px] uppercase font-bold text-slate-400 mb-0.5">Address</div>
+                      <div className="flex items-start gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+                        <span className="text-slate-700 leading-snug text-[11px]">{billingAddrStr}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Card 2: Order Information */}
-            <div className="border border-gray-200 rounded-xl p-4 bg-white">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800 mb-3">
-                <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                Order Information
-              </div>
-
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
-                    <Calendar className="w-3 h-3" /> Order Date
-                  </div>
-                  <div className="flex items-center gap-1.5 font-bold text-gray-900 text-[11px]">
-                    {fmtDate(activeOrder.orderDate)}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
-                    <Calendar className="w-3 h-3" /> Expected Delivery Date
-                  </div>
-                  <div className="flex items-center gap-1.5 font-bold text-gray-900 text-[11px]">
-                    {activeOrder.promisedDate ? fmtDate(activeOrder.promisedDate) : 'Not specified'}
-                  </div>
-                </div>
-
-                <div className="pt-1 border-t border-gray-100 grid grid-cols-2 gap-x-4 gap-y-2.5">
-                  <div>
-                    <div className="text-[10px] text-gray-400">Customer PO No.</div>
-                    <div className="font-bold text-gray-800 mt-0.5">{activeOrder.customerPoNumber || '—'}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-gray-400">Transporter</div>
-                    <div className="flex items-center gap-1 font-bold text-gray-800 mt-0.5">
-                      <Truck className="w-3 h-3 text-gray-400" />
-                      <span className="truncate">{activeOrder.transporter || '—'}</span>
+            <div className="border border-slate-200/90 rounded-2xl p-4 bg-white shadow-3xs flex flex-col justify-between hover:border-slate-300 transition-all">
+              <div>
+                <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                    <div className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                      <Calendar className="w-3.5 h-3.5" />
                     </div>
+                    Order Information
                   </div>
-                  <div>
-                    <div className="text-[10px] text-gray-400">Order Type</div>
-                    <div className="font-bold text-gray-800 mt-0.5">{activeOrder.orderType || 'Credit'}</div>
+                  <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${statusBadge(activeOrder.status)}`}>
+                    {activeOrder.status}
+                  </span>
+                </div>
+
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500 font-medium">Order Date:</span>
+                    <span className="font-bold text-slate-900">{fmtDate(activeOrder.orderDate)}</span>
                   </div>
-                  <div>
-                    <div className="text-[10px] text-gray-400">Order Status</div>
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border mt-0.5 ${statusBadge(activeOrder.status)}`}>
-                      {activeOrder.status}
-                    </span>
+
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500 font-medium">Expected Delivery:</span>
+                    <span className="font-bold text-slate-900">{activeOrder.promisedDate ? fmtDate(activeOrder.promisedDate) : 'Not specified'}</span>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-2">
+                    <div className="p-2 bg-slate-50/80 rounded-lg border border-slate-150/70">
+                      <div className="text-[9.5px] uppercase font-bold text-slate-400">PO Number</div>
+                      <div className="font-bold text-slate-800 text-[11px] truncate mt-0.5">{activeOrder.customerPoNumber || '—'}</div>
+                    </div>
+                    <div className="p-2 bg-slate-50/80 rounded-lg border border-slate-150/70">
+                      <div className="text-[9.5px] uppercase font-bold text-slate-400">Transporter</div>
+                      <div className="flex items-center gap-1 font-bold text-slate-800 text-[11px] truncate mt-0.5">
+                        <Truck className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="truncate">{activeOrder.transporter || '—'}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Card 3: Delivery & Billing Address */}
-            <div className="border border-gray-200 rounded-xl p-4 bg-white">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
-                  <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                  Delivery &amp; Billing Address
+            <div className="border border-slate-200/90 rounded-2xl p-4 bg-white shadow-3xs flex flex-col justify-between hover:border-slate-300 transition-all">
+              <div>
+                <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                    <div className="w-6 h-6 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                      <MapPin className="w-3.5 h-3.5" />
+                    </div>
+                    Delivery &amp; Billing Address
+                  </div>
+                  <button onClick={() => onEdit(activeOrder)} className="flex items-center gap-1 text-[11px] text-blue-600 font-bold hover:text-blue-700 cursor-pointer">
+                    <Edit className="w-3 h-3" /> Edit
+                  </button>
                 </div>
-                <button onClick={() => onEdit(activeOrder)} className="flex items-center gap-1 text-[11px] text-blue-600 font-bold hover:text-blue-700 cursor-pointer">
-                  <Edit className="w-3 h-3" /> Edit
-                </button>
+
+                {/* Address Tabs */}
+                <div className="flex rounded-lg bg-slate-100/90 p-0.5 mb-2.5 text-[11px]">
+                  <button
+                    onClick={() => setAddressTab('billing')}
+                    className={`flex-1 py-1 rounded-md font-bold transition-all cursor-pointer ${addressTab === 'billing' ? 'bg-white shadow-xs text-blue-700' : 'text-slate-500 hover:text-slate-800'}`}
+                  >
+                    Billing Address
+                  </button>
+                  <button
+                    onClick={() => setAddressTab('delivery')}
+                    className={`flex-1 py-1 rounded-md font-bold transition-all cursor-pointer ${addressTab === 'delivery' ? 'bg-white shadow-xs text-blue-700' : 'text-slate-500 hover:text-slate-800'}`}
+                  >
+                    Delivery Address
+                  </button>
+                </div>
+
+                <div className="space-y-1 text-[11px]">
+                  <div className="font-bold text-slate-900">
+                    {addressTab === 'billing' ? (ba?.attention || activeOrder.customerName) : (sa?.attention || activeOrder.customerName)}
+                  </div>
+                  <div className="text-slate-600 leading-relaxed text-[11px]">
+                    {addressTab === 'billing' ? billingAddrStr : deliveryAddrStr}
+                  </div>
+                </div>
               </div>
 
-              {/* Address Tabs */}
-              <div className="flex rounded-lg bg-gray-100 p-0.5 mb-3 text-[11px]">
-                <button
-                  onClick={() => setAddressTab('billing')}
-                  className={`flex-1 py-1 rounded-md font-bold transition-all cursor-pointer ${addressTab === 'billing' ? 'bg-white shadow-sm text-blue-700' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  Billing Address
-                </button>
-                <button
-                  onClick={() => setAddressTab('delivery')}
-                  className={`flex-1 py-1 rounded-md font-bold transition-all cursor-pointer ${addressTab === 'delivery' ? 'bg-white shadow-sm text-blue-700' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  Delivery Address
-                </button>
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="font-bold text-gray-900">
-                  {addressTab === 'billing' ? (ba?.attention || activeOrder.customerName) : (sa?.attention || activeOrder.customerName)}
-                </div>
-                <div className="text-gray-600 leading-relaxed">
-                  {addressTab === 'billing' ? billingAddrStr : deliveryAddrStr}
-                </div>
-                <div className="text-gray-600">
-                  Mobile: {addressTab === 'billing' ? (ba?.phone || activeOrder.customerPhone || '—') : (sa?.phone || activeOrder.customerPhone || '—')}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-gray-100 text-[10.5px]">
+              <div className="flex items-center gap-1.5 mt-2.5 pt-2 border-t border-slate-100 text-[10.5px]">
                 {sameAddr ? (
                   <span className="text-emerald-700 flex items-center gap-1 font-medium">
                     <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
@@ -1182,14 +1178,14 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
           </div>
 
           {/* ── ORDER ITEMS TABLE ── */}
-          <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
+          <div className="border border-slate-200/90 rounded-2xl bg-white overflow-hidden shadow-3xs">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-150">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
                 <Package className="w-3.5 h-3.5 text-blue-600" />
                 Order Items ({(activeOrder.items || []).length})
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => onEdit(activeOrder)} className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold cursor-pointer transition-all">
+                <button onClick={() => onEdit(activeOrder)} className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold cursor-pointer transition-all shadow-xs">
                   <Plus className="w-3 h-3" /> Add Product
                 </button>
               </div>
@@ -1197,10 +1193,10 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
 
             <div className="overflow-x-auto">
               <table className="w-full text-[11px] text-left">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr className="text-gray-500 font-bold uppercase tracking-wide text-[10px]">
+                <thead className="bg-slate-50/90 border-b border-slate-200">
+                  <tr className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">
                     <th className="px-3 py-2.5 text-center w-8 whitespace-nowrap">#</th>
-                    <th className="px-3 py-2.5 min-w-[180px] whitespace-nowrap text-left">Item / Product</th>
+                    <th className="px-3 py-2.5 min-w-[280px] whitespace-nowrap text-left">Item / Product</th>
                     <th className="px-3 py-2.5 text-center whitespace-nowrap">Stock (GBL)</th>
                     <th className="px-3 py-2.5 text-center whitespace-nowrap">GBL *</th>
                     <th className="px-3 py-2.5 text-center whitespace-nowrap">Pcs / GBL</th>
@@ -1214,7 +1210,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                     <th className="px-3 py-2.5 text-center whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-slate-100">
                   {(activeOrder.items || []).map((item, idx) => {
                     const dispatched = item.dispatchedQty || 0;
                     const pending = Math.max(0, item.quantity - dispatched);
@@ -1241,24 +1237,29 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
 
                     const itemStatusColor = itemStatus === 'Fulfilled' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : itemStatus === 'Partial' ? 'bg-amber-50 text-amber-700 border-amber-200'
-                      : 'bg-gray-100 text-gray-600 border-gray-200';
+                      : 'bg-slate-100 text-slate-600 border-slate-200';
 
                     const { ratePerPcs, totalAmount, hasMasterMatch } = resolveItemPricing(item);
                     const looseComps = resolveItemComponents(item, activeOrder);
 
                     return (
                       <tr key={idx} className="hover:bg-blue-50/20 transition-colors">
-                        <td className="px-3 py-2.5 text-center text-gray-500 font-bold">{idx + 1}</td>
-                        <td className="px-3 py-2.5">
-                          <div className="font-bold text-gray-900">{item.itemName}</div>
-                          <div className="text-[10px] text-gray-400 font-mono">{item.skuCode}</div>
+                        <td className="px-3 py-3 text-center align-top text-slate-500 font-bold">{idx + 1}</td>
+                        <td className="px-3 py-3 align-top min-w-[280px]">
+                          <div className="font-bold text-slate-900 text-xs">{item.itemName}</div>
+                          <div className="text-[10.5px] text-slate-400 font-mono mt-0.5">{item.skuCode}</div>
                           {looseComps && looseComps.length > 0 && (
-                            <div className="mt-1.5 p-2 bg-indigo-50/70 rounded-lg border border-indigo-100 text-[11px] space-y-1">
-                              <span className="font-bold text-indigo-900 flex items-center gap-1 text-[10px] uppercase">
-                                <Layers className="w-3 h-3 text-indigo-600" />
-                                <span>Loose Books / Mixed Stock Breakdown ({looseComps.length} items):</span>
-                              </span>
-                              <div className="space-y-0.5 pl-1.5 border-l-2 border-indigo-300">
+                            <div className="mt-2.5 p-2.5 bg-gradient-to-br from-indigo-50/80 via-slate-50 to-purple-50/50 rounded-xl border border-indigo-100/90 text-[11px] shadow-3xs space-y-1.5 w-full min-w-[250px]">
+                              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-indigo-950 pb-1 border-b border-indigo-100/80">
+                                <span className="flex items-center gap-1.5">
+                                  <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                                  <span>Loose Stock Breakdown</span>
+                                </span>
+                                <span className="px-1.5 py-0.5 rounded bg-indigo-100/80 text-indigo-800 text-[9.5px]">
+                                  {looseComps.length} Items
+                                </span>
+                              </div>
+                              <div className="space-y-1">
                                 {looseComps.map((comp: any, cIdx: number) => {
                                   const compName = comp.name || comp.itemName || comp.skuCode || `Item ${cIdx + 1}`;
                                   const compQty = comp.quantity || comp.pcs || 0;
@@ -1268,13 +1269,20 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                                   const compRatePerPcs = compMasterRate > 0 && compPcsPerGbl > 1 && compMasterRate > compPcsPerGbl / 2 ? compMasterRate / compPcsPerGbl : compMasterRate;
 
                                   return (
-                                    <div key={comp.componentId || cIdx} className="flex items-center justify-between text-gray-700">
-                                      <span className="font-medium">
+                                    <div key={comp.componentId || cIdx} className="flex items-center justify-between gap-2 text-slate-700 bg-white/80 p-1.5 rounded-lg border border-slate-100">
+                                      <span className="font-semibold text-slate-800 text-[10.5px] truncate">
                                         • {compName}
                                       </span>
-                                      <span className="font-mono text-gray-600 text-[10px]">
-                                        {compQty} pcs {compGbl ? `(${compGbl} GBL)` : ''} {compRatePerPcs > 0 ? `× ₹${compRatePerPcs.toFixed(2)}/pc` : ''}
-                                      </span>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className="font-mono text-slate-600 text-[10px]">
+                                          {compQty} pcs {compGbl ? `(${compGbl} GBL)` : ''}
+                                        </span>
+                                        {compRatePerPcs > 0 && (
+                                          <span className="font-mono text-indigo-700 font-bold text-[10px] bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                                            ₹{compRatePerPcs.toFixed(2)}/pc
+                                          </span>
+                                        )}
+                                      </div>
                                     </div>
                                   );
                                 })}
@@ -1282,31 +1290,31 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                             </div>
                           )}
                         </td>
-                        <td className="px-3 py-2.5 text-center">
-                          <span className={`font-bold font-mono ${realStockGbl > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
+                        <td className="px-3 py-3 text-center align-top">
+                          <span className={`font-bold font-mono ${realStockGbl > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
                             {realStockGbl}
                           </span>
                         </td>
-                        <td className="px-3 py-2.5 text-center font-bold font-mono text-gray-900">{gbl || '—'}</td>
-                        <td className="px-3 py-2.5 text-center font-mono text-gray-700">{pcsPerGbl || '—'}</td>
-                        <td className="px-3 py-2.5 text-center font-black font-mono text-gray-900">{item.quantity.toLocaleString('en-IN')}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-gray-800">
+                        <td className="px-3 py-3 text-center align-top font-bold font-mono text-slate-900">{gbl || '—'}</td>
+                        <td className="px-3 py-3 text-center align-top font-mono text-slate-700">{pcsPerGbl || '—'}</td>
+                        <td className="px-3 py-3 text-center align-top font-black font-mono text-slate-900">{item.quantity.toLocaleString('en-IN')}</td>
+                        <td className="px-3 py-3 text-right align-top font-mono text-slate-800">
                           {ratePerPcs > 0 ? `₹${ratePerPcs.toFixed(2)}` : (hasMasterMatch ? '₹0.00' : '—')}
                         </td>
-                        <td className="px-3 py-2.5 text-right font-bold font-mono text-gray-900">
+                        <td className="px-3 py-3 text-right align-top font-bold font-mono text-slate-900">
                           {totalAmount > 0 ? `₹${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : (hasMasterMatch ? '₹0.00' : '—')}
                         </td>
-                        <td className="px-3 py-2.5 text-center">
-                          <span className="font-bold text-gray-700 font-mono">{(item as any).producedQty || 0}</span>
+                        <td className="px-3 py-3 text-center align-top">
+                          <span className="font-bold text-slate-700 font-mono">{(item as any).producedQty || 0}</span>
                         </td>
-                        <td className="px-3 py-2.5 text-center font-mono text-gray-700">{dispatched}</td>
-                        <td className="px-3 py-2.5 text-center">
+                        <td className="px-3 py-3 text-center align-top font-mono text-slate-700">{dispatched}</td>
+                        <td className="px-3 py-3 text-center align-top">
                           <span className={`font-bold font-mono ${pending > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{pending}</span>
                         </td>
-                        <td className="px-3 py-2.5 text-center">
+                        <td className="px-3 py-3 text-center align-top">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${itemStatusColor}`}>{itemStatus}</span>
                         </td>
-                        <td className="px-3 py-2.5 text-center">
+                        <td className="px-3 py-3 text-center align-top">
                           <div className="flex items-center justify-center gap-1.5">
                             <button onClick={() => onEdit(activeOrder)} className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded cursor-pointer transition-all" title="Edit">
                               <Edit className="w-3.5 h-3.5" />
