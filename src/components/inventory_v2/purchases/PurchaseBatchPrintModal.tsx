@@ -2,8 +2,7 @@ import React, { useRef } from 'react';
 import { X, Printer, Ban, CheckCircle, Clock, Building2, MapPin } from 'lucide-react';
 import { PurchaseInvoiceV2 } from './purchaseService';
 import { SkuV2, WarehouseLocationV2 } from '../../../api/mfgApiV2';
-import UniversalPrintVoucherModal from '../../ui/UniversalPrintVoucherModal';
-import { getItemMetrics } from './PurchaseInvoicePage';
+import { getItemMetrics } from './purchaseMetrics';
 
 interface PurchaseBatchPrintModalProps {
   invoice: PurchaseInvoiceV2 | null;

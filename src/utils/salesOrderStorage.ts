@@ -2,6 +2,30 @@ import { SalesOrderV2 } from '../api/salesOrderApiV2';
 
 const LEGACY_STORAGE_KEY = 'skbw_custom_sales_orders_v2';
 
+// Safe string converter to prevent 'Cannot convert object to primitive value'
+const toSafeString = (val: any): string => {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (typeof val === 'object') {
+    if (val._id) return toSafeString(val._id);
+    if (val.id) return toSafeString(val.id);
+    if (val.name) return toSafeString(val.name);
+    try {
+      if (typeof val.toString === 'function') {
+        const str = val.toString();
+        if (str !== '[object Object]') return str;
+      }
+    } catch {}
+    try {
+      return JSON.stringify(val);
+    } catch {
+      return '';
+    }
+  }
+  return '';
+};
+
 export const getCustomSalesOrders = (companyId?: string): SalesOrderV2[] => {
   try {
     if (!companyId) return [];
@@ -16,7 +40,7 @@ export const getCustomSalesOrders = (companyId?: string): SalesOrderV2[] => {
           // Group legacy orders by their company
           const byComp: Record<string, SalesOrderV2[]> = {};
           legacyList.forEach((o: any) => {
-            const cId = String(o.company?._id || o.company || '');
+            const cId = toSafeString(o.company?._id || o.company);
             if (cId) {
               if (!byComp[cId]) byComp[cId] = [];
               byComp[cId].push(o);
@@ -50,8 +74,8 @@ export const getCustomSalesOrders = (companyId?: string): SalesOrderV2[] => {
 
     // Strictly ensure no foreign company order leaks
     return parsed.filter((o: any) => {
-      const cId = String(o.company?._id || o.company || '');
-      return !cId || cId === String(companyId);
+      const cId = toSafeString(o.company?._id || o.company);
+      return !cId || cId === toSafeString(companyId);
     });
   } catch (err) {
     console.warn('Failed to read custom sales orders from localStorage:', err);
@@ -62,7 +86,7 @@ export const getCustomSalesOrders = (companyId?: string): SalesOrderV2[] => {
 export const saveCustomSalesOrder = (order: SalesOrderV2, targetCompanyId?: string): void => {
   try {
     if (!order) return;
-    const companyId = targetCompanyId || String((order as any).company?._id || (order as any).company || '');
+    const companyId = targetCompanyId || toSafeString((order as any).company?._id || (order as any).company);
     if (!companyId) return;
 
     const scopedKey = `skbw_custom_sales_orders_v2_${companyId}`;
@@ -82,7 +106,7 @@ export const saveCustomSalesOrder = (order: SalesOrderV2, targetCompanyId?: stri
       updated = [...existing, orderWithCompany];
     }
 
-    updated.sort((a, b) => (String(b.orderNumber || '')).localeCompare(String(a.orderNumber || ''), undefined, { numeric: true, sensitivity: 'base' }));
+    updated.sort((a, b) => (toSafeString(b.orderNumber)).localeCompare(toSafeString(a.orderNumber), undefined, { numeric: true, sensitivity: 'base' }));
 
     localStorage.setItem(scopedKey, JSON.stringify(updated));
   } catch (err) {

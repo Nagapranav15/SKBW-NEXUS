@@ -19,7 +19,7 @@ export type SortField = 'dispatchNo' | 'dispatchDate' | 'customerName' | 'region
 export type InvoiceSortField = 'invoiceNumber' | 'invoiceDate' | 'dispatchNumber' | 'customerName' | 'region' | 'itemCount' | 'subtotal' | 'grandTotal' | 'status';
 
 // Safe string converter to prevent 'Cannot convert object to primitive value'
-export const toSafeString = (val: any): string => {
+const toSafeString = (val: any): string => {
   if (val === null || val === undefined) return '';
   if (typeof val === 'string') return val;
   if (typeof val === 'number' || typeof val === 'boolean') return String(val);
@@ -43,7 +43,7 @@ export const toSafeString = (val: any): string => {
   return '';
 };
 
-export const getSafeText = (val: any, fallback = ''): string => {
+const getSafeText = (val: any, fallback = ''): string => {
   if (val === null || val === undefined) return fallback;
   if (typeof val === 'string') return val.trim() || fallback;
   if (typeof val === 'number') return String(val);
@@ -1551,3 +1551,6 @@ export const InvoicesModule: React.FC = () => {
     </div>
   );
 };
+
+export default InvoicesModule;
+

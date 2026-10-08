@@ -18,7 +18,7 @@ import { DispatchOrderDetailModal } from './DispatchOrderDetailModal';
 import { showToast } from '../ui/Toast';
 
 // Safe string converter to prevent 'Cannot convert object to primitive value'
-export const toSafeString = (val: any): string => {
+const toSafeString = (val: any): string => {
   if (val === null || val === undefined) return '';
   if (typeof val === 'string') return val;
   if (typeof val === 'number' || typeof val === 'boolean') return String(val);

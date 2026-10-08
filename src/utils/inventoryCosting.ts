@@ -1,6 +1,31 @@
 import { getSkusV2, getBalancesV2, getPurchaseInvoicesV2, SkuV2 } from '../api/mfgApiV2';
 import { getProductionOrders } from '../api/productionApi';
 
+// Safe string converter to prevent 'Cannot convert object to primitive value'
+const toSafeString = (val: any): string => {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (typeof val === 'object') {
+    if (val._id) return toSafeString(val._id);
+    if (val.id) return toSafeString(val.id);
+    if (val.name) return toSafeString(val.name);
+    if (val.skuCode) return toSafeString(val.skuCode);
+    try {
+      if (typeof val.toString === 'function') {
+        const str = val.toString();
+        if (str !== '[object Object]') return str;
+      }
+    } catch {}
+    try {
+      return JSON.stringify(val);
+    } catch {
+      return '';
+    }
+  }
+  return '';
+};
+
 export interface ComponentCostingResult {
   rate: number;
   availableStock: number;
@@ -42,7 +67,7 @@ export const fetchStockCostings = async (companyId: string): Promise<StockCostin
     // 1. Process SKUs
     const skus: SkuV2[] = skusRes.status === 'fulfilled' && Array.isArray(skusRes.value) ? skusRes.value : [];
     skus.forEach(s => {
-      const sId = String(s._id || '');
+      const sId = toSafeString(s._id);
       const sCode = (s.skuCode || '').trim().toLowerCase();
       const sName = (s.name || '').trim().toLowerCase();
 
@@ -82,7 +107,7 @@ export const fetchStockCostings = async (companyId: string): Promise<StockCostin
       const liveOnHandMap = new Map<string, number>();
       balancesRes.value.forEach((b: any) => {
         const rawId = b.skuId?._id || b.skuId;
-        const sId = rawId ? String(rawId) : '';
+        const sId = toSafeString(rawId);
         const qty = Number(b.onHand) || 0;
         if (sId) {
           liveOnHandMap.set(sId, (liveOnHandMap.get(sId) || 0) + qty);
@@ -109,7 +134,7 @@ export const fetchStockCostings = async (companyId: string): Promise<StockCostin
         if (inv.status === 'Cancelled') return;
         (inv.items || []).forEach((item: any) => {
           const rawId = item.skuId?._id || item.skuId;
-          const sId = rawId ? String(rawId) : '';
+          const sId = toSafeString(rawId);
           const qty = Number(item.quantity) || 0;
           const price = Number(item.purchasePrice || item.rate || item.price || item.ratePerKg || 0);
 
@@ -146,7 +171,7 @@ export const fetchStockCostings = async (companyId: string): Promise<StockCostin
       prodOrders.forEach((po: any) => {
         if (po.status === 'Cancelled') return;
         const rawId = po.itemId?._id || po.itemId;
-        const sId = rawId ? String(rawId) : '';
+        const sId = toSafeString(rawId);
         const sCode = (po.itemCode || '').trim().toLowerCase();
         const sName = (po.itemName || '').trim().toLowerCase();
 
@@ -208,7 +233,7 @@ export const resolveComponentCosting = (
     };
   }
 
-  const sId = component.skuId ? String(component.skuId) : '';
+  const sId = toSafeString(component.skuId);
   const sCode = (component.skuCode || component.code || '').trim().toLowerCase();
   const sName = (component.name || component.component || '').trim().toLowerCase();
 
@@ -223,7 +248,7 @@ export const resolveComponentCosting = (
 
   const rateInfo = (sId && costings.ratesMap.get(sId)) ||
     (sCode && costings.ratesMap.get(sCode)) ||
-    (matchedSku?._id && costings.ratesMap.get(String(matchedSku._id))) ||
+    (matchedSku?._id && costings.ratesMap.get(toSafeString(matchedSku._id))) ||
     (matchedSku?.skuCode && costings.ratesMap.get(matchedSku.skuCode.trim().toLowerCase()));
 
   if (rateInfo && rateInfo.rate > 0) {
@@ -253,7 +278,7 @@ export const resolveComponentCosting = (
   let resolvedStock = fallbackStock;
   const liveStockVal = (sId && costings.stockMap.get(sId)) ??
     (sCode && costings.stockMap.get(sCode)) ??
-    (matchedSku?._id && costings.stockMap.get(String(matchedSku._id))) ??
+    (matchedSku?._id && costings.stockMap.get(toSafeString(matchedSku._id))) ??
     (matchedSku?.skuCode && costings.stockMap.get(matchedSku.skuCode.trim().toLowerCase()));
 
   if (liveStockVal !== undefined) {

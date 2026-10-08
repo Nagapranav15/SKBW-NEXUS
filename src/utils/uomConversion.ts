@@ -17,12 +17,25 @@ export interface SkuUomLike {
   conv?: number | string;
 }
 
+const toSafeStr = (val: any): string => {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (typeof val === 'object') {
+    if (val.name) return toSafeStr(val.name);
+    if (val.title) return toSafeStr(val.title);
+    if (val.skuCode) return toSafeStr(val.skuCode);
+    return '';
+  }
+  return '';
+};
+
 export function isBoardSku(sku?: any): boolean {
   if (!sku) return false;
-  const cat = String(sku.category || sku.group || '').toLowerCase();
-  const name = String(sku.name || sku.title || sku.component || sku.itemName || '').toLowerCase();
-  const rule = String(sku.ruleType || '').toLowerCase();
-  const code = String(sku.skuCode || sku.code || '').toLowerCase();
+  const cat = toSafeStr(sku.category || sku.group).toLowerCase();
+  const name = toSafeStr(sku.name || sku.title || sku.component || sku.itemName).toLowerCase();
+  const rule = toSafeStr(sku.ruleType).toLowerCase();
+  const code = toSafeStr(sku.skuCode || sku.code).toLowerCase();
   return cat.includes('board') || name.includes('board') || rule.includes('board') || code.includes('board');
 }
 

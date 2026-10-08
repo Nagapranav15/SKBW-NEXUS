@@ -84,7 +84,7 @@ export interface SkuLocationInfo {
   onHand?: number;
 }
 
-export const resolveSkuLocationInfo = (
+const resolveSkuLocationInfo = (
   locIdOrObj: any,
   allLocations: WarehouseLocationV2[]
 ): SkuLocationInfo => {
