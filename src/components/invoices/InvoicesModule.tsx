@@ -1089,31 +1089,31 @@ export const InvoicesModule: React.FC = () => {
 
                           {/* Invoice Number */}
                           <td className="py-3 px-3 font-mono font-bold text-blue-700">
-                            {inv.invoiceNumber}
+                            {getSafeText(inv.invoiceNumber)}
                           </td>
 
                           {/* Invoice Date */}
                           <td className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
-                            {inv.invoiceDate}
+                            {getSafeText(inv.invoiceDate)}
                           </td>
 
                           {/* DC Ref */}
                           <td className="py-3 px-3 font-mono text-gray-700 font-bold">
-                            {inv.dispatchNumber || 'DIRECT'}
+                            {getSafeText(inv.dispatchNumber, 'DIRECT')}
                           </td>
 
                           {/* Customer */}
                           <td className="py-3 px-3">
-                            <div className="font-bold text-gray-900">{inv.customerName}</div>
+                            <div className="font-bold text-gray-900">{getSafeText(inv.customerName, 'Customer')}</div>
                             {inv.customerPhone && (
-                              <div className="text-[10px] text-gray-400 font-mono">{inv.customerPhone}</div>
+                              <div className="text-[10px] text-gray-400 font-mono">{getSafeText(inv.customerPhone)}</div>
                             )}
                           </td>
 
                           {/* Region */}
                           <td className="py-3 px-3">
                             <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                              {inv.region || 'Telangana'}
+                              {getSafeText(inv.region, 'Telangana')}
                             </span>
                           </td>
 
@@ -1202,8 +1202,8 @@ export const InvoicesModule: React.FC = () => {
                                     {(inv.items || []).map((it, itemIdx) => (
                                       <tr key={itemIdx} className="hover:bg-gray-50">
                                         <td className="py-2 px-3 text-gray-400 font-bold">{itemIdx + 1}</td>
-                                        <td className="py-2 px-3 font-mono font-bold text-blue-700">{it.skuCode || '—'}</td>
-                                        <td className="py-2 px-3 font-bold text-gray-900">{it.itemName}</td>
+                                        <td className="py-2 px-3 font-mono font-bold text-blue-700">{getSafeText(it.skuCode, '—')}</td>
+                                        <td className="py-2 px-3 font-bold text-gray-900">{getSafeText(it.itemName, 'Item')}</td>
                                         <td className="py-2 px-3 text-right font-mono font-bold text-gray-800">
                                           {it.invoiceQtyGbl || it.dispatchedGbl} GBL (= {it.invoiceQtyPcs || it.dispatchedPcs} PCS)
                                         </td>
