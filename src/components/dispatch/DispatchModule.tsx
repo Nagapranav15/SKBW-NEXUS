@@ -15,6 +15,7 @@ import { getDeliveryChallans, deleteDeliveryChallan } from '../../api/deliveryCh
 import { CreateDispatchModal } from './CreateDispatchModal';
 import { ViewDeliveryChallanModal } from './ViewDeliveryChallanModal';
 import { DispatchOrderDetailModal } from './DispatchOrderDetailModal';
+import { ConfirmActionModal } from '../common/ConfirmActionModal';
 import { showToast } from '../ui/Toast';
 
 // Safe string converter to prevent 'Cannot convert object to primitive value'
@@ -311,6 +312,7 @@ export const DispatchModule: React.FC = () => {
   const [isChallanModalOpen, setIsChallanModalOpen] = useState(false);
   const [activeChallan, setActiveChallan] = useState<any>(null);
   const [selectedOrderDetailRow, setSelectedOrderDetailRow] = useState<DispatchRowOrder | null>(null);
+  const [revertConfirmChallan, setRevertConfirmChallan] = useState<any | null>(null);
 
   // Delivery Challans List
   const [deliveryChallansList, setDeliveryChallansList] = useState<any[]>([]);
@@ -728,12 +730,9 @@ export const DispatchModule: React.FC = () => {
     });
   }, [displayRows, activeTab, selectedCustomer, selectedRegion, selectedStatus, startDate, endDate, searchQuery, sortField, sortAsc]);
 
-  // Paginated Rows
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
-  const paginatedRows = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredRows.slice(start, start + pageSize);
-  }, [filteredRows, currentPage, pageSize]);
+  // Paginated Rows (All rows rendered directly without page slicing)
+  const totalPages = 1;
+  const paginatedRows = filteredRows;
 
   // Sorted Delivery Challans List (for History Tab)
   const sortedChallansList = useMemo(() => {
@@ -855,13 +854,12 @@ export const DispatchModule: React.FC = () => {
   };
 
   // Revert / Delete Delivery Challan: Reverses stock and sends sales order back to pending
-  const handleRevertChallan = async (challan: any) => {
+  const handleRevertChallan = (challan: any) => {
+    setRevertConfirmChallan(challan);
+  };
+
+  const executeRevertChallan = async (challan: any) => {
     const dcNo = challan.dcNumber || 'this delivery challan';
-    const soRef = challan.orderNumber && challan.orderNumber !== 'DIRECT' ? ` (Linked to SO: ${challan.orderNumber})` : '';
-    
-    if (!window.confirm(`Are you sure you want to REVERT Delivery Challan ${dcNo}${soRef}?\n\nThis will:\n1. Cancel this delivery challan record\n2. Reverse and restore inventory stock back to warehouse\n3. Send the Sales Order back to Pending status.`)) {
-      return;
-    }
 
     try {
       const companyId = selectedCompany?._id;
@@ -2057,75 +2055,6 @@ export const DispatchModule: React.FC = () => {
             </table>
           </div>
 
-          {/* ── FOOTER PAGINATION (Matching Production Module Style) ── */}
-          <div className="px-6 py-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-medium text-gray-600 bg-white">
-            <div>
-              Showing <span className="font-bold text-gray-900">{filteredRows.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}</span> - <span className="font-bold text-gray-900">{Math.min(currentPage * pageSize, filteredRows.length)}</span> of <span className="font-bold text-gray-900">{filteredRows.length}</span> orders
-            </div>
-
-            <div className="flex items-center gap-4">
-              {/* Rows per page selector */}
-              <div className="flex items-center gap-1.5">
-                <span>Rows</span>
-                <div className="relative">
-                  <select
-                    value={pageSize}
-                    onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                    className="appearance-none bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1 pr-6 text-xs font-bold text-gray-700 cursor-pointer focus:outline-none"
-                  >
-                    <option value={5}>5</option>
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                  </select>
-                  <ChevronDown className="w-3 h-3 text-gray-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-              </div>
-
-              {/* Page number */}
-              <div className="flex items-center gap-1.5">
-                <span>Page</span>
-                <span className="w-8 py-1 text-center font-bold text-gray-900 border border-gray-200 rounded-lg bg-gray-50">
-                  {currentPage}
-                </span>
-                <span>of {totalPages}</span>
-              </div>
-
-              {/* Pagination Controls */}
-              <div className="flex items-center gap-1">
-                <button
-                  disabled={currentPage <= 1}
-                  onClick={() => setCurrentPage(1)}
-                  className="p-1 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5 -mr-1.5 inline" />
-                  <ChevronLeft className="w-3.5 h-3.5 inline" />
-                </button>
-                <button
-                  disabled={currentPage <= 1}
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  className="p-1 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  className="p-1 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-                >
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setCurrentPage(totalPages)}
-                  className="p-1 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-                >
-                  <ChevronRight className="w-3.5 h-3.5 -mr-1.5 inline" />
-                  <ChevronRight className="w-3.5 h-3.5 inline" />
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
@@ -2197,6 +2126,26 @@ export const DispatchModule: React.FC = () => {
             setActiveChallan(ch);
             setIsChallanModalOpen(true);
           }}
+        />
+      )}
+
+      {/* ── REVERT DELIVERY CHALLAN CONFIRM MODAL ── */}
+      {revertConfirmChallan && (
+        <ConfirmActionModal
+          isOpen={!!revertConfirmChallan}
+          onClose={() => setRevertConfirmChallan(null)}
+          onConfirm={() => executeRevertChallan(revertConfirmChallan)}
+          title={`REVERT Delivery Challan ${revertConfirmChallan.dcNumber || ''}`}
+          subtitle={revertConfirmChallan.orderNumber && revertConfirmChallan.orderNumber !== 'DIRECT' ? `Linked to SO: ${revertConfirmChallan.orderNumber}` : undefined}
+          description="Are you sure you want to revert this delivery challan? This will cancel the delivery challan record, restore stock to inventory, and reset the sales order status."
+          bullets={[
+            'Cancel this delivery challan record',
+            'Reverse and restore inventory stock back to warehouse',
+            'Send the Sales Order back to Pending status'
+          ]}
+          confirmText="Yes, Revert Challan"
+          cancelText="Cancel"
+          variant="warning"
         />
       )}
     </div>

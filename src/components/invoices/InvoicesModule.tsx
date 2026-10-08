@@ -12,6 +12,7 @@ import { getDeliveryChallans, deleteDeliveryChallan } from '../../api/deliveryCh
 import { DispatchDeliveryRecord } from './invoiceSampleData';
 import { CreateInvoiceModal } from './CreateInvoiceModal';
 import { InvoiceSuccessModal } from './InvoiceSuccessModal';
+import { ConfirmActionModal } from '../common/ConfirmActionModal';
 import { showToast } from '../ui/Toast';
 
 export type InvoiceTabType = 'pending' | 'partial' | 'history' | 'all';
@@ -66,9 +67,10 @@ export const InvoicesModule: React.FC = () => {
   const [selectedDispatchForModal, setSelectedDispatchForModal] = useState<DispatchDeliveryRecord | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<SalesInvoice | null>(null);
 
-  // Success / Print Preview Modal
+  // Success / Print Preview Modal & Confirmation
   const [activeInvoiceForPreview, setActiveInvoiceForPreview] = useState<SalesInvoice | null>(null);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [deleteConfirmInvoice, setDeleteConfirmInvoice] = useState<SalesInvoice | null>(null);
 
   // Raw data from backend & local caches
   const [deliveries, setDeliveries] = useState<DispatchDeliveryRecord[]>([]);
@@ -469,19 +471,12 @@ export const InvoicesModule: React.FC = () => {
     });
   }, [invoicesList, selectedCustomer, selectedRegion, startDate, endDate, searchQuery, invSortField, invSortAsc]);
 
-  // Paginated Rows
+  // Paginated Rows (Render all rows directly without pagination slicing)
   const currentTotal = activeTab === 'history' ? filteredInvoices.length : filteredDeliveries.length;
-  const totalPages = Math.max(1, Math.ceil(currentTotal / pageSize));
+  const totalPages = 1;
 
-  const paginatedDeliveries = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredDeliveries.slice(start, start + pageSize);
-  }, [filteredDeliveries, currentPage, pageSize]);
-
-  const paginatedInvoices = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredInvoices.slice(start, start + pageSize);
-  }, [filteredInvoices, currentPage, pageSize]);
+  const paginatedDeliveries = filteredDeliveries;
+  const paginatedInvoices = filteredInvoices;
 
   // Accordion Expand Toggle
   const toggleRowExpand = (id: string) => {
@@ -607,12 +602,12 @@ export const InvoicesModule: React.FC = () => {
   };
 
   // Delete Invoice
-  const handleDeleteInvoice = async (inv: SalesInvoice) => {
-    const num = inv.invoiceNumber;
-    if (!window.confirm(`Are you sure you want to delete Tax Invoice ${num}? This will restore the Delivery Challan to Not Invoiced status.`)) {
-      return;
-    }
+  const handleDeleteInvoice = (inv: SalesInvoice) => {
+    setDeleteConfirmInvoice(inv);
+  };
 
+  const executeDeleteInvoice = async (inv: SalesInvoice) => {
+    const num = inv.invoiceNumber;
     try {
       const companyId = selectedCompany?._id;
       if (inv._id) {
@@ -635,7 +630,7 @@ export const InvoicesModule: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-4 max-w-7xl mx-auto">
+    <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
       
       {/* ── 1. TOP HEADER & TITLE BANNER (Matching DispatchModule) ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-gray-150 shadow-2xs">
@@ -1461,65 +1456,6 @@ export const InvoicesModule: React.FC = () => {
           )}
         </div>
 
-        {/* ── 5. PAGINATION & FOOTER ── */}
-        <div className="px-4 py-3 bg-white border-t border-gray-150 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2 text-gray-500 font-medium">
-            <span>Showing</span>
-            <span className="font-bold text-gray-900">
-              {currentTotal === 0 ? 0 : (currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, currentTotal)}
-            </span>
-            <span>of</span>
-            <span className="font-bold text-gray-900">{currentTotal}</span>
-            <span>entries</span>
-
-            <select
-              value={pageSize}
-              onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-              className="ml-2 px-2 py-1 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 cursor-pointer"
-            >
-              <option value={10}>10 / page</option>
-              <option value={25}>25 / page</option>
-              <option value={50}>50 / page</option>
-              <option value={100}>100 / page</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              const pageNum = i + 1;
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => setCurrentPage(pageNum)}
-                  className={`w-7 h-7 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                    currentPage === pageNum
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-200'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
-
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage >= totalPages}
-              className="p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
       </div>
 
       {/* ── 6. CREATE / EDIT INVOICE MODAL ── */}
@@ -1545,6 +1481,24 @@ export const InvoicesModule: React.FC = () => {
             setIsPreviewModalOpen(false);
             handleEditInvoice(activeInvoiceForPreview);
           }}
+        />
+      )}
+
+      {/* ── 8. DELETE INVOICE CONFIRM MODAL ── */}
+      {deleteConfirmInvoice && (
+        <ConfirmActionModal
+          isOpen={!!deleteConfirmInvoice}
+          onClose={() => setDeleteConfirmInvoice(null)}
+          onConfirm={() => executeDeleteInvoice(deleteConfirmInvoice)}
+          title={`Delete Sales Tax Invoice ${deleteConfirmInvoice.invoiceNumber || ''}`}
+          description={`Are you sure you want to delete Tax Invoice ${deleteConfirmInvoice.invoiceNumber || ''}? This action cannot be undone.`}
+          bullets={[
+            'Delete the tax invoice record permanently',
+            'Restore the linked Delivery Challan back to "Not Invoiced" status'
+          ]}
+          confirmText="Yes, Delete Invoice"
+          cancelText="Cancel"
+          variant="danger"
         />
       )}
 
