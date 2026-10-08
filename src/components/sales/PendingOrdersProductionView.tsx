@@ -3135,66 +3135,90 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                             const code = (item.skuCode || '').toLowerCase().trim();
                             const req = itemWiseRequirements.find(r => r.skuCode.toLowerCase() === code);
                             const isInStock = req ? req.shortfallGbl === 0 : false;
+                            const comps = resolveItemComponents(item, order);
 
                             return (
-                              <div
-                                key={item._id || item.skuCode || iIdx}
-                                style={{ animationDelay: `${iIdx * 35}ms` }}
-                                title={`${item.itemName || item.skuCode} | Code: ${item.skuCode} | Conversion: ${pcsPerGbl} pcs/GBL | Pending: ${pendingGbl} GBL (${pendingPcs.toLocaleString()} pcs) | Stock: ${isInStock ? 'In Stock' : 'Needs Production'}`}
-                                className="group/item flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-slate-50/90 hover:bg-blue-50/60 border border-slate-200/70 hover:border-blue-300/80 shadow-3xs hover:shadow-2xs transition-all duration-150 animate-in fade-in"
-                              >
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                  {/* Cute live pulse status dot */}
-                                  <span className="relative flex h-2 w-2 shrink-0">
-                                    <span
-                                      className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-60 ${
-                                        isInStock ? 'bg-emerald-400' : 'bg-rose-400'
-                                      }`}
-                                    />
-                                    <span
-                                      className={`relative inline-flex rounded-full h-2 w-2 ${
-                                        isInStock ? 'bg-emerald-500' : 'bg-rose-500'
-                                      }`}
-                                    />
-                                  </span>
+                              <div key={item._id || item.skuCode || iIdx} className="space-y-1">
+                                <div
+                                  style={{ animationDelay: `${iIdx * 35}ms` }}
+                                  title={`${item.itemName || item.skuCode} | Code: ${item.skuCode} | Conversion: ${pcsPerGbl} pcs/GBL | Pending: ${pendingGbl} GBL (${pendingPcs.toLocaleString()} pcs) | Stock: ${isInStock ? 'In Stock' : 'Needs Production'}`}
+                                  className="group/item flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-slate-50/90 hover:bg-blue-50/60 border border-slate-200/70 hover:border-blue-300/80 shadow-3xs hover:shadow-2xs transition-all duration-150 animate-in fade-in"
+                                >
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    {/* Live pulse status dot */}
+                                    <span className="relative flex h-2 w-2 shrink-0">
+                                      <span
+                                        className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-60 ${
+                                          isInStock ? 'bg-emerald-400' : 'bg-rose-400'
+                                        }`}
+                                      />
+                                      <span
+                                        className={`relative inline-flex rounded-full h-2 w-2 ${
+                                          isInStock ? 'bg-emerald-500' : 'bg-rose-500'
+                                        }`}
+                                      />
+                                    </span>
 
-                                  <span
-                                    className="font-semibold text-slate-800 group-hover/item:text-blue-900 text-[11.5px] leading-tight whitespace-normal break-words"
-                                    title={item.itemName || item.skuCode}
-                                  >
-                                    {item.itemName || item.skuCode}
-                                  </span>
-                                </div>
-
-                                {/* Cute compact right quantity */}
-                                <div className="flex items-center gap-1.5 shrink-0 font-mono text-right pl-1">
-                                  {!isInStock && pendingGbl > 0 && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleStartProduction(
-                                          item.skuCode || '',
-                                          item.itemName || item.skuCode || '',
-                                          pendingGbl,
-                                          order.orderNumber,
-                                          order._id
-                                        );
-                                      }}
-                                      className="px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded text-[10.5px] font-semibold cursor-pointer transition-colors flex items-center gap-0.5 shadow-3xs"
-                                      title={`Produce ${pendingGbl} GBL for ${order.orderNumber}`}
+                                    <span
+                                      className="font-bold text-slate-800 group-hover/item:text-blue-900 text-[11.5px] leading-tight whitespace-normal break-words"
+                                      title={item.itemName || item.skuCode}
                                     >
-                                      <Factory className="w-3 h-3 text-blue-600" />
-                                      <span>Produce</span>
-                                    </button>
-                                  )}
-                                  <span className="font-bold text-blue-700 bg-white group-hover/item:bg-blue-50 px-1.5 py-0.5 rounded border border-slate-200/90 text-xs shadow-3xs transition-colors">
-                                    {pendingGbl} <span className="text-[9.5px] font-semibold text-slate-500">GBL</span>
-                                  </span>
-                                  <span className="text-[10px] text-slate-400 font-medium">
-                                    ({pendingPcs.toLocaleString()} pcs)
-                                  </span>
+                                      {item.itemName || item.skuCode}
+                                    </span>
+                                  </div>
+
+                                  {/* Compact right quantity */}
+                                  <div className="flex items-center gap-1.5 shrink-0 font-mono text-right pl-1">
+                                    {!isInStock && pendingGbl > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleStartProduction(
+                                            item.skuCode || '',
+                                            item.itemName || item.skuCode || '',
+                                            pendingGbl,
+                                            order.orderNumber,
+                                            order._id
+                                          );
+                                        }}
+                                        className="px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded text-[10.5px] font-semibold cursor-pointer transition-colors flex items-center gap-0.5 shadow-3xs"
+                                        title={`Produce ${pendingGbl} GBL for ${order.orderNumber}`}
+                                      >
+                                        <Factory className="w-3 h-3 text-blue-600" />
+                                        <span>Produce</span>
+                                      </button>
+                                    )}
+                                    <span className="font-bold text-blue-700 bg-white group-hover/item:bg-blue-50 px-1.5 py-0.5 rounded border border-slate-200/90 text-xs shadow-3xs transition-colors">
+                                      {pendingGbl} <span className="text-[9.5px] font-semibold text-slate-500">GBL</span>
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 font-medium">
+                                      ({pendingPcs.toLocaleString()} pcs)
+                                    </span>
+                                  </div>
                                 </div>
+
+                                {/* Render constituent sub-items for Loose Books / mixed stock */}
+                                {comps.length > 0 && (
+                                  <div className="ml-4 pl-2 border-l-2 border-indigo-200/90 space-y-1 my-1">
+                                    {comps.map((c: any, cIdx: number) => {
+                                      const cQty = Number(c.quantity) || 1;
+                                      const cPcsPerGbl = Number(c.pcsPerGbl) || 100;
+                                      const cEqGbl = cQty > 0 ? +(cQty / cPcsPerGbl).toFixed(1) : 0;
+                                      return (
+                                        <div key={cIdx} className="flex items-center justify-between gap-2 px-2 py-1 rounded bg-indigo-50/50 border border-indigo-100/60 text-[11px]">
+                                          <span className="font-semibold text-indigo-900 flex items-center gap-1">
+                                            <span className="text-indigo-500 font-black">&bull;</span>
+                                            <span>{(c.name || c.skuCode || '').toUpperCase()}</span>
+                                          </span>
+                                          <span className="font-mono text-[10px] font-semibold text-indigo-700">
+                                            {cQty} {c.uom || 'PCS'} {cEqGbl > 0 ? `(${cEqGbl} GBL)` : ''}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                               </div>
                             );
                           })}

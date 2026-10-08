@@ -745,6 +745,26 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
             pcsPerGbl = packPcs;
           }
 
+          let resolvedRate = Number(i.unitPrice ?? (i as any).rate ?? (i as any).price ?? 0);
+          if (resolvedRate <= 0) {
+            const codeKey = (i.skuCode || '').toLowerCase().trim();
+            const nameKey = (i.itemName || '').toLowerCase().trim();
+            const sIdKey = typeof i.skuId === 'object' ? (i.skuId as any)?._id : i.skuId;
+            const matched = availableSkus.find(s =>
+              (sIdKey && String(s._id) === String(sIdKey)) ||
+              (codeKey && s.skuCode && s.skuCode.toLowerCase().trim() === codeKey) ||
+              (nameKey && s.name && s.name.toLowerCase().trim() === nameKey)
+            );
+            if (matched) {
+              resolvedRate = Number(matched.sellingPrice || (matched as any).price || (matched as any).rate || (matched as any).unitPrice || 0);
+            }
+          }
+
+          const resolvedPcsPerGbl = pcsPerGbl || (packPcs > 0 ? packPcs : 100);
+          const gblNum = Number(gbl) || 0;
+          const totalPcsVal = i.quantity || (gblNum > 0 ? gblNum * Number(resolvedPcsPerGbl) : 0);
+          const totalAmountVal = i.totalAmount || (totalPcsVal > 0 && resolvedRate > 0 ? Math.round(totalPcsVal * resolvedRate * 100) / 100 : 0);
+
           return {
             skuId: typeof i.skuId === 'object' ? (i.skuId as any)?._id : (i.skuId || ''),
             skuCode: i.skuCode || '',
@@ -755,12 +775,12 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
             stockPcs: 0,
             stockGbl: null,
             gbl: gbl !== undefined && gbl !== null ? gbl : '',
-            pcsPerGbl: pcsPerGbl || (packPcs > 0 ? packPcs : 100),
-            totalPcs: i.quantity || 0,
-            rate: i.unitPrice || 0,
+            pcsPerGbl: resolvedPcsPerGbl,
+            totalPcs: totalPcsVal,
+            rate: resolvedRate > 0 ? resolvedRate : '',
             discPercent: i.discountPercent || 0,
             discAmount: 0,
-            amount: i.totalAmount || 0,
+            amount: totalAmountVal,
             isMixedBundle: !!i.isMixedBundle,
             components: comps
           };
