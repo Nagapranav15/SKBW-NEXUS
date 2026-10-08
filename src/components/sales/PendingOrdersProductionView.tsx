@@ -248,8 +248,8 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
     });
   }, [selectedCompany?._id, stockRefreshKey]);
 
-  // Helper to resolve constituent component books for Loose Books / Mixed Stock items (excluding BOM)
-  const resolveItemComponents = useCallback((item: any) => {
+  // Helper to resolve constituent component books for Loose Books / Mixed Stock items
+  const resolveItemComponents = useCallback((item: any, order?: SalesOrderV2) => {
     if (Array.isArray(item.components) && item.components.length > 0) {
       return item.components;
     }
@@ -259,6 +259,40 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
     if (Array.isArray(item.subItems) && item.subItems.length > 0) {
       return item.subItems;
     }
+
+    const itemNameUpper = (item.itemName || item.skuCode || '').toUpperCase().trim();
+    const isLooseOrMixed = itemNameUpper.includes('LOOSE') ||
+                           itemNameUpper.includes('LOSSE') ||
+                           itemNameUpper.includes('MIXED') ||
+                           !!item.isMixedBundle;
+
+    if (isLooseOrMixed && order && Array.isArray(order.items)) {
+      const otherItems = order.items.filter(other => {
+        const otherName = (other.itemName || other.skuCode || '').toUpperCase().trim();
+        return other !== item &&
+               !otherName.includes('LOOSE') &&
+               !otherName.includes('LOSSE') &&
+               !otherName.includes('MIXED');
+      });
+
+      if (otherItems.length > 0) {
+        const pcsPerGbl = item.pcsPerGbl || 100;
+        const totalPcsInBundle = (Number(item.gbl) || 1) * pcsPerGbl;
+        const pcsPerComponent = Math.floor(totalPcsInBundle / otherItems.length);
+
+        return otherItems.map(other => {
+          const name = (other.itemName || other.skuCode || '').toUpperCase().trim();
+          return {
+            name,
+            skuCode: other.skuCode || '',
+            quantity: pcsPerComponent,
+            pcsPerGbl: other.pcsPerGbl || 100,
+            uom: other.uom || 'PCS'
+          };
+        });
+      }
+    }
+
     return [];
   }, []);
 
@@ -274,7 +308,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
         const name = (rawName || rawCode || code).toUpperCase();
         const key = (rawName || rawCode || code).toUpperCase();
 
-        const comps = resolveItemComponents(item);
+        const comps = resolveItemComponents(item, o);
         const isMixedBundle = !!(item as any).isMixedBundle || comps.length > 0;
         const packPcs = (isMixedBundle && comps.length > 0)
           ? comps.reduce((sum: number, c: any) => sum + (Number(c.quantity) || 0), 0)
@@ -1341,7 +1375,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
         `;
 
         const itemRows = items.map(item => {
-          const comps = resolveItemComponents(item);
+          const comps = resolveItemComponents(item, order);
           const desc = (item as any).description || (item as any).remarks || (item as any).notes || '';
           const packPcs = ((item as any).isMixedBundle && comps.length > 0)
             ? comps.reduce((sum: number, c: any) => sum + (Number(c.quantity) || 0), 0)
