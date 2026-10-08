@@ -248,6 +248,33 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
     });
   }, [selectedCompany?._id, stockRefreshKey]);
 
+  // Helper to dynamically resolve component books for Loose Books / Mixed Stock items
+  const resolveItemComponents = useCallback((item: any) => {
+    if (Array.isArray(item.components) && item.components.length > 0) {
+      return item.components;
+    }
+    
+    const rawCode = (item.skuCode || '').toLowerCase().trim();
+    const rawName = (item.itemName || '').toLowerCase().trim();
+    const matchedSku = loadedSkus.find(s =>
+      (item.skuId && String(s._id) === String(item.skuId)) ||
+      (rawCode && s.skuCode && s.skuCode.toLowerCase().trim() === rawCode) ||
+      (rawName && s.name && s.name.toLowerCase().trim() === rawName)
+    );
+
+    const rawBom = matchedSku?.bomItems || matchedSku?.components || (matchedSku as any)?.bom || (matchedSku as any)?.subItems || [];
+    if (Array.isArray(rawBom) && rawBom.length > 0) {
+      return rawBom.map((b: any, bIdx: number) => ({
+        name: b.name || b.itemName || b.component || b.skuCode || `Component ${bIdx + 1}`,
+        skuCode: b.skuCode || b.code || '',
+        quantity: Number(b.qty || b.quantity || b.qtyPerBatch) || 1,
+        uom: b.uom || b.unit || 'PCS'
+      }));
+    }
+
+    return [];
+  }, [loadedSkus]);
+
   // Compute Item-wise Production Requirements (Sales Orders Outstanding)
   const itemWiseRequirements = useMemo<SkuProductionRequirement[]>(() => {
     const map = new Map<string, SkuProductionRequirement>();
@@ -260,7 +287,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
         const name = (rawName || rawCode || code).toUpperCase();
         const key = (rawName || rawCode || code).toUpperCase();
 
-        const comps = (item as any).components || [];
+        const comps = resolveItemComponents(item);
         const isMixedBundle = !!(item as any).isMixedBundle || comps.length > 0;
         const packPcs = (isMixedBundle && comps.length > 0)
           ? comps.reduce((sum: number, c: any) => sum + (Number(c.quantity) || 0), 0)
@@ -1327,7 +1354,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
         `;
 
         const itemRows = items.map(item => {
-          const comps = (item as any).components || [];
+          const comps = resolveItemComponents(item);
           const desc = (item as any).description || (item as any).remarks || (item as any).notes || '';
           const packPcs = ((item as any).isMixedBundle && comps.length > 0)
             ? comps.reduce((sum: number, c: any) => sum + (Number(c.quantity) || 0), 0)
