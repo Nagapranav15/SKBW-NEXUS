@@ -3,71 +3,35 @@ import {
   BarChart3, TrendingUp, FileText, ShoppingCart, Search, Filter,
   Calendar, Download, RefreshCw, Printer, ChevronDown, Eye, X,
   Building, MapPin, Phone, CheckCircle2, Clock, AlertCircle, ArrowUpDown,
-  ChevronLeft, ChevronRight, Layers, IndianRupee, Package, ArrowUp, ArrowDown
+  ChevronLeft, ChevronRight, Layers, IndianRupee, Package, ArrowUp, ArrowDown,
+  Factory, Truck, ShoppingBag, Users, DollarSign, PieChart, ShieldAlert,
+  HelpCircle, Percent
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../../context/AuthContext';
 import { getInvoices, SalesInvoice } from '../../api/invoiceApi';
 import { getDeliveryChallans } from '../../api/deliveryChallanApi';
 import { getParties } from '../../api/partyApi';
-import { getSkusV2 } from '../../api/mfgApiV2';
+import { getSkusV2, getBalancesV2, getLedgerV2, getPurchaseInvoicesV2 } from '../../api/mfgApiV2';
+import { getSalesOrdersV2 } from '../../api/salesOrderApiV2';
+import { getProductionOrders } from '../../api/productionApi';
+import { getTransactions } from '../../api/transactionApi';
 import { showToast } from '../ui/Toast';
 
-export type ReportTabType = 'sales_register' | 'receivables' | 'sku_sales' | 'regional';
+// Main Category Types
+export type MainCategoryType =
+  | 'dashboard'
+  | 'sales'
+  | 'purchases'
+  | 'inventory'
+  | 'production'
+  | 'dispatch'
+  | 'orders'
+  | 'directory'
+  | 'ledger'
+  | 'tax';
 
-export interface SalesReportRow {
-  id: string;
-  date: string;
-  invoiceNo: string;
-  dcNo?: string;
-  customerName: string;
-  customerId?: string;
-  city?: string;
-  region?: string;
-  itemsCount: number;
-  totalGbl: number;
-  totalPcs: number;
-  totalAmount: number;
-  status: 'paid' | 'unpaid' | 'partial' | 'pending';
-  items?: any[];
-}
-
-export interface ReceivablesReportRow {
-  customerId: string;
-  customerName: string;
-  code?: string;
-  phone?: string;
-  city?: string;
-  region?: string;
-  creditLimit: number;
-  totalInvoiced: number;
-  totalPaid: number;
-  outstandingBalance: number;
-  invoiceCount: number;
-  lastInvoiceDate?: string;
-}
-
-export interface SkuSalesReportRow {
-  skuId: string;
-  skuCode: string;
-  skuName: string;
-  category: string;
-  totalGblSold: number;
-  totalPcsSold: number;
-  totalRevenue: number;
-  avgRate: number;
-  orderCount: number;
-}
-
-export interface RegionalReportRow {
-  region: string;
-  customerCount: number;
-  totalOrders: number;
-  totalGbl: number;
-  totalRevenue: number;
-}
-
-// Helper clean string
+// Safe String Conversion Helper
 const cleanVal = (val: any, fallback = ''): string => {
   if (val === null || val === undefined) return fallback;
   if (typeof val === 'string') return val.trim() || fallback;
@@ -75,6 +39,7 @@ const cleanVal = (val: any, fallback = ''): string => {
   if (typeof val === 'object') {
     if (val.name) return cleanVal(val.name, fallback);
     if (val.firmName) return cleanVal(val.firmName, fallback);
+    if (val.label) return cleanVal(val.label, fallback);
     if (val._id) return String(val._id);
   }
   return fallback;
@@ -83,38 +48,47 @@ const cleanVal = (val: any, fallback = ''): string => {
 const SalesReports: React.FC = () => {
   const { selectedCompany } = useAuth();
 
-  // Active Tab
-  const [activeTab, setActiveTab] = useState<ReportTabType>('sales_register');
+  // Active Main Category & Sub Report Selection
+  const [activeCategory, setActiveCategory] = useState<MainCategoryType>('dashboard');
+  const [activeSubReport, setActiveSubReport] = useState<string>('summary');
 
-  // Raw API Data
+  // Raw API Master State
   const [invoices, setInvoices] = useState<SalesInvoice[]>([]);
+  const [salesOrders, setSalesOrders] = useState<any[]>([]);
   const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [purchases, setPurchases] = useState<any[]>([]);
+  const [productions, setProductions] = useState<any[]>([]);
   const [parties, setParties] = useState<any[]>([]);
   const [skus, setSkus] = useState<any[]>([]);
+  const [balances, setBalances] = useState<any[]>([]);
+  const [inventoryLedger, setInventoryLedger] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Filters
+  // Filter Bar States
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState('ALL');
+  const [selectedSupplier, setSelectedSupplier] = useState('ALL');
   const [selectedRegion, setSelectedRegion] = useState('ALL');
+  const [selectedStatus, setSelectedStatus] = useState('ALL');
 
-  // Date Filter
+  // Date Filter Popover & Range State
   const [showDateFilter, setShowDateFilter] = useState(false);
-  const [datePreset, setDatePreset] = useState<'All' | 'Today' | 'This Week' | 'This Month' | 'Custom'>('All');
+  const [datePreset, setDatePreset] = useState<'All' | 'Today' | 'Yesterday' | 'This Week' | 'This Month' | 'Last Month' | 'This Quarter' | 'This Year' | 'Custom'>('All');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const dateFilterRef = useRef<HTMLDivElement>(null);
 
-  // Pagination & Sorting
+  // Sorting & Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [sortField, setSortField] = useState<string>('date');
   const [sortAsc, setSortAsc] = useState(false);
 
-  // Detail Modal State
+  // Drill-down Detail Modal State
   const [selectedRowDetail, setSelectedRowDetail] = useState<any | null>(null);
 
-  // Click outside listener for date filter popover
+  // Close Date Filter popover on outside click
   useEffect(() => {
     const handleOutside = (e: MouseEvent) => {
       if (dateFilterRef.current && !dateFilterRef.current.contains(e.target as Node)) {
@@ -125,121 +99,146 @@ const SalesReports: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleOutside);
   }, []);
 
-  // Fetch dynamic report data from Backend APIs & Local Storage
-  const loadReportData = async (showSpinner = true) => {
+  // Parallel Load All Business Master Data
+  const loadAllReportData = async (showSpinner = true) => {
     if (showSpinner) setIsLoading(true);
     try {
       const companyId = selectedCompany?._id;
 
-      const [invsRes, dcsRes, partiesRes, skusRes] = await Promise.all([
+      const [
+        invsRes,
+        ordersRes,
+        dcsRes,
+        purchasesRes,
+        prodsRes,
+        partiesRes,
+        skusRes,
+        balancesRes,
+        invLedgerRes,
+        txsRes
+      ] = await Promise.all([
         getInvoices(companyId).catch(() => [] as SalesInvoice[]),
+        getSalesOrdersV2(companyId).catch(() => []),
         getDeliveryChallans(companyId).catch(() => null),
-        getParties({ company: companyId, limit: 1000 }).catch(() => null),
-        getSkusV2(companyId).catch(() => [])
+        getPurchaseInvoicesV2({ companyId }).catch(() => null),
+        getProductionOrders({ companyId }).catch(() => []),
+        getParties({ company: companyId, limit: 2000 }).catch(() => null),
+        getSkusV2(companyId).catch(() => []),
+        getBalancesV2(companyId).catch(() => []),
+        getLedgerV2({ companyId, limit: 1000 }).catch(() => null),
+        getTransactions({ companyId }).catch(() => null)
       ]);
 
-      // 1. Process Invoices
+      // 1. Invoices
       const invList = Array.isArray(invsRes) ? invsRes : [];
       const localInvsKey = `skbw_local_invoices_${companyId || 'default'}`;
       let localInvs: any[] = [];
       try {
         localInvs = JSON.parse(localStorage.getItem(localInvsKey) || '[]');
-      } catch (e) {
-        console.warn(e);
-      }
-      const combinedInvs = [...localInvs, ...invList];
-      setInvoices(combinedInvs);
+      } catch {}
+      setInvoices([...localInvs, ...invList]);
 
-      // 2. Process Delivery Challans
+      // 2. Sales Orders
+      setSalesOrders(Array.isArray(ordersRes) ? ordersRes : []);
+
+      // 3. Delivery Challans
       const dcList = dcsRes?.data?.deliveryChallans || dcsRes?.deliveryChallans || (Array.isArray(dcsRes) ? dcsRes : []);
       setDeliveries(dcList);
 
-      // 3. Process Parties
+      // 4. Purchases
+      const purList = purchasesRes?.data?.invoices || purchasesRes?.invoices || purchasesRes?.data || (Array.isArray(purchasesRes) ? purchasesRes : []);
+      setPurchases(purList);
+
+      // 5. Productions
+      setProductions(Array.isArray(prodsRes) ? prodsRes : []);
+
+      // 6. Parties
       const partyList = partiesRes?.data?.parties || partiesRes?.data || (Array.isArray(partiesRes) ? partiesRes : []);
       let localParties: any[] = [];
       try {
         localParties = JSON.parse(localStorage.getItem(`skbw_parties_${companyId || 'default'}`) || '[]');
-      } catch (e) {
-        console.warn(e);
-      }
+      } catch {}
       setParties([...partyList, ...localParties]);
 
-      // 4. Process SKUs
+      // 7. SKUs & Stock Balances
       setSkus(Array.isArray(skusRes) ? skusRes : []);
+      setBalances(Array.isArray(balancesRes) ? balancesRes : []);
+
+      // 8. Inventory Movements Ledger
+      const ledgerList = invLedgerRes?.data?.ledger || invLedgerRes?.ledger || (Array.isArray(invLedgerRes) ? invLedgerRes : []);
+      setInventoryLedger(ledgerList);
+
+      // 9. Financial Transactions
+      const txList = txsRes?.data?.transactions || txsRes?.transactions || (Array.isArray(txsRes) ? txsRes : []);
+      setTransactions(txList);
     } catch (err) {
-      console.error('Failed to load report data:', err);
-      showToast('Failed to load latest report data', 'error');
+      console.error('Failed to fetch full report dataset:', err);
+      showToast('Error refreshing report metrics', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadReportData(true);
+    loadAllReportData(true);
   }, [selectedCompany?._id]);
 
-  // Handle Preset Date Filters
-  const applyDatePreset = (preset: 'All' | 'Today' | 'This Week' | 'This Month' | 'Custom') => {
+  // Date Filter Preset Handler
+  const applyDatePreset = (preset: typeof datePreset) => {
     setDatePreset(preset);
     const today = new Date();
+    const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
     if (preset === 'All') {
       setStartDate('');
       setEndDate('');
     } else if (preset === 'Today') {
-      const iso = today.toISOString().split('T')[0];
+      const iso = formatDate(today);
+      setStartDate(iso);
+      setEndDate(iso);
+    } else if (preset === 'Yesterday') {
+      const yest = new Date(today);
+      yest.setDate(yest.getDate() - 1);
+      const iso = formatDate(yest);
       setStartDate(iso);
       setEndDate(iso);
     } else if (preset === 'This Week') {
-      const first = new Date(today.setDate(today.getDate() - today.getDay()));
-      const last = new Date(today.setDate(today.getDate() - today.getDay() + 6));
-      setStartDate(first.toISOString().split('T')[0]);
-      setEndDate(last.toISOString().split('T')[0]);
+      const first = new Date(today);
+      first.setDate(first.getDate() - first.getDay());
+      setStartDate(formatDate(first));
+      setEndDate(formatDate(new Date()));
     } else if (preset === 'This Month') {
-      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-      setStartDate(firstDay.toISOString().split('T')[0]);
-      setEndDate(lastDay.toISOString().split('T')[0]);
+      const first = new Date(today.getFullYear(), today.getMonth(), 1);
+      setStartDate(formatDate(first));
+      setEndDate(formatDate(new Date()));
+    } else if (preset === 'Last Month') {
+      const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const last = new Date(today.getFullYear(), today.getMonth(), 0);
+      setStartDate(formatDate(first));
+      setEndDate(formatDate(last));
+    } else if (preset === 'This Quarter') {
+      const qMonth = Math.floor(today.getMonth() / 3) * 3;
+      const first = new Date(today.getFullYear(), qMonth, 1);
+      setStartDate(formatDate(first));
+      setEndDate(formatDate(new Date()));
+    } else if (preset === 'This Year') {
+      const first = new Date(today.getFullYear(), 0, 1);
+      setStartDate(formatDate(first));
+      setEndDate(formatDate(new Date()));
     }
     if (preset !== 'Custom') {
       setShowDateFilter(false);
     }
+    setCurrentPage(1);
   };
 
-  // Extract unique regions/cities for filter
-  const availableRegions = useMemo(() => {
-    const regSet = new Set<string>();
-    invoices.forEach(inv => {
-      const r = cleanVal(inv.region || inv.city || inv.billToAddress?.city || inv.billToAddress?.state);
-      if (r) regSet.add(r);
-    });
-    parties.forEach(p => {
-      const r = cleanVal(p.city || p.state || p.region);
-      if (r) regSet.add(r);
-    });
-    return Array.from(regSet).sort();
-  }, [invoices, parties]);
-
-  // Extract unique customer names for filter
-  const availableCustomers = useMemo(() => {
-    const custMap = new Map<string, string>();
-    invoices.forEach(inv => {
-      const name = cleanVal(inv.customerName);
-      if (name) custMap.set(name.toLowerCase(), name);
-    });
-    parties.forEach(p => {
-      const name = cleanVal(p.firmName || p.name);
-      if (name) custMap.set(name.toLowerCase(), name);
-    });
-    return Array.from(custMap.values()).sort();
-  }, [invoices, parties]);
-
-  // Date filtering predicate
+  // Date Filtering Predicate
   const isWithinDateRange = (dateStr?: string) => {
     if (!dateStr) return true;
     const itemDate = new Date(dateStr).getTime();
     if (isNaN(itemDate)) return true;
     if (startDate) {
-      const start = new Date(startDate).getTime();
+      const start = new Date(startDate + 'T00:00:00').getTime();
       if (itemDate < start) return false;
     }
     if (endDate) {
@@ -249,253 +248,407 @@ const SalesReports: React.FC = () => {
     return true;
   };
 
-  // ── 1. Sales Register Data ──
-  const salesRegisterRows = useMemo<SalesReportRow[]>(() => {
-    return invoices
-      .filter(inv => isWithinDateRange(inv.invoiceDate || inv.date || (inv as any).createdAt))
-      .map(inv => {
-        const totalGbl = (inv.items || []).reduce((s, it) => s + (Number(it.invoiceQtyGbl || it.dispatchedGbl || it.quantity) || 0), 0);
-        const totalPcs = (inv.items || []).reduce((s, it) => s + (Number(it.invoiceQtyPcs || it.dispatchedPcs) || 0), 0);
-        return {
-          id: inv._id || inv.invoiceNumber,
-          date: inv.invoiceDate || (inv as any).date || '',
-          invoiceNo: inv.invoiceNumber || '—',
-          dcNo: inv.dispatchNumber || (inv as any).dcNumber || '—',
-          customerName: cleanVal(inv.customerName, 'Unnamed Customer'),
-          customerId: inv.customerId ? String(inv.customerId) : undefined,
-          city: cleanVal(inv.city || inv.billToAddress?.city),
-          region: cleanVal(inv.region || inv.state || inv.billToAddress?.state),
-          itemsCount: (inv.items || []).length,
-          totalGbl,
-          totalPcs: totalPcs || totalGbl * 100,
-          totalAmount: Number(inv.grandTotal || inv.subtotal || 0),
-          status: ((inv.status || 'unpaid').toLowerCase() as any),
-          items: inv.items || []
-        };
-      });
-  }, [invoices, startDate, endDate]);
+  // Extract Filter Options
+  const customersList = useMemo(() => {
+    const set = new Set<string>();
+    invoices.forEach(i => { if (i.customerName) set.add(i.customerName.trim()); });
+    salesOrders.forEach(o => { if (o.customerName) set.add(o.customerName.trim()); });
+    parties.filter(p => p.type === 'customer' || !p.type).forEach(p => {
+      const n = cleanVal(p.firmName || p.name);
+      if (n) set.add(n);
+    });
+    return Array.from(set).sort();
+  }, [invoices, salesOrders, parties]);
 
-  // ── 2. Receivables Report Data ──
-  const receivablesRows = useMemo<ReceivablesReportRow[]>(() => {
-    const custMap = new Map<string, ReceivablesReportRow>();
+  const suppliersList = useMemo(() => {
+    const set = new Set<string>();
+    purchases.forEach(p => {
+      const n = cleanVal(p.vendorName || p.supplierName || p.vendor?.firmName);
+      if (n) set.add(n);
+    });
+    parties.filter(p => p.type === 'vendor' || p.type === 'supplier').forEach(p => {
+      const n = cleanVal(p.firmName || p.name);
+      if (n) set.add(n);
+    });
+    return Array.from(set).sort();
+  }, [purchases, parties]);
 
-    // Pre-populate with directory parties
+  const regionsList = useMemo(() => {
+    const set = new Set<string>();
+    invoices.forEach(i => {
+      const r = cleanVal(i.region || i.city || i.billToAddress?.city || i.billToAddress?.state);
+      if (r) set.add(r);
+    });
     parties.forEach(p => {
-      const name = cleanVal(p.firmName || p.name);
-      if (!name) return;
-      const key = name.toLowerCase();
-      custMap.set(key, {
-        customerId: String(p._id || p.id || key),
-        customerName: name,
-        code: cleanVal(p.customerCode || p.code),
+      const r = cleanVal(p.city || p.state || p.region);
+      if (r) set.add(r);
+    });
+    return Array.from(set).sort();
+  }, [invoices, parties]);
+
+  // Executive KPI Metrics Calculation
+  const kpiMetrics = useMemo(() => {
+    // Current Period Sales Invoices
+    const periodInvoices = invoices.filter(i => isWithinDateRange(i.invoiceDate || i.date));
+    const totalSales = periodInvoices.reduce((s, i) => s + Number(i.grandTotal || i.subtotal || 0), 0);
+    const totalSalesVolumeGbl = periodInvoices.reduce((s, i) =>
+      s + (i.items || []).reduce((sub, it) => sub + Number(it.invoiceQtyGbl || it.dispatchedGbl || it.quantity || 0), 0), 0
+    );
+
+    // Purchases
+    const periodPurchases = purchases.filter(p => isWithinDateRange(p.invoiceDate || p.createdAt || p.date));
+    const totalPurchasesCost = periodPurchases.reduce((s, p) => s + Number(p.grandTotal || p.totalAmount || p.total || 0), 0);
+
+    // Outstanding Receivables & Payables
+    const totalReceivables = invoices.reduce((s, i) => {
+      const tot = Number(i.grandTotal || i.subtotal || 0);
+      const paid = i.status === 'paid' ? tot : Number(i.paidAmount || 0);
+      return s + Math.max(0, tot - paid);
+    }, 0);
+
+    const totalPayables = purchases.reduce((s, p) => {
+      const tot = Number(p.grandTotal || p.totalAmount || 0);
+      const paid = Number(p.paidAmount || (p.paymentStatus === 'paid' ? tot : 0));
+      return s + Math.max(0, tot - paid);
+    }, 0);
+
+    // Stock Inventory Valuation
+    const stockValuation = skus.reduce((s, sku) => {
+      const stock = Number(sku.presentStock || sku.openingStock || 0);
+      const cost = Number(sku.costPrice || sku.avgCost || sku.purchasePrice || sku.standardCost || 0);
+      return s + (stock * cost);
+    }, 0);
+
+    // Low Stock Count
+    const lowStockCount = skus.filter(sku => {
+      const present = Number(sku.presentStock || 0);
+      const min = Number(sku.minStockLevel || 0);
+      return min > 0 && present <= min;
+    }).length;
+
+    // Production Output
+    const periodProductions = productions.filter(p => isWithinDateRange(p.createdAt || p.startDate || p.date));
+    const totalProducedQty = periodProductions.reduce((s, p) => s + Number(p.totalProducedQty || p.producedQuantity || p.targetQty || 0), 0);
+
+    // Sales Orders Pending
+    const pendingOrdersCount = salesOrders.filter(o => o.status === 'Draft' || o.status === 'Confirmed' || o.status === 'In Production' || o.status === 'Pending').length;
+    const pendingDispatchCount = deliveries.filter(d => d.status === 'pending' || d.status === 'in_transit' || d.status === 'Partial').length;
+
+    // Tax Collected
+    const totalTaxCollected = periodInvoices.reduce((s, i) => s + Number(i.taxAmount || i.totalTax || 0), 0);
+
+    // Estimated Gross Profit
+    const grossProfit = Math.max(0, totalSales - totalPurchasesCost);
+    const profitMargin = totalSales > 0 ? ((grossProfit / totalSales) * 100).toFixed(1) : '0';
+
+    return {
+      totalSales,
+      totalSalesVolumeGbl,
+      totalPurchasesCost,
+      totalReceivables,
+      totalPayables,
+      stockValuation,
+      lowStockCount,
+      totalProducedQty,
+      pendingOrdersCount,
+      pendingDispatchCount,
+      totalTaxCollected,
+      grossProfit,
+      profitMargin
+    };
+  }, [invoices, purchases, skus, productions, salesOrders, deliveries, startDate, endDate]);
+
+  // ── GENERATE DATA FOR CURRENT ACTIVE TAB & SUB-REPORT ──
+  const activeReportRows = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+
+    // 1. DASHBOARD OVERVIEW / TRENDS
+    if (activeCategory === 'dashboard') {
+      return invoices
+        .filter(i => isWithinDateRange(i.invoiceDate || i.date))
+        .map(i => ({
+          id: i._id || i.invoiceNumber,
+          date: i.invoiceDate || (i as any).date || '',
+          refNo: i.invoiceNumber,
+          entity: cleanVal(i.customerName, 'Unnamed Customer'),
+          type: 'Invoice Sale',
+          region: cleanVal(i.region || i.city || i.billToAddress?.city),
+          volume: (i.items || []).reduce((s, it) => s + Number(it.invoiceQtyGbl || it.quantity || 0), 0),
+          amount: Number(i.grandTotal || i.subtotal || 0),
+          status: i.status || 'unpaid',
+          raw: i
+        }));
+    }
+
+    // 2. SALES REPORTS
+    if (activeCategory === 'sales') {
+      if (activeSubReport === 'by_customer') {
+        const map = new Map<string, any>();
+        invoices.filter(i => isWithinDateRange(i.invoiceDate || i.date)).forEach(i => {
+          const name = cleanVal(i.customerName, 'Unnamed Customer');
+          const key = name.toLowerCase();
+          const existing = map.get(key) || {
+            id: key,
+            customerName: name,
+            region: cleanVal(i.region || i.city || i.billToAddress?.city),
+            invoiceCount: 0,
+            totalGbl: 0,
+            grossSales: 0,
+            taxAmount: 0,
+            netSales: 0
+          };
+          const amt = Number(i.grandTotal || i.subtotal || 0);
+          const tax = Number(i.taxAmount || 0);
+          const gbl = (i.items || []).reduce((s, it) => s + Number(it.invoiceQtyGbl || it.quantity || 0), 0);
+          existing.invoiceCount += 1;
+          existing.totalGbl += gbl;
+          existing.grossSales += amt;
+          existing.taxAmount += tax;
+          existing.netSales += amt;
+          map.set(key, existing);
+        });
+        return Array.from(map.values());
+      } else if (activeSubReport === 'by_item') {
+        const map = new Map<string, any>();
+        invoices.filter(i => isWithinDateRange(i.invoiceDate || i.date)).forEach(i => {
+          (i.items || []).forEach(it => {
+            const key = (it.skuCode || it.itemName || '').toLowerCase().trim();
+            if (!key) return;
+            const existing = map.get(key) || {
+              id: key,
+              skuCode: it.skuCode || '—',
+              itemName: it.itemName || 'Item',
+              category: it.category || 'General',
+              quantityGbl: 0,
+              quantityPcs: 0,
+              totalRevenue: 0,
+              avgRate: 0,
+              orderCount: 0
+            };
+            const gbl = Number(it.invoiceQtyGbl || it.quantity || 0);
+            const pcs = Number(it.invoiceQtyPcs) || (gbl * (it.pcsPerGbl || 100));
+            const amt = Number(it.amount || (gbl * (it.rate || 0))) || 0;
+            existing.quantityGbl += gbl;
+            existing.quantityPcs += pcs;
+            existing.totalRevenue += amt;
+            existing.orderCount += 1;
+            map.set(key, existing);
+          });
+        });
+        return Array.from(map.values()).map(s => ({
+          ...s,
+          avgRate: s.quantityGbl > 0 ? Math.round((s.totalRevenue / s.quantityGbl) * 100) / 100 : 0
+        }));
+      } else {
+        // Sales Summary / Invoices
+        return invoices
+          .filter(i => isWithinDateRange(i.invoiceDate || i.date))
+          .map(i => ({
+            id: i._id || i.invoiceNumber,
+            date: i.invoiceDate || (i as any).date || '',
+            invoiceNo: i.invoiceNumber,
+            dcNo: i.dispatchNumber || '—',
+            customerName: cleanVal(i.customerName, 'Unnamed Customer'),
+            region: cleanVal(i.region || i.city || i.billToAddress?.city),
+            itemCount: (i.items || []).length,
+            totalGbl: (i.items || []).reduce((s, it) => s + Number(it.invoiceQtyGbl || it.quantity || 0), 0),
+            amount: Number(i.grandTotal || i.subtotal || 0),
+            status: i.status || 'unpaid',
+            raw: i
+          }));
+      }
+    }
+
+    // 3. PURCHASE REPORTS
+    if (activeCategory === 'purchases') {
+      return purchases
+        .filter(p => isWithinDateRange(p.invoiceDate || p.createdAt || p.date))
+        .map(p => ({
+          id: p._id || p.invoiceNumber || p.batchNumber,
+          date: p.invoiceDate || (p.createdAt ? p.createdAt.split('T')[0] : '') || '',
+          invoiceNo: p.invoiceNumber || p.batchNumber || 'PUR-001',
+          supplierName: cleanVal(p.vendorName || p.supplierName || p.vendor?.firmName || 'Unnamed Vendor'),
+          itemCount: (p.items || []).length,
+          totalQty: (p.items || []).reduce((s, it) => s + Number(it.quantity || it.receivedQty || 0), 0),
+          totalAmount: Number(p.grandTotal || p.totalAmount || p.total || 0),
+          status: p.paymentStatus || p.status || 'Received',
+          raw: p
+        }));
+    }
+
+    // 4. INVENTORY REPORTS
+    if (activeCategory === 'inventory') {
+      if (activeSubReport === 'movement') {
+        return inventoryLedger
+          .filter(l => isWithinDateRange(l.timestamp || l.createdAt))
+          .map(l => ({
+            id: l._id,
+            date: l.timestamp ? l.timestamp.split('T')[0] : '',
+            type: l.transactionType || 'Movement',
+            skuCode: l.skuId?.skuCode || '—',
+            skuName: l.skuId?.name || 'Item',
+            location: l.locationId?.name || 'Warehouse Storage',
+            qtyIn: Number(l.qtyIn || 0),
+            qtyOut: Number(l.qtyOut || 0),
+            balanceAfter: Number(l.balanceAfter || 0),
+            raw: l
+          }));
+      } else {
+        // Stock Summary
+        return skus.map(s => {
+          const present = Number(s.presentStock || s.openingStock || 0);
+          const cost = Number(s.costPrice || s.avgCost || s.purchasePrice || s.standardCost || 0);
+          return {
+            id: s._id || s.skuCode,
+            skuCode: s.skuCode || '—',
+            name: s.name || 'Unnamed SKU',
+            category: s.category || 'General',
+            unit: s.unit || 'GBL',
+            presentStock: present,
+            minStockLevel: Number(s.minStockLevel || 0),
+            unitCost: cost,
+            totalValue: present * cost,
+            status: present <= 0 ? 'Out of Stock' : (s.minStockLevel && present <= s.minStockLevel ? 'Low Stock' : 'In Stock'),
+            raw: s
+          };
+        });
+      }
+    }
+
+    // 5. PRODUCTION REPORTS
+    if (activeCategory === 'production') {
+      return productions
+        .filter(p => isWithinDateRange(p.createdAt || p.startDate || p.date))
+        .map(p => ({
+          id: p._id || p.orderNumber,
+          date: p.startDate || (p.createdAt ? p.createdAt.split('T')[0] : '') || '',
+          orderNo: p.orderNumber || 'PROD-001',
+          itemName: p.itemName || p.skuCode || 'Finished Book',
+          targetQty: Number(p.targetQty || p.quantity || 0),
+          producedQty: Number(p.totalProducedQty || p.producedQuantity || 0),
+          department: p.department || 'Manufacturing',
+          status: p.status || 'In Production',
+          raw: p
+        }));
+    }
+
+    // 6. DISPATCH REPORTS
+    if (activeCategory === 'dispatch') {
+      return deliveries
+        .filter(d => isWithinDateRange(d.date || d.createdAt))
+        .map(d => ({
+          id: d._id || d.dcNumber,
+          date: d.date || '',
+          dcNo: d.dcNumber || 'DC-001',
+          customerName: cleanVal(d.customerName || d.consigneeName, 'Direct Consignee'),
+          transporter: d.transporterName || 'Self Delivery',
+          totalGbl: Number(d.totalGbl || d.totalQuantity || 0),
+          status: d.status || 'delivered',
+          raw: d
+        }));
+    }
+
+    // 7. SALES ORDERS REPORTS
+    if (activeCategory === 'orders') {
+      return salesOrders
+        .filter(o => isWithinDateRange(o.orderDate || o.createdAt))
+        .map(o => ({
+          id: o._id || o.orderNumber,
+          date: o.orderDate || (o.createdAt ? o.createdAt.split('T')[0] : '') || '',
+          orderNo: o.orderNumber || 'SO-001',
+          customerName: cleanVal(o.customerName, 'Unnamed Customer'),
+          region: cleanVal(o.region || o.city),
+          itemCount: (o.items || []).length,
+          totalAmount: Number(o.grandTotal || o.total || 0),
+          status: o.status || 'Confirmed',
+          raw: o
+        }));
+    }
+
+    // 8. DIRECTORY / CUSTOMERS & SUPPLIERS
+    if (activeCategory === 'directory') {
+      return parties.map(p => ({
+        id: p._id || p.id,
+        name: cleanVal(p.firmName || p.name, 'Unnamed Party'),
+        type: p.type || 'customer',
         phone: cleanVal(p.mobile || p.phone),
         city: cleanVal(p.city || p.billingAddress?.city),
         region: cleanVal(p.region || p.state || p.billingAddress?.state),
         creditLimit: Number(p.creditLimit || 0),
-        totalInvoiced: 0,
-        totalPaid: 0,
-        outstandingBalance: Number(p.openingBalance || p.outstandingBalance || 0),
-        invoiceCount: 0,
-        lastInvoiceDate: undefined
-      });
-    });
-
-    // Accumulate invoices
-    invoices.forEach(inv => {
-      const name = cleanVal(inv.customerName);
-      if (!name) return;
-      const key = name.toLowerCase();
-      const existing = custMap.get(key) || {
-        customerId: String(inv.customerId || key),
-        customerName: name,
-        code: '',
-        phone: cleanVal(inv.billToAddress?.phone),
-        city: cleanVal(inv.city || inv.billToAddress?.city),
-        region: cleanVal(inv.region || inv.state || inv.billToAddress?.state),
-        creditLimit: 0,
-        totalInvoiced: 0,
-        totalPaid: 0,
-        outstandingBalance: 0,
-        invoiceCount: 0,
-        lastInvoiceDate: undefined
-      };
-
-      const invDate = inv.invoiceDate || (inv as any).date;
-      if (isWithinDateRange(invDate)) {
-        const invTotal = Number(inv.grandTotal || inv.subtotal || 0);
-        const invPaid = inv.status === 'paid' ? invTotal : Number(inv.paidAmount || 0);
-        const invDue = Math.max(0, invTotal - invPaid);
-
-        existing.totalInvoiced += invTotal;
-        existing.totalPaid += invPaid;
-        existing.outstandingBalance += invDue;
-        existing.invoiceCount += 1;
-
-        if (!existing.lastInvoiceDate || (invDate && invDate > existing.lastInvoiceDate)) {
-          existing.lastInvoiceDate = invDate;
-        }
-      }
-
-      custMap.set(key, existing);
-    });
-
-    return Array.from(custMap.values()).filter(r => r.totalInvoiced > 0 || r.outstandingBalance > 0);
-  }, [invoices, parties, startDate, endDate]);
-
-  // ── 3. SKU Sales Report Data ──
-  const skuSalesRows = useMemo<SkuSalesReportRow[]>(() => {
-    const skuMap = new Map<string, SkuSalesReportRow>();
-
-    // Pre-populate SKUs from master
-    skus.forEach(s => {
-      const code = (s.skuCode || s.name || '').toLowerCase().trim();
-      if (!code) return;
-      skuMap.set(code, {
-        skuId: String(s._id || s.id),
-        skuCode: s.skuCode || '—',
-        skuName: s.name || 'Unnamed Item',
-        category: s.category || 'General',
-        totalGblSold: 0,
-        totalPcsSold: 0,
-        totalRevenue: 0,
-        avgRate: Number(s.sellingPrice || s.rate || 0),
-        orderCount: 0
-      });
-    });
-
-    invoices.forEach(inv => {
-      if (!isWithinDateRange(inv.invoiceDate || inv.date)) return;
-      (inv.items || []).forEach(it => {
-        const codeKey = (it.skuCode || it.itemName || '').toLowerCase().trim();
-        if (!codeKey) return;
-        const gbl = Number(it.invoiceQtyGbl || it.dispatchedGbl || it.quantity) || 0;
-        const pcs = Number(it.invoiceQtyPcs || it.dispatchedPcs) || (gbl * (it.pcsPerGbl || 100));
-        const amt = Number(it.amount || (gbl * (it.rate || 0))) || 0;
-
-        const existing = skuMap.get(codeKey) || {
-          skuId: String(it.skuId || codeKey),
-          skuCode: it.skuCode || '—',
-          skuName: it.itemName || 'Item',
-          category: 'General',
-          totalGblSold: 0,
-          totalPcsSold: 0,
-          totalRevenue: 0,
-          avgRate: 0,
-          orderCount: 0
-        };
-
-        existing.totalGblSold += gbl;
-        existing.totalPcsSold += pcs;
-        existing.totalRevenue += amt;
-        existing.orderCount += 1;
-
-        skuMap.set(codeKey, existing);
-      });
-    });
-
-    return Array.from(skuMap.values())
-      .filter(s => s.totalGblSold > 0 || s.totalRevenue > 0)
-      .map(s => ({
-        ...s,
-        avgRate: s.totalGblSold > 0 ? Math.round((s.totalRevenue / s.totalGblSold) * 100) / 100 : s.avgRate
+        openingBalance: Number(p.openingBalance || 0),
+        raw: p
       }));
-  }, [invoices, skus, startDate, endDate]);
-
-  // ── 4. Regional Report Data ──
-  const regionalRows = useMemo<RegionalReportRow[]>(() => {
-    const regMap = new Map<string, RegionalReportRow>();
-
-    invoices.forEach(inv => {
-      if (!isWithinDateRange(inv.invoiceDate || inv.date)) return;
-      const regName = cleanVal(inv.region || inv.city || inv.billToAddress?.city || inv.billToAddress?.state, 'Unassigned Region');
-      const key = regName.toLowerCase();
-
-      const existing = regMap.get(key) || {
-        region: regName,
-        customerCount: 0,
-        totalOrders: 0,
-        totalGbl: 0,
-        totalRevenue: 0
-      };
-
-      const gbl = (inv.items || []).reduce((s, it) => s + (Number(it.invoiceQtyGbl || it.dispatchedGbl || it.quantity) || 0), 0);
-      const amt = Number(inv.grandTotal || inv.subtotal || 0);
-
-      existing.totalOrders += 1;
-      existing.totalGbl += gbl;
-      existing.totalRevenue += amt;
-
-      regMap.set(key, existing);
-    });
-
-    return Array.from(regMap.values()).sort((a, b) => b.totalRevenue - a.totalRevenue);
-  }, [invoices, startDate, endDate]);
-
-  // Overall Minimal Stats Summary Bar
-  const summaryStats = useMemo(() => {
-    const totalRevenue = salesRegisterRows.reduce((s, r) => s + r.totalAmount, 0);
-    const totalGbl = salesRegisterRows.reduce((s, r) => s + r.totalGbl, 0);
-    const totalInvoices = salesRegisterRows.length;
-    const totalOutstanding = receivablesRows.reduce((s, r) => s + r.outstandingBalance, 0);
-
-    return {
-      totalRevenue,
-      totalGbl,
-      totalInvoices,
-      totalOutstanding
-    };
-  }, [salesRegisterRows, receivablesRows]);
-
-  // Filtered & Sorted Current Tab Rows
-  const processedRows = useMemo(() => {
-    let rows: any[] = [];
-    const q = searchQuery.toLowerCase().trim();
-
-    if (activeTab === 'sales_register') {
-      rows = salesRegisterRows.filter(r => {
-        const matchesQuery = !q ||
-          r.invoiceNo.toLowerCase().includes(q) ||
-          r.dcNo?.toLowerCase().includes(q) ||
-          r.customerName.toLowerCase().includes(q) ||
-          r.region?.toLowerCase().includes(q);
-
-        const matchesCust = selectedCustomer === 'ALL' || r.customerName.toLowerCase() === selectedCustomer.toLowerCase();
-        const matchesReg = selectedRegion === 'ALL' || (r.region || r.city || '').toLowerCase() === selectedRegion.toLowerCase();
-
-        return matchesQuery && matchesCust && matchesReg;
-      });
-    } else if (activeTab === 'receivables') {
-      rows = receivablesRows.filter(r => {
-        const matchesQuery = !q ||
-          r.customerName.toLowerCase().includes(q) ||
-          r.code?.toLowerCase().includes(q) ||
-          r.phone?.toLowerCase().includes(q) ||
-          r.city?.toLowerCase().includes(q);
-
-        const matchesCust = selectedCustomer === 'ALL' || r.customerName.toLowerCase() === selectedCustomer.toLowerCase();
-        const matchesReg = selectedRegion === 'ALL' || (r.region || r.city || '').toLowerCase() === selectedRegion.toLowerCase();
-
-        return matchesQuery && matchesCust && matchesReg;
-      });
-    } else if (activeTab === 'sku_sales') {
-      rows = skuSalesRows.filter(r => {
-        return !q ||
-          r.skuCode.toLowerCase().includes(q) ||
-          r.skuName.toLowerCase().includes(q) ||
-          r.category.toLowerCase().includes(q);
-      });
-    } else if (activeTab === 'regional') {
-      rows = regionalRows.filter(r => {
-        const matchesQuery = !q || r.region.toLowerCase().includes(q);
-        const matchesReg = selectedRegion === 'ALL' || r.region.toLowerCase() === selectedRegion.toLowerCase();
-        return matchesQuery && matchesReg;
-      });
     }
 
-    // Sort
-    return [...rows].sort((a, b) => {
+    // 9. FINANCIAL / LEDGER
+    if (activeCategory === 'ledger') {
+      return transactions
+        .filter(t => isWithinDateRange(t.date || t.createdAt))
+        .map(t => ({
+          id: t._id || t.voucherNo,
+          date: t.date || (t.createdAt ? t.createdAt.split('T')[0] : '') || '',
+          voucherNo: t.voucherNo || t.refNo || 'TX-001',
+          type: t.transactionType || t.type || 'Payment',
+          partyName: cleanVal(t.partyName || t.customerName || t.vendorName, 'Cash/Bank Account'),
+          debit: Number(t.debit || (t.type === 'Invoice' ? t.amount : 0)),
+          credit: Number(t.credit || (t.type === 'Payment' ? t.amount : 0)),
+          balance: Number(t.runningBalance || t.amount || 0),
+          raw: t
+        }));
+    }
+
+    // 10. TAX REPORTS
+    if (activeCategory === 'tax') {
+      return invoices
+        .filter(i => isWithinDateRange(i.invoiceDate || i.date))
+        .map(i => {
+          const subtotal = Number(i.subtotal || i.taxableAmount || i.grandTotal || 0);
+          const tax = Number(i.taxAmount || i.totalTax || 0);
+          return {
+            id: i._id || i.invoiceNumber,
+            date: i.invoiceDate || (i as any).date || '',
+            invoiceNo: i.invoiceNumber,
+            customerName: cleanVal(i.customerName, 'Unnamed Customer'),
+            gstin: cleanVal(i.gstNumber || i.billToAddress?.gstin, 'Unregistered'),
+            taxableAmount: subtotal,
+            taxAmount: tax,
+            totalAmount: Number(i.grandTotal || subtotal + tax),
+            raw: i
+          };
+        });
+    }
+
+    return [];
+  }, [activeCategory, activeSubReport, invoices, salesOrders, deliveries, purchases, productions, skus, parties, inventoryLedger, transactions, searchQuery, selectedCustomer, selectedSupplier, selectedRegion, selectedStatus, startDate, endDate]);
+
+  // Filter & Sort Processed Rows
+  const filteredAndSortedRows = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    let rows = activeReportRows.filter(r => {
+      // Universal Query Search
+      const matchesSearch = !q || Object.values(r).some(val =>
+        val !== null && val !== undefined && String(val).toLowerCase().includes(q)
+      );
+
+      // Customer Filter
+      const matchesCust = selectedCustomer === 'ALL' || (r.customerName || r.entity || r.name || '').toLowerCase() === selectedCustomer.toLowerCase();
+
+      // Supplier Filter
+      const matchesSupp = selectedSupplier === 'ALL' || (r.supplierName || r.vendorName || r.name || '').toLowerCase() === selectedSupplier.toLowerCase();
+
+      // Region Filter
+      const matchesReg = selectedRegion === 'ALL' || (r.region || r.city || '').toLowerCase() === selectedRegion.toLowerCase();
+
+      return matchesSearch && matchesCust && matchesSupp && matchesReg;
+    });
+
+    // Universal Sorting
+    return rows.sort((a: any, b: any) => {
       let valA = a[sortField];
       let valB = b[sortField];
+
+      if (valA === undefined || valA === null) valA = '';
+      if (valB === undefined || valB === null) valB = '';
 
       if (typeof valA === 'string') valA = valA.toLowerCase();
       if (typeof valB === 'string') valB = valB.toLowerCase();
@@ -504,78 +657,16 @@ const SalesReports: React.FC = () => {
       if (valA > valB) return sortAsc ? 1 : -1;
       return 0;
     });
-  }, [activeTab, salesRegisterRows, receivablesRows, skuSalesRows, regionalRows, searchQuery, selectedCustomer, selectedRegion, sortField, sortAsc]);
+  }, [activeReportRows, searchQuery, selectedCustomer, selectedSupplier, selectedRegion, sortField, sortAsc]);
 
   // Pagination Slice
-  const totalPages = Math.ceil(processedRows.length / pageSize) || 1;
+  const totalPages = Math.ceil(filteredAndSortedRows.length / pageSize) || 1;
   const paginatedRows = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return processedRows.slice(start, start + pageSize);
-  }, [processedRows, currentPage, pageSize]);
+    return filteredAndSortedRows.slice(start, start + pageSize);
+  }, [filteredAndSortedRows, currentPage, pageSize]);
 
-  // Export to Excel
-  const handleExportExcel = () => {
-    let exportData: any[] = [];
-    let fileName = `Sales_Report_${new Date().toISOString().split('T')[0]}`;
-
-    if (activeTab === 'sales_register') {
-      fileName = `Sales_Register_${new Date().toISOString().split('T')[0]}`;
-      exportData = processedRows.map(r => ({
-        'Invoice Date': r.date,
-        'Invoice No': r.invoiceNo,
-        'Delivery Challan No': r.dcNo,
-        'Customer / Party': r.customerName,
-        'Region / City': r.region || r.city || '—',
-        'Line Items': r.itemsCount,
-        'Total GBL': r.totalGbl,
-        'Total Amount (₹)': r.totalAmount,
-        'Status': r.status.toUpperCase()
-      }));
-    } else if (activeTab === 'receivables') {
-      fileName = `Customer_Receivables_${new Date().toISOString().split('T')[0]}`;
-      exportData = processedRows.map(r => ({
-        'Customer Name': r.customerName,
-        'Customer Code': r.code || '—',
-        'Phone': r.phone || '—',
-        'City / Region': r.city || r.region || '—',
-        'Total Billed (₹)': r.totalInvoiced,
-        'Total Paid (₹)': r.totalPaid,
-        'Outstanding Balance (₹)': r.outstandingBalance,
-        'Total Invoices': r.invoiceCount
-      }));
-    } else if (activeTab === 'sku_sales') {
-      fileName = `SKU_Sales_Summary_${new Date().toISOString().split('T')[0]}`;
-      exportData = processedRows.map(r => ({
-        'SKU Code': r.skuCode,
-        'Item Name': r.skuName,
-        'Category': r.category,
-        'GBL Quantity Sold': r.totalGblSold,
-        'PCS Quantity Sold': r.totalPcsSold,
-        'Average Rate (₹)': r.avgRate,
-        'Total Revenue (₹)': r.totalRevenue
-      }));
-    } else if (activeTab === 'regional') {
-      fileName = `Regional_Sales_Summary_${new Date().toISOString().split('T')[0]}`;
-      exportData = processedRows.map(r => ({
-        'Region / City': r.region,
-        'Total Orders': r.totalOrders,
-        'Total Volume (GBL)': r.totalGbl,
-        'Total Revenue (₹)': r.totalRevenue
-      }));
-    }
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Report');
-    XLSX.writeFile(wb, `${fileName}.xlsx`);
-    showToast('Report exported to Excel successfully', 'success');
-  };
-
-  // Print Report Handler
-  const handlePrintReport = () => {
-    window.print();
-  };
-
+  // Column Sort Handler
   const handleSort = (field: string) => {
     if (sortField === field) {
       setSortAsc(!sortAsc);
@@ -585,27 +676,47 @@ const SalesReports: React.FC = () => {
     }
   };
 
+  // Export to Excel Engine
+  const handleExportExcel = () => {
+    const title = `${activeCategory.toUpperCase()}_Report_${activeSubReport}_${new Date().toISOString().split('T')[0]}`;
+    const cleanRows = filteredAndSortedRows.map(r => {
+      const copy = { ...r };
+      delete copy.raw;
+      delete copy.id;
+      return copy;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(cleanRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Report');
+    XLSX.writeFile(wb, `${title}.xlsx`);
+    showToast('Report exported to Excel successfully', 'success');
+  };
+
+  // Print Report Handler
+  const handlePrintReport = () => {
+    window.print();
+  };
+
   return (
     <div className="p-4 sm:p-6 bg-slate-50/50 min-h-screen space-y-5">
-      {/* ── HEADER ── */}
+      {/* ── HEADER & NAVIGATION TITLE ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold shadow-2xs">
-              <BarChart3 className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-lg font-black text-slate-900 tracking-tight">Sales & Financial Reports</h1>
-              <p className="text-xs text-slate-500 font-medium">Tally-grade real-time financial ledger analytics, register logs, and receivables summary.</p>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-md shrink-0">
+            <BarChart3 className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-slate-900 tracking-tight">Enterprise ERP Reports & Analytics</h1>
+            <p className="text-xs text-slate-500 font-medium">Real-time Tally-grade ledger audit, financial reporting, stock valuation, and operational analytics.</p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           <button
-            onClick={() => loadReportData(true)}
+            onClick={() => loadAllReportData(true)}
             className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
-            title="Refresh Report Data"
+            title="Refresh All Report Data"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
           </button>
@@ -628,112 +739,102 @@ const SalesReports: React.FC = () => {
         </div>
       </div>
 
-      {/* ── MINIMAL KPI STATS ROW ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Sales Billed</p>
-            <p className="text-lg font-black text-slate-900 font-mono mt-0.5">₹{summaryStats.totalRevenue.toLocaleString('en-IN')}</p>
-          </div>
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
-            <IndianRupee className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Invoices & Orders</p>
-            <p className="text-lg font-black text-slate-900 font-mono mt-0.5">{summaryStats.totalInvoices.toLocaleString('en-IN')}</p>
-          </div>
-          <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold shrink-0">
-            <FileText className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Volume (GBL)</p>
-            <p className="text-lg font-black text-slate-900 font-mono mt-0.5">{summaryStats.totalGbl.toLocaleString('en-IN')} GBL</p>
-          </div>
-          <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold shrink-0">
-            <Layers className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Receivables</p>
-            <p className="text-lg font-black text-rose-700 font-mono mt-0.5">₹{summaryStats.totalOutstanding.toLocaleString('en-IN')}</p>
-          </div>
-          <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold shrink-0">
-            <TrendingUp className="w-5 h-5" />
-          </div>
-        </div>
-      </div>
-
-      {/* ── TOP TABS ── */}
+      {/* ── CATEGORY LANDING TABS BAR ── */}
       <div className="flex items-center gap-1.5 p-1.5 bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-x-auto">
-        <button
-          onClick={() => { setActiveTab('sales_register'); setCurrentPage(1); }}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'sales_register'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-          }`}
-        >
-          <FileText className="w-3.5 h-3.5" />
-          <span>Sales Register Log</span>
-        </button>
-
-        <button
-          onClick={() => { setActiveTab('receivables'); setCurrentPage(1); }}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'receivables'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-          }`}
-        >
-          <Building className="w-3.5 h-3.5" />
-          <span>Customer Receivables Statement</span>
-        </button>
-
-        <button
-          onClick={() => { setActiveTab('sku_sales'); setCurrentPage(1); }}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'sku_sales'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-          }`}
-        >
-          <Package className="w-3.5 h-3.5" />
-          <span>SKU / Product Sales Summary</span>
-        </button>
-
-        <button
-          onClick={() => { setActiveTab('regional'); setCurrentPage(1); }}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'regional'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-          }`}
-        >
-          <MapPin className="w-3.5 h-3.5" />
-          <span>Regional / Market Analysis</span>
-        </button>
+        {[
+          { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboardIcon },
+          { id: 'sales', label: 'Sales', icon: ShoppingCart },
+          { id: 'purchases', label: 'Purchases', icon: ShoppingBag },
+          { id: 'inventory', label: 'Stock & Inventory', icon: Layers },
+          { id: 'production', label: 'Production', icon: Factory },
+          { id: 'dispatch', label: 'Dispatch', icon: Truck },
+          { id: 'orders', label: 'Sales Orders', icon: Package },
+          { id: 'directory', label: 'Directory', icon: Users },
+          { id: 'ledger', label: 'Ledger & Finance', icon: IndianRupee },
+          { id: 'tax', label: 'Tax & GST', icon: Percent }
+        ].map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => {
+              setActiveCategory(cat.id as MainCategoryType);
+              setActiveSubReport('summary');
+              setCurrentPage(1);
+            }}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeCategory === cat.id
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+            }`}
+          >
+            <cat.icon className="w-3.5 h-3.5" />
+            <span>{cat.label}</span>
+          </button>
+        ))}
       </div>
 
-      {/* ── FILTER CONTROLS BAR ── */}
+      {/* ── SUB-REPORT SUB-TAB NAVIGATION (IF APPLICABLE) ── */}
+      {activeCategory !== 'dashboard' && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-slate-100/70 border border-slate-200 rounded-xl overflow-x-auto text-xs font-bold text-slate-600">
+          <span className="text-[10px] uppercase font-black text-slate-400 mr-1">Report View:</span>
+          {activeCategory === 'sales' && (
+            <>
+              <SubTabBtn active={activeSubReport === 'summary'} onClick={() => setActiveSubReport('summary')}>Sales Summary</SubTabBtn>
+              <SubTabBtn active={activeSubReport === 'by_customer'} onClick={() => setActiveSubReport('by_customer')}>Sales by Customer</SubTabBtn>
+              <SubTabBtn active={activeSubReport === 'by_item'} onClick={() => setActiveSubReport('by_item')}>Sales by Item / SKU</SubTabBtn>
+            </>
+          )}
+          {activeCategory === 'inventory' && (
+            <>
+              <SubTabBtn active={activeSubReport === 'summary'} onClick={() => setActiveSubReport('summary')}>Stock Summary</SubTabBtn>
+              <SubTabBtn active={activeSubReport === 'movement'} onClick={() => setActiveSubReport('movement')}>Stock Movement Ledger</SubTabBtn>
+            </>
+          )}
+          {activeCategory === 'purchases' && (
+            <SubTabBtn active={true} onClick={() => {}}>Purchase Batch Log</SubTabBtn>
+          )}
+          {activeCategory === 'production' && (
+            <SubTabBtn active={true} onClick={() => {}}>Production Orders</SubTabBtn>
+          )}
+          {activeCategory === 'dispatch' && (
+            <SubTabBtn active={true} onClick={() => {}}>Delivery Challans</SubTabBtn>
+          )}
+          {activeCategory === 'orders' && (
+            <SubTabBtn active={true} onClick={() => {}}>Sales Orders Log</SubTabBtn>
+          )}
+          {activeCategory === 'directory' && (
+            <SubTabBtn active={true} onClick={() => {}}>Party Master Directory</SubTabBtn>
+          )}
+          {activeCategory === 'ledger' && (
+            <SubTabBtn active={true} onClick={() => {}}>Financial Ledger Transactions</SubTabBtn>
+          )}
+          {activeCategory === 'tax' && (
+            <SubTabBtn active={true} onClick={() => {}}>Tax & GST Audit</SubTabBtn>
+          )}
+        </div>
+      )}
+
+      {/* ── EXECUTIVE KPI CARDS ROW (Matching Tally / Enterprise standards) ── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        <KpiCard title="Sales Revenue" value={`₹${kpiMetrics.totalSales.toLocaleString('en-IN')}`} icon={IndianRupee} color="text-emerald-600" bg="bg-emerald-50" />
+        <KpiCard title="Sales Volume" value={`${kpiMetrics.totalSalesVolumeGbl.toLocaleString('en-IN')} GBL`} icon={Layers} color="text-blue-600" bg="bg-blue-50" />
+        <KpiCard title="Purchases Spend" value={`₹${kpiMetrics.totalPurchasesCost.toLocaleString('en-IN')}`} icon={ShoppingBag} color="text-purple-600" bg="bg-purple-50" />
+        <KpiCard title="Receivables" value={`₹${kpiMetrics.totalReceivables.toLocaleString('en-IN')}`} icon={TrendingUp} color="text-rose-600" bg="bg-rose-50" />
+        <KpiCard title="Stock Valuation" value={`₹${kpiMetrics.stockValuation.toLocaleString('en-IN')}`} icon={Package} color="text-indigo-600" bg="bg-indigo-50" />
+        <KpiCard title="Gross Margin" value={`${kpiMetrics.profitMargin}%`} icon={Percent} color="text-amber-600" bg="bg-amber-50" />
+      </div>
+
+      {/* ── UNIVERSAL FILTER SYSTEM BAR ── */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
         <div className="flex flex-col md:flex-row items-center justify-between gap-3">
-          {/* Search Bar */}
+          {/* Universal Search */}
           <div className="relative w-full md:w-80">
             <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
             <input
               type="text"
-              placeholder="Search by invoice #, customer name, SKU..."
+              placeholder="Search by ref #, customer, item, SKU..."
               value={searchQuery}
               onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 shadow-2xs"
+              className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 shadow-2xs"
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery('')} className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600">
@@ -743,32 +844,48 @@ const SalesReports: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2.5 w-full md:w-auto flex-wrap sm:flex-nowrap">
-            {/* Customer Dropdown */}
-            {(activeTab === 'sales_register' || activeTab === 'receivables') && (
+            {/* Customer Filter */}
+            {customersList.length > 0 && (
               <div className="flex-1 sm:flex-initial">
                 <select
                   value={selectedCustomer}
                   onChange={e => { setSelectedCustomer(e.target.value); setCurrentPage(1); }}
-                  className="w-full sm:w-48 py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
+                  className="w-full sm:w-44 py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
                 >
                   <option value="ALL">All Customers</option>
-                  {availableCustomers.map(c => (
+                  {customersList.map(c => (
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
               </div>
             )}
 
-            {/* Region Dropdown */}
-            {availableRegions.length > 0 && (
+            {/* Supplier Filter */}
+            {suppliersList.length > 0 && (
+              <div className="flex-1 sm:flex-initial">
+                <select
+                  value={selectedSupplier}
+                  onChange={e => { setSelectedSupplier(e.target.value); setCurrentPage(1); }}
+                  className="w-full sm:w-44 py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
+                >
+                  <option value="ALL">All Suppliers</option>
+                  {suppliersList.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Region Filter */}
+            {regionsList.length > 0 && (
               <div className="flex-1 sm:flex-initial">
                 <select
                   value={selectedRegion}
                   onChange={e => { setSelectedRegion(e.target.value); setCurrentPage(1); }}
-                  className="w-full sm:w-44 py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
+                  className="w-full sm:w-40 py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
                 >
-                  <option value="ALL">All Regions / Cities</option>
-                  {availableRegions.map(r => (
+                  <option value="ALL">All Regions</option>
+                  {regionsList.map(r => (
                     <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
@@ -803,12 +920,12 @@ const SalesReports: React.FC = () => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-1.5">
-                    {(['All', 'Today', 'This Week', 'This Month', 'Custom'] as const).map(p => (
+                    {(['All', 'Today', 'Yesterday', 'This Week', 'This Month', 'Last Month', 'This Quarter', 'This Year', 'Custom'] as const).map(p => (
                       <button
                         key={p}
                         type="button"
                         onClick={() => applyDatePreset(p)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-center cursor-pointer ${
+                        className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all text-center cursor-pointer ${
                           datePreset === p
                             ? 'bg-blue-600 text-white'
                             : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -848,92 +965,87 @@ const SalesReports: React.FC = () => {
         </div>
       </div>
 
-      {/* ── DATA TABLE ── */}
+      {/* ── UNIVERSAL REPORT DATA TABLE ── */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                {activeTab === 'sales_register' && (
+                {activeCategory === 'sales' && activeSubReport === 'by_customer' && (
                   <>
-                    <th className="py-3 px-4 text-left cursor-pointer hover:bg-slate-100" onClick={() => handleSort('date')}>
-                      <div className="flex items-center gap-1">Date <ArrowUpDown className="w-3 h-3 text-slate-400" /></div>
-                    </th>
-                    <th className="py-3 px-4 text-left cursor-pointer hover:bg-slate-100" onClick={() => handleSort('invoiceNo')}>
-                      <div className="flex items-center gap-1">Invoice # <ArrowUpDown className="w-3 h-3 text-slate-400" /></div>
-                    </th>
-                    <th className="py-3 px-4 text-left">DC #</th>
-                    <th className="py-3 px-4 text-left cursor-pointer hover:bg-slate-100" onClick={() => handleSort('customerName')}>
-                      <div className="flex items-center gap-1">Customer / Party <ArrowUpDown className="w-3 h-3 text-slate-400" /></div>
-                    </th>
+                    <th className="py-3 px-4 text-left cursor-pointer" onClick={() => handleSort('customerName')}>Customer Name</th>
                     <th className="py-3 px-4 text-left">Region / City</th>
-                    <th className="py-3 px-4 text-right">Line Items</th>
-                    <th className="py-3 px-4 text-right cursor-pointer hover:bg-slate-100" onClick={() => handleSort('totalGbl')}>
-                      <div className="flex items-center justify-end gap-1">Qty (GBL) <ArrowUpDown className="w-3 h-3 text-slate-400" /></div>
-                    </th>
-                    <th className="py-3 px-4 text-right cursor-pointer hover:bg-slate-100" onClick={() => handleSort('totalAmount')}>
-                      <div className="flex items-center justify-end gap-1">Amount (₹) <ArrowUpDown className="w-3 h-3 text-slate-400" /></div>
-                    </th>
-                    <th className="py-3 px-4 text-center">Status</th>
-                    <th className="py-3 px-4 text-center">Action</th>
+                    <th className="py-3 px-4 text-right cursor-pointer" onClick={() => handleSort('invoiceCount')}>Invoices</th>
+                    <th className="py-3 px-4 text-right cursor-pointer" onClick={() => handleSort('totalGbl')}>Volume (GBL)</th>
+                    <th className="py-3 px-4 text-right cursor-pointer" onClick={() => handleSort('grossSales')}>Gross Sales (₹)</th>
+                    <th className="py-3 px-4 text-right">Tax (₹)</th>
+                    <th className="py-3 px-4 text-right cursor-pointer" onClick={() => handleSort('netSales')}>Net Sales (₹)</th>
                   </>
                 )}
 
-                {activeTab === 'receivables' && (
+                {activeCategory === 'sales' && activeSubReport === 'by_item' && (
                   <>
-                    <th className="py-3 px-4 text-left cursor-pointer hover:bg-slate-100" onClick={() => handleSort('customerName')}>
-                      <div className="flex items-center gap-1">Customer / Party <ArrowUpDown className="w-3 h-3 text-slate-400" /></div>
-                    </th>
-                    <th className="py-3 px-4 text-left">City / Region</th>
-                    <th className="py-3 px-4 text-left">Phone</th>
-                    <th className="py-3 px-4 text-right cursor-pointer hover:bg-slate-100" onClick={() => handleSort('totalInvoiced')}>
-                      <div className="flex items-center justify-end gap-1">Total Billed (₹) <ArrowUpDown className="w-3 h-3 text-slate-400" /></div>
-                    </th>
-                    <th className="py-3 px-4 text-right cursor-pointer hover:bg-slate-100" onClick={() => handleSort('totalPaid')}>
-                      <div className="flex items-center justify-end gap-1">Received (₹) <ArrowUpDown className="w-3 h-3 text-slate-400" /></div>
-                    </th>
-                    <th className="py-3 px-4 text-right cursor-pointer hover:bg-slate-100" onClick={() => handleSort('outstandingBalance')}>
-                      <div className="flex items-center justify-end gap-1">Outstanding (₹) <ArrowUpDown className="w-3 h-3 text-slate-400" /></div>
-                    </th>
-                    <th className="py-3 px-4 text-center">Invoices</th>
-                    <th className="py-3 px-4 text-center">Action</th>
-                  </>
-                )}
-
-                {activeTab === 'sku_sales' && (
-                  <>
-                    <th className="py-3 px-4 text-left cursor-pointer hover:bg-slate-100" onClick={() => handleSort('skuCode')}>
-                      <div className="flex items-center gap-1">SKU Code <ArrowUpDown className="w-3 h-3 text-slate-400" /></div>
-                    </th>
-                    <th className="py-3 px-4 text-left cursor-pointer hover:bg-slate-100" onClick={() => handleSort('skuName')}>
-                      <div className="flex items-center gap-1">Item Description <ArrowUpDown className="w-3 h-3 text-slate-400" /></div>
-                    </th>
+                    <th className="py-3 px-4 text-left cursor-pointer" onClick={() => handleSort('skuCode')}>SKU Code</th>
+                    <th className="py-3 px-4 text-left cursor-pointer" onClick={() => handleSort('itemName')}>Item Description</th>
                     <th className="py-3 px-4 text-left">Category</th>
-                    <th className="py-3 px-4 text-right cursor-pointer hover:bg-slate-100" onClick={() => handleSort('totalGblSold')}>
-                      <div className="flex items-center justify-end gap-1">GBL Sold <ArrowUpDown className="w-3 h-3 text-slate-400" /></div>
-                    </th>
-                    <th className="py-3 px-4 text-right">PCS Sold</th>
+                    <th className="py-3 px-4 text-right cursor-pointer" onClick={() => handleSort('quantityGbl')}>Qty Sold (GBL)</th>
+                    <th className="py-3 px-4 text-right">Qty Sold (PCS)</th>
                     <th className="py-3 px-4 text-right">Avg Rate (₹)</th>
-                    <th className="py-3 px-4 text-right cursor-pointer hover:bg-slate-100" onClick={() => handleSort('totalRevenue')}>
-                      <div className="flex items-center justify-end gap-1">Total Revenue (₹) <ArrowUpDown className="w-3 h-3 text-slate-400" /></div>
-                    </th>
+                    <th className="py-3 px-4 text-right cursor-pointer" onClick={() => handleSort('totalRevenue')}>Total Revenue (₹)</th>
                   </>
                 )}
 
-                {activeTab === 'regional' && (
+                {activeCategory === 'sales' && activeSubReport === 'summary' && (
                   <>
-                    <th className="py-3 px-4 text-left cursor-pointer hover:bg-slate-100" onClick={() => handleSort('region')}>
-                      <div className="flex items-center gap-1">Region / City Market <ArrowUpDown className="w-3 h-3 text-slate-400" /></div>
-                    </th>
-                    <th className="py-3 px-4 text-right cursor-pointer hover:bg-slate-100" onClick={() => handleSort('totalOrders')}>
-                      <div className="flex items-center justify-end gap-1">Total Orders <ArrowUpDown className="w-3 h-3 text-slate-400" /></div>
-                    </th>
-                    <th className="py-3 px-4 text-right cursor-pointer hover:bg-slate-100" onClick={() => handleSort('totalGbl')}>
-                      <div className="flex items-center justify-end gap-1">Total Volume (GBL) <ArrowUpDown className="w-3 h-3 text-slate-400" /></div>
-                    </th>
-                    <th className="py-3 px-4 text-right cursor-pointer hover:bg-slate-100" onClick={() => handleSort('totalRevenue')}>
-                      <div className="flex items-center justify-end gap-1">Total Revenue (₹) <ArrowUpDown className="w-3 h-3 text-slate-400" /></div>
-                    </th>
+                    <th className="py-3 px-4 text-left cursor-pointer" onClick={() => handleSort('date')}>Date</th>
+                    <th className="py-3 px-4 text-left cursor-pointer" onClick={() => handleSort('invoiceNo')}>Invoice #</th>
+                    <th className="py-3 px-4 text-left">DC #</th>
+                    <th className="py-3 px-4 text-left cursor-pointer" onClick={() => handleSort('customerName')}>Customer / Party</th>
+                    <th className="py-3 px-4 text-left">Region / City</th>
+                    <th className="py-3 px-4 text-right">Items</th>
+                    <th className="py-3 px-4 text-right cursor-pointer" onClick={() => handleSort('totalGbl')}>Qty (GBL)</th>
+                    <th className="py-3 px-4 text-right cursor-pointer" onClick={() => handleSort('amount')}>Amount (₹)</th>
+                    <th className="py-3 px-4 text-center">Status</th>
+                    <th className="py-3 px-4 text-center">Drill-Down</th>
+                  </>
+                )}
+
+                {activeCategory === 'inventory' && activeSubReport === 'movement' && (
+                  <>
+                    <th className="py-3 px-4 text-left cursor-pointer" onClick={() => handleSort('date')}>Timestamp</th>
+                    <th className="py-3 px-4 text-left">Type</th>
+                    <th className="py-3 px-4 text-left cursor-pointer" onClick={() => handleSort('skuCode')}>SKU Code</th>
+                    <th className="py-3 px-4 text-left">Item Name</th>
+                    <th className="py-3 px-4 text-left">Location</th>
+                    <th className="py-3 px-4 text-right">Qty In</th>
+                    <th className="py-3 px-4 text-right">Qty Out</th>
+                    <th className="py-3 px-4 text-right">Balance After</th>
+                  </>
+                )}
+
+                {activeCategory === 'inventory' && activeSubReport === 'summary' && (
+                  <>
+                    <th className="py-3 px-4 text-left cursor-pointer" onClick={() => handleSort('skuCode')}>SKU Code</th>
+                    <th className="py-3 px-4 text-left cursor-pointer" onClick={() => handleSort('name')}>Item Description</th>
+                    <th className="py-3 px-4 text-left">Category</th>
+                    <th className="py-3 px-4 text-right cursor-pointer" onClick={() => handleSort('presentStock')}>Present Stock</th>
+                    <th className="py-3 px-4 text-right">Min Stock</th>
+                    <th className="py-3 px-4 text-right">Unit Cost (₹)</th>
+                    <th className="py-3 px-4 text-right cursor-pointer" onClick={() => handleSort('totalValue')}>Valuation (₹)</th>
+                    <th className="py-3 px-4 text-center">Status</th>
+                  </>
+                )}
+
+                {activeCategory !== 'sales' && activeCategory !== 'inventory' && (
+                  <>
+                    <th className="py-3 px-4 text-left cursor-pointer" onClick={() => handleSort('date')}>Date / Time</th>
+                    <th className="py-3 px-4 text-left">Reference #</th>
+                    <th className="py-3 px-4 text-left">Party / Description</th>
+                    <th className="py-3 px-4 text-left">Details / Region</th>
+                    <th className="py-3 px-4 text-right">Volume / Qty</th>
+                    <th className="py-3 px-4 text-right">Amount (₹)</th>
+                    <th className="py-3 px-4 text-center">Status</th>
+                    <th className="py-3 px-4 text-center">Drill-Down</th>
                   </>
                 )}
               </tr>
@@ -945,98 +1057,118 @@ const SalesReports: React.FC = () => {
                   <td colSpan={10} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                      <span>Loading report metrics...</span>
+                      <span>Fetching dynamic ERP dataset...</span>
                     </div>
                   </td>
                 </tr>
               ) : paginatedRows.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="py-12 text-center text-slate-400 italic">
-                    No matching report entries found for the selected criteria.
+                    No records found matching the active category filters.
                   </td>
                 </tr>
               ) : (
-                paginatedRows.map((row, idx) => (
-                  <tr key={row.id || row.customerId || row.skuId || row.region || idx} className="hover:bg-blue-50/40 transition-colors">
-                    {/* 1. SALES REGISTER TAB */}
-                    {activeTab === 'sales_register' && (
+                paginatedRows.map((row: any, idx: number) => (
+                  <tr key={row.id || idx} className="hover:bg-blue-50/40 transition-colors">
+                    {activeCategory === 'sales' && activeSubReport === 'by_customer' && (
+                      <>
+                        <td className="py-3 px-4 font-bold text-slate-900">{row.customerName}</td>
+                        <td className="py-3 px-4 text-slate-600">{row.region || '—'}</td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-700">{row.invoiceCount}</td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">{row.totalGbl.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-900">₹{row.grossSales.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-500">₹{row.taxAmount.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-emerald-700">₹{row.netSales.toLocaleString('en-IN')}</td>
+                      </>
+                    )}
+
+                    {activeCategory === 'sales' && activeSubReport === 'by_item' && (
+                      <>
+                        <td className="py-3 px-4 font-mono font-bold text-purple-700">{row.skuCode}</td>
+                        <td className="py-3 px-4 font-bold text-slate-900">{row.itemName}</td>
+                        <td className="py-3 px-4 text-slate-600">{row.category}</td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">{row.quantityGbl.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-600">{row.quantityPcs.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-700">₹{row.avgRate.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-emerald-700">₹{row.totalRevenue.toLocaleString('en-IN')}</td>
+                      </>
+                    )}
+
+                    {activeCategory === 'sales' && activeSubReport === 'summary' && (
                       <>
                         <td className="py-3 px-4 font-mono text-slate-600">{row.date || '—'}</td>
                         <td className="py-3 px-4 font-mono font-bold text-blue-700">{row.invoiceNo}</td>
                         <td className="py-3 px-4 font-mono text-slate-500">{row.dcNo}</td>
                         <td className="py-3 px-4 font-bold text-slate-900">{row.customerName}</td>
-                        <td className="py-3 px-4 text-slate-600">{row.region || row.city || '—'}</td>
-                        <td className="py-3 px-4 text-right font-mono">{row.itemsCount}</td>
+                        <td className="py-3 px-4 text-slate-600">{row.region || '—'}</td>
+                        <td className="py-3 px-4 text-right font-mono">{row.itemCount}</td>
                         <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">{row.totalGbl.toLocaleString('en-IN')}</td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">₹{row.totalAmount.toLocaleString('en-IN')}</td>
-                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">₹{row.amount.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-center">
                           <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                            row.status === 'paid'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : row.status === 'partial'
-                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                              : 'bg-rose-50 text-rose-700 border border-rose-200'
+                            row.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
                           }`}>
-                            {row.status.toUpperCase()}
+                            {String(row.status).toUpperCase()}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-center">
-                          <button
-                            onClick={() => setSelectedRowDetail(row)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
-                            title="View Transaction Breakdown"
-                          >
+                          <button onClick={() => setSelectedRowDetail(row.raw || row)} className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg">
                             <Eye className="w-4 h-4" />
                           </button>
                         </td>
                       </>
                     )}
 
-                    {/* 2. RECEIVABLES TAB */}
-                    {activeTab === 'receivables' && (
+                    {activeCategory === 'inventory' && activeSubReport === 'movement' && (
                       <>
-                        <td className="py-3 px-4">
-                          <div className="font-bold text-slate-900">{row.customerName}</div>
-                          {row.code && <div className="text-[10px] font-mono text-slate-400">Code: {row.code}</div>}
-                        </td>
-                        <td className="py-3 px-4 text-slate-600">{row.city || row.region || '—'}</td>
-                        <td className="py-3 px-4 font-mono text-slate-600">{row.phone || '—'}</td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">₹{row.totalInvoiced.toLocaleString('en-IN')}</td>
-                        <td className="py-3 px-4 text-right font-mono text-emerald-700 font-bold">₹{row.totalPaid.toLocaleString('en-IN')}</td>
-                        <td className="py-3 px-4 text-right font-mono text-rose-700 font-black">₹{row.outstandingBalance.toLocaleString('en-IN')}</td>
-                        <td className="py-3 px-4 text-center font-mono text-slate-700">{row.invoiceCount}</td>
-                        <td className="py-3 px-4 text-center">
-                          <button
-                            onClick={() => setSelectedRowDetail(row)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
-                            title="View Customer Statement Details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        </td>
+                        <td className="py-3 px-4 font-mono text-slate-600">{row.date}</td>
+                        <td className="py-3 px-4 font-bold text-blue-700">{row.type}</td>
+                        <td className="py-3 px-4 font-mono font-bold text-purple-700">{row.skuCode}</td>
+                        <td className="py-3 px-4 text-slate-900 font-bold">{row.skuName}</td>
+                        <td className="py-3 px-4 text-slate-600">{row.location}</td>
+                        <td className="py-3 px-4 text-right font-mono text-emerald-700 font-bold">+{row.qtyIn}</td>
+                        <td className="py-3 px-4 text-right font-mono text-rose-700 font-bold">-{row.qtyOut}</td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">{row.balanceAfter}</td>
                       </>
                     )}
 
-                    {/* 3. SKU SALES TAB */}
-                    {activeTab === 'sku_sales' && (
+                    {activeCategory === 'inventory' && activeSubReport === 'summary' && (
                       <>
                         <td className="py-3 px-4 font-mono font-bold text-purple-700">{row.skuCode}</td>
-                        <td className="py-3 px-4 font-bold text-slate-900">{row.skuName}</td>
+                        <td className="py-3 px-4 font-bold text-slate-900">{row.name}</td>
                         <td className="py-3 px-4 text-slate-600">{row.category}</td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">{row.totalGblSold.toLocaleString('en-IN')}</td>
-                        <td className="py-3 px-4 text-right font-mono text-slate-600">{row.totalPcsSold.toLocaleString('en-IN')}</td>
-                        <td className="py-3 px-4 text-right font-mono text-slate-700">₹{row.avgRate.toLocaleString('en-IN')}</td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">₹{row.totalRevenue.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">{row.presentStock} {row.unit}</td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-500">{row.minStockLevel || '—'}</td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-700">₹{row.unitCost.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-emerald-700">₹{row.totalValue.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            row.status === 'In Stock' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
+                          }`}>
+                            {row.status}
+                          </span>
+                        </td>
                       </>
                     )}
 
-                    {/* 4. REGIONAL TAB */}
-                    {activeTab === 'regional' && (
+                    {activeCategory !== 'sales' && activeCategory !== 'inventory' && (
                       <>
-                        <td className="py-3 px-4 font-bold text-slate-900">{row.region}</td>
-                        <td className="py-3 px-4 text-right font-mono text-slate-800">{row.totalOrders}</td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">{row.totalGbl.toLocaleString('en-IN')} GBL</td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">₹{row.totalRevenue.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 font-mono text-slate-600">{row.date || '—'}</td>
+                        <td className="py-3 px-4 font-mono font-bold text-blue-700">{row.invoiceNo || row.orderNo || row.dcNo || row.voucherNo || row.id}</td>
+                        <td className="py-3 px-4 font-bold text-slate-900">{row.customerName || row.supplierName || row.partyName || row.name || row.entity || '—'}</td>
+                        <td className="py-3 px-4 text-slate-600">{row.region || row.city || row.transporter || row.type || '—'}</td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-800">{row.totalGbl || row.totalQty || row.targetQty || row.volume || 0}</td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">₹{Number(row.totalAmount || row.amount || row.taxAmount || 0).toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                            {String(row.status || 'Active').toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <button onClick={() => setSelectedRowDetail(row.raw || row)} className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg">
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </td>
                       </>
                     )}
                   </tr>
@@ -1049,7 +1181,7 @@ const SalesReports: React.FC = () => {
         {/* ── PAGINATION BAR ── */}
         <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2 text-slate-500 font-medium">
-            <span>Showing {processedRows.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to {Math.min(currentPage * pageSize, processedRows.length)} of {processedRows.length} entries</span>
+            <span>Showing {filteredAndSortedRows.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to {Math.min(currentPage * pageSize, filteredAndSortedRows.length)} of {filteredAndSortedRows.length} entries</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -1068,7 +1200,7 @@ const SalesReports: React.FC = () => {
               <button
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors"
+                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40 hover:bg-slate-100"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -1078,7 +1210,7 @@ const SalesReports: React.FC = () => {
               <button
                 disabled={currentPage >= totalPages}
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors"
+                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40 hover:bg-slate-100"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -1087,10 +1219,10 @@ const SalesReports: React.FC = () => {
         </div>
       </div>
 
-      {/* ── DETAIL BREAKDOWN MODAL ── */}
+      {/* ── DRILL-DOWN DETAIL MODAL ── */}
       {selectedRowDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[85vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
@@ -1098,9 +1230,9 @@ const SalesReports: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 text-sm">
-                    {selectedRowDetail.invoiceNo ? `Invoice Details (${selectedRowDetail.invoiceNo})` : `Customer Statement (${selectedRowDetail.customerName})`}
+                    {selectedRowDetail.invoiceNumber || selectedRowDetail.orderNumber || selectedRowDetail.dcNumber || 'Transaction Detail'}
                   </h3>
-                  <p className="text-[10px] text-slate-500 font-medium">Detailed transaction breakdown</p>
+                  <p className="text-[10px] text-slate-500 font-medium">Itemized audit breakdown</p>
                 </div>
               </div>
               <button onClick={() => setSelectedRowDetail(null)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
@@ -1108,35 +1240,33 @@ const SalesReports: React.FC = () => {
               </button>
             </div>
 
-            {selectedRowDetail.customerName && (
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-xs">
-                <div className="font-bold text-slate-900">{selectedRowDetail.customerName}</div>
-                {selectedRowDetail.city && <div className="text-slate-500">{selectedRowDetail.city}, {selectedRowDetail.region}</div>}
-                {selectedRowDetail.phone && <div className="font-mono text-slate-600">Phone: {selectedRowDetail.phone}</div>}
-              </div>
-            )}
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-xs">
+              <div className="font-bold text-slate-900">{selectedRowDetail.customerName || selectedRowDetail.firmName || selectedRowDetail.vendorName || 'General Party'}</div>
+              {selectedRowDetail.city && <div className="text-slate-500">{selectedRowDetail.city}, {selectedRowDetail.region || selectedRowDetail.state}</div>}
+              {selectedRowDetail.date && <div className="font-mono text-slate-600">Date: {selectedRowDetail.date || selectedRowDetail.invoiceDate}</div>}
+            </div>
 
-            {selectedRowDetail.items && Array.isArray(selectedRowDetail.items) && selectedRowDetail.items.length > 0 && (
+            {selectedRowDetail.items && Array.isArray(selectedRowDetail.items) && (
               <div className="space-y-2">
-                <p className="text-xs font-bold text-slate-800 uppercase tracking-wider">Itemized Breakdown</p>
+                <p className="text-xs font-bold text-slate-800 uppercase tracking-wider">Line Items</p>
                 <div className="overflow-x-auto rounded-xl border border-slate-200">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500">
                         <th className="py-2 px-3 text-left">SKU Code</th>
                         <th className="py-2 px-3 text-left">Item Name</th>
-                        <th className="py-2 px-3 text-right">Qty (GBL)</th>
-                        <th className="py-2 px-3 text-right">Rate (₹)</th>
-                        <th className="py-2 px-3 text-right">Amount (₹)</th>
+                        <th className="py-2 px-3 text-right">Qty</th>
+                        <th className="py-2 px-3 text-right">Rate</th>
+                        <th className="py-2 px-3 text-right">Amount</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {selectedRowDetail.items.map((it: any, idx: number) => (
                         <tr key={idx}>
                           <td className="py-2 px-3 font-mono font-bold text-purple-700">{it.skuCode || '—'}</td>
-                          <td className="py-2 px-3 text-slate-800">{it.itemName || 'Item'}</td>
-                          <td className="py-2 px-3 text-right font-mono">{it.invoiceQtyGbl || it.dispatchedGbl || it.quantity || 0}</td>
-                          <td className="py-2 px-3 text-right font-mono">₹{Number(it.rate || 0).toLocaleString()}</td>
+                          <td className="py-2 px-3 text-slate-800">{it.itemName || it.name || 'Item'}</td>
+                          <td className="py-2 px-3 text-right font-mono">{it.invoiceQtyGbl || it.quantity || 0}</td>
+                          <td className="py-2 px-3 text-right font-mono">₹{Number(it.rate || it.unitPrice || 0).toLocaleString()}</td>
                           <td className="py-2 px-3 text-right font-mono font-bold">₹{Number(it.amount || 0).toLocaleString()}</td>
                         </tr>
                       ))}
@@ -1160,5 +1290,34 @@ const SalesReports: React.FC = () => {
     </div>
   );
 };
+
+// UI Helpers
+const SubTabBtn: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode }> = ({ active, onClick, children }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+      active ? 'bg-white text-blue-700 shadow-2xs' : 'hover:bg-white/60 text-slate-600'
+    }`}
+  >
+    {children}
+  </button>
+);
+
+const KpiCard: React.FC<{ title: string; value: string; icon: any; color: string; bg: string }> = ({ title, value, icon: Icon, color, bg }) => (
+  <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between">
+    <div>
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{title}</p>
+      <p className="text-base font-black text-slate-900 font-mono mt-0.5">{value}</p>
+    </div>
+    <div className={`w-8 h-8 rounded-xl ${bg} ${color} flex items-center justify-center font-bold shrink-0`}>
+      <Icon className="w-4 h-4" />
+    </div>
+  </div>
+);
+
+const LayoutDashboardIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <BarChart3 className={className} />
+);
 
 export default SalesReports;
