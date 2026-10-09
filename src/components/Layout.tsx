@@ -20,7 +20,8 @@ import {
   FileText,
   BookOpen,
   BarChart3,
-  Keyboard
+  Keyboard,
+  Wallet
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useRealtime } from '../context/RealtimeContext';
@@ -99,6 +100,7 @@ const Layout: React.FC = () => {
         'nav_production': '/production',
         'nav_dispatch': '/dispatch',
         'nav_invoices': '/invoices',
+        'nav_collections': '/collections',
         'nav_ledgers': '/ledgers',
         'nav_reports': '/reports',
         'nav_settings': '/inventory-v2/settings'
@@ -150,6 +152,9 @@ const Layout: React.FC = () => {
     }
     if (path === '/invoices') {
       return location.pathname.startsWith('/invoices') || location.pathname.startsWith('/sales/invoices');
+    }
+    if (path === '/collections') {
+      return location.pathname.startsWith('/collections') || location.pathname.startsWith('/payments/collections');
     }
     if (path === '/ledgers') {
       return location.pathname.startsWith('/ledgers') || location.pathname.startsWith('/reports/ledgers');
@@ -249,6 +254,7 @@ const Layout: React.FC = () => {
         { label: 'Production', path: '/production', icon: Factory, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS', 'MANAGE_ORDERS', 'VIEW_ORDERS'] },
         { label: 'Dispatch', path: '/dispatch', icon: Truck, permission: ['MANAGE_ORDERS', 'VIEW_ORDERS', 'MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
         { label: 'Invoices', path: '/invoices', icon: FileText, permission: ['MANAGE_ORDERS', 'VIEW_ORDERS', 'MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
+        { label: 'Payment Collections', path: '/collections', icon: Wallet, permission: ['MANAGE_ORDERS', 'VIEW_ORDERS', 'MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
       ]
     },
     {

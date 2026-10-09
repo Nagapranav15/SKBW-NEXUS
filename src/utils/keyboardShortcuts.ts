@@ -1,6 +1,6 @@
 export interface ShortcutItem {
   id: string;
-  module: 'Global' | 'Item Master' | 'Stock & Inventory' | 'Business Directory' | 'Purchase Batches' | 'Sale Orders' | 'Production' | 'Dispatch' | 'Invoices' | 'Ledgers' | 'Reports' | 'Form Navigation';
+  module: 'Global' | 'Item Master' | 'Stock & Inventory' | 'Business Directory' | 'Purchase Batches' | 'Sale Orders' | 'Production' | 'Dispatch' | 'Invoices' | 'Payment Collections' | 'Ledgers' | 'Reports' | 'Form Navigation';
   subCategory?: string; // e.g. 'Tabs', 'Actions', 'Form Controls'
   actionName: string;
   description: string;
@@ -84,6 +84,14 @@ export const DEFAULT_KEYBOARD_SHORTCUTS: Record<string, ShortcutItem> = {
     actionName: 'Go to Invoices',
     description: 'Open Sales Invoices & GST billing',
     defaultKey: 'Alt+9'
+  },
+  'nav_collections': {
+    id: 'nav_collections',
+    module: 'Global',
+    subCategory: 'Navigation',
+    actionName: 'Go to Payment Collections',
+    description: 'Open Payment Collection App, Route Planner & Agent Logs',
+    defaultKey: 'Alt+C'
   },
   'nav_ledgers': {
     id: 'nav_ledgers',
