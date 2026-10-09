@@ -21,6 +21,17 @@ export interface StorageLocationOption {
   level: string;
 }
 
+const extractParties = (res: any): any[] => {
+  if (!res) return [];
+  const d = res.data ?? res;
+  if (Array.isArray(d)) return d;
+  if (Array.isArray(d?.parties)) return d.parties;
+  if (Array.isArray(d?.customers)) return d.customers;
+  if (Array.isArray(d?.data)) return d.data;
+  if (Array.isArray(res?.parties)) return res.parties;
+  return [];
+};
+
 export interface SkuLocationStock {
   locationId: string;
   locationName: string;
@@ -93,6 +104,14 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
   const [directCustomerPhone, setDirectCustomerPhone] = useState('');
   const [directRegion, setDirectRegion] = useState('');
   const [selectedPartyId, setSelectedPartyId] = useState('');
+
+  // Customer search & dropdown state
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [highlightedCustomerIdx, setHighlightedCustomerIdx] = useState(0);
+  const customerRef = useRef<HTMLDivElement>(null);
+  const customerInputRef = useRef<HTMLInputElement>(null);
+  const customerDropdownListRef = useRef<HTMLDivElement>(null);
 
   // Parties & Master SKUs
   const [partyOptions, setPartyOptions] = useState<any[]>([]);
@@ -370,8 +389,43 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
       setSkuLocationStockMap(locStockMap);
       setAvailableSkus(sList);
 
-      const pList = Array.isArray(partiesRes) ? partiesRes : (partiesRes?.data || partiesRes?.parties || []);
-      setPartyOptions(Array.isArray(pList) ? pList : []);
+      // Extract backend parties & merge local storage fallback
+      const rawBackendParties: any[] = extractParties(partiesRes);
+
+      let localParties: any[] = [];
+      try {
+        const stored = localStorage.getItem(`skbw_parties_${compId}`) || localStorage.getItem('parties');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          localParties = extractParties(parsed);
+        }
+      } catch (e) {
+        console.warn('Failed to parse local parties:', e);
+      }
+
+      const partyMap = new Map<string, any>();
+      [...rawBackendParties, ...localParties].forEach((p: any) => {
+        if (!p || p.isDeleted) return;
+        const name = (p.firmName || p.name || p.companyName || p.ownerName || '').trim();
+        if (!name) return;
+        const key = (p._id || p.id || name).toString().toLowerCase();
+        if (!partyMap.has(key)) {
+          partyMap.set(key, { ...p, firmName: name });
+        } else {
+          const existing = partyMap.get(key);
+          if (!existing.phone && p.phone) existing.phone = p.phone;
+          if (!existing.mobile && p.mobile) existing.mobile = p.mobile;
+          if (!existing.city && p.city) existing.city = p.city;
+          if (!existing.state && p.state) existing.state = p.state;
+          if (!existing.customerCode && p.customerCode) existing.customerCode = p.customerCode;
+        }
+      });
+
+      const uniqueParties = Array.from(partyMap.values()).sort((a, b) =>
+        (a.firmName || a.name || '').localeCompare(b.firmName || b.name || '')
+      );
+
+      setPartyOptions(uniqueParties);
     }).catch(err => {
       console.warn('Failed to load modal dependencies:', err);
     });
@@ -385,6 +439,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
       // Pre-fill from existing challan for editing
       const ch = editingChallan;
       setDirectCustomerName(ch.customerName || '');
+      setCustomerSearch(ch.customerName || '');
       setTransporter(ch.transporterName || '');
       setVehicleNumber(ch.vehicleNumber || '');
       setLrNumber(ch.lrNumber || '');
@@ -793,9 +848,84 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     );
   };
 
+  // Filtered party options for searchable customer dropdown
+  const filteredParties = useMemo(() => {
+    if (!customerSearch.trim()) return partyOptions;
+    const q = customerSearch.toLowerCase().trim();
+    return partyOptions.filter(p => {
+      const name = (p.firmName || p.name || p.companyName || '').toLowerCase();
+      const city = (p.city || '').toLowerCase();
+      const state = (p.state || '').toLowerCase();
+      const code = (p.customerCode || '').toLowerCase();
+      const phone = (p.mobile || p.phone || '').toLowerCase();
+      return name.includes(q) || city.includes(q) || state.includes(q) || code.includes(q) || phone.includes(q);
+    });
+  }, [partyOptions, customerSearch]);
+
+  // Click outside listener for customer dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (customerRef.current && !customerRef.current.contains(e.target as Node)) {
+        setShowCustomerDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Auto scroll highlighted customer into view
+  useEffect(() => {
+    if (showCustomerDropdown && customerDropdownListRef.current) {
+      const activeEl = customerDropdownListRef.current.children[highlightedCustomerIdx] as HTMLElement;
+      if (activeEl) {
+        activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }, [highlightedCustomerIdx, showCustomerDropdown]);
+
+  // Keyboard navigation for customer dropdown
+  const handleCustomerKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!showCustomerDropdown) {
+        setShowCustomerDropdown(true);
+        return;
+      }
+      if (filteredParties.length > 0) {
+        setHighlightedCustomerIdx(prev => Math.min(prev + 1, filteredParties.length - 1));
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (showCustomerDropdown && filteredParties.length > 0) {
+        setHighlightedCustomerIdx(prev => Math.max(prev - 1, 0));
+      }
+    } else if (e.key === 'Enter') {
+      if (showCustomerDropdown && filteredParties.length > 0) {
+        e.preventDefault();
+        const selected = filteredParties[highlightedCustomerIdx] || filteredParties[0];
+        if (selected) {
+          handleSelectParty(selected._id || selected.id);
+          customerInputRef.current?.blur();
+        }
+      }
+    } else if (e.key === 'Escape') {
+      setShowCustomerDropdown(false);
+    }
+  };
+
   // Direct party select handler
   const handleSelectParty = (partyId: string) => {
     setSelectedPartyId(partyId);
+    setShowCustomerDropdown(false);
+    if (!partyId) {
+      setCustomerSearch('');
+      setDirectCustomerName('');
+      setDirectCustomerPhone('');
+      setDirectRegion('');
+      setBillToAddress('');
+      setShipToAddress('');
+      return;
+    }
     const p = partyOptions.find(item => item._id === partyId || item.id === partyId);
     if (p) {
       const pName = p.firmName || p.name || p.companyName || '';
@@ -805,6 +935,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
       const pStreet = p.address || p.billingAddress?.street || p.billingAddress?.address || '';
       const pPincode = p.pincode || p.billingAddress?.pincode || '';
 
+      setCustomerSearch(pName);
       setDirectCustomerName(pName);
       setDirectCustomerPhone(pPhone);
       setDirectRegion(pCity || pState);
@@ -819,6 +950,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
       setBillToAddress(addressLines);
       setShipToAddress(addressLines);
     } else {
+      setCustomerSearch('');
       setDirectCustomerName('');
       setDirectCustomerPhone('');
       setDirectRegion('');
@@ -1098,6 +1230,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
             num={1}
             label={dispatchMode === 'direct' ? 'Customer & Dispatch Destination' : 'Order & Customer Details'}
             badge={dispatchMode === 'direct' ? 'Consignee Details' : (activeOrder?.orderNumber || 'Sales Order')}
+            className="z-50"
           >
             {dispatchMode === 'order' ? (
               /* SALES ORDER SOURCE FIELDS */
@@ -1150,21 +1283,101 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
               /* DIRECT DISPATCH FIELDS - EXACT SAME 5-COLUMN GRID LAYOUT AS SALES ORDER! */
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
                 <div className="lg:col-span-2">
-                  <FieldLabel>Select Customer / Party <Required /></FieldLabel>
-                  <div className="relative">
-                    <select
-                      value={selectedPartyId}
-                      onChange={e => handleSelectParty(e.target.value)}
-                      className="w-full h-9 bg-white border border-purple-300 rounded-xl px-3 pr-8 text-xs font-bold text-slate-900 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-500/15 cursor-pointer shadow-2xs"
-                    >
-                      <option value="">— Choose Customer from Directory —</option>
-                      {partyOptions.map(p => (
-                        <option key={p._id || p.id} value={p._id || p.id}>
-                          {p.firmName || p.name || p.companyName} {p.customerCode ? `(${p.customerCode})` : ''} {p.city ? `• ${p.city}` : p.state ? `• ${p.state}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                  <div className="flex items-center justify-between mb-1">
+                    <FieldLabel>Select Customer / Party <Required /></FieldLabel>
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      {partyOptions.length > 0 ? `${partyOptions.length.toLocaleString()} customers available` : ''}
+                    </span>
+                  </div>
+                  <div ref={customerRef} className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400 z-10 pointer-events-none" />
+                    <input
+                      ref={customerInputRef}
+                      type="text"
+                      value={customerSearch}
+                      onChange={(e) => {
+                        setCustomerSearch(e.target.value);
+                        setShowCustomerDropdown(true);
+                        setHighlightedCustomerIdx(0);
+                        if (!e.target.value) {
+                          handleSelectParty('');
+                        }
+                      }}
+                      onClick={() => setShowCustomerDropdown(true)}
+                      onFocus={() => setShowCustomerDropdown(true)}
+                      onKeyDown={handleCustomerKeyDown}
+                      placeholder="Search customer firm name..."
+                      className="w-full pl-8 pr-10 h-9 bg-white border border-purple-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-purple-500/15 focus:border-purple-600 focus:outline-none shadow-2xs"
+                    />
+
+                    <div className="absolute right-2.5 top-2.5 flex items-center gap-1 text-slate-400 z-10">
+                      {customerSearch || selectedPartyId ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomerSearch('');
+                            handleSelectParty('');
+                          }}
+                          className="p-0.5 hover:text-slate-600 rounded-md cursor-pointer"
+                          title="Clear customer"
+                        >
+                          <X className="w-3.5 h-3.5 text-slate-500" />
+                        </button>
+                      ) : (
+                        <ChevronDown 
+                          className="w-4 h-4 cursor-pointer hover:text-slate-600" 
+                          onClick={() => setShowCustomerDropdown(!showCustomerDropdown)} 
+                        />
+                      )}
+                    </div>
+
+                    {/* Customer Dropdown Popover */}
+                    {showCustomerDropdown && (
+                      <div
+                        ref={customerDropdownListRef}
+                        className="absolute left-0 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-2xl z-[999] max-h-64 overflow-y-auto divide-y divide-slate-50 p-1"
+                      >
+                        {filteredParties.slice(0, 200).map((c, idx) => {
+                          const cId = c._id || c.id;
+                          const isHighlighted = highlightedCustomerIdx === idx;
+                          const isSelected = selectedPartyId === cId;
+                          const cName = c.firmName || c.name || c.companyName || c.ownerName || c.contactName;
+                          const cLocation = [c.city, c.state].filter(Boolean).join(', ');
+                          const cPhone = c.mobile || c.phone || c.contactPerson?.mobile || '';
+
+                          return (
+                            <div
+                              key={cId || `${cName}-${idx}`}
+                              onClick={() => handleSelectParty(cId)}
+                              onMouseEnter={() => setHighlightedCustomerIdx(idx)}
+                              className={`p-2.5 cursor-pointer rounded-lg transition-colors flex items-center justify-between ${
+                                isHighlighted || isSelected
+                                  ? 'bg-blue-100/90 text-blue-900 font-bold border border-blue-200'
+                                  : 'hover:bg-blue-50/70'
+                              }`}
+                            >
+                              <div>
+                                <div className="font-bold text-slate-900 text-xs">{cName}</div>
+                                <div className="text-[10px] text-slate-400">{cLocation || '—'}</div>
+                              </div>
+                              {cPhone && (
+                                <span className="text-[10px] bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-bold font-mono">
+                                  {cPhone}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {filteredParties.length > 200 && (
+                          <div className="p-2 text-center text-slate-400 text-[10px] bg-slate-50 rounded-lg">
+                            Showing first 200 of {filteredParties.length} customers. Type in the search box to find specific customer.
+                          </div>
+                        )}
+                        {filteredParties.length === 0 && (
+                          <div className="p-3 text-center text-slate-400 italic">No customers found</div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1997,15 +2210,22 @@ function SectionCard({
   label,
   badge,
   children,
+  className = '',
+  style,
 }: {
   num: number;
   label: string;
   badge?: string;
   children: React.ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
 }) {
   return (
-    <div className="border border-slate-200/90 rounded-2xl bg-white shadow-2xs overflow-hidden">
-      <div className="bg-slate-50/80 px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+    <div
+      style={style}
+      className={`relative border border-slate-200/90 rounded-2xl bg-white shadow-2xs ${className}`}
+    >
+      <div className="bg-slate-50/80 px-5 py-3 border-b border-slate-100 flex items-center justify-between rounded-t-2xl">
         <div className="flex items-center gap-2.5">
           <div className="w-5 h-5 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-black shrink-0 shadow-2xs">
             {num}
