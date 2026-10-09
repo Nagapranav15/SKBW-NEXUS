@@ -86,6 +86,24 @@ const BASE_CUSTOMERS = [
   { _id: 'cust-20', firmName: 'Pragati Paper Mart', ownerName: 'Mohan Lal', phone: '9908123456', address: 'Sultan Bazaar', city: 'Hyderabad', state: 'Telangana', pincode: '500095', creditLimit: 120000, outstandingBalance: 31000, preferredTransport: 'Chennupati Cargo Services', lastOrderDate: '2026-09-04', group: 'A Grade' }
 ];
 
+// Helper to extract customer tags array safely from any customer object format
+export const getCustomerTags = (cust: any): string[] => {
+  if (!cust) return [];
+  if (Array.isArray(cust.tags)) {
+    return cust.tags.filter((t: any) => typeof t === 'string' && Boolean(t.trim()));
+  }
+  if (typeof cust.tags === 'string' && cust.tags.trim()) {
+    return cust.tags.split(',').map((t: string) => t.trim()).filter(Boolean);
+  }
+  if (Array.isArray(cust.tag)) {
+    return cust.tag.filter((t: any) => typeof t === 'string' && Boolean(t.trim()));
+  }
+  if (typeof cust.tag === 'string' && cust.tag.trim()) {
+    return cust.tag.split(',').map((t: string) => t.trim()).filter(Boolean);
+  }
+  return [];
+};
+
 // Combine base customers and all sample customers from sales orders
 const ALL_SYSTEM_CUSTOMERS: any[] = (() => {
   const map = new Map<string, any>();
@@ -1343,7 +1361,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       (c.firmName || c.ownerName || c.contactName || c.name || '').toLowerCase().includes(q) ||
       (c.city || '').toLowerCase().includes(q) ||
       (c.state || '').toLowerCase().includes(q) ||
-      (c.phone || c.mobile || '').includes(q)
+      (c.phone || c.mobile || '').includes(q) ||
+      getCustomerTags(c).some(t => t.toLowerCase().includes(q))
     );
   }, [customersList, customerSearch]);
 
@@ -1627,8 +1646,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       shiftFocus(1);
     }
 
-    // 2. Arrow Down
-    if (e.key === 'ArrowDown') {
+    // 2. Arrow Down / Arrow Right
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
       if (showQuickPresetMenu && predefinedCharges.length > 0) {
         e.preventDefault();
         setHighlightedQuickPresetIdx(prev => Math.min(prev + 1, predefinedCharges.length - 1));
@@ -1668,14 +1687,14 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         }));
         return;
       }
-      if (target.tagName === 'INPUT' && (target as HTMLInputElement).type !== 'date') {
+      if (target.tagName === 'INPUT' || target.tagName === 'SELECT') {
         e.preventDefault();
         shiftFocus(1);
       }
     }
 
-    // 3. Arrow Up
-    if (e.key === 'ArrowUp') {
+    // 3. Arrow Up / Arrow Left
+    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
       if (showQuickPresetMenu && predefinedCharges.length > 0) {
         e.preventDefault();
         setHighlightedQuickPresetIdx(prev => Math.max(prev - 1, 0));
@@ -1700,7 +1719,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         }));
         return;
       }
-      if (target.tagName === 'INPUT' && (target as HTMLInputElement).type !== 'date') {
+      if (target.tagName === 'INPUT' || target.tagName === 'SELECT') {
         e.preventDefault();
         shiftFocus(-1);
       }
@@ -1912,7 +1931,14 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                               }`}
                             >
                               <div>
-                                <div className="font-bold text-gray-900 text-xs">{c.firmName || c.ownerName || c.contactName}</div>
+                                <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5 flex-wrap">
+                                  <span>{c.firmName || c.ownerName || c.contactName}</span>
+                                  {getCustomerTags(c).map((tag: string, tIdx: number) => (
+                                    <span key={tIdx} className="px-1.5 py-0.2 bg-indigo-50 text-indigo-700 border border-indigo-200/70 rounded text-[9px] font-bold">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
                                 <div className="text-[10px] text-gray-400">{c.city ? `${c.city}, ` : ''}{c.state || ''}</div>
                               </div>
                               <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
@@ -1956,8 +1982,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                       </button>
                     </div>
 
-                    <div className="flex items-center gap-2 pt-0.5">
-                      <div className="flex items-center gap-1 font-bold text-gray-900">
+                    <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
+                      <div className="flex items-center gap-1 font-bold text-gray-900 shrink-0">
                         <Phone className="w-3.5 h-3.5 text-blue-600" />
                         <span>{billingAddress.phone || selectedCustomer.phone || selectedCustomer.mobile || '—'}</span>
                       </div>
@@ -1967,11 +1993,28 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           target="_blank"
                           rel="noreferrer"
                           title="Chat on WhatsApp"
+                          className="shrink-0"
                         >
                           <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-500 hover:scale-110" />
                         </a>
                       )}
-                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px] ml-auto">
+
+                      {/* Customer Tags Badges */}
+                      {getCustomerTags(selectedCustomer).length > 0 && (
+                        <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar max-w-[180px] shrink-0">
+                          {getCustomerTags(selectedCustomer).map((tag: string, tIdx: number) => (
+                            <span 
+                              key={tIdx} 
+                              className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200/80 rounded-md font-bold text-[9px] shrink-0 whitespace-nowrap"
+                              title={`Customer Tag: ${tag}`}
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px] ml-auto shrink-0">
                         {selectedCustomer.status === 'inactive' ? 'Inactive' : 'Active'}
                       </span>
                     </div>
@@ -3374,6 +3417,16 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                   <p className="text-[11px] text-gray-400 font-mono mt-0.5">
                     CUSTOMER CODE: <span className="font-extrabold text-blue-600">{selectedCustomer.code || selectedCustomer._id?.slice(-6).toUpperCase() || 'CUST-001'}</span>
                   </p>
+                  {getCustomerTags(selectedCustomer).length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tags:</span>
+                      {getCustomerTags(selectedCustomer).map((tag: string, tIdx: number) => (
+                        <span key={tIdx} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full font-bold text-[10px]">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               <button

@@ -241,7 +241,16 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
   const fmtMoney = (n?: number) =>
     n != null ? `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
 
-  const custObj = customerDetails || (typeof activeOrder.customer === 'object' ? activeOrder.customer : null);
+  const getCustomerTags = (cust: any): string[] => {
+    if (!cust) return [];
+    if (Array.isArray(cust.tags)) return cust.tags.filter((t: any) => typeof t === 'string' && Boolean(t.trim()));
+    if (typeof cust.tags === 'string' && cust.tags.trim()) return cust.tags.split(',').map((t: string) => t.trim()).filter(Boolean);
+    if (Array.isArray(cust.tag)) return cust.tag.filter((t: any) => typeof t === 'string' && Boolean(t.trim()));
+    if (typeof cust.tag === 'string' && cust.tag.trim()) return cust.tag.split(',').map((t: string) => t.trim()).filter(Boolean);
+    return [];
+  };
+
+  const custTags = getCustomerTags(custObj);
   const ba = activeOrder.billingAddress as any;
   const sa = activeOrder.shippingAddress as any;
 
@@ -1033,6 +1042,11 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                       <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-full text-[10px] font-bold">
                         {activeOrder.orderType || 'Credit'}
                       </span>
+                      {custTags.map((tag: string, tIdx: number) => (
+                        <span key={tIdx} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200/80 rounded-full text-[10px] font-bold">
+                          {tag}
+                        </span>
+                      ))}
                     </div>
                   </div>
 

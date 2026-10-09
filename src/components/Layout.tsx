@@ -19,16 +19,20 @@ import {
   Truck,
   FileText,
   BookOpen,
-  BarChart3
+  BarChart3,
+  Keyboard
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useRealtime } from '../context/RealtimeContext';
 import DataManager from './DataManager';
+import { KeyboardShortcutLegendModal } from './ui/KeyboardShortcutLegendModal';
+import { getKeyboardShortcuts, matchShortcut } from '../utils/keyboardShortcuts';
 
 const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [showDataManager, setShowDataManager] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showShortcutLegend, setShowShortcutLegend] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, hasPermission, hasRole, selectedCompany } = useAuth();
@@ -56,91 +60,65 @@ const Layout: React.FC = () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const activeEl = document.activeElement;
+      if (e.key === 'Escape') {
+        setShowDataManager(false);
+        setShowShortcutLegend(false);
+        return;
+      }
+
+      // Ignore when user is actively typing in input/textarea/editable elements
+      const target = e.target as HTMLElement | null;
       if (
-        activeEl && (
-          activeEl.tagName === 'INPUT' ||
-          activeEl.tagName === 'TEXTAREA' ||
-          (activeEl as HTMLElement).isContentEditable
-        )
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
       ) {
         return;
       }
 
-      const key = e.key.toLowerCase();
-      const isAltPressed = e.altKey;
-      const isSimplePress = !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey;
+      const shortcuts = getKeyboardShortcuts(selectedCompany?._id);
 
-      if (isAltPressed || isSimplePress) {
-        switch (key) {
-          case 'escape':
-            setShowDataManager(false);
-            break;
-          case 'd':
-            e.preventDefault();
-            handleNavigate('/dashboard');
-            break;
-          case 'i':
-            e.preventDefault();
-            handleNavigate('/inventory-v2/skus');
-            break;
-          case 'c':
-            e.preventDefault();
-            handleNavigate('/directory?tab=customers');
-            break;
-          case 'v':
-            e.preventDefault();
-            handleNavigate('/directory?tab=vendors');
-            break;
-          case 'a':
-            e.preventDefault();
-            handleNavigate('/directory?tab=agents');
-            break;
-          case 'r':
-            e.preventDefault();
-            handleNavigate('/directory?tab=regions');
-            break;
-          case 'y':
-            e.preventDefault();
-            handleNavigate('/directory?tab=cities');
-            break;
-          case 't':
-            e.preventDefault();
-            handleNavigate('/directory?tab=transporters');
-            break;
-          case 'g':
-            e.preventDefault();
-            setShowDataManager(true);
-            break;
-          case 'x':
-            e.preventDefault();
-            handleNavigate('/transactions');
-            break;
-          case 'l':
-            e.preventDefault();
-            handleNavigate('/analyzer');
-            break;
-          case 's':
-            e.preventDefault();
-            handleNavigate('/company-selection');
-            break;
-          case 'p':
-            e.preventDefault();
-            handleNavigate('/production');
-            break;
-          case 'n':
-            e.preventDefault();
-            handleNavigate('/invoices');
-            break;
-          default:
-            break;
+      // Check Legend toggle (Shift+? or custom)
+      const legendShortcut = shortcuts['open_shortcuts_legend']?.customKey || shortcuts['open_shortcuts_legend']?.defaultKey || 'Shift+?';
+      if ((e.shiftKey && (e.key === '?' || e.key === '/')) || matchShortcut(e, legendShortcut)) {
+        e.preventDefault();
+        setShowShortcutLegend(prev => !prev);
+        return;
+      }
+
+      // Check global module navigation shortcuts
+      const navMap: Record<string, string> = {
+        'nav_dashboard': '/dashboard',
+        'nav_items': '/inventory-v2/skus',
+        'nav_stock': '/stock-inventory',
+        'nav_directory': '/directory',
+        'nav_purchases': '/inventory-v2/purchases',
+        'nav_orders': '/sales/orders',
+        'nav_production': '/production',
+        'nav_dispatch': '/dispatch',
+        'nav_invoices': '/invoices',
+        'nav_ledgers': '/ledgers',
+        'nav_reports': '/reports',
+        'nav_settings': '/inventory-v2/settings'
+      };
+
+      for (const [shortcutId, targetPath] of Object.entries(navMap)) {
+        const item = shortcuts[shortcutId];
+        if (!item) continue;
+        const key = item.customKey || item.defaultKey;
+        if (matchShortcut(e, key)) {
+          e.preventDefault();
+          navigate(targetPath);
+          return;
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [user, selectedCompany]);
+  }, [selectedCompany?._id, navigate]);
 
   const handleNavigate = (path: string) => {
     navigate(path);
@@ -439,6 +417,11 @@ const Layout: React.FC = () => {
                 icon: Building2
               })}
               {renderNavItem({
+                label: 'Shortcuts Legend',
+                icon: Keyboard,
+                action: () => setShowShortcutLegend(true)
+              })}
+              {renderNavItem({
                 label: 'Settings',
                 path: '/inventory-v2/settings',
                 icon: Settings
@@ -536,6 +519,12 @@ const Layout: React.FC = () => {
       <DataManager 
         isOpen={showDataManager} 
         onClose={() => setShowDataManager(false)} 
+      />
+
+      {/* Keyboard Shortcuts Legend Modal */}
+      <KeyboardShortcutLegendModal
+        isOpen={showShortcutLegend}
+        onClose={() => setShowShortcutLegend(false)}
       />
     </div>
   );

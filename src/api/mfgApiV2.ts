@@ -295,6 +295,7 @@ export interface MetadataV2 {
   departmentPresets?: any[];
   additionalCostPresets?: any[];
   scrapPresets?: any[];
+  keyboardShortcuts?: Record<string, any>;
 }
 
 export const getMetadataV2 = async (companyId: string): Promise<MetadataV2> => {
@@ -317,6 +318,7 @@ export const updateMetadataV2 = async (metadataData: {
   departmentPresets?: any[];
   additionalCostPresets?: any[];
   scrapPresets?: any[];
+  keyboardShortcuts?: Record<string, any>;
 }): Promise<MetadataV2> => {
   const response = await api.post('/v2/metadata', metadataData);
   return response.data;

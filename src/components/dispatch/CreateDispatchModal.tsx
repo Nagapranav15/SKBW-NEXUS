@@ -913,6 +913,44 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     }
   };
 
+  // Helper to shift focus across fields in CreateDispatchModal via Arrow keys / Tab
+  const handleModalFormKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (!target || (target.tagName !== 'INPUT' && target.tagName !== 'SELECT')) return;
+
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+      if (showCustomerDropdown) return;
+      e.preventDefault();
+      const form = e.currentTarget;
+      const focusables = Array.from(
+        form.querySelectorAll<HTMLElement>(
+          'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])'
+        )
+      ).filter(el => el.offsetWidth > 0 || el.offsetHeight > 0);
+
+      const index = focusables.indexOf(target);
+      const nextIdx = index + 1;
+      if (nextIdx >= 0 && nextIdx < focusables.length) {
+        focusables[nextIdx]?.focus();
+      }
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      if (showCustomerDropdown) return;
+      e.preventDefault();
+      const form = e.currentTarget;
+      const focusables = Array.from(
+        form.querySelectorAll<HTMLElement>(
+          'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])'
+        )
+      ).filter(el => el.offsetWidth > 0 || el.offsetHeight > 0);
+
+      const index = focusables.indexOf(target);
+      const nextIdx = index - 1;
+      if (nextIdx >= 0 && nextIdx < focusables.length) {
+        focusables[nextIdx]?.focus();
+      }
+    }
+  };
+
   // Direct party select handler
   const handleSelectParty = (partyId: string) => {
     setSelectedPartyId(partyId);
@@ -1184,7 +1222,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
         </div>
 
         {/* ── SCROLLABLE BODY ── */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-slate-50/60 text-xs">
+        <div onKeyDown={handleModalFormKeyDown} className="flex-1 overflow-y-auto p-6 space-y-5 bg-slate-50/60 text-xs">
 
           {/* DISPATCH MODE TOGGLE (If not editing) */}
           {!isEditing && (
