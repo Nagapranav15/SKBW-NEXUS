@@ -250,14 +250,23 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
 
   // Helper to resolve constituent component books for Loose Books / Mixed Stock items
   const resolveItemComponents = useCallback((item: any, order?: SalesOrderV2) => {
+    let rawComps: any[] = [];
     if (Array.isArray(item.components) && item.components.length > 0) {
-      return item.components;
+      rawComps = item.components;
+    } else if (Array.isArray(item.mixedItems) && item.mixedItems.length > 0) {
+      rawComps = item.mixedItems;
+    } else if (Array.isArray(item.subItems) && item.subItems.length > 0) {
+      rawComps = item.subItems;
     }
-    if (Array.isArray(item.mixedItems) && item.mixedItems.length > 0) {
-      return item.mixedItems;
-    }
-    if (Array.isArray(item.subItems) && item.subItems.length > 0) {
-      return item.subItems;
+
+    if (rawComps.length > 0) {
+      return rawComps.map(c => {
+        const origUom = String(c.uom || c.unit || '').toUpperCase();
+        return {
+          ...c,
+          uom: origUom === 'GBL' ? 'pcs' : (c.uom || 'pcs')
+        };
+      });
     }
 
     const itemNameUpper = (item.itemName || item.skuCode || '').toUpperCase().trim();
@@ -287,7 +296,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
             skuCode: other.skuCode || '',
             quantity: pcsPerComponent,
             pcsPerGbl: other.pcsPerGbl || 100,
-            uom: other.uom || 'PCS'
+            uom: 'pcs'
           };
         });
       }
@@ -3212,7 +3221,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                             <span>{(c.name || c.skuCode || '').toUpperCase()}</span>
                                           </span>
                                           <span className="font-mono text-[10px] font-semibold text-indigo-700">
-                                            {cQty} {c.uom || 'PCS'} {cEqGbl > 0 ? `(${cEqGbl} GBL)` : ''}
+                                            {cQty} {(c.uom && String(c.uom).toUpperCase() !== 'GBL') ? c.uom : 'pcs'} {cEqGbl > 0 ? `(${cEqGbl} GBL)` : ''}
                                           </span>
                                         </div>
                                       );

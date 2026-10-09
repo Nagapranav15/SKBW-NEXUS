@@ -17,7 +17,9 @@ import {
   ChevronRight,
   Factory,
   Truck,
-  FileText
+  FileText,
+  BookOpen,
+  BarChart3
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useRealtime } from '../context/RealtimeContext';
@@ -171,6 +173,12 @@ const Layout: React.FC = () => {
     if (path === '/invoices') {
       return location.pathname.startsWith('/invoices') || location.pathname.startsWith('/sales/invoices');
     }
+    if (path === '/ledgers') {
+      return location.pathname.startsWith('/ledgers') || location.pathname.startsWith('/reports/ledgers');
+    }
+    if (path === '/reports') {
+      return location.pathname === '/reports' || location.pathname.startsWith('/sales/reports');
+    }
     if (path === '/dashboard') {
       return location.pathname === '/dashboard' || location.pathname === '/';
     }
@@ -263,6 +271,13 @@ const Layout: React.FC = () => {
         { label: 'Production', path: '/production', icon: Factory, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS', 'MANAGE_ORDERS', 'VIEW_ORDERS'] },
         { label: 'Dispatch', path: '/dispatch', icon: Truck, permission: ['MANAGE_ORDERS', 'VIEW_ORDERS', 'MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
         { label: 'Invoices', path: '/invoices', icon: FileText, permission: ['MANAGE_ORDERS', 'VIEW_ORDERS', 'MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
+      ]
+    },
+    {
+      title: 'REPORTS',
+      items: [
+        { label: 'Ledgers', path: '/ledgers', icon: BookOpen },
+        { label: 'Reports', path: '/reports', icon: BarChart3 },
       ]
     }
   ];
