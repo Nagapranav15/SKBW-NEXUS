@@ -154,6 +154,12 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     return matched ? String(matched._id) : '';
   }, [activeLocModalRow, availableSkus]);
 
+  // Selected party object for direct dispatch
+  const selectedParty = useMemo(() => {
+    if (!selectedPartyId) return null;
+    return partyOptions.find(p => p._id === selectedPartyId || p.id === selectedPartyId) || null;
+  }, [partyOptions, selectedPartyId]);
+
   // DC / DO Number
   const [fetchedDcNumber, setFetchedDcNumber] = useState('');
 
@@ -792,15 +798,32 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     setSelectedPartyId(partyId);
     const p = partyOptions.find(item => item._id === partyId || item.id === partyId);
     if (p) {
-      const pName = p.name || p.companyName || '';
+      const pName = p.firmName || p.name || p.companyName || '';
+      const pPhone = p.mobile || p.phone || p.contactPerson?.mobile || '';
+      const pCity = p.city || p.billingAddress?.city || '';
+      const pState = p.state || p.region || p.billingAddress?.state || '';
+      const pStreet = p.address || p.billingAddress?.street || p.billingAddress?.address || '';
+      const pPincode = p.pincode || p.billingAddress?.pincode || '';
+
       setDirectCustomerName(pName);
-      setDirectCustomerPhone(p.phone || p.mobile || '');
-      setDirectRegion(p.state || p.city || '');
-      const addr = p.address || (p.city ? `${pName}\n${p.city}${p.state ? ', ' + p.state : ''}` : '');
-      if (addr) {
-        setBillToAddress(addr);
-        setShipToAddress(addr);
-      }
+      setDirectCustomerPhone(pPhone);
+      setDirectRegion(pCity || pState);
+
+      const addressLines = [
+        pName,
+        pStreet,
+        [pCity, pState, pPincode].filter(Boolean).join(', '),
+        pPhone ? `Phone: ${pPhone}` : ''
+      ].filter(Boolean).join('\n');
+
+      setBillToAddress(addressLines);
+      setShipToAddress(addressLines);
+    } else {
+      setDirectCustomerName('');
+      setDirectCustomerPhone('');
+      setDirectRegion('');
+      setBillToAddress('');
+      setShipToAddress('');
     }
   };
 
@@ -1124,30 +1147,41 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                 </div>
               </div>
             ) : (
-              /* DIRECT DISPATCH FIELDS */
-              <div className="space-y-3.5">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                  <div>
-                    <FieldLabel>Select Party From Directory (Optional)</FieldLabel>
-                    <div className="relative">
-                      <select
-                        value={selectedPartyId}
-                        onChange={e => handleSelectParty(e.target.value)}
-                        className="w-full h-9 bg-white border border-slate-200 rounded-xl px-3 pr-8 text-xs font-semibold text-slate-800 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 cursor-pointer shadow-2xs"
-                      >
-                        <option value="">— Choose from Party Directory —</option>
-                        {partyOptions.map(p => (
-                          <option key={p._id || p.id} value={p._id || p.id}>
-                            {p.name || p.companyName} {p.city ? `(${p.city})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-3 pointer-events-none" />
-                    </div>
+              /* DIRECT DISPATCH FIELDS - EXACT SAME 5-COLUMN GRID LAYOUT AS SALES ORDER! */
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+                <div className="lg:col-span-2">
+                  <FieldLabel>Select Customer / Party <Required /></FieldLabel>
+                  <div className="relative">
+                    <select
+                      value={selectedPartyId}
+                      onChange={e => handleSelectParty(e.target.value)}
+                      className="w-full h-9 bg-white border border-purple-300 rounded-xl px-3 pr-8 text-xs font-bold text-slate-900 focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-500/15 cursor-pointer shadow-2xs"
+                    >
+                      <option value="">— Choose Customer from Directory —</option>
+                      {partyOptions.map(p => (
+                        <option key={p._id || p.id} value={p._id || p.id}>
+                          {p.firmName || p.name || p.companyName} {p.customerCode ? `(${p.customerCode})` : ''} {p.city ? `• ${p.city}` : p.state ? `• ${p.state}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-3 pointer-events-none" />
                   </div>
+                </div>
 
-                  <div>
-                    <FieldLabel>Customer / Consignee Name <Required /></FieldLabel>
+                <div>
+                  <FieldLabel>Customer Code / City</FieldLabel>
+                  <StatDisplay icon={<MapPin className="w-3.5 h-3.5 text-purple-600" />}>
+                    {selectedParty?.customerCode ? `${selectedParty.customerCode} ${selectedParty.city ? `(${selectedParty.city})` : ''}` : (selectedParty?.city || selectedParty?.state || directRegion || '—')}
+                  </StatDisplay>
+                </div>
+
+                <div>
+                  <FieldLabel>Customer / Consignee Name</FieldLabel>
+                  {selectedParty ? (
+                    <StatDisplay icon={<Building className="w-3.5 h-3.5 text-purple-600" />}>
+                      {selectedParty.firmName || selectedParty.name || selectedParty.companyName || directCustomerName || '—'}
+                    </StatDisplay>
+                  ) : (
                     <input
                       type="text"
                       placeholder="e.g. Abbu Stationery / SRS Books"
@@ -1155,10 +1189,16 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                       onChange={e => setDirectCustomerName(e.target.value)}
                       className="w-full h-9 px-3 text-xs border border-slate-200 rounded-xl font-bold text-slate-900 bg-white focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 shadow-2xs"
                     />
-                  </div>
+                  )}
+                </div>
 
-                  <div>
-                    <FieldLabel>Contact Phone</FieldLabel>
+                <div>
+                  <FieldLabel>Contact Phone</FieldLabel>
+                  {selectedParty ? (
+                    <StatDisplay icon={<Phone className="w-3.5 h-3.5 text-purple-600" />}>
+                      {selectedParty.mobile || selectedParty.phone || directCustomerPhone || '—'}
+                    </StatDisplay>
+                  ) : (
                     <div className="relative">
                       <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
                       <input
@@ -1169,7 +1209,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                         className="w-full h-9 pl-9 pr-3 text-xs border border-slate-200 rounded-xl font-mono text-slate-800 bg-white focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 shadow-2xs"
                       />
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             )}
