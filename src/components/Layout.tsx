@@ -254,6 +254,11 @@ const Layout: React.FC = () => {
         { label: 'Production', path: '/production', icon: Factory, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS', 'MANAGE_ORDERS', 'VIEW_ORDERS'] },
         { label: 'Dispatch', path: '/dispatch', icon: Truck, permission: ['MANAGE_ORDERS', 'VIEW_ORDERS', 'MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
         { label: 'Invoices', path: '/invoices', icon: FileText, permission: ['MANAGE_ORDERS', 'VIEW_ORDERS', 'MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
+      ]
+    },
+    {
+      title: 'FIELD COLLECTIONS & ROUTES',
+      items: [
         { label: 'Payment Collections', path: '/collections', icon: Wallet, permission: ['MANAGE_ORDERS', 'VIEW_ORDERS', 'MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
       ]
     },
