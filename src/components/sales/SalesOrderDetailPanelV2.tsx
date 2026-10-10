@@ -250,6 +250,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
     return [];
   };
 
+  const custObj = customerDetails || (typeof activeOrder.customer === 'object' ? activeOrder.customer : null);
   const custTags = getCustomerTags(custObj);
   const ba = activeOrder.billingAddress as any;
   const sa = activeOrder.shippingAddress as any;
