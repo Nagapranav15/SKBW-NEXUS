@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   X, Truck, Package, CheckCircle2, AlertTriangle, AlertCircle, Printer,
   Edit3, MapPin, Phone, Save, Plus, Trash2, Calendar, Search,
-  ChevronDown, Building, RefreshCw, Check
+  ChevronDown, Building, RefreshCw, Check, Hash
 } from 'lucide-react';
 import { SalesOrderV2, updateSalesOrderV2 } from '../../api/salesOrderApiV2';
 import { createDeliveryChallan, updateDeliveryChallan, getNextDeliveryChallanNumber } from '../../api/deliveryChallanApi';
@@ -29,6 +29,23 @@ const extractParties = (res: any): any[] => {
   if (Array.isArray(d?.customers)) return d.customers;
   if (Array.isArray(d?.data)) return d.data;
   if (Array.isArray(res?.parties)) return res.parties;
+  return [];
+};
+
+export const getCustomerTags = (cust: any): string[] => {
+  if (!cust) return [];
+  if (Array.isArray(cust.tags)) {
+    return cust.tags.filter((t: any) => typeof t === 'string' && Boolean(t.trim()));
+  }
+  if (typeof cust.tags === 'string' && cust.tags.trim()) {
+    return cust.tags.split(',').map((t: string) => t.trim()).filter(Boolean);
+  }
+  if (Array.isArray(cust.tag)) {
+    return cust.tag.filter((t: any) => typeof t === 'string' && Boolean(t.trim()));
+  }
+  if (typeof cust.tag === 'string' && cust.tag.trim()) {
+    return cust.tag.split(',').map((t: string) => t.trim()).filter(Boolean);
+  }
   return [];
 };
 
@@ -123,6 +140,109 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
     if (dispatchMode === 'direct') return null;
     return (selectedOrderId ? (allOrders.find(o => o._id === selectedOrderId) ?? order ?? null) : (order ?? null));
   }, [allOrders, selectedOrderId, order, dispatchMode]);
+
+  // Sales Order search & dropdown state (matching Sales Order customer dropdown)
+  const [orderSearch, setOrderSearch] = useState('');
+  const [showOrderDropdown, setShowOrderDropdown] = useState(false);
+  const [highlightedOrderIdx, setHighlightedOrderIdx] = useState(0);
+  const orderDropdownRef = useRef<HTMLDivElement>(null);
+  const orderInputRef = useRef<HTMLInputElement>(null);
+  const orderDropdownListRef = useRef<HTMLDivElement>(null);
+
+  // Helper to find customer party details for an order
+  const findPartyForOrder = (ord: any) => {
+    if (!ord) return null;
+    const cName = (ord.customerName || '').toLowerCase().trim();
+    const cId = ord.customerId || (ord.customer as any)?._id || (ord.customer as any)?.id;
+    return partyOptions.find(p =>
+      (cId && (p._id === cId || p.id === cId)) ||
+      (cName && (p.firmName || p.name || '').toLowerCase().trim() === cName) ||
+      (cName && (p.firmName || p.name || '').toLowerCase().includes(cName)) ||
+      (cName && cName.includes((p.firmName || p.name || '').toLowerCase().trim()))
+    ) || null;
+  };
+
+  const activeOrderParty = useMemo(() => {
+    return findPartyForOrder(activeOrder);
+  }, [activeOrder, partyOptions]);
+
+  // Filtered orders for searchable dropdown
+  const filteredOrders = useMemo(() => {
+    const list = allOrders.length > 0 ? allOrders : (order ? [order] : []);
+    if (!orderSearch.trim()) return list;
+    const q = orderSearch.toLowerCase().trim();
+    return list.filter(o => {
+      const num = (o.orderNumber || '').toLowerCase();
+      const cust = (o.customerName || '').toLowerCase();
+      const p = findPartyForOrder(o);
+      const phone = (o.customerPhone || (o.customer as any)?.phone || p?.phone || p?.mobile || '').toLowerCase();
+      const city = ((o as any).city || o.shippingAddress?.city || o.billingAddress?.city || p?.city || '').toLowerCase();
+      return num.includes(q) || cust.includes(q) || phone.includes(q) || city.includes(q);
+    });
+  }, [allOrders, order, orderSearch, partyOptions]);
+
+  // Synchronize order search display text with active order
+  useEffect(() => {
+    if (activeOrder) {
+      setOrderSearch(`${activeOrder.orderNumber} • ${activeOrder.customerName}`);
+    } else if (!selectedOrderId) {
+      setOrderSearch('');
+    }
+  }, [activeOrder, selectedOrderId]);
+
+  // Click outside listener for order dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (orderDropdownRef.current && !orderDropdownRef.current.contains(e.target as Node)) {
+        setShowOrderDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Auto scroll highlighted order into view
+  useEffect(() => {
+    if (showOrderDropdown && orderDropdownListRef.current) {
+      const activeEl = orderDropdownListRef.current.children[highlightedOrderIdx] as HTMLElement;
+      if (activeEl) {
+        activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }, [highlightedOrderIdx, showOrderDropdown]);
+
+  // Keyboard navigation for order dropdown
+  const handleOrderKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!showOrderDropdown) {
+        setShowOrderDropdown(true);
+        return;
+      }
+      if (filteredOrders.length > 0) {
+        setHighlightedOrderIdx(prev => Math.min(prev + 1, filteredOrders.length - 1));
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (showOrderDropdown && filteredOrders.length > 0) {
+        setHighlightedOrderIdx(prev => Math.max(prev - 1, 0));
+      }
+    } else if (e.key === 'Enter') {
+      if (showOrderDropdown && filteredOrders.length > 0) {
+        e.preventDefault();
+        const selected = filteredOrders[highlightedOrderIdx] || filteredOrders[0];
+        if (selected) {
+          setSelectedOrderId(selected._id);
+          setOrderSearch(`${selected.orderNumber} • ${selected.customerName}`);
+          setShowOrderDropdown(false);
+          if (onOrderChange) onOrderChange(selected);
+          orderInputRef.current?.blur();
+        }
+      }
+    } else if (e.key === 'Escape') {
+      setShowOrderDropdown(false);
+    }
+  };
 
   // Live stock & warehouse locations
   const [modalStockMap, setModalStockMap] = useState<Map<string, { pcs: number; gbl: number }>>(new Map());
@@ -260,7 +380,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
       getBalancesV2(compId).catch(() => []),
       getSkusV2(compId).catch(() => []),
       getWarehouseHierarchyV2(compId).catch(() => []),
-      getParties({ company: compId, limit: 1000, light: true }).catch(() => ({ data: [] }))
+      getParties({ company: compId, type: 'customer', limit: 10000, light: true }).catch(() => ({ data: [] }))
     ]).then(([balances, skus, locationsRes, partiesRes]) => {
       const locList = Array.isArray(locationsRes) ? locationsRes : [];
       setWarehouseLocations(locList);
@@ -406,6 +526,8 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
       const partyMap = new Map<string, any>();
       [...rawBackendParties, ...localParties].forEach((p: any) => {
         if (!p || p.isDeleted) return;
+        const pType = (p.type || p.partyType || '').toLowerCase().trim();
+        if (pType && pType !== 'customer') return;
         const name = (p.firmName || p.name || p.companyName || p.ownerName || '').trim();
         if (!name) return;
         const key = (p._id || p.id || name).toString().toLowerCase();
@@ -534,27 +656,39 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
   useEffect(() => {
     if (dispatchMode !== 'order' || !activeOrder?.items || isEditing) return;
 
-    if ((activeOrder as any).transporter && !transporter) {
-      setTransporter((activeOrder as any).transporter);
+    const tName = (activeOrder as any).transporter || (activeOrder as any).preferredTransport || activeOrderParty?.preferredTransport;
+    if (tName && !transporter) {
+      setTransporter(tName);
     }
 
-    const custName = activeOrder.customerName || '';
+    const custName = (activeOrder.customerName || activeOrderParty?.firmName || '').toUpperCase();
     const billingAddr = (activeOrder as any).billingAddress;
     const shippingAddr = (activeOrder as any).shippingAddress;
-    const city = (activeOrder as any).city || billingAddr?.city || '';
-    const state = (activeOrder as any).region || billingAddr?.state || '';
-    const pin = billingAddr?.pincode || (activeOrder as any).pincode || '—';
-    const street = billingAddr?.address || billingAddr?.street || (activeOrder as any).address || 'Main Road';
+    const city = (activeOrder as any).city || billingAddr?.city || activeOrderParty?.city || '';
+    const state = (activeOrder as any).region || billingAddr?.state || activeOrderParty?.state || '';
+    const pin = billingAddr?.pincode || (activeOrder as any).pincode || activeOrderParty?.pincode || '';
+    const street = billingAddr?.address || billingAddr?.street || (activeOrder as any).address || activeOrderParty?.address1 || activeOrderParty?.area || activeOrderParty?.address || '';
+    const phone = activeOrder.customerPhone || (activeOrder as any).phone || activeOrderParty?.phone || activeOrderParty?.mobile || '';
 
-    const builtBill = `${custName}\n${street}\n${city}${state ? ', ' + state : ''} - ${pin}`;
-    setBillToAddress(builtBill);
+    const billParts = [
+      custName,
+      street,
+      [city, state].filter(Boolean).join(', ') + (pin ? ` - ${pin}` : ''),
+      phone ? `Phone : ${phone}` : ''
+    ].filter(Boolean);
+    setBillToAddress(billParts.join('\n'));
 
     const shipCity = shippingAddr?.city || city;
     const shipState = shippingAddr?.state || state;
     const shipPin = shippingAddr?.pincode || pin;
     const shipStreet = shippingAddr?.address || shippingAddr?.street || street;
-    const builtShip = `${custName}\n${shipStreet}\n${shipCity}${shipState ? ', ' + shipState : ''} - ${shipPin}`;
-    setShipToAddress(builtShip);
+    const shipParts = [
+      custName,
+      shipStreet,
+      [shipCity, shipState].filter(Boolean).join(', ') + (shipPin ? ` - ${shipPin}` : ''),
+      phone ? `Phone : ${phone}` : ''
+    ].filter(Boolean);
+    setShipToAddress(shipParts.join('\n'));
 
     const rows: ItemRow[] = activeOrder.items.map((item, idx) => {
       const rawOrdered = Number(item.quantity) || 0;
@@ -1271,28 +1405,125 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
             className="z-50"
           >
             {dispatchMode === 'order' ? (
-              /* SALES ORDER SOURCE FIELDS */
+              /* SALES ORDER SOURCE FIELDS - SEARCHABLE ACCORDING TO SALES ORDER DROPDOWN */
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
                 <div className="lg:col-span-2">
-                  <FieldLabel>Select Sales Order <Required /></FieldLabel>
-                  <div className="relative">
-                    <select
-                      value={selectedOrderId}
-                      onChange={e => {
-                        setSelectedOrderId(e.target.value);
-                        const m = allOrders.find(o => o._id === e.target.value);
-                        if (m && onOrderChange) onOrderChange(m);
+                  <div className="flex items-center justify-between mb-1">
+                    <FieldLabel>Select Sales Order <Required /></FieldLabel>
+                    <span className="text-[10px] text-gray-400 font-mono">
+                      {allOrders.length > 0 ? `${allOrders.length.toLocaleString()} approved orders available` : (order ? '1 order available' : '')}
+                    </span>
+                  </div>
+                  <div ref={orderDropdownRef} className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400 z-10 pointer-events-none" />
+                    <input
+                      ref={orderInputRef}
+                      type="text"
+                      value={orderSearch}
+                      onChange={(e) => {
+                        setOrderSearch(e.target.value);
+                        setShowOrderDropdown(true);
+                        setHighlightedOrderIdx(0);
                       }}
-                      className="w-full h-9 bg-white border border-slate-200 rounded-xl px-3 pr-8 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 cursor-pointer shadow-2xs"
-                    >
-                      <option value="">— Choose Approved Sales Order —</option>
-                      {(allOrders.length > 0 ? allOrders : order ? [order] : []).map(o => (
-                        <option key={o._id} value={o._id}>
-                          {o.orderNumber} • {o.customerName} ({o.items?.length || 0} items)
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                      onClick={() => setShowOrderDropdown(true)}
+                      onFocus={() => setShowOrderDropdown(true)}
+                      onKeyDown={handleOrderKeyDown}
+                      placeholder="Search order number, customer firm name, phone..."
+                      className="w-full pl-8 pr-10 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
+                    />
+
+                    <div className="absolute right-2 top-2 flex items-center gap-1 text-gray-400 z-10">
+                      {orderSearch ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOrderSearch('');
+                            setSelectedOrderId('');
+                            if (onOrderChange) onOrderChange(null);
+                          }}
+                          className="p-1 hover:text-gray-600 rounded-md cursor-pointer"
+                          title="Clear selection"
+                        >
+                          <X className="w-3.5 h-3.5 text-gray-500" />
+                        </button>
+                      ) : (
+                        <ChevronDown 
+                          className="w-4 h-4 cursor-pointer hover:text-gray-600" 
+                          onClick={() => setShowOrderDropdown(!showOrderDropdown)} 
+                        />
+                      )}
+                    </div>
+
+                    {/* Sales Order Dropdown Popover (Exact match to Sale Order dropdown) */}
+                    {showOrderDropdown && (
+                      <div
+                        ref={orderDropdownListRef}
+                        className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-64 overflow-y-auto divide-y divide-gray-50 p-1"
+                      >
+                        {filteredOrders.length === 0 ? (
+                          <div className="p-3 text-center text-gray-400 italic text-xs">No matching orders found</div>
+                        ) : (
+                          filteredOrders.slice(0, 100).map((o, idx) => {
+                            const isHighlighted = highlightedOrderIdx === idx;
+                            const isSelected = selectedOrderId === o._id;
+                            const oParty = findPartyForOrder(o);
+                            const oPhone = o.customerPhone || (o.customer as any)?.phone || oParty?.phone || oParty?.mobile || '';
+                            const oCity = (o as any).city || o.shippingAddress?.city || o.billingAddress?.city || oParty?.city || '';
+                            const oState = (o as any).region || o.shippingAddress?.state || o.billingAddress?.state || oParty?.state || '';
+                            const oLoc = [oCity, oState].filter(Boolean).join(', ');
+                            const oTransporter = o.transporter || (o as any).preferredTransport || oParty?.preferredTransport || '';
+                            const itemCount = o.items?.length || 0;
+                            const totalGbl = o.totalGbl || (o.items || []).reduce((s: number, it: any) => s + (Number(it.gbl) || 0), 0);
+
+                            return (
+                              <div
+                                key={o._id || idx}
+                                onClick={() => {
+                                  setSelectedOrderId(o._id);
+                                  setOrderSearch(`${o.orderNumber} • ${o.customerName}`);
+                                  setShowOrderDropdown(false);
+                                  if (onOrderChange) onOrderChange(o);
+                                }}
+                                onMouseEnter={() => setHighlightedOrderIdx(idx)}
+                                className={`p-2.5 cursor-pointer rounded-lg transition-colors flex items-center justify-between ${
+                                  isHighlighted || isSelected
+                                    ? 'bg-blue-100/90 text-blue-900 font-bold border border-blue-200'
+                                    : 'hover:bg-blue-50/70'
+                                }`}
+                              >
+                                <div>
+                                  <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-mono text-blue-700 font-black">{o.orderNumber}</span>
+                                    <span className="text-gray-400">•</span>
+                                    <span>{o.customerName}</span>
+                                    <span className="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200/70 rounded text-[9px] font-bold">
+                                      {itemCount} Items
+                                    </span>
+                                    {totalGbl > 0 && (
+                                      <span className="px-1.5 py-0.2 bg-indigo-50 text-indigo-700 border border-indigo-200/70 rounded text-[9px] font-bold">
+                                        {totalGbl} GBL
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-2">
+                                    <span>{oLoc || '—'}</span>
+                                    {oTransporter && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="text-slate-600 font-semibold">🚚 {oTransporter}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                                <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold font-mono">
+                                  {oPhone || 'Select'}
+                                </span>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1306,29 +1537,29 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                 <div>
                   <FieldLabel>Customer / Party</FieldLabel>
                   <StatDisplay icon={<Building className="w-3.5 h-3.5 text-slate-400" />}>
-                    {activeOrder?.customerName || '—'}
+                    {activeOrder?.customerName || activeOrderParty?.firmName || '—'}
                   </StatDisplay>
                 </div>
 
                 <div>
                   <FieldLabel>Contact Number</FieldLabel>
                   <StatDisplay icon={<Phone className="w-3.5 h-3.5 text-slate-400" />}>
-                    {activeOrder?.customerPhone || (activeOrder?.customer as any)?.phone || '—'}
+                    {activeOrder?.customerPhone || (activeOrder?.customer as any)?.phone || activeOrderParty?.phone || activeOrderParty?.mobile || activeOrderParty?.whatsapp || '—'}
                   </StatDisplay>
                 </div>
               </div>
             ) : (
-              /* DIRECT DISPATCH FIELDS - EXACT SAME 5-COLUMN GRID LAYOUT AS SALES ORDER! */
+              /* DIRECT DISPATCH FIELDS - SEARCHABLE CUSTOMER DROPDOWN */
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
                 <div className="lg:col-span-2">
                   <div className="flex items-center justify-between mb-1">
-                    <FieldLabel>Select Customer / Party <Required /></FieldLabel>
-                    <span className="text-[10px] text-slate-400 font-medium">
-                      {partyOptions.length > 0 ? `${partyOptions.length.toLocaleString()} customers available` : ''}
+                    <FieldLabel>Customer <Required /></FieldLabel>
+                    <span className="text-[10px] text-gray-400 font-mono">
+                      {partyOptions.length > 0 ? `${partyOptions.length.toLocaleString()} customers available` : 'Loading customers...'}
                     </span>
                   </div>
                   <div ref={customerRef} className="relative">
-                    <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400 z-10 pointer-events-none" />
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400 z-10 pointer-events-none" />
                     <input
                       ref={customerInputRef}
                       type="text"
@@ -1345,10 +1576,10 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                       onFocus={() => setShowCustomerDropdown(true)}
                       onKeyDown={handleCustomerKeyDown}
                       placeholder="Search customer firm name..."
-                      className="w-full pl-8 pr-10 h-9 bg-white border border-purple-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-purple-500/15 focus:border-purple-600 focus:outline-none shadow-2xs"
+                      className="w-full pl-8 pr-10 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
                     />
 
-                    <div className="absolute right-2.5 top-2.5 flex items-center gap-1 text-slate-400 z-10">
+                    <div className="absolute right-2 top-2 flex items-center gap-1 text-gray-400 z-10">
                       {customerSearch || selectedPartyId ? (
                         <button
                           type="button"
@@ -1356,14 +1587,14 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                             setCustomerSearch('');
                             handleSelectParty('');
                           }}
-                          className="p-0.5 hover:text-slate-600 rounded-md cursor-pointer"
+                          className="p-1 hover:text-gray-600 rounded-md cursor-pointer"
                           title="Clear customer"
                         >
-                          <X className="w-3.5 h-3.5 text-slate-500" />
+                          <X className="w-3.5 h-3.5 text-gray-500" />
                         </button>
                       ) : (
                         <ChevronDown 
-                          className="w-4 h-4 cursor-pointer hover:text-slate-600" 
+                          className="w-4 h-4 cursor-pointer hover:text-gray-600" 
                           onClick={() => setShowCustomerDropdown(!showCustomerDropdown)} 
                         />
                       )}
@@ -1373,7 +1604,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                     {showCustomerDropdown && (
                       <div
                         ref={customerDropdownListRef}
-                        className="absolute left-0 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-2xl z-[999] max-h-64 overflow-y-auto divide-y divide-slate-50 p-1"
+                        className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-64 overflow-y-auto divide-y divide-gray-50 p-1"
                       >
                         {filteredParties.slice(0, 200).map((c, idx) => {
                           const cId = c._id || c.id;
@@ -1382,6 +1613,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                           const cName = c.firmName || c.name || c.companyName || c.ownerName || c.contactName;
                           const cLocation = [c.city, c.state].filter(Boolean).join(', ');
                           const cPhone = c.mobile || c.phone || c.contactPerson?.mobile || '';
+                          const tags = getCustomerTags(c);
 
                           return (
                             <div
@@ -1395,14 +1627,19 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                               }`}
                             >
                               <div>
-                                <div className="font-bold text-slate-900 text-xs">{cName}</div>
-                                <div className="text-[10px] text-slate-400">{cLocation || '—'}</div>
+                                <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5 flex-wrap">
+                                  <span>{cName}</span>
+                                  {tags.map((tag: string, tIdx: number) => (
+                                    <span key={tIdx} className="px-1.5 py-0.2 bg-indigo-50 text-indigo-700 border border-indigo-200/70 rounded text-[9px] font-bold">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                                <div className="text-[10px] text-gray-400 mt-0.5">{cLocation || '—'}</div>
                               </div>
-                              {cPhone && (
-                                <span className="text-[10px] bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-bold font-mono">
-                                  {cPhone}
-                                </span>
-                              )}
+                              <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold font-mono">
+                                {cPhone || 'Select'}
+                              </span>
                             </div>
                           );
                         })}
@@ -1420,9 +1657,9 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                 </div>
 
                 <div>
-                  <FieldLabel>Customer Code / City</FieldLabel>
-                  <StatDisplay icon={<MapPin className="w-3.5 h-3.5 text-purple-600" />}>
-                    {selectedParty?.customerCode ? `${selectedParty.customerCode} ${selectedParty.city ? `(${selectedParty.city})` : ''}` : (selectedParty?.city || selectedParty?.state || directRegion || '—')}
+                  <FieldLabel>Customer Code</FieldLabel>
+                  <StatDisplay icon={<Hash className="w-3.5 h-3.5 text-slate-400" />}>
+                    {selectedParty?.customerCode || selectedParty?.code || '—'}
                   </StatDisplay>
                 </div>
 
