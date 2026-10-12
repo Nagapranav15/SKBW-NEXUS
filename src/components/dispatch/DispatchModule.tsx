@@ -879,6 +879,43 @@ export const DispatchModule: React.FC = () => {
     setIsCreateModalOpen(true);
   };
 
+  // Open / Print Delivery Challan for a pending order
+  const handlePrintOrderChallan = (row: DispatchRowOrder) => {
+    const existingChallans = orderChallansMap.get(row._id) || orderChallansMap.get(row.orderNumber) || [];
+    if (existingChallans.length > 0) {
+      setActiveChallan(existingChallans[0]);
+      setIsChallanModalOpen(true);
+    } else {
+      // Build delivery challan preview/print object directly from order data
+      const raw = row.rawOrder;
+      const draftDc = {
+        _id: `draft-dc-${row.orderNumber}`,
+        dcNumber: `DC-${row.orderNumber?.replace(/^SO-0*/, '') || '001'}`,
+        orderNumber: row.orderNumber,
+        date: row.rawDate || raw?.orderDate || new Date().toISOString(),
+        customerName: row.customerName,
+        customerPhone: row.customerPhone || raw?.customerPhone || '',
+        customerAddress: raw?.shippingAddress?.address || raw?.billingAddress?.address || '',
+        city: row.city || raw?.shippingAddress?.city || '',
+        pincode: raw?.shippingAddress?.pincode || '',
+        transporterName: row.transporter || raw?.transporter || '',
+        items: (row.items || []).map((it: any) => ({
+          itemName: it.itemName || it.skuCode || 'Item',
+          skuCode: it.skuCode,
+          quantity: it.pendingQty ?? it.orderedQty ?? 0,
+          deliveredQty: it.pendingQty ?? it.orderedQty ?? 0,
+          gbl: it.gbl ?? 0,
+          deliveredGbl: it.gbl ?? 0,
+          uom: it.uom || 'GBL',
+          coverPacking: it.coverPacking || '',
+          pcsPerGbl: it.pcs && it.gbl ? Math.round(it.pcs / it.gbl) : undefined
+        }))
+      };
+      setActiveChallan(draftDc);
+      setIsChallanModalOpen(true);
+    }
+  };
+
   // Revert / Delete Delivery Challan: Reverses stock and sends sales order back to pending
   const handleRevertChallan = (challan: any) => {
     setRevertConfirmChallan(challan);
@@ -1959,7 +1996,7 @@ export const DispatchModule: React.FC = () => {
                             )}
                           </td>
 
-                          {/* Actions Column: Dispatch, Edit, Delete, More (Icon-only buttons) */}
+                          {/* Actions Column: Dispatch, Print, Dropdown */}
                           <td className="py-3 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                             <div className="inline-flex items-center gap-1.5">
                               {/* 1. Dispatch Icon Button */}
@@ -1971,7 +2008,16 @@ export const DispatchModule: React.FC = () => {
                                 <Truck className="w-4 h-4" />
                               </button>
 
-                              {/* 2. More Options Dropdown Toggle */}
+                              {/* 2. Print Delivery Challan Icon Button */}
+                              <button
+                                onClick={() => handlePrintOrderChallan(row)}
+                                className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 border border-blue-200/80 rounded-lg transition-all flex items-center justify-center shadow-2xs cursor-pointer hover:scale-105 active:scale-95"
+                                title="Print Delivery Challan"
+                              >
+                                <Printer className="w-4 h-4 text-blue-600" />
+                              </button>
+
+                              {/* 3. More Options Dropdown Toggle */}
                               <div className="relative inline-flex items-center overflow-visible">
                                 <button
                                   onClick={(e) => {
@@ -2010,6 +2056,16 @@ export const DispatchModule: React.FC = () => {
                                   >
                                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                                     <span>Dispatch All Pending</span>
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setOpenActionDropdownId(null);
+                                      handlePrintOrderChallan(row);
+                                    }}
+                                    className="w-full px-3 py-1.5 text-xs text-left font-bold text-blue-700 hover:bg-blue-50 flex items-center gap-2 cursor-pointer"
+                                  >
+                                    <Printer className="w-3.5 h-3.5 text-blue-600" />
+                                    <span>Print Delivery Challan</span>
                                   </button>
                                   <button
                                     onClick={() => {
@@ -2079,6 +2135,14 @@ export const DispatchModule: React.FC = () => {
                                     }`}>
                                       {row.readyStatus}
                                     </span>
+                                    <button
+                                      onClick={() => handlePrintOrderChallan(row)}
+                                      className="px-2.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-md text-xs font-bold flex items-center gap-1 cursor-pointer transition-all hover:scale-105 active:scale-95"
+                                      title="Print Delivery Challan"
+                                    >
+                                      <Printer className="w-3.5 h-3.5" />
+                                      <span>Print DC</span>
+                                    </button>
                                   </div>
                                 </div>
 

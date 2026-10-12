@@ -90,10 +90,44 @@ export const DispatchOrderDetailModal: React.FC<DispatchOrderDetailModalProps> =
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
+                const ch = challanHistory.length > 0 ? challanHistory[0] : {
+                  dcNumber: `DC-${orderRow.orderNumber?.replace(/^SO-0*/, '') || '001'}`,
+                  orderNumber: orderRow.orderNumber,
+                  date: orderRow.orderDate || new Date().toISOString(),
+                  customerName: orderRow.customerName,
+                  customerPhone: orderRow.customerPhone || '',
+                  customerAddress: orderRow.customerAddress || orderRow.city || '',
+                  city: orderRow.city || '',
+                  pincode: orderRow.pincode || '',
+                  transporterName: orderRow.transporter || '',
+                  items: (orderRow.items || []).map((it: any) => ({
+                    itemName: it.itemName || it.skuCode || 'Item',
+                    skuCode: it.skuCode,
+                    quantity: it.pendingQty ?? it.orderedQty ?? 0,
+                    deliveredQty: it.pendingQty ?? it.orderedQty ?? 0,
+                    gbl: it.gbl ?? 0,
+                    deliveredGbl: it.gbl ?? 0,
+                    uom: it.uom || 'GBL',
+                    coverPacking: it.coverPacking || '',
+                    pcsPerGbl: it.pcs && it.gbl ? Math.round(it.pcs / it.gbl) : undefined
+                  }))
+                };
+                if (onViewChallan) {
+                  onViewChallan(ch);
+                }
+              }}
+              className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95"
+              title="Print Delivery Challan"
+            >
+              <Printer className="w-4 h-4 text-blue-600" />
+              <span>Print Challan</span>
+            </button>
+            <button
+              onClick={() => {
                 onClose();
                 onOpenDispatch(orderRow);
               }}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95"
             >
               <Truck className="w-4 h-4" />
               <span>Create Dispatch</span>
