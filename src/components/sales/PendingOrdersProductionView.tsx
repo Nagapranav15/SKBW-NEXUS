@@ -1435,14 +1435,11 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
 
           const compRows = comps.map((c: any) => {
             const cQtyPcs = Number(c.quantity) || 1;
-            const cPcsPerGbl = Number(c.pcsPerGbl) || 100;
-            const cEqGbl = cQtyPcs > 0 ? +(cQtyPcs / cPcsPerGbl).toFixed(1) : 0;
-            const gblText = cEqGbl > 0 ? ` (${cEqGbl} GBL equivalent)` : '';
             return `
               <tr class="item-sub-row component-sub-row">
                 <td class="col-date"></td>
                 <td class="col-customer">
-                  <div class="component-item-text">&bull; ${(c.name || c.skuCode || '').toUpperCase()} — ${cQtyPcs} ${c.uom || 'PCS'}${gblText}</div>
+                  <div class="component-item-text">&bull; ${(c.name || c.skuCode || '').toUpperCase()} — ${cQtyPcs} ${c.uom || 'PCS'}</div>
                 </td>
                 <td class="col-orderno"></td>
                 <td class="col-pending"></td>
