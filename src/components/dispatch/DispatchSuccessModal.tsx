@@ -1,6 +1,8 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { X, Package, Truck, FileText, ChevronRight, CheckCircle2, Printer } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { printDeliveryChallan } from '../../utils/printDeliveryChallan';
 
 interface DispatchSuccessModalProps {
   isOpen: boolean;
@@ -17,7 +19,10 @@ export const DispatchSuccessModal: React.FC<DispatchSuccessModalProps> = ({
   onPrintChallan,
   onViewDetails,
 }) => {
+  const { selectedCompany } = useAuth();
   if (!isOpen || !challan) return null;
+
+  const handlePrint = onPrintChallan || (() => printDeliveryChallan(challan, selectedCompany));
 
   const dcNumber = challan.dcNumber || challan._id || 'DO-001';
   const orderNumber = challan.orderNumber || '—';
@@ -222,16 +227,13 @@ export const DispatchSuccessModal: React.FC<DispatchSuccessModalProps> = ({
           >
             Close
           </button>
-          <div className="flex items-center gap-2">
-            {onPrintChallan && (
-              <button
-                onClick={onPrintChallan}
-                className="px-4 py-2 text-xs font-bold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50 rounded-xl cursor-pointer transition-colors flex items-center gap-1.5"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                Print Delivery Challan
-              </button>
-            )}
+            <button
+              onClick={handlePrint}
+              className="px-4 py-2 text-xs font-bold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50 rounded-xl cursor-pointer transition-colors flex items-center gap-1.5"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              Print Delivery Challan
+            </button>
             {onViewDetails && (
               <button
                 onClick={onViewDetails}

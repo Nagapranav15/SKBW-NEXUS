@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Printer } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import { getDeliveryChallans, createDeliveryChallan, updateDeliveryChallan, deleteDeliveryChallan } from '../../api/deliveryChallanApi';
 import { getSalesOrders } from '../../api/salesOrderApi';
+import { printDeliveryChallan } from '../../utils/printDeliveryChallan';
 
 const DeliveryChallan: React.FC = () => {
   const { selectedCompany, hasPermission } = useAuth();
@@ -128,10 +129,21 @@ const DeliveryChallan: React.FC = () => {
                   <td className="px-6 py-4 text-[13.5px] font-medium text-gray-900">₹{dc.total?.toFixed(2)}</td>
                   <td className="px-6 py-4"><span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(dc.status)}`}>{dc.status}</span></td>
                   <td className="px-6 py-4">
-                    {canManage && <div className="flex space-x-2">
-                      <button onClick={() => { setEditingChallan(dc); setFormData({ orderId: dc.orderId, orderNumber: dc.orderNumber, customerName: dc.customerName, date: dc.date, transporterName: dc.transporterName, vehicleNumber: dc.vehicleNumber, items: dc.items, notes: dc.notes }); setShowForm(true); }} className="text-blue-600 hover:text-blue-900"><Edit className="w-4 h-4" /></button>
-                      <button onClick={() => handleDelete(dc._id)} className="text-red-600 hover:text-red-900"><Trash2 className="w-4 h-4" /></button>
-                    </div>}
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => printDeliveryChallan(dc, selectedCompany)}
+                        className="text-gray-600 hover:text-blue-700 transition-colors cursor-pointer"
+                        title="Print Delivery Challan"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
+                      {canManage && (
+                        <>
+                          <button onClick={() => { setEditingChallan(dc); setFormData({ orderId: dc.orderId, orderNumber: dc.orderNumber, customerName: dc.customerName, date: dc.date, transporterName: dc.transporterName, vehicleNumber: dc.vehicleNumber, items: dc.items, notes: dc.notes }); setShowForm(true); }} className="text-blue-600 hover:text-blue-900 cursor-pointer"><Edit className="w-4 h-4" /></button>
+                          <button onClick={() => handleDelete(dc._id)} className="text-red-600 hover:text-red-900 cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
