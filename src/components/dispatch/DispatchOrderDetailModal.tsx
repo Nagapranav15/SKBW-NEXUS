@@ -69,7 +69,7 @@ export const DispatchOrderDetailModal: React.FC<DispatchOrderDetailModalProps> =
                   {orderRow.orderNumber}
                 </h2>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-600 border border-blue-200">
-                  {orderRow.orderDate}
+                  {orderRow.orderDate} {orderRow.orderTime ? `• ${orderRow.orderTime}` : ''}
                 </span>
                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
                   orderRow.readyStatus === 'Ready'
@@ -130,6 +130,12 @@ export const DispatchOrderDetailModal: React.FC<DispatchOrderDetailModalProps> =
                   <div className="flex items-center gap-2">
                     <MapPin className="w-3.5 h-3.5 text-gray-400" />
                     <span>{orderRow.city}, {orderRow.region}</span>
+                  </div>
+                )}
+                {orderRow.transporter && orderRow.transporter !== '—' && (
+                  <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+                    <Truck className="w-3.5 h-3.5 text-blue-500" />
+                    <span className="font-semibold text-gray-800">Transporter: {orderRow.transporter}</span>
                   </div>
                 )}
               </div>

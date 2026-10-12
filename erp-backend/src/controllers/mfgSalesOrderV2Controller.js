@@ -82,7 +82,7 @@ exports.getSalesOrders = async (req, res, next) => {
     let v2Orders = [];
     try {
       v2Orders = await SalesOrderV2.find(query)
-        .populate("customer", "firmName contactName gstin phone city state")
+        .populate("customer", "firmName contactName gstin phone city state preferredTransport transporter")
         .populate("items.skuId", "skuCode name category unit gsm width length ruleType pages paperType")
         .sort({ createdAt: -1 });
     } catch (queryErr) {
@@ -151,7 +151,7 @@ exports.getSalesOrderById = async (req, res, next) => {
   try {
     const { id } = req.params;
     let order = await SalesOrderV2.findById(id)
-      .populate("customer", "firmName contactName gstin phone email billingAddress shippingAddress state")
+      .populate("customer", "firmName contactName gstin phone email billingAddress shippingAddress state preferredTransport transporter")
       .populate("items.skuId", "skuCode name category unit gsm width length ruleType pages paperType reamWeight bomItems recipeYieldQty recipeYieldUnit batchYieldQty batchYieldUnit");
 
     if (!order) {

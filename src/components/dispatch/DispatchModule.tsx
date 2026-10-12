@@ -18,6 +18,7 @@ import { ViewDeliveryChallanModal } from './ViewDeliveryChallanModal';
 import { DispatchOrderDetailModal } from './DispatchOrderDetailModal';
 import { ConfirmActionModal } from '../common/ConfirmActionModal';
 import { showToast } from '../ui/Toast';
+import { getOrderTime } from '../../utils/dateUtils';
 
 // Safe string converter to prevent 'Cannot convert object to primitive value'
 const toSafeString = (val: any): string => {
@@ -54,6 +55,8 @@ export interface DispatchRowOrder {
   customerPhone?: string;
   city?: string;
   region: string;
+  transporter?: string;
+  orderTime?: string;
   itemCount: number;
   pendingGbl: number;
   pendingPcs: number;
@@ -271,6 +274,7 @@ export const DispatchModule: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState('ALL');
   const [selectedRegion, setSelectedRegion] = useState('ALL');
+  const [selectedTransporter, setSelectedTransporter] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
 
   // Filter Popover Menu State
@@ -285,7 +289,7 @@ export const DispatchModule: React.FC = () => {
   const dateFilterRef = useRef<HTMLDivElement>(null);
 
   // Sorting for Orders View (All columns clickable)
-  type SortField = 'orderNumber' | 'rawDate' | 'customerName' | 'region' | 'itemCount' | 'pendingGbl' | 'pendingPcs' | 'readyStatus';
+  type SortField = 'orderNumber' | 'rawDate' | 'customerName' | 'region' | 'transporter' | 'itemCount' | 'pendingGbl' | 'pendingPcs' | 'readyStatus';
   const [sortField, setSortField] = useState<SortField>('orderNumber');
   const [sortAsc, setSortAsc] = useState(false);
   const [showSortMenu, setShowSortMenu] = useState(false);
@@ -610,15 +614,24 @@ export const DispatchModule: React.FC = () => {
         }
       }
 
+      const transporter = 
+        (o.transporter && typeof o.transporter === 'string' && o.transporter.trim()) ? o.transporter.trim() :
+        (o.customer && typeof o.customer === 'object' && ((o.customer as any).preferredTransport || (o.customer as any).transporter)) ? ((o.customer as any).preferredTransport || (o.customer as any).transporter).trim() :
+        (o as any).transporterName || (o as any).transportName || (o as any).transport || '—';
+
+      const orderTime = getOrderTime(o);
+
       return {
         _id: o._id || `order-${idx}`,
         orderNumber: o.orderNumber || `SO-${String(idx + 1).padStart(4, '0')}`,
         orderDate: formattedDate,
+        orderTime,
         rawDate,
         customerName: o.customerName || 'Customer',
         customerPhone: o.customerPhone || (o.customer && (o.customer.phone || o.customer.mobile)) || '',
         city: o.city || (o.shippingAddress && o.shippingAddress.city) || (o.billingAddress && o.billingAddress.city) || '',
         region: o.region || (o.shippingAddress && o.shippingAddress.state) || (o.billingAddress && o.billingAddress.state) || 'Telangana',
+        transporter,
         itemCount: itemsTransformed.length,
         pendingGbl: Math.round(totalPendingGbl),
         pendingPcs: Math.round(totalPendingPcs),
@@ -673,6 +686,14 @@ export const DispatchModule: React.FC = () => {
     return Array.from(set).sort();
   }, [displayRows]);
 
+  const transporterOptions = useMemo(() => {
+    const set = new Set<string>();
+    displayRows.forEach(r => {
+      if (r.transporter && r.transporter !== '—') set.add(r.transporter);
+    });
+    return Array.from(set).sort();
+  }, [displayRows]);
+
   // Filtered & Sorted Rows
   const filteredRows = useMemo(() => {
     const res = displayRows.filter(row => {
@@ -684,6 +705,7 @@ export const DispatchModule: React.FC = () => {
       // Dropdown filters
       if (selectedCustomer !== 'ALL' && row.customerName !== selectedCustomer) return false;
       if (selectedRegion !== 'ALL' && row.region !== selectedRegion) return false;
+      if (selectedTransporter !== 'ALL' && row.transporter !== selectedTransporter) return false;
       if (selectedStatus !== 'ALL' && row.readyStatus !== selectedStatus) return false;
 
       // Date range filter
@@ -698,8 +720,9 @@ export const DispatchModule: React.FC = () => {
         const matchesCity = (row.city || '').toLowerCase().includes(q);
         const matchesPhone = (row.customerPhone || '').toLowerCase().includes(q);
         const matchesRegion = row.region.toLowerCase().includes(q);
+        const matchesTransporter = (row.transporter || '').toLowerCase().includes(q);
         const matchesItem = row.items.some(i => i.itemName.toLowerCase().includes(q) || (i.skuCode || '').toLowerCase().includes(q));
-        if (!matchesNo && !matchesCust && !matchesCity && !matchesPhone && !matchesRegion && !matchesItem) {
+        if (!matchesNo && !matchesCust && !matchesCity && !matchesPhone && !matchesRegion && !matchesTransporter && !matchesItem) {
           return false;
         }
       }
@@ -718,6 +741,8 @@ export const DispatchModule: React.FC = () => {
         cmp = a.customerName.localeCompare(b.customerName);
       } else if (sortField === 'region') {
         cmp = a.region.localeCompare(b.region);
+      } else if (sortField === 'transporter') {
+        cmp = (a.transporter || '').localeCompare(b.transporter || '');
       } else if (sortField === 'itemCount') {
         cmp = a.itemCount - b.itemCount;
       } else if (sortField === 'pendingGbl') {
@@ -729,7 +754,7 @@ export const DispatchModule: React.FC = () => {
       }
       return sortAsc ? cmp : -cmp;
     });
-  }, [displayRows, activeTab, selectedCustomer, selectedRegion, selectedStatus, startDate, endDate, searchQuery, sortField, sortAsc]);
+  }, [displayRows, activeTab, selectedCustomer, selectedRegion, selectedTransporter, selectedStatus, startDate, endDate, searchQuery, sortField, sortAsc]);
 
   // Paginated Rows (All rows rendered directly without page slicing)
   const totalPages = 1;
@@ -1026,10 +1051,12 @@ export const DispatchModule: React.FC = () => {
       const exportData = targetRows.map(row => ({
         'SO Number': row.orderNumber,
         'Order Date': row.orderDate,
+        'Order Time': row.orderTime || '',
         'Customer Name': row.customerName,
         'Phone': row.customerPhone || '',
         'City': row.city || '',
         'Region': row.region,
+        'Transporter': row.transporter || '—',
         'Items Count': row.itemCount,
         'Items Detail': row.items.map(i => `${i.itemName} (${i.gbl} GBL / ${i.pcs} PCS)`).join('; '),
         'Pending GBL': row.pendingGbl,
@@ -1351,6 +1378,21 @@ export const DispatchModule: React.FC = () => {
                   </select>
                 </div>
 
+                {/* Transporter Filter */}
+                <div>
+                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Transporter</label>
+                  <select
+                    value={selectedTransporter}
+                    onChange={e => { setSelectedTransporter(e.target.value); setCurrentPage(1); }}
+                    className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                  >
+                    <option value="ALL">All Transporters ({transporterOptions.length})</option>
+                    {transporterOptions.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Readiness Status */}
                 <div>
                   <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Readiness Status</label>
@@ -1410,6 +1452,13 @@ export const DispatchModule: React.FC = () => {
                 >
                   <span>Customer Name</span>
                   {sortField === 'customerName' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
+                </button>
+                <button
+                  onClick={() => { handleSort('transporter'); setShowSortMenu(false); }}
+                  className="w-full px-2.5 py-1.5 text-left rounded-xl hover:bg-gray-50 flex items-center justify-between font-semibold text-gray-700"
+                >
+                  <span>Transporter</span>
+                  {sortField === 'transporter' && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
                 </button>
                 <button
                   onClick={() => { handleSort('pendingGbl'); setShowSortMenu(false); }}
@@ -1685,7 +1734,22 @@ export const DispatchModule: React.FC = () => {
                     </div>
                   </th>
 
-                  {/* 5. ITEMS COUNT */}
+                  {/* 5. TRANSPORTER */}
+                  <th 
+                    onClick={() => handleSort('transporter')}
+                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-900 whitespace-nowrap transition-colors"
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>TRANSPORTER</span>
+                      {sortField === 'transporter' ? (
+                        sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                      )}
+                    </div>
+                  </th>
+
+                  {/* 6. ITEMS COUNT */}
                   <th 
                     onClick={() => handleSort('itemCount')}
                     className="py-3 px-3 font-bold text-center cursor-pointer hover:text-gray-900 whitespace-nowrap w-32 transition-colors"
@@ -1751,7 +1815,7 @@ export const DispatchModule: React.FC = () => {
               <tbody className="divide-y divide-gray-100 text-xs">
                 {paginatedRows.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="py-12 text-center text-gray-400">
+                    <td colSpan={12} className="py-12 text-center text-gray-400">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <Truck className="w-8 h-8 text-gray-300 stroke-[1.5]" />
                         <span className="font-semibold text-sm">No pending orders matching filters</span>
@@ -1800,9 +1864,15 @@ export const DispatchModule: React.FC = () => {
                             </button>
                           </td>
 
-                          {/* Order Date */}
-                          <td className="py-3.5 px-3 text-gray-600 font-mono text-xs whitespace-nowrap">
-                            {row.orderDate}
+                          {/* Order Date & Time */}
+                          <td className="py-3.5 px-3 text-gray-600 whitespace-nowrap">
+                            <div className="font-mono text-xs font-semibold text-gray-900">{row.orderDate}</div>
+                            {row.orderTime ? (
+                              <div className="font-mono text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
+                                <Clock className="w-2.5 h-2.5 text-gray-400 shrink-0" />
+                                <span>{row.orderTime}</span>
+                              </div>
+                            ) : null}
                           </td>
 
                           {/* Customer Block */}
@@ -1827,6 +1897,18 @@ export const DispatchModule: React.FC = () => {
                           {/* Region */}
                           <td className="py-3.5 px-3 text-gray-700 font-medium whitespace-nowrap">
                             {row.region}
+                          </td>
+
+                          {/* Transporter */}
+                          <td className="py-3.5 px-3 whitespace-nowrap">
+                            {row.transporter && row.transporter !== '—' ? (
+                              <div className="flex items-center gap-1.5">
+                                <Truck className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                <span className="font-semibold text-gray-800 text-xs">{row.transporter}</span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 font-normal text-xs">—</span>
+                            )}
                           </td>
 
                           {/* ITEMS: Only shows number of items badge when unopened; click toggles dropdown */}
@@ -1979,7 +2061,7 @@ export const DispatchModule: React.FC = () => {
                         {/* ── EXPANDED DETAILED ITEMS SUB-TABLE (ACCORDION DROPDOWN) ── */}
                         {isExpanded && (
                           <tr className="bg-slate-50/80 border-b border-gray-200 animate-in fade-in duration-150">
-                            <td colSpan={11} className="p-3 pl-8 pr-4">
+                            <td colSpan={12} className="p-3 pl-8 pr-4">
                               <div className="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden">
                                 <div className="px-4 py-2.5 bg-gray-50/90 border-b border-gray-200 flex items-center justify-between text-xs font-semibold text-gray-700">
                                   <span className="flex items-center gap-2">

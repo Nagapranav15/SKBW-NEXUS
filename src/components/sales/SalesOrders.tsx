@@ -29,7 +29,7 @@ import autoTable from 'jspdf-autotable';
 import { generateFullDashboardOrders, INITIAL_FEATURED_ORDERS } from './salesOrderSampleData';
 import { PendingOrdersProductionView } from './PendingOrdersProductionView';
 import { getCustomSalesOrders, saveCustomSalesOrder } from '../../utils/salesOrderStorage';
-import { formatDateDDMMYYYY } from '../../utils/dateUtils';
+import { formatDateDDMMYYYY, getOrderTime } from '../../utils/dateUtils';
 
 // Custom SVG WhatsApp icon matching site vibe
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ 
@@ -44,7 +44,7 @@ const WhatsAppIcon: React.FC<{ className?: string }> = ({
   </svg>
 );
 
-type SortField = 'orderNumber' | 'orderDate' | 'customerName' | 'city' | 'promisedDate' | 'grandTotal' | 'fulfillmentStatus' | 'status';
+type SortField = 'orderNumber' | 'orderDate' | 'customerName' | 'city' | 'transporter' | 'promisedDate' | 'grandTotal' | 'fulfillmentStatus' | 'status';
 type SortOrder = 'asc' | 'desc';
 
 interface ColumnConfig {
@@ -123,6 +123,7 @@ const SalesOrders: React.FC = () => {
     { id: 'orderDate', label: 'Date', visible: true },
     { id: 'customer', label: 'Customer', visible: true },
     { id: 'cityRegion', label: 'City / Region', visible: true },
+    { id: 'transporter', label: 'Transporter', visible: true },
     { id: 'promisedDate', label: 'Expected Delivery', visible: true },
     { id: 'grandTotal', label: 'Amount (₹)', visible: true },
     { id: 'fulfillmentStatus', label: 'Fulfilment Status', visible: true },
@@ -619,10 +620,12 @@ const SalesOrders: React.FC = () => {
       'S.No': idx + 1,
       'SO No.': o.orderNumber,
       'Order Date': formatDateDDMMYYYY(o.orderDate),
+      'Order Time': getOrderTime(o) || '—',
       'Customer Name': o.customerName,
       'Mobile No.': o.customerPhone || '—',
       'City': o.city || '—',
       'Region / State': o.region || '—',
+      'Transporter': o.transporter || '—',
       'Agent': o.agent || '—',
       'Expected Delivery': formatDateDDMMYYYY(o.promisedDate),
       'Amount (₹)': o.grandTotal,
@@ -1481,6 +1484,19 @@ const SalesOrders: React.FC = () => {
                   </th>
                 )}
 
+                {/* Transporter */}
+                {isColVisible('transporter') && (
+                  <th 
+                    onClick={() => handleSort('transporter')}
+                    className="py-3.5 px-3 cursor-pointer hover:bg-gray-100/70 transition-colors whitespace-nowrap"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Transporter</span>
+                      <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    </div>
+                  </th>
+                )}
+
                 {/* Expected Delivery */}
                 {isColVisible('promisedDate') && (
                   <th 
@@ -1582,7 +1598,13 @@ const SalesOrders: React.FC = () => {
                     {/* Date */}
                     {isColVisible('orderDate') && (
                       <td className="py-3.5 px-3 text-gray-600 font-medium whitespace-nowrap font-mono">
-                        {formatDateDDMMYYYY(order.orderDate)}
+                        <div className="font-semibold text-gray-900">{formatDateDDMMYYYY(order.orderDate)}</div>
+                        {getOrderTime(order) ? (
+                          <div className="text-[11px] text-gray-400 font-normal flex items-center gap-1 mt-0.5">
+                            <Clock className="w-2.5 h-2.5 text-gray-400 shrink-0" />
+                            <span>{getOrderTime(order)}</span>
+                          </div>
+                        ) : null}
                       </td>
                     )}
 
@@ -1613,6 +1635,20 @@ const SalesOrders: React.FC = () => {
                         <div className="text-[11px] text-gray-500 mt-0.5 font-medium">
                           {order.region || 'Andhra Pradesh'}
                         </div>
+                      </td>
+                    )}
+
+                    {/* Transporter */}
+                    {isColVisible('transporter') && (
+                      <td className="py-3.5 px-3 whitespace-nowrap">
+                        {order.transporter ? (
+                          <div className="flex items-center gap-1.5">
+                            <Truck className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            <span className="font-semibold text-gray-800 text-xs">{order.transporter}</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 font-normal text-xs">—</span>
+                        )}
                       </td>
                     )}
 

@@ -14,7 +14,7 @@ import { useAuth } from '../../context/AuthContext';
 import { showToast } from '../ui/Toast';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
-import { formatDateDDMMYYYY } from '../../utils/dateUtils';
+import { formatDateDDMMYYYY, getOrderTime } from '../../utils/dateUtils';
 import { NewProductionOrderWizard } from '../production/NewProductionOrderWizard';
 
 interface PendingOrdersProductionViewProps {
@@ -1368,11 +1368,15 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
         grandTotalPendingGbl += totalPendingGbl;
 
         const formattedDate = formatReportDate(order.orderDate);
+        const orderTime = getOrderTime(order);
         const cityState = getCityStateStr(order);
 
         const mainRow = `
           <tr class="order-main-row">
-            <td class="col-date">${formattedDate}</td>
+            <td class="col-date">
+              ${formattedDate}
+              ${orderTime ? `<div style="font-size: 7pt; color: #64748b; font-weight: normal; margin-top: 2px;">${orderTime}</div>` : ''}
+            </td>
             <td class="col-customer">
               <div class="customer-name">${order.customerName || '—'}</div>
               <div class="city-state">${cityState}</div>
@@ -2949,7 +2953,15 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                           {o.orderNumber}
                                         </button>
                                       </td>
-                                      <td className="py-2 px-3 font-mono text-gray-600">{formatDateDDMMYYYY(o.orderDate)}</td>
+                                      <td className="py-2 px-3 font-mono text-gray-600">
+                                        <div className="font-semibold text-gray-900">{formatDateDDMMYYYY(o.orderDate)}</div>
+                                        {getOrderTime(o.rawOrder || o) ? (
+                                          <div className="text-[11px] text-gray-400 font-normal flex items-center gap-1 mt-0.5">
+                                            <Clock className="w-2.5 h-2.5 text-gray-400 shrink-0" />
+                                            <span>{getOrderTime(o.rawOrder || o)}</span>
+                                          </div>
+                                        ) : null}
+                                      </td>
                                       <td className="py-2 px-3 font-semibold text-gray-900">{o.customerName}</td>
                                       <td className="py-2 px-3 text-gray-500">
                                         <div className="flex items-center gap-1.5">
@@ -3095,7 +3107,13 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
 
                       {/* Date */}
                       <td className="align-middle py-3 px-3 w-28 text-center whitespace-nowrap font-mono text-xs text-gray-600">
-                        {formatDateDDMMYYYY(order.orderDate)}
+                        <div className="font-semibold text-gray-900">{formatDateDDMMYYYY(order.orderDate)}</div>
+                        {getOrderTime(order.rawOrder || order) ? (
+                          <div className="text-[11px] text-gray-400 font-normal flex items-center justify-center gap-1 mt-0.5">
+                            <Clock className="w-2.5 h-2.5 text-gray-400 shrink-0" />
+                            <span>{getOrderTime(order.rawOrder || order)}</span>
+                          </div>
+                        ) : null}
                       </td>
 
                       {/* Customer */}
