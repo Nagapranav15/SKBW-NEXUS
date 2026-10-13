@@ -8,6 +8,9 @@ import {
   HelpCircle, Percent
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { generateListPdf } from '../../utils/pdfReport';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js';
+import { Bar, Doughnut } from 'react-chartjs-2';
 import { useAuth } from '../../context/AuthContext';
 import { getInvoices, SalesInvoice } from '../../api/invoiceApi';
 import { getDeliveryChallans } from '../../api/deliveryChallanApi';
@@ -17,6 +20,8 @@ import { getSalesOrdersV2 } from '../../api/salesOrderApiV2';
 import { getProductionOrders } from '../../api/productionApi';
 import { getTransactions } from '../../api/transactionApi';
 import { showToast } from '../ui/Toast';
+
+ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
 
 // Main Category Types
 export type MainCategoryType =
@@ -45,6 +50,31 @@ const cleanVal = (val: any, fallback = ''): string => {
   return fallback;
 };
 
+const DONUT_COLORS = ['#0059CF', '#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#94a3b8'];
+const barOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: { x: { grid: { display: false } }, y: { grid: { color: '#f1f5f9' } } }
+};
+const donutOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  cutout: '65%',
+  plugins: { legend: { position: 'right' as const, labels: { boxWidth: 10, font: { size: 12 } } } }
+};
+
+const ChartCard: React.FC<{ title: string; empty?: boolean; children: React.ReactNode }> = ({ title, empty, children }) => (
+  <div className="bg-gray-50 rounded-xl p-4">
+    <h3 className="text-[0.875rem] font-medium text-gray-700 mb-3">{title}</h3>
+    <div className="h-56">
+      {empty ? (
+        <div className="h-full flex items-center justify-center text-[0.875rem] text-gray-400">No data for the selected period</div>
+      ) : children}
+    </div>
+  </div>
+);
+
 const SalesReports: React.FC = () => {
   const { selectedCompany } = useAuth();
 
@@ -64,6 +94,7 @@ const SalesReports: React.FC = () => {
   const [inventoryLedger, setInventoryLedger] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadIssues, setLoadIssues] = useState<string[]>([]);
 
   // Filter Bar States
   const [searchQuery, setSearchQuery] = useState('');
@@ -74,6 +105,7 @@ const SalesReports: React.FC = () => {
 
   // Date Filter Popover & Range State
   const [showDateFilter, setShowDateFilter] = useState(false);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [datePreset, setDatePreset] = useState<'All' | 'Today' | 'Yesterday' | 'This Week' | 'This Month' | 'Last Month' | 'This Quarter' | 'This Year' | 'Custom'>('All');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -104,6 +136,13 @@ const SalesReports: React.FC = () => {
     if (showSpinner) setIsLoading(true);
     try {
       const companyId = selectedCompany?._id;
+      const issues: string[] = [];
+      const safe = <T,>(label: string, p: Promise<T>, fallback: T): Promise<T> =>
+        p.catch(err => {
+          console.error(`Reports: failed to load ${label}`, err);
+          issues.push(`${label} could not be loaded`);
+          return fallback;
+        });
 
       const [
         invsRes,
@@ -117,16 +156,16 @@ const SalesReports: React.FC = () => {
         invLedgerRes,
         txsRes
       ] = await Promise.all([
-        getInvoices(companyId).catch(() => [] as SalesInvoice[]),
-        getSalesOrdersV2(companyId).catch(() => []),
-        getDeliveryChallans(companyId).catch(() => null),
-        getPurchaseInvoicesV2({ companyId }).catch(() => null),
-        getProductionOrders({ companyId }).catch(() => []),
-        getParties({ company: companyId, limit: 2000 }).catch(() => null),
-        getSkusV2(companyId).catch(() => []),
-        getBalancesV2(companyId).catch(() => []),
-        getLedgerV2({ companyId, limit: 1000 }).catch(() => null),
-        getTransactions({ companyId }).catch(() => null)
+        safe('Invoices', getInvoices(companyId), [] as SalesInvoice[]),
+        safe('Sales orders', getSalesOrdersV2(companyId), [] as any[]),
+        safe('Delivery challans', getDeliveryChallans(companyId), null as any),
+        safe('Purchases', getPurchaseInvoicesV2({ companyId }), null as any),
+        safe('Production orders', getProductionOrders({ companyId }), [] as any[]),
+        safe('Parties', getParties({ company: companyId, limit: 2000 }), null as any),
+        safe('Items', getSkusV2(companyId), [] as any[]),
+        safe('Stock balances', getBalancesV2(companyId), [] as any[]),
+        safe('Stock ledger', getLedgerV2({ companyId, limit: 1000 }), null as any),
+        safe('Transactions', getTransactions({ companyId }), null as any)
       ]);
 
       // 1. Invoices
@@ -136,7 +175,13 @@ const SalesReports: React.FC = () => {
       try {
         localInvs = JSON.parse(localStorage.getItem(localInvsKey) || '[]');
       } catch {}
-      setInvoices([...localInvs, ...invList]);
+      const serverNos = new Set(invList.map((i: any) => String(i.invoiceNumber || i._id)));
+      const unsyncedLocal = localInvs.filter((i: any) => !serverNos.has(String(i.invoiceNumber || i._id)));
+      // Cancelled and draft invoices are not revenue / receivables
+      setInvoices([...unsyncedLocal, ...invList].filter((i: any) => {
+        const st = String(i.status || '').toLowerCase();
+        return st !== 'cancelled' && st !== 'draft';
+      }));
 
       // 2. Sales Orders
       setSalesOrders(Array.isArray(ordersRes) ? ordersRes : []);
@@ -158,7 +203,8 @@ const SalesReports: React.FC = () => {
       try {
         localParties = JSON.parse(localStorage.getItem(`skbw_parties_${companyId || 'default'}`) || '[]');
       } catch {}
-      setParties([...partyList, ...localParties]);
+      const partyIds = new Set(partyList.map((p: any) => String(p._id || p.id || '')));
+      setParties([...partyList, ...localParties.filter((p: any) => !partyIds.has(String(p._id || p.id || '')))]);
 
       // 7. SKUs & Stock Balances
       setSkus(Array.isArray(skusRes) ? skusRes : []);
@@ -171,6 +217,10 @@ const SalesReports: React.FC = () => {
       // 9. Financial Transactions
       const txList = txsRes?.data?.transactions || txsRes?.transactions || (Array.isArray(txsRes) ? txsRes : []);
       setTransactions(txList);
+
+      if (partyList.length >= 2000) issues.push('Showing only the first 2,000 parties');
+      if (ledgerList.length >= 1000) issues.push('Showing only the latest 1,000 stock ledger entries');
+      setLoadIssues(issues);
     } catch (err) {
       console.error('Failed to fetch full report dataset:', err);
       showToast('Error refreshing report metrics', 'error');
@@ -315,7 +365,7 @@ const SalesReports: React.FC = () => {
     // Stock Inventory Valuation
     const stockValuation = skus.reduce((s, sku) => {
       const stock = Number(sku.presentStock || sku.openingStock || 0);
-      const cost = Number(sku.costPrice || sku.avgCost || sku.purchasePrice || sku.standardCost || 0);
+      const cost = Number(sku.avgRate || sku.avgCost || sku.costPrice || sku.standardCost || sku.purchasePrice || sku.ratePerKg || sku.rate || 0);
       return s + (stock * cost);
     }, 0);
 
@@ -357,6 +407,48 @@ const SalesReports: React.FC = () => {
       profitMargin
     };
   }, [invoices, purchases, skus, productions, salesOrders, deliveries, startDate, endDate]);
+
+  // ── DASHBOARD CHART DATA ──
+  const chartData = useMemo(() => {
+    const inRange = invoices.filter(i => isWithinDateRange(i.invoiceDate || (i as any).date));
+    const amt = (i: any) => Number(i.grandTotal || i.subtotal || 0);
+
+    const monthMap = new Map<string, number>();
+    inRange.forEach(i => {
+      const d = new Date(i.invoiceDate || (i as any).date || '');
+      if (isNaN(d.getTime())) return;
+      const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthMap.set(k, (monthMap.get(k) || 0) + amt(i));
+    });
+    const months = Array.from(monthMap.keys()).sort().slice(-12);
+
+    const custMap = new Map<string, number>();
+    const regionMap = new Map<string, number>();
+    inRange.forEach(i => {
+      const c = cleanVal(i.customerName, 'Unnamed Customer');
+      custMap.set(c, (custMap.get(c) || 0) + amt(i));
+      const r = cleanVal(i.region || i.city || i.billToAddress?.city, 'Unspecified');
+      regionMap.set(r, (regionMap.get(r) || 0) + amt(i));
+    });
+    const topCust = Array.from(custMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const regions = Array.from(regionMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+    const stockMap = new Map<string, number>();
+    skus.forEach(sku => {
+      const v = Number(sku.presentStock || 0) * Number(sku.avgRate || sku.avgCost || sku.costPrice || sku.standardCost || sku.purchasePrice || sku.ratePerKg || sku.rate || 0);
+      if (v <= 0) return;
+      const c = cleanVal(sku.category, 'General');
+      stockMap.set(c, (stockMap.get(c) || 0) + v);
+    });
+    const stockCats = Array.from(stockMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+    return {
+      months: { labels: months, values: months.map(m => Math.round(monthMap.get(m) || 0)) },
+      topCust: { labels: topCust.map(c => c[0]), values: topCust.map(c => Math.round(c[1])) },
+      regions: { labels: regions.map(r => r[0]), values: regions.map(r => Math.round(r[1])) },
+      stock: { labels: stockCats.map(c => c[0]), values: stockCats.map(c => Math.round(c[1])) }
+    };
+  }, [invoices, skus, startDate, endDate]);
 
   // ── GENERATE DATA FOR CURRENT ACTIVE TAB & SUB-REPORT ──
   const activeReportRows = useMemo(() => {
@@ -497,7 +589,7 @@ const SalesReports: React.FC = () => {
         // Stock Summary
         return skus.map(s => {
           const present = Number(s.presentStock || s.openingStock || 0);
-          const cost = Number(s.costPrice || s.avgCost || s.purchasePrice || s.standardCost || 0);
+          const cost = Number(s.avgRate || s.avgCost || s.costPrice || s.standardCost || s.purchasePrice || s.ratePerKg || s.rate || 0);
           return {
             id: s._id || s.skuCode,
             skuCode: s.skuCode || '—',
@@ -516,6 +608,26 @@ const SalesReports: React.FC = () => {
     }
 
     // 5. PRODUCTION REPORTS
+    if (activeCategory === 'production' && activeSubReport === 'yield') {
+      return productions
+        .filter(p => isWithinDateRange(p.createdAt || p.startDate || p.date))
+        .map(p => {
+          const target = Number(p.targetQty || p.quantity || 0);
+          const produced = Number(p.totalProducedQty || p.producedQuantity || 0);
+          return {
+            id: p._id || p.orderNumber,
+            date: p.startDate || (p.createdAt ? p.createdAt.split('T')[0] : '') || '',
+            orderNo: p.orderNumber || '—',
+            itemName: p.itemName || p.skuCode || '—',
+            targetQty: target,
+            producedQty: produced,
+            variance: produced - target,
+            yieldPct: target > 0 ? Math.round((produced / target) * 1000) / 10 : 0,
+            status: p.status || '—',
+            raw: p
+          };
+        });
+    }
     if (activeCategory === 'production') {
       return productions
         .filter(p => isWithinDateRange(p.createdAt || p.startDate || p.date))
@@ -581,6 +693,26 @@ const SalesReports: React.FC = () => {
     }
 
     // 9. FINANCIAL / LEDGER
+    if (activeCategory === 'ledger' && activeSubReport === 'ageing') {
+      const today = Date.now();
+      const map = new Map<string, any>();
+      invoices.forEach(i => {
+        const total = Number(i.grandTotal || i.subtotal || 0);
+        const paid = i.status === 'paid' ? total : Number(i.paidAmount || 0);
+        const due = total - paid;
+        if (due <= 0.5) return;
+        const name = cleanVal(i.customerName, 'Unnamed Customer');
+        const key = name.toLowerCase();
+        const base = new Date(i.invoiceDate || (i as any).date || '').getTime();
+        const days = isNaN(base) ? 0 : Math.max(0, Math.floor((today - base) / 86400000));
+        const row = map.get(key) || { id: key, customerName: name, region: cleanVal(i.region || i.city || i.billToAddress?.city), b0: 0, b30: 0, b60: 0, b90: 0, total: 0, invoices: 0 };
+        if (days <= 30) row.b0 += due; else if (days <= 60) row.b30 += due; else if (days <= 90) row.b60 += due; else row.b90 += due;
+        row.total += due;
+        row.invoices += 1;
+        map.set(key, row);
+      });
+      return Array.from(map.values());
+    }
     if (activeCategory === 'ledger') {
       return transactions
         .filter(t => isWithinDateRange(t.date || t.createdAt))
@@ -695,52 +827,42 @@ const SalesReports: React.FC = () => {
 
   // Print Report Handler
   const handlePrintReport = () => {
-    window.print();
+    if (filteredAndSortedRows.length === 0) {
+      showToast('No report rows to print', 'info');
+      return;
+    }
+    const keys = Object.keys(filteredAndSortedRows[0]).filter(k => k !== 'raw' && k !== 'id');
+    const label = (k: string) => k.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase());
+    const fmt = (v: any) => (typeof v === 'number' ? v.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : (v === null || v === undefined || v === '' ? '—' : String(v)));
+    generateListPdf({
+      companyName: selectedCompany?.name || 'SKBW ERP',
+      title: `${activeCategory} report${activeSubReport !== 'summary' ? ` — ${activeSubReport.replace('_', ' ')}` : ''}`,
+      meta: [`Rows: ${filteredAndSortedRows.length}`, ...(startDate || endDate ? [`Period: ${startDate || '…'} to ${endDate || '…'}`] : [])],
+      head: ['#', ...keys.map(label)],
+      body: filteredAndSortedRows.map((r: any, i: number) => [i + 1, ...keys.map(k => fmt(r[k]))]),
+      fileName: `${activeCategory}_report_${new Date().toISOString().slice(0, 10)}`,
+      rightAlignColumns: keys.map((k, i) => (typeof filteredAndSortedRows[0][k] === 'number' ? i + 1 : -1)).filter(i => i > 0),
+    });
   };
 
   return (
-    <div className="p-4 sm:p-6 bg-slate-50/50 min-h-screen space-y-5">
-      {/* ── HEADER & NAVIGATION TITLE ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-md shrink-0">
-            <BarChart3 className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight">Enterprise ERP Reports & Analytics</h1>
-            <p className="text-xs text-slate-500 font-medium">Real-time Tally-grade ledger audit, financial reporting, stock valuation, and operational analytics.</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-          <button
-            onClick={() => loadAllReportData(true)}
-            className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
-            title="Refresh All Report Data"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
-          </button>
-
-          <button
-            onClick={handleExportExcel}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-bold text-xs shadow-2xs transition-colors cursor-pointer"
-          >
-            <Download className="w-4 h-4 text-emerald-600" />
-            <span>Export Excel</span>
-          </button>
-
-          <button
-            onClick={handlePrintReport}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 font-bold text-xs shadow-2xs transition-colors cursor-pointer"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Print Report</span>
-          </button>
+    <div className="p-4 md:p-6 bg-white min-h-[calc(100*var(--vh,1vh))] space-y-4 font-sans text-gray-800">
+      {/* ── HEADER ── */}
+      <div className="flex items-baseline justify-between gap-4 px-1">
+        <div>
+          <h1 className="text-lg font-semibold text-gray-900">Reports</h1>
+          <p className="text-[0.875rem] text-gray-500">
+            Ledger audit, financial reporting, stock valuation &amp; operational analytics.
+          </p>
         </div>
       </div>
 
-      {/* ── CATEGORY LANDING TABS BAR ── */}
-      <div className="flex items-center gap-1.5 p-1.5 bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-x-auto">
+      {/* ── TABS & ACTION TOOLBAR (same as Item Master / Business Directory) ── */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between border-b border-gray-200 bg-white px-1 relative">
+        {showFilterPanel && (
+          <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowFilterPanel(false)} />
+        )}
+        <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full min-w-0">
         {[
           { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboardIcon },
           { id: 'sales', label: 'Sales', icon: ShoppingCart },
@@ -760,22 +882,208 @@ const SalesReports: React.FC = () => {
               setActiveSubReport('summary');
               setCurrentPage(1);
             }}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`px-4 py-3 text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
               activeCategory === cat.id
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                ? 'border-blue-700 text-blue-700 bg-transparent'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
             <cat.icon className="w-3.5 h-3.5" />
             <span>{cat.label}</span>
           </button>
         ))}
+        </div>
+
+        <div className="py-2 flex items-center gap-2 shrink-0 flex-wrap">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search reports..."
+              value={searchQuery}
+              onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+              className="pl-8 pr-7 py-1.5 text-[0.875rem] bg-gray-50 border border-gray-200 rounded-xl w-40 md:w-52 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-2 top-2 text-gray-400 hover:text-gray-600 cursor-pointer">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {(customersList.length > 0 || suppliersList.length > 0 || regionsList.length > 0) && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowFilterPanel(v => !v)}
+                className={`p-2 rounded-xl border flex items-center justify-center cursor-pointer shadow-2xs ${
+                  (selectedCustomer !== 'ALL' || selectedSupplier !== 'ALL' || selectedRegion !== 'ALL')
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200'
+                }`}
+                title="Filters"
+              >
+                <Filter className="w-4 h-4" />
+              </button>
+              {showFilterPanel && (
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl border border-gray-200 shadow-2xl p-4 z-50 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                    <h4 className="text-[0.875rem] font-semibold text-gray-900">Filters</h4>
+                    <button onClick={() => setShowFilterPanel(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 cursor-pointer">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+            {/* Customer Filter */}
+            {customersList.length > 0 && (
+              <div className="w-full">
+                <select
+                  value={selectedCustomer}
+                  onChange={e => { setSelectedCustomer(e.target.value); setCurrentPage(1); }}
+                  className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[0.875rem] font-semibold text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
+                >
+                  <option value="ALL">All Customers</option>
+                  {customersList.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Supplier Filter */}
+            {suppliersList.length > 0 && (
+              <div className="w-full">
+                <select
+                  value={selectedSupplier}
+                  onChange={e => { setSelectedSupplier(e.target.value); setCurrentPage(1); }}
+                  className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[0.875rem] font-semibold text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
+                >
+                  <option value="ALL">All Suppliers</option>
+                  {suppliersList.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Region Filter */}
+            {regionsList.length > 0 && (
+              <div className="w-full">
+                <select
+                  value={selectedRegion}
+                  onChange={e => { setSelectedRegion(e.target.value); setCurrentPage(1); }}
+                  className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[0.875rem] font-semibold text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
+                >
+                  <option value="ALL">All Regions</option>
+                  {regionsList.map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+                </div>
+              )}
+            </div>
+          )}
+
+            {/* Date Range Popover */}
+            <div ref={dateFilterRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setShowDateFilter(!showDateFilter)}
+                className={`p-2 rounded-xl border flex items-center justify-center cursor-pointer shadow-2xs ${
+                  datePreset !== 'All'
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200'
+                }`}
+                title={datePreset === 'All' ? 'Filter Date' : datePreset}
+              >
+                <Calendar className="w-4 h-4" />
+              </button>
+
+              {showDateFilter && (
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl border border-slate-200 shadow-2xl z-50 p-4 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <span className="text-[0.875rem] font-medium text-slate-800 uppercase tracking-wider">Date Presets</span>
+                    <button onClick={() => setShowDateFilter(false)} className="text-slate-400 hover:text-slate-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {(['All', 'Today', 'Yesterday', 'This Week', 'This Month', 'Last Month', 'This Quarter', 'This Year', 'Custom'] as const).map(p => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => applyDatePreset(p)}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold text-center cursor-pointer ${
+                          datePreset === p
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+
+                  {datePreset === 'Custom' && (
+                    <div className="pt-2 border-t border-slate-100 space-y-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">From Date</label>
+                        <input
+                          type="date"
+                          value={startDate}
+                          onChange={e => setStartDate(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-[0.875rem] font-semibold text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">To Date</label>
+                        <input
+                          type="date"
+                          value={endDate}
+                          onChange={e => setEndDate(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-[0.875rem] font-semibold text-slate-800"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+          <button
+            type="button"
+            onClick={() => loadAllReportData(true)}
+            className="p-2 rounded-xl border bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200 flex items-center justify-center cursor-pointer shadow-2xs"
+            title="Refresh All Report Data"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            className="p-2 rounded-xl border bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200 flex items-center justify-center cursor-pointer shadow-2xs"
+            title="Export Excel"
+          >
+            <Download className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handlePrintReport}
+            className="p-2 rounded-xl border bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200 flex items-center justify-center cursor-pointer shadow-2xs"
+            title="Print Report"
+          >
+            <Printer className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* ── SUB-REPORT SUB-TAB NAVIGATION (IF APPLICABLE) ── */}
       {activeCategory !== 'dashboard' && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-slate-100/70 border border-slate-200 rounded-xl overflow-x-auto text-xs font-bold text-slate-600">
-          <span className="text-[10px] uppercase font-black text-slate-400 mr-1">Report View:</span>
+        <div className="flex items-center gap-2 px-1 overflow-x-auto text-[0.875rem] font-semibold text-slate-600">
+          <span className="text-xs uppercase font-semibold text-slate-400 mr-1">Report View:</span>
           {activeCategory === 'sales' && (
             <>
               <SubTabBtn active={activeSubReport === 'summary'} onClick={() => setActiveSubReport('summary')}>Sales Summary</SubTabBtn>
@@ -793,7 +1101,10 @@ const SalesReports: React.FC = () => {
             <SubTabBtn active={true} onClick={() => {}}>Purchase Batch Log</SubTabBtn>
           )}
           {activeCategory === 'production' && (
-            <SubTabBtn active={true} onClick={() => {}}>Production Orders</SubTabBtn>
+            <>
+              <SubTabBtn active={activeSubReport === 'summary'} onClick={() => setActiveSubReport('summary')}>Production Orders</SubTabBtn>
+              <SubTabBtn active={activeSubReport === 'yield'} onClick={() => setActiveSubReport('yield')}>Yield &amp; Variance</SubTabBtn>
+            </>
           )}
           {activeCategory === 'dispatch' && (
             <SubTabBtn active={true} onClick={() => {}}>Delivery Challans</SubTabBtn>
@@ -805,7 +1116,10 @@ const SalesReports: React.FC = () => {
             <SubTabBtn active={true} onClick={() => {}}>Party Master Directory</SubTabBtn>
           )}
           {activeCategory === 'ledger' && (
-            <SubTabBtn active={true} onClick={() => {}}>Financial Ledger Transactions</SubTabBtn>
+            <>
+              <SubTabBtn active={activeSubReport === 'summary'} onClick={() => setActiveSubReport('summary')}>Ledger Transactions</SubTabBtn>
+              <SubTabBtn active={activeSubReport === 'ageing'} onClick={() => setActiveSubReport('ageing')}>Receivables Ageing</SubTabBtn>
+            </>
           )}
           {activeCategory === 'tax' && (
             <SubTabBtn active={true} onClick={() => {}}>Tax & GST Audit</SubTabBtn>
@@ -813,164 +1127,52 @@ const SalesReports: React.FC = () => {
         </div>
       )}
 
+      {loadIssues.length > 0 && (
+        <div className="flex items-start gap-2 px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-[0.875rem]">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <p className="font-medium">Some report data is incomplete. Figures below may be understated.</p>
+            <ul className="text-xs list-disc pl-4 mt-0.5">
+              {loadIssues.map(m => <li key={m}>{m}</li>)}
+            </ul>
+          </div>
+          <button type="button" onClick={() => loadAllReportData(true)} className="text-xs font-semibold underline cursor-pointer shrink-0">Retry</button>
+        </div>
+      )}
+
       {/* ── EXECUTIVE KPI CARDS ROW (Matching Tally / Enterprise standards) ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
         <KpiCard title="Sales Revenue" value={`₹${kpiMetrics.totalSales.toLocaleString('en-IN')}`} icon={IndianRupee} color="text-emerald-600" bg="bg-emerald-50" />
         <KpiCard title="Sales Volume" value={`${kpiMetrics.totalSalesVolumeGbl.toLocaleString('en-IN')} GBL`} icon={Layers} color="text-blue-600" bg="bg-blue-50" />
-        <KpiCard title="Purchases Spend" value={`₹${kpiMetrics.totalPurchasesCost.toLocaleString('en-IN')}`} icon={ShoppingBag} color="text-purple-600" bg="bg-purple-50" />
+        <KpiCard title="Purchases Spend" value={`₹${kpiMetrics.totalPurchasesCost.toLocaleString('en-IN')}`} icon={ShoppingBag} color="text-blue-600" bg="bg-blue-50" />
         <KpiCard title="Receivables" value={`₹${kpiMetrics.totalReceivables.toLocaleString('en-IN')}`} icon={TrendingUp} color="text-rose-600" bg="bg-rose-50" />
-        <KpiCard title="Stock Valuation" value={`₹${kpiMetrics.stockValuation.toLocaleString('en-IN')}`} icon={Package} color="text-indigo-600" bg="bg-indigo-50" />
+        <KpiCard title="Stock Valuation" value={`₹${kpiMetrics.stockValuation.toLocaleString('en-IN')}`} icon={Package} color="text-blue-600" bg="bg-blue-50" />
         <KpiCard title="Gross Margin" value={`${kpiMetrics.profitMargin}%`} icon={Percent} color="text-amber-600" bg="bg-amber-50" />
       </div>
 
-      {/* ── UNIVERSAL FILTER SYSTEM BAR ── */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-3">
-          {/* Universal Search */}
-          <div className="relative w-full md:w-80">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by ref #, customer, item, SKU..."
-              value={searchQuery}
-              onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 shadow-2xs"
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2.5 w-full md:w-auto flex-wrap sm:flex-nowrap">
-            {/* Customer Filter */}
-            {customersList.length > 0 && (
-              <div className="flex-1 sm:flex-initial">
-                <select
-                  value={selectedCustomer}
-                  onChange={e => { setSelectedCustomer(e.target.value); setCurrentPage(1); }}
-                  className="w-full sm:w-44 py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
-                >
-                  <option value="ALL">All Customers</option>
-                  {customersList.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Supplier Filter */}
-            {suppliersList.length > 0 && (
-              <div className="flex-1 sm:flex-initial">
-                <select
-                  value={selectedSupplier}
-                  onChange={e => { setSelectedSupplier(e.target.value); setCurrentPage(1); }}
-                  className="w-full sm:w-44 py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
-                >
-                  <option value="ALL">All Suppliers</option>
-                  {suppliersList.map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Region Filter */}
-            {regionsList.length > 0 && (
-              <div className="flex-1 sm:flex-initial">
-                <select
-                  value={selectedRegion}
-                  onChange={e => { setSelectedRegion(e.target.value); setCurrentPage(1); }}
-                  className="w-full sm:w-40 py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
-                >
-                  <option value="ALL">All Regions</option>
-                  {regionsList.map(r => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Date Range Popover */}
-            <div ref={dateFilterRef} className="relative flex-1 sm:flex-initial">
-              <button
-                type="button"
-                onClick={() => setShowDateFilter(!showDateFilter)}
-                className={`w-full sm:w-auto flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold transition-all shadow-2xs cursor-pointer ${
-                  datePreset !== 'All'
-                    ? 'bg-blue-50 text-blue-700 border-blue-300'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                  <span>{datePreset === 'All' ? 'Filter Date' : datePreset}</span>
-                </div>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-              </button>
-
-              {showDateFilter && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl border border-slate-200 shadow-2xl z-50 p-4 space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                    <span className="text-xs font-black text-slate-800 uppercase tracking-wider">Date Presets</span>
-                    <button onClick={() => setShowDateFilter(false)} className="text-slate-400 hover:text-slate-600">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {(['All', 'Today', 'Yesterday', 'This Week', 'This Month', 'Last Month', 'This Quarter', 'This Year', 'Custom'] as const).map(p => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => applyDatePreset(p)}
-                        className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all text-center cursor-pointer ${
-                          datePreset === p
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-
-                  {datePreset === 'Custom' && (
-                    <div className="pt-2 border-t border-slate-100 space-y-2">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">From Date</label>
-                        <input
-                          type="date"
-                          value={startDate}
-                          onChange={e => setStartDate(e.target.value)}
-                          className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">To Date</label>
-                        <input
-                          type="date"
-                          value={endDate}
-                          onChange={e => setEndDate(e.target.value)}
-                          className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+      {activeCategory === 'dashboard' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <ChartCard title="Monthly sales (₹)" empty={chartData.months.labels.length === 0}>
+            <Bar data={{ labels: chartData.months.labels, datasets: [{ data: chartData.months.values, backgroundColor: '#0059CF', borderRadius: 4 }] }} options={barOptions} />
+          </ChartCard>
+          <ChartCard title="Top 10 customers (₹)" empty={chartData.topCust.labels.length === 0}>
+            <Bar data={{ labels: chartData.topCust.labels, datasets: [{ data: chartData.topCust.values, backgroundColor: '#4B8CE6', borderRadius: 4 }] }} options={{ ...barOptions, indexAxis: 'y' as const }} />
+          </ChartCard>
+          <ChartCard title="Sales by region" empty={chartData.regions.labels.length === 0}>
+            <Doughnut data={{ labels: chartData.regions.labels, datasets: [{ data: chartData.regions.values, backgroundColor: DONUT_COLORS, borderWidth: 0 }] }} options={donutOptions} />
+          </ChartCard>
+          <ChartCard title="Stock value by category" empty={chartData.stock.labels.length === 0}>
+            <Doughnut data={{ labels: chartData.stock.labels, datasets: [{ data: chartData.stock.values, backgroundColor: DONUT_COLORS, borderWidth: 0 }] }} options={donutOptions} />
+          </ChartCard>
         </div>
-      </div>
+      )}
 
       {/* ── UNIVERSAL REPORT DATA TABLE ── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+      <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2">
         <div className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse">
+          <table className="w-full text-left text-[0.875rem] text-gray-700">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+              <tr className="text-xs uppercase font-semibold text-gray-600 border-b border-gray-200">
                 {activeCategory === 'sales' && activeSubReport === 'by_customer' && (
                   <>
                     <th className="py-3 px-4 text-left cursor-pointer" onClick={() => handleSort('customerName')}>Customer Name</th>
@@ -1036,7 +1238,33 @@ const SalesReports: React.FC = () => {
                   </>
                 )}
 
-                {activeCategory !== 'sales' && activeCategory !== 'inventory' && (
+                {activeCategory === 'ledger' && activeSubReport === 'ageing' && (
+                  <>
+                    <th className="py-3 px-4 text-left cursor-pointer" onClick={() => handleSort('customerName')}>Customer</th>
+                    <th className="py-3 px-4 text-left">Region</th>
+                    <th className="py-3 px-4 text-right">Open Invoices</th>
+                    <th className="py-3 px-4 text-right">0–30 days (₹)</th>
+                    <th className="py-3 px-4 text-right">31–60 days (₹)</th>
+                    <th className="py-3 px-4 text-right">61–90 days (₹)</th>
+                    <th className="py-3 px-4 text-right">90+ days (₹)</th>
+                    <th className="py-3 px-4 text-right cursor-pointer" onClick={() => handleSort('total')}>Total Due (₹)</th>
+                  </>
+                )}
+
+                {activeCategory === 'production' && activeSubReport === 'yield' && (
+                  <>
+                    <th className="py-3 px-4 text-left cursor-pointer" onClick={() => handleSort('date')}>Date</th>
+                    <th className="py-3 px-4 text-left">Order #</th>
+                    <th className="py-3 px-4 text-left">Item</th>
+                    <th className="py-3 px-4 text-right">Target Qty</th>
+                    <th className="py-3 px-4 text-right">Produced Qty</th>
+                    <th className="py-3 px-4 text-right cursor-pointer" onClick={() => handleSort('variance')}>Variance</th>
+                    <th className="py-3 px-4 text-right cursor-pointer" onClick={() => handleSort('yieldPct')}>Yield %</th>
+                    <th className="py-3 px-4 text-center">Status</th>
+                  </>
+                )}
+
+                {activeCategory !== 'sales' && activeCategory !== 'inventory' && !(activeCategory === 'ledger' && activeSubReport === 'ageing') && !(activeCategory === 'production' && activeSubReport === 'yield') && (
                   <>
                     <th className="py-3 px-4 text-left cursor-pointer" onClick={() => handleSort('date')}>Date / Time</th>
                     <th className="py-3 px-4 text-left">Reference #</th>
@@ -1051,7 +1279,7 @@ const SalesReports: React.FC = () => {
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-100 font-medium">
+            <tbody className="bg-white divide-y divide-slate-100 font-medium">
               {isLoading ? (
                 <tr>
                   <td colSpan={10} className="py-12 text-center text-slate-400">
@@ -1069,50 +1297,50 @@ const SalesReports: React.FC = () => {
                 </tr>
               ) : (
                 paginatedRows.map((row: any, idx: number) => (
-                  <tr key={row.id || idx} className="hover:bg-blue-50/40 transition-colors">
+                  <tr key={row.id || idx} className="hover:bg-blue-50/40">
                     {activeCategory === 'sales' && activeSubReport === 'by_customer' && (
                       <>
-                        <td className="py-3 px-4 font-bold text-slate-900">{row.customerName}</td>
+                        <td className="py-3 px-4 font-semibold text-slate-900">{row.customerName}</td>
                         <td className="py-3 px-4 text-slate-600">{row.region || '—'}</td>
                         <td className="py-3 px-4 text-right font-mono text-slate-700">{row.invoiceCount}</td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">{row.totalGbl.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-slate-800">{row.totalGbl.toLocaleString('en-IN')}</td>
                         <td className="py-3 px-4 text-right font-mono text-slate-900">₹{row.grossSales.toLocaleString('en-IN')}</td>
                         <td className="py-3 px-4 text-right font-mono text-slate-500">₹{row.taxAmount.toLocaleString('en-IN')}</td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-emerald-700">₹{row.netSales.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-emerald-700">₹{row.netSales.toLocaleString('en-IN')}</td>
                       </>
                     )}
 
                     {activeCategory === 'sales' && activeSubReport === 'by_item' && (
                       <>
-                        <td className="py-3 px-4 font-mono font-bold text-purple-700">{row.skuCode}</td>
-                        <td className="py-3 px-4 font-bold text-slate-900">{row.itemName}</td>
+                        <td className="py-3 px-4 font-mono font-semibold text-blue-700">{row.skuCode}</td>
+                        <td className="py-3 px-4 font-semibold text-slate-900">{row.itemName}</td>
                         <td className="py-3 px-4 text-slate-600">{row.category}</td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">{row.quantityGbl.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-slate-800">{row.quantityGbl.toLocaleString('en-IN')}</td>
                         <td className="py-3 px-4 text-right font-mono text-slate-600">{row.quantityPcs.toLocaleString('en-IN')}</td>
                         <td className="py-3 px-4 text-right font-mono text-slate-700">₹{row.avgRate.toLocaleString('en-IN')}</td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-emerald-700">₹{row.totalRevenue.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-emerald-700">₹{row.totalRevenue.toLocaleString('en-IN')}</td>
                       </>
                     )}
 
                     {activeCategory === 'sales' && activeSubReport === 'summary' && (
                       <>
                         <td className="py-3 px-4 font-mono text-slate-600">{row.date || '—'}</td>
-                        <td className="py-3 px-4 font-mono font-bold text-blue-700">{row.invoiceNo}</td>
+                        <td className="py-3 px-4 font-mono font-semibold text-blue-700">{row.invoiceNo}</td>
                         <td className="py-3 px-4 font-mono text-slate-500">{row.dcNo}</td>
-                        <td className="py-3 px-4 font-bold text-slate-900">{row.customerName}</td>
+                        <td className="py-3 px-4 font-semibold text-slate-900">{row.customerName}</td>
                         <td className="py-3 px-4 text-slate-600">{row.region || '—'}</td>
                         <td className="py-3 px-4 text-right font-mono">{row.itemCount}</td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">{row.totalGbl.toLocaleString('en-IN')}</td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">₹{row.amount.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-slate-800">{row.totalGbl.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-slate-900">₹{row.amount.toLocaleString('en-IN')}</td>
                         <td className="py-3 px-4 text-center">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                             row.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
                           }`}>
                             {String(row.status).toUpperCase()}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-center">
-                          <button onClick={() => setSelectedRowDetail(row.raw || row)} className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg">
+                          <button onClick={() => setSelectedRowDetail(row.raw || row)} className="icon-btn">
                             <Eye className="w-4 h-4" />
                           </button>
                         </td>
@@ -1122,27 +1350,27 @@ const SalesReports: React.FC = () => {
                     {activeCategory === 'inventory' && activeSubReport === 'movement' && (
                       <>
                         <td className="py-3 px-4 font-mono text-slate-600">{row.date}</td>
-                        <td className="py-3 px-4 font-bold text-blue-700">{row.type}</td>
-                        <td className="py-3 px-4 font-mono font-bold text-purple-700">{row.skuCode}</td>
-                        <td className="py-3 px-4 text-slate-900 font-bold">{row.skuName}</td>
+                        <td className="py-3 px-4 font-semibold text-blue-700">{row.type}</td>
+                        <td className="py-3 px-4 font-mono font-semibold text-blue-700">{row.skuCode}</td>
+                        <td className="py-3 px-4 text-slate-900 font-semibold">{row.skuName}</td>
                         <td className="py-3 px-4 text-slate-600">{row.location}</td>
-                        <td className="py-3 px-4 text-right font-mono text-emerald-700 font-bold">+{row.qtyIn}</td>
-                        <td className="py-3 px-4 text-right font-mono text-rose-700 font-bold">-{row.qtyOut}</td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">{row.balanceAfter}</td>
+                        <td className="py-3 px-4 text-right font-mono text-emerald-700 font-semibold">+{row.qtyIn}</td>
+                        <td className="py-3 px-4 text-right font-mono text-rose-700 font-semibold">-{row.qtyOut}</td>
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-slate-900">{row.balanceAfter}</td>
                       </>
                     )}
 
                     {activeCategory === 'inventory' && activeSubReport === 'summary' && (
                       <>
-                        <td className="py-3 px-4 font-mono font-bold text-purple-700">{row.skuCode}</td>
-                        <td className="py-3 px-4 font-bold text-slate-900">{row.name}</td>
+                        <td className="py-3 px-4 font-mono font-semibold text-blue-700">{row.skuCode}</td>
+                        <td className="py-3 px-4 font-semibold text-slate-900">{row.name}</td>
                         <td className="py-3 px-4 text-slate-600">{row.category}</td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">{row.presentStock} {row.unit}</td>
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-slate-900">{row.presentStock} {row.unit}</td>
                         <td className="py-3 px-4 text-right font-mono text-slate-500">{row.minStockLevel || '—'}</td>
                         <td className="py-3 px-4 text-right font-mono text-slate-700">₹{row.unitCost.toLocaleString('en-IN')}</td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-emerald-700">₹{row.totalValue.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-emerald-700">₹{row.totalValue.toLocaleString('en-IN')}</td>
                         <td className="py-3 px-4 text-center">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                             row.status === 'In Stock' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
                           }`}>
                             {row.status}
@@ -1151,21 +1379,49 @@ const SalesReports: React.FC = () => {
                       </>
                     )}
 
-                    {activeCategory !== 'sales' && activeCategory !== 'inventory' && (
+                    {activeCategory === 'ledger' && activeSubReport === 'ageing' && (
+                      <>
+                        <td className="py-3 px-4 font-semibold text-slate-900">{row.customerName}</td>
+                        <td className="py-3 px-4 text-slate-600">{row.region || '—'}</td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-700">{row.invoices}</td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-700">{row.b0 ? row.b0.toLocaleString('en-IN') : '—'}</td>
+                        <td className="py-3 px-4 text-right font-mono text-amber-700">{row.b30 ? row.b30.toLocaleString('en-IN') : '—'}</td>
+                        <td className="py-3 px-4 text-right font-mono text-orange-700">{row.b60 ? row.b60.toLocaleString('en-IN') : '—'}</td>
+                        <td className="py-3 px-4 text-right font-mono text-rose-600">{row.b90 ? row.b90.toLocaleString('en-IN') : '—'}</td>
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-slate-900">₹{row.total.toLocaleString('en-IN')}</td>
+                      </>
+                    )}
+
+                    {activeCategory === 'production' && activeSubReport === 'yield' && (
                       <>
                         <td className="py-3 px-4 font-mono text-slate-600">{row.date || '—'}</td>
-                        <td className="py-3 px-4 font-mono font-bold text-blue-700">{row.invoiceNo || row.orderNo || row.dcNo || row.voucherNo || row.id}</td>
-                        <td className="py-3 px-4 font-bold text-slate-900">{row.customerName || row.supplierName || row.partyName || row.name || row.entity || '—'}</td>
+                        <td className="py-3 px-4 font-mono text-blue-700">{row.orderNo}</td>
+                        <td className="py-3 px-4 text-slate-900">{row.itemName}</td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-700">{row.targetQty.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right font-mono text-slate-700">{row.producedQty.toLocaleString('en-IN')}</td>
+                        <td className={`py-3 px-4 text-right font-mono ${row.variance < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>{row.variance > 0 ? '+' : ''}{row.variance.toLocaleString('en-IN')}</td>
+                        <td className={`py-3 px-4 text-right font-mono ${row.yieldPct < 95 ? 'text-rose-600' : 'text-emerald-700'}`}>{row.yieldPct}%</td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">{String(row.status).toUpperCase()}</span>
+                        </td>
+                      </>
+                    )}
+
+                    {activeCategory !== 'sales' && activeCategory !== 'inventory' && !(activeCategory === 'ledger' && activeSubReport === 'ageing') && !(activeCategory === 'production' && activeSubReport === 'yield') && (
+                      <>
+                        <td className="py-3 px-4 font-mono text-slate-600">{row.date || '—'}</td>
+                        <td className="py-3 px-4 font-mono font-semibold text-blue-700">{row.invoiceNo || row.orderNo || row.dcNo || row.voucherNo || row.id}</td>
+                        <td className="py-3 px-4 font-semibold text-slate-900">{row.customerName || row.supplierName || row.partyName || row.name || row.entity || '—'}</td>
                         <td className="py-3 px-4 text-slate-600">{row.region || row.city || row.transporter || row.type || '—'}</td>
                         <td className="py-3 px-4 text-right font-mono text-slate-800">{row.totalGbl || row.totalQty || row.targetQty || row.volume || 0}</td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">₹{Number(row.totalAmount || row.amount || row.taxAmount || 0).toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right font-mono font-semibold text-slate-900">₹{Number(row.totalAmount || row.amount || row.taxAmount || 0).toLocaleString('en-IN')}</td>
                         <td className="py-3 px-4 text-center">
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                             {String(row.status || 'Active').toUpperCase()}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-center">
-                          <button onClick={() => setSelectedRowDetail(row.raw || row)} className="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg">
+                          <button onClick={() => setSelectedRowDetail(row.raw || row)} className="icon-btn">
                             <Eye className="w-4 h-4" />
                           </button>
                         </td>
@@ -1179,7 +1435,7 @@ const SalesReports: React.FC = () => {
         </div>
 
         {/* ── PAGINATION BAR ── */}
-        <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+        <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-[0.875rem]">
           <div className="flex items-center gap-2 text-slate-500 font-medium">
             <span>Showing {filteredAndSortedRows.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to {Math.min(currentPage * pageSize, filteredAndSortedRows.length)} of {filteredAndSortedRows.length} entries</span>
           </div>
@@ -1188,7 +1444,7 @@ const SalesReports: React.FC = () => {
             <select
               value={pageSize}
               onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-              className="py-1 px-2.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700"
+              className="py-1 px-2.5 bg-white border border-slate-200 rounded-lg text-[0.875rem] font-semibold text-slate-700"
             >
               <option value={10}>10 per page</option>
               <option value={25}>25 per page</option>
@@ -1204,7 +1460,7 @@ const SalesReports: React.FC = () => {
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="px-2.5 py-1 text-xs font-bold text-slate-800">
+              <span className="px-2.5 py-1 text-[0.875rem] font-semibold text-slate-800">
                 Page {currentPage} of {totalPages}
               </span>
               <button
@@ -1221,18 +1477,18 @@ const SalesReports: React.FC = () => {
 
       {/* ── DRILL-DOWN DETAIL MODAL ── */}
       {selectedRowDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40">
+          <div className="bg-white max-w-2xl w-full p-6 space-y-4 max-h-[calc(85*var(--vh,1vh))] overflow-y-auto dlg-panel">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-semibold">
                   <FileText className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 text-sm">
+                  <h3 className="font-semibold text-slate-900 text-[0.875rem]">
                     {selectedRowDetail.invoiceNumber || selectedRowDetail.orderNumber || selectedRowDetail.dcNumber || 'Transaction Detail'}
                   </h3>
-                  <p className="text-[10px] text-slate-500 font-medium">Itemized audit breakdown</p>
+                  <p className="text-xs text-slate-500 font-medium">Itemized audit breakdown</p>
                 </div>
               </div>
               <button onClick={() => setSelectedRowDetail(null)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
@@ -1240,19 +1496,19 @@ const SalesReports: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-xs">
-              <div className="font-bold text-slate-900">{selectedRowDetail.customerName || selectedRowDetail.firmName || selectedRowDetail.vendorName || 'General Party'}</div>
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1 text-[0.875rem]">
+              <div className="font-semibold text-slate-900">{selectedRowDetail.customerName || selectedRowDetail.firmName || selectedRowDetail.vendorName || 'General Party'}</div>
               {selectedRowDetail.city && <div className="text-slate-500">{selectedRowDetail.city}, {selectedRowDetail.region || selectedRowDetail.state}</div>}
               {selectedRowDetail.date && <div className="font-mono text-slate-600">Date: {selectedRowDetail.date || selectedRowDetail.invoiceDate}</div>}
             </div>
 
             {selectedRowDetail.items && Array.isArray(selectedRowDetail.items) && (
               <div className="space-y-2">
-                <p className="text-xs font-bold text-slate-800 uppercase tracking-wider">Line Items</p>
+                <p className="text-[0.875rem] font-medium text-slate-800 uppercase tracking-wider">Line Items</p>
                 <div className="overflow-x-auto rounded-xl border border-slate-200">
-                  <table className="w-full text-xs">
+                  <table className="w-full text-[0.875rem]">
                     <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500">
+                      <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500">
                         <th className="py-2 px-3 text-left">SKU Code</th>
                         <th className="py-2 px-3 text-left">Item Name</th>
                         <th className="py-2 px-3 text-right">Qty</th>
@@ -1260,14 +1516,14 @@ const SalesReports: React.FC = () => {
                         <th className="py-2 px-3 text-right">Amount</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="bg-white divide-y divide-slate-100">
                       {selectedRowDetail.items.map((it: any, idx: number) => (
                         <tr key={idx}>
-                          <td className="py-2 px-3 font-mono font-bold text-purple-700">{it.skuCode || '—'}</td>
+                          <td className="py-2 px-3 font-mono font-semibold text-blue-700">{it.skuCode || '—'}</td>
                           <td className="py-2 px-3 text-slate-800">{it.itemName || it.name || 'Item'}</td>
                           <td className="py-2 px-3 text-right font-mono">{it.invoiceQtyGbl || it.quantity || 0}</td>
                           <td className="py-2 px-3 text-right font-mono">₹{Number(it.rate || it.unitPrice || 0).toLocaleString()}</td>
-                          <td className="py-2 px-3 text-right font-mono font-bold">₹{Number(it.amount || 0).toLocaleString()}</td>
+                          <td className="py-2 px-3 text-right font-mono font-semibold">₹{Number(it.amount || 0).toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1276,10 +1532,10 @@ const SalesReports: React.FC = () => {
               </div>
             )}
 
-            <div className="flex justify-end pt-3 border-t border-slate-100">
+            <div className="flex justify-end pt-3 border-t border-slate-100 dlg-footer">
               <button
                 onClick={() => setSelectedRowDetail(null)}
-                className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-[0.875rem] font-semibold cursor-pointer"
               >
                 Close
               </button>
@@ -1296,7 +1552,7 @@ const SubTabBtn: React.FC<{ active: boolean; onClick: () => void; children: Reac
   <button
     type="button"
     onClick={onClick}
-    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+    className={`px-3 py-1 rounded-lg text-[0.875rem] font-semibold cursor-pointer whitespace-nowrap ${
       active ? 'bg-white text-blue-700 shadow-2xs' : 'hover:bg-white/60 text-slate-600'
     }`}
   >
@@ -1307,10 +1563,10 @@ const SubTabBtn: React.FC<{ active: boolean; onClick: () => void; children: Reac
 const KpiCard: React.FC<{ title: string; value: string; icon: any; color: string; bg: string }> = ({ title, value, icon: Icon, color, bg }) => (
   <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between">
     <div>
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{title}</p>
-      <p className="text-base font-black text-slate-900 font-mono mt-0.5">{value}</p>
+      <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">{title}</p>
+      <p className="text-base font-semibold text-slate-900 font-mono mt-0.5">{value}</p>
     </div>
-    <div className={`w-8 h-8 rounded-xl ${bg} ${color} flex items-center justify-center font-bold shrink-0`}>
+    <div className={`w-8 h-8 rounded-xl ${bg} ${color} flex items-center justify-center font-semibold shrink-0`}>
       <Icon className="w-4 h-4" />
     </div>
   </div>

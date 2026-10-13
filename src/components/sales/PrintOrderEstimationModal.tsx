@@ -10,6 +10,37 @@ interface PrintOrderEstimationModalProps {
   onBack?: () => void; // back to success page if launched from there
 }
 
+// Single stylesheet used by BOTH the on-screen preview and the print window, so they always match.
+const DOC_CSS = `
+  .est-doc { box-sizing: border-box; background: #fff; color: #000; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; border: 1.5px solid #000; padding: 6mm 7mm; display: flex; flex-direction: column; width: var(--doc-w, 100%); min-height: var(--doc-h, 277mm); margin: 0 auto; }
+  .est-doc * { box-sizing: border-box; }
+  .est-doc strong, .est-doc th, .est-doc b { font-weight: 700 !important; }
+  .est-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; padding-bottom: 8px; border-bottom: 1.5px solid #000; }
+  .est-head-center { text-align: center; padding: 0 12px; }
+  .est-title { font-size: 19pt; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; line-height: 1.15; }
+  .est-company { font-size: 13pt; font-weight: 700; text-transform: uppercase; margin-top: 4px; }
+  .est-addr { font-size: 9pt; margin-top: 2px; }
+  .est-serial { justify-self: end; font-size: 10pt; line-height: 1.7; white-space: nowrap; }
+  .est-serial span.k { display: inline-block; width: 62px; font-weight: 700; }
+  .est-cust { padding: 8px 0 10px; }
+  .est-cust-name { font-size: 12.5pt; font-weight: 700; text-transform: uppercase; }
+  .est-cust-line { font-size: 10pt; margin-top: 2px; text-transform: uppercase; }
+  .est-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .est-table th, .est-table td { border: 1px solid #000; padding: 0 8px; height: 26px; font-size: 10.5pt; vertical-align: middle; }
+  .est-table thead th { background: #f3f4f6; text-align: center; height: 28px; }
+  .est-table .c-gbl { width: 54px; } .est-table .c-qty { width: 64px; } .est-table .c-rate { width: 84px; } .est-table .c-amt { width: 100px; }
+  .est-table td.num { text-align: center; }
+  .est-table td.right { text-align: right; font-variant-numeric: tabular-nums; }
+  .est-table td.left { text-align: left; }
+  .est-table tr.total td { font-weight: 700; background: #f3f4f6; height: 30px; }
+  .est-comp { font-size: 8.5pt; color: #444; margin-top: 1px; padding-left: 8px; }
+  .est-comp div { display: flex; justify-content: space-between; border-top: 0.5px dashed #bbb; padding: 1px 0; }
+  .est-foot { margin-top: auto; padding-top: 14px; }
+  .est-trans { display: flex; justify-content: space-between; align-items: flex-end; font-size: 10pt; line-height: 1.8; }
+  .est-sigline { display: inline-block; width: 150px; border-bottom: 1px solid #000; }
+  .est-note { text-align: center; font-size: 10pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-top: 1.5px solid #000; margin-top: 10px; padding-top: 8px; }
+`;
+
 const PrintOrderEstimationModal: React.FC<PrintOrderEstimationModalProps> = ({
   order,
   onClose,
@@ -115,6 +146,106 @@ const PrintOrderEstimationModal: React.FC<PrintOrderEstimationModalProps> = ({
   // Grand total
   const grandTotal = order.grandTotal || tableRows.reduce((s, r) => s + r.amount, 0);
 
+  const docJsx = (
+    <div className="est-doc">
+      {showSection.companyHeader && (
+        <div className="est-head">
+          <div />
+          <div className="est-head-center">
+            <div className="est-title">Order Estimation</div>
+            <div className="est-company">{companyName} ({fy})</div>
+            <div className="est-addr">{companyLine1}</div>
+            <div className="est-addr">E-Mail : {companyEmail.toUpperCase()}</div>
+          </div>
+          <div className="est-serial">
+            <div><span className="k">Serial No.</span>: {order.orderNumber}</div>
+            <div><span className="k">Date</span>: {fmtDatePrint(order.orderDate)}</div>
+          </div>
+        </div>
+      )}
+
+      {showSection.customerDetails && (
+        <div className="est-cust">
+          <div className="est-cust-name">{customerNamePrint}</div>
+          {custAddrLines.map((line, i) => (
+            <div key={i} className="est-cust-line">{line}</div>
+          ))}
+          {(custOwner || custPhone) && (
+            <div className="est-cust-line">{[custOwner, custPhone].filter(Boolean).join(' - ')}</div>
+          )}
+        </div>
+      )}
+
+      {showSection.itemDetails && (
+        <table className="est-table doc-table">
+          <thead>
+            <tr>
+              <th className="c-gbl">GBL</th>
+              <th>Particulars</th>
+              <th className="c-qty">Qty</th>
+              <th className="c-rate">Rate</th>
+              <th className="c-amt">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tableRows.map((row, idx) => (
+              <tr key={idx}>
+                <td className="num">{row.gbl || ''}</td>
+                <td className="left">
+                  <div style={{ fontWeight: row.isMixedBundle ? 700 : 400 }}>{row.particulars}</div>
+                  {row.components && row.components.length > 0 && (
+                    <div className="est-comp">
+                      {row.components.map((c: any, ci: number) => (
+                        <div key={ci}>
+                          <span>└ {c.name || 'Component'} ({c.quantity} {c.uom || 'pcs'} @ ₹{Number(c.rate || 0).toFixed(2)})</span>
+                          <span>₹{Number(c.amount || 0).toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </td>
+                <td className="num">{row.qty}</td>
+                <td className="right">{row.rate ? row.rate.toFixed(2) : ''}</td>
+                <td className="right">{row.amount ? row.amount.toFixed(2) : ''}</td>
+              </tr>
+            ))}
+            {Array.from({ length: emptyCount }).map((_, i) => (
+              <tr key={`empty-${i}`}>
+                <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
+              </tr>
+            ))}
+            <tr className="total">
+              <td className="num">{totalGbl > 0 ? totalGbl : ''}</td>
+              <td className="num">Thank You</td>
+              <td>&nbsp;</td>
+              <td className="right">Total</td>
+              <td className="right">{grandTotal.toFixed(2)}</td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+
+      <div className="est-foot">
+        {(showSection.transportDetails || showSection.signature) && (
+          <div className="est-trans">
+            {showSection.transportDetails ? (
+              <div>
+                <div>Transport : {order.transporter || ''}</div>
+                <div>LR No. &nbsp;&nbsp;&nbsp;&nbsp;: </div>
+              </div>
+            ) : <div />}
+            {showSection.signature && (
+              <div>Signature : <span className="est-sigline">&nbsp;</span></div>
+            )}
+          </div>
+        )}
+        {showSection.notesTerms && (
+          <div className="est-note">Goods once sold cannot be taken back</div>
+        )}
+      </div>
+    </div>
+  );
+
   // ── Print handler ──
   const handlePrint = () => {
     const content = printFrameRef.current;
@@ -130,33 +261,11 @@ const PrintOrderEstimationModal: React.FC<PrintOrderEstimationModalProps> = ({
 <head>
   <title>Order Estimation - ${order.orderNumber}</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; font-size: 11pt; background: #fff; }
-    .doc { border: 2px solid #000; padding: 14px 16px; max-width: 680px; margin: 10px auto; }
-    .header { text-align: center; border-bottom: 1.5px solid #000; padding-bottom: 8px; margin-bottom: 6px; }
-    .header-title { font-size: 20pt; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
-    .header-company { font-size: 13pt; font-weight: 700; text-transform: uppercase; margin-top: 2px; }
-    .header-addr { font-size: 9pt; margin-top: 2px; }
-    .serial-block { float: right; text-align: left; font-size: 10pt; }
-    .serial-block div { margin-bottom: 2px; }
-    .customer-block { border-bottom: 1.5px solid #000; padding: 6px 0; margin-bottom: 0; clear: both; }
-    .customer-block .cust-name { font-size: 12pt; font-weight: 700; text-transform: uppercase; }
-    .customer-block .cust-line { font-size: 10pt; margin-top: 2px; text-transform: uppercase; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border: 1.5px solid #000; padding: 4px 6px; font-size: 10pt; }
-    thead th { font-weight: 700; text-align: center; background: #fff; }
-    .col-gbl { width: 48px; text-align: center; }
-    .col-qty { width: 56px; text-align: center; }
-    .col-rate { width: 70px; text-align: right; }
-    .col-amt { width: 90px; text-align: right; }
-    .col-particulars { text-align: left; }
-    td.num { text-align: center; }
-    td.right { text-align: right; }
-    .footer-row td { font-weight: 700; font-size: 11pt; }
-    .transport-sig { display: flex; justify-content: space-between; align-items: flex-end; padding: 8px 0 4px; font-size: 10pt; }
-    .sig-line { border-bottom: 1.5px solid #000; width: 160px; display: inline-block; }
-    .final-note { text-align: center; font-size: 10pt; font-weight: 700; padding-top: 8px; border-top: 1.5px solid #000; margin-top: 4px; text-transform: uppercase; }
-    @media print { @page { size: ${pageSize}; margin: 8mm; } body { margin: 0; } }
+    * { margin: 0; padding: 0; }
+    body { background: #fff; }
+    ${DOC_CSS}
+    .est-doc { --doc-w: 100%; --doc-h: ${paperSize === 'A5' ? '194mm' : '281mm'}; }
+    @media print { @page { size: ${pageSize}; margin: 8mm; } .est-doc { break-inside: avoid; } }
   </style>
 </head>
 <body>
@@ -190,7 +299,7 @@ ${Array.from({ length: copies }).map(() => content.innerHTML).join('<div style="
             <Printer className="w-5 h-5 text-blue-600" />
             <span className="font-black text-gray-900 text-sm">Print Order Estimation</span>
           </div>
-          <p className="text-[11px] text-gray-400">Generate and print the order estimation</p>
+          <p className="text-[0.6875rem] text-gray-400">Generate and print the order estimation</p>
         </div>
 
         {/* Options Content */}
@@ -313,266 +422,16 @@ ${Array.from({ length: copies }).map(() => content.innerHTML).join('<div style="
 
         {/* Document */}
         <div className="flex-1 flex items-start justify-center p-8">
-          {/* Hidden div used for print HTML generation */}
-          <div ref={printFrameRef} style={{ display: 'none' }}>
-            <div className="doc">
-              {showSection.companyHeader && (
-                <div className="header">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ textAlign: 'center', flex: 1 }}>
-                      <div className="header-title">ORDER ESTIMATION</div>
-                      <div className="header-company">{companyName} ({fy})</div>
-                      <div className="header-addr">{companyLine1}</div>
-                      <div className="header-addr">E-Mail : {companyEmail.toUpperCase()}</div>
-                    </div>
-                    <div className="serial-block">
-                      <div><strong>Serial No.</strong> : {order.orderNumber}</div>
-                      <div><strong>Date</strong>       : {fmtDatePrint(order.orderDate)}</div>
-                    </div>
-                  </div>
-                </div>
-              )}
+          {/* Hidden copy used for print HTML generation */}
+          <div ref={printFrameRef} style={{ display: 'none' }}>{docJsx}</div>
 
-              {showSection.customerDetails && (
-                <div className="customer-block">
-                  <div className="cust-name">{customerNamePrint}</div>
-                  {custAddrLines.map((line, i) => (
-                    <div key={i} className="cust-line">{line}</div>
-                  ))}
-                  {(custOwner || custPhone) && (
-                    <div className="cust-line">
-                      {[custOwner, custPhone].filter(Boolean).join(' - ')}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {showSection.itemDetails && (
-                <table>
-                  <thead>
-                    <tr>
-                      <th className="col-gbl">GBL</th>
-                      <th className="col-particulars">Particulars</th>
-                      <th className="col-qty">Qty</th>
-                      <th className="col-rate">Rate</th>
-                      <th className="col-amt">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tableRows.map((row, idx) => (
-                      <tr key={idx}>
-                        <td className="num">{row.gbl || ''}</td>
-                        <td>
-                          <div style={{ fontWeight: row.isMixedBundle ? 'bold' : 'normal' }}>{row.particulars}</div>
-                          {row.components && row.components.length > 0 && (
-                            <div style={{ fontSize: '9pt', color: '#333', marginTop: '2px', paddingLeft: '8px' }}>
-                              {row.components.map((c: any, ci: number) => (
-                                <div key={ci} style={{ display: 'flex', justifyContent: 'space-between', borderTop: '0.5px dashed #ccc', paddingTop: '1px' }}>
-                                  <span>└ {c.name || 'Component'} ({c.quantity} {c.uom || 'pcs'} @ ₹{Number(c.rate || 0).toFixed(2)})</span>
-                                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>₹{Number(c.amount || 0).toFixed(2)}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                        <td className="num">{row.qty}</td>
-                        <td className="right">{row.rate ? row.rate.toFixed(2) : ''}</td>
-                        <td className="right">{row.amount ? row.amount.toFixed(2) : ''}</td>
-                      </tr>
-                    ))}
-                    {/* Empty filler rows */}
-                    {Array.from({ length: emptyCount }).map((_, i) => (
-                      <tr key={`empty-${i}`}>
-                        <td>&nbsp;</td>
-                        <td>&nbsp;</td>
-                        <td>&nbsp;</td>
-                        <td>&nbsp;</td>
-                        <td>&nbsp;</td>
-                      </tr>
-                    ))}
-                    {/* Total footer row */}
-                    <tr className="footer-row">
-                      <td className="num">{totalGbl > 0 ? totalGbl : ''}</td>
-                      <td style={{ textAlign: 'center' }}>Thank You</td>
-                      <td>&nbsp;</td>
-                      <td className="right"><strong>Total</strong></td>
-                      <td className="right"><strong>{grandTotal.toFixed(2)}</strong></td>
-                    </tr>
-                  </tbody>
-                </table>
-              )}
-
-              {(showSection.transportDetails || showSection.signature) && (
-                <div className="transport-sig">
-                  {showSection.transportDetails ? (
-                    <div>
-                      <div>Transport : {order.transporter || ''}</div>
-                      <div>LR NO &nbsp;&nbsp; : </div>
-                    </div>
-                  ) : <div />}
-                  {showSection.signature && (
-                    <div style={{ textAlign: 'right' }}>
-                      Signature : <span className="sig-line">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {showSection.notesTerms && (
-                <div className="final-note">GOODS ONCE SOLD CANNOT BE TAKEN BACK</div>
-              )}
-            </div>
-          </div>
-
-          {/* Visible preview (mirrors the print template) */}
+          {/* Visible preview (same markup + same CSS as the print) */}
           <div
-            className="bg-white shadow-xl"
-            style={{
-              width: paperSize === 'A4' ? 680 : 520,
-              border: '2px solid #000',
-              padding: '14px 16px',
-              fontFamily: 'Arial, sans-serif',
-              fontSize: 11,
-              color: '#000',
-            }}
+            className="shadow-xl"
+            style={{ ['--doc-w' as any]: paperSize === 'A4' ? '794px' : '559px', ['--doc-h' as any]: paperSize === 'A4' ? '1123px' : '794px' }}
           >
-            {/* Company Header */}
-            {showSection.companyHeader && (
-              <div style={{ borderBottom: '1.5px solid #000', paddingBottom: 8, marginBottom: 6 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ textAlign: 'center', flex: 1 }}>
-                    <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: 1, textTransform: 'uppercase' }}>ORDER ESTIMATION</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', marginTop: 2 }}>{companyName} ({fy})</div>
-                    <div style={{ fontSize: 9, marginTop: 2 }}>{companyLine1}</div>
-                    <div style={{ fontSize: 9 }}>E-Mail : {companyEmail.toUpperCase()}</div>
-                  </div>
-                  <div style={{ textAlign: 'left', fontSize: 10, minWidth: 140 }}>
-                    <div><strong>Serial No.</strong> : {order.orderNumber}</div>
-                    <div style={{ marginTop: 2 }}><strong>Date</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : {fmtDatePrint(order.orderDate)}</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Customer block */}
-            {showSection.customerDetails && (
-              <div style={{ borderBottom: '1.5px solid #000', paddingBottom: 6, marginBottom: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase' }}>{customerNamePrint}</div>
-                {custAddrLines.map((line, i) => (
-                  <div key={i} style={{ fontSize: 10, marginTop: 2, textTransform: 'uppercase' }}>{line}</div>
-                ))}
-                {(custOwner || custPhone) && (
-                  <div style={{ fontSize: 10, marginTop: 2, textTransform: 'uppercase' }}>
-                    {[custOwner, custPhone].filter(Boolean).join(' - ')}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Items Table */}
-            {showSection.itemDetails && (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    {['GBL', 'Particulars', 'Qty', 'Rate', 'Amount'].map((h, i) => (
-                      <th
-                        key={h}
-                        style={{
-                          border: '1.5px solid #000',
-                          padding: '4px 6px',
-                          fontSize: 11,
-                          fontWeight: 700,
-                          textAlign: i === 1 ? 'left' : 'center',
-                          width: i === 0 ? 48 : i === 2 ? 56 : i === 3 ? 70 : i === 4 ? 90 : undefined,
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {tableRows.map((row, idx) => (
-                    <tr key={idx}>
-                      <td style={{ border: '1.5px solid #000', padding: '4px 6px', textAlign: 'center', fontSize: 11 }}>
-                        {row.gbl || ''}
-                      </td>
-                      <td style={{ border: '1.5px solid #000', padding: '4px 6px', fontSize: 11 }}>
-                        <div style={{ fontWeight: row.isMixedBundle ? 600 : 'normal' }}>{row.particulars}</div>
-                        {row.components && row.components.length > 0 && (
-                          <div style={{ fontSize: 9.5, color: '#444', marginTop: 2, paddingLeft: 6 }}>
-                            {row.components.map((c: any, ci: number) => (
-                              <div key={ci} style={{ display: 'flex', justifyContent: 'space-between', borderTop: '0.5px dashed #ccc', paddingTop: 1 }}>
-                                <span>└ {c.name || 'Component'} ({c.quantity} {c.uom || 'pcs'} @ ₹{Number(c.rate || 0).toFixed(2)})</span>
-                                <span style={{ fontVariantNumeric: 'tabular-nums' }}>₹{Number(c.amount || 0).toFixed(2)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ border: '1.5px solid #000', padding: '4px 6px', textAlign: 'center', fontSize: 11 }}>
-                        {row.qty}
-                      </td>
-                      <td style={{ border: '1.5px solid #000', padding: '4px 6px', textAlign: 'right', fontSize: 11 }}>
-                        {row.rate ? row.rate.toFixed(2) : ''}
-                      </td>
-                      <td style={{ border: '1.5px solid #000', padding: '4px 6px', textAlign: 'right', fontSize: 11 }}>
-                        {row.amount ? row.amount.toFixed(2) : ''}
-                      </td>
-                    </tr>
-                  ))}
-                  {/* Empty rows */}
-                  {Array.from({ length: emptyCount }).map((_, i) => (
-                    <tr key={`empty-${i}`} style={{ height: 24 }}>
-                      {[0, 1, 2, 3, 4].map(c => (
-                        <td key={c} style={{ border: '1.5px solid #000', padding: '4px 6px' }}>&nbsp;</td>
-                      ))}
-                    </tr>
-                  ))}
-                  {/* Total Row */}
-                  <tr>
-                    <td style={{ border: '1.5px solid #000', padding: '4px 6px', textAlign: 'center', fontWeight: 700, fontSize: 11 }}>
-                      {totalGbl > 0 ? totalGbl : ''}
-                    </td>
-                    <td style={{ border: '1.5px solid #000', padding: '4px 6px', textAlign: 'center', fontWeight: 700, fontSize: 11 }}>
-                      Thank You
-                    </td>
-                    <td style={{ border: '1.5px solid #000', padding: '4px 6px' }}>&nbsp;</td>
-                    <td style={{ border: '1.5px solid #000', padding: '4px 6px', textAlign: 'right', fontWeight: 700, fontSize: 11 }}>
-                      Total
-                    </td>
-                    <td style={{ border: '1.5px solid #000', padding: '4px 6px', textAlign: 'right', fontWeight: 700, fontSize: 11 }}>
-                      {grandTotal.toFixed(2)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            )}
-
-            {/* Transport + Signature row */}
-            {(showSection.transportDetails || showSection.signature) && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', padding: '8px 0 4px', fontSize: 10 }}>
-                {showSection.transportDetails ? (
-                  <div>
-                    <div>Transport : {order.transporter || ''}</div>
-                    <div style={{ marginTop: 2 }}>LR NO &nbsp;&nbsp; : </div>
-                  </div>
-                ) : <div />}
-                {showSection.signature && (
-                  <div style={{ textAlign: 'right' }}>
-                    Signature :{' '}
-                    <span style={{ borderBottom: '1.5px solid #000', display: 'inline-block', width: 140 }}>&nbsp;</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Footer note */}
-            {showSection.notesTerms && (
-              <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 10, paddingTop: 8, borderTop: '1.5px solid #000', marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                GOODS ONCE SOLD CANNOT BE TAKEN BACK
-              </div>
-            )}
+            <style>{DOC_CSS}</style>
+            {docJsx}
           </div>
         </div>
       </div>

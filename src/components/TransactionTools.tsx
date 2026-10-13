@@ -154,7 +154,7 @@ const TransactionTools: React.FC = () => {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Transaction Tools</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">Transaction Tools</h1>
         <p className="text-gray-600 text-sm mt-1">Manage transactions, export data, and import records</p>
       </div>
 
@@ -169,7 +169,7 @@ const TransactionTools: React.FC = () => {
       {activeTab === 'list' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100">
           <div className="p-4 border-b border-gray-100 flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-[200px]">
+            <div className="relative flex-1 min-w-[12.5rem]">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
               <input value={search} onChange={e => { setSearch(e.target.value); setPagination(p => ({ ...p, page: 1 })); }} placeholder="Search transactions..." className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
             </div>
@@ -214,9 +214,9 @@ const TransactionTools: React.FC = () => {
                     <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${t.type === 'credit' || t.type === 'income' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{t.type}</span></td>
                     <td className={`px-4 py-3 text-right font-semibold ${t.type === 'credit' || t.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>₹{t.amount?.toLocaleString()}</td>
                     <td className="px-4 py-3">{pmBadge(t.paymentMethod, t.customPaymentMethod)}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-500 max-w-[120px] truncate">{t.referenceId || '-'}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-500 max-w-[7.5rem] truncate">{t.referenceId || '-'}</td>
                     <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${t.source_type === 'MANUAL' ? 'bg-gray-100 text-gray-600' : t.source_type === 'SALE' ? 'bg-blue-100 text-blue-700' : t.source_type === 'PURCHASE' ? 'bg-orange-100 text-orange-700' : t.source_type === 'EXPENSE' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>{t.source_type || 'MANUAL'}</span></td>
-                    <td className="px-4 py-3 text-gray-500 max-w-[180px] truncate">{t.description}</td>
+                    <td className="px-4 py-3 text-gray-500 max-w-[11.25rem] truncate">{t.description}</td>
                     <td className="px-4 py-3 text-center"><div className="flex items-center justify-center space-x-1">
                       {(t.source_type === 'MANUAL' || !t.source_type) && <button onClick={() => handleEdit(t)} className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors"><Edit className="w-4 h-4 text-blue-600" /></button>}
                       {(t.source_type === 'MANUAL' || !t.source_type) && <button onClick={() => handleDelete(t._id)} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4 text-red-500" /></button>}
@@ -285,7 +285,7 @@ const TransactionTools: React.FC = () => {
                   </div>
                 )}
                 {importMsg && <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">{importMsg}</div>}
-                <div className="overflow-x-auto max-h-[300px] border border-gray-200 rounded-lg">
+                <div className="overflow-x-auto max-h-[18.75rem] border border-gray-200 rounded-lg">
                   <table className="w-full text-xs">
                     <thead className="bg-gray-50 sticky top-0"><tr>{Object.keys(importData[0] || {}).slice(0, 7).map(k => <th key={k} className="px-3 py-2 text-left font-medium text-gray-600">{k}</th>)}</tr></thead>
                     <tbody className="divide-y divide-gray-100">{importData.slice(0, 20).map((r, i) => <tr key={i}>{Object.values(r).slice(0, 7).map((v: any, j) => <td key={j} className="px-3 py-1.5 text-gray-700">{String(v || '')}</td>)}</tr>)}</tbody>

@@ -7,6 +7,7 @@ import {
   Printer, X, ArrowUp, ArrowDown, Calendar, Edit3, Trash2, RotateCcw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { generateObjectListPdf } from '../../utils/pdfReport';
 import { useAuth } from '../../context/AuthContext';
 import { getSalesOrdersV2, SalesOrderV2, updateSalesOrderV2 } from '../../api/salesOrderApiV2';
 import { getCustomSalesOrders, saveCustomSalesOrder } from '../../utils/salesOrderStorage';
@@ -1083,7 +1084,7 @@ export const DispatchModule: React.FC = () => {
   };
 
   // Export Excel
-  const handleExportExcel = (targetRows = filteredRows) => {
+  const handleExportExcel = (targetRows = filteredRows, asPdf = false) => {
     try {
       const exportData = targetRows.map(row => ({
         'SO Number': row.orderNumber,
@@ -1101,6 +1102,16 @@ export const DispatchModule: React.FC = () => {
         'Ready Status': row.readyStatus
       }));
 
+      if (asPdf) {
+        generateObjectListPdf({
+          companyName: selectedCompany?.name,
+          title: 'Pending Dispatch Orders Report',
+          rows: exportData,
+          fileName: `Pending_Dispatch_Orders_${new Date().toISOString().split('T')[0]}`,
+        });
+        showToast('Dispatch orders PDF downloaded', 'success');
+        return;
+      }
       const ws = XLSX.utils.json_to_sheet(exportData);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Pending Dispatch');
@@ -1142,21 +1153,18 @@ export const DispatchModule: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+    <div className="min-h-[calc(100*var(--vh,1vh))] bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
       {/* ── 1. HEADER BANNER (Matching Production Module Style) ── */}
-      <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
+      <div className="flex flex-row items-center justify-between gap-4 px-1 relative">
         <div className="flex items-center gap-3.5">
-          <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
-            <Truck className="w-6 h-6 stroke-[2.2]" />
-          </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+            <h1 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
               <span>Pending Orders for Dispatch</span>
-              <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold transition-all">
+              <span className="text-xs font-medium text-gray-500">
                 {metrics.pendingOrders} Orders
               </span>
             </h1>
-            <p className="text-xs text-gray-500 font-medium">
+            <p className="text-[0.875rem] text-gray-500 font-medium">
               Create dispatches from Sales Orders or create direct standalone dispatches directly.
             </p>
           </div>
@@ -1166,26 +1174,33 @@ export const DispatchModule: React.FC = () => {
         <div className="flex items-center gap-2.5 flex-wrap">
           <button
             onClick={() => handleExportExcel()}
-            className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-xl border border-gray-200 text-xs font-bold flex items-center gap-2 shadow-2xs transition-colors cursor-pointer"
+            className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-xl border border-gray-200 text-[0.875rem] font-semibold flex items-center gap-2 shadow-2xs cursor-pointer"
           >
             <Download className="w-4 h-4 text-gray-500" />
             <span className="hidden sm:inline">Export Excel</span>
+          </button>
+          <button
+            onClick={() => handleExportExcel(filteredRows, true)}
+            className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-xl border border-gray-200 text-[0.875rem] font-semibold flex items-center gap-2 shadow-2xs cursor-pointer"
+          >
+            <Printer className="w-4 h-4 text-gray-500" />
+            <span className="hidden sm:inline">Print PDF</span>
           </button>
 
           {/* Direct Dispatch without Sales Order */}
           <button
             onClick={handleOpenDirectDispatch}
-            className="px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold flex items-center gap-2 shadow-2xs transition-all cursor-pointer"
+            className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-[0.875rem] font-semibold flex items-center gap-2 shadow-2xs cursor-pointer"
             title="Create a new dispatch batch directly without any Sales Order"
           >
-            <Plus className="w-4 h-4 text-purple-600 stroke-[2.5]" />
+            <Plus className="w-4 h-4 text-blue-600 stroke-[2.5]" />
             <span>+ Direct Dispatch</span>
           </button>
 
           {/* Standard Dispatch from Sales Order */}
           <button
             onClick={() => handleOpenDispatch()}
-            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm shadow-blue-500/25 transition-all cursor-pointer"
+            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[0.875rem] font-semibold flex items-center gap-2 shadow-sm shadow-blue-500/25 cursor-pointer"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>+ Create Dispatch</span>
@@ -1194,7 +1209,7 @@ export const DispatchModule: React.FC = () => {
       </div>
 
       {/* ── 2. TOP NAVIGATION TABS & ACTION BAR (Matching Production Module Style) ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-4 rounded-2xl shadow-2xs relative">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-1 relative">
         {/* Navigation Tabs */}
         <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full">
           {[
@@ -1209,7 +1224,7 @@ export const DispatchModule: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => { setActiveTab(tab.id as any); setCurrentPage(1); }}
-                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
                   active 
                     ? 'border-blue-600 text-blue-700 bg-transparent'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
@@ -1217,7 +1232,7 @@ export const DispatchModule: React.FC = () => {
               >
                 <span>{tab.label}</span>
                 {tab.count !== undefined && (
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                  <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
                     active ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-700'
                   }`}>
                     {tab.count}
@@ -1238,7 +1253,7 @@ export const DispatchModule: React.FC = () => {
               value={searchQuery}
               onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
               placeholder="Search orders, items, DC..."
-              className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-36 md:w-48 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+              className="pl-8 pr-7 py-1.5 text-[0.875rem] bg-gray-50 border border-gray-200 rounded-xl w-36 md:w-48 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
             />
             {searchQuery && (
               <button 
@@ -1254,14 +1269,14 @@ export const DispatchModule: React.FC = () => {
           <button
             type="button"
             onClick={toggleAllDetails}
-            className={`px-2.5 py-1.5 text-xs rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 font-bold shadow-2xs ${
+            className={`px-2.5 py-1.5 text-[0.875rem] rounded-xl border cursor-pointer flex items-center gap-1.5 font-semibold shadow-2xs ${
               isAllExpanded
                 ? 'bg-blue-50 text-blue-700 border-blue-200'
                 : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
             }`}
             title={isAllExpanded ? "Collapse All Items" : "Expand All Items"}
           >
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isAllExpanded ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-3.5 h-3.5 ${isAllExpanded ? 'rotate-180' : ''}`} />
             <span className="hidden sm:inline">{isAllExpanded ? 'Collapse All' : 'Detailed View'}</span>
           </button>
 
@@ -1274,7 +1289,7 @@ export const DispatchModule: React.FC = () => {
                 setShowFilterMenu(false);
                 setShowSortMenu(false);
               }}
-              className={`px-2.5 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs text-xs font-bold ${
+              className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 cursor-pointer shadow-2xs text-[0.875rem] font-semibold ${
                 datePreset !== 'All' || startDate || endDate
                   ? 'bg-blue-50 border-blue-300 text-blue-700 ring-2 ring-blue-100'
                   : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-700'
@@ -1290,15 +1305,15 @@ export const DispatchModule: React.FC = () => {
 
             {showDateFilter && (
               <div 
-                className="absolute right-0 mt-1.5 w-68 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-xs text-left animate-in fade-in zoom-in-95 duration-100"
+                className="absolute right-0 mt-1.5 w-68 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-[0.875rem] text-left"
                 onClick={e => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
-                  <span className="font-bold text-gray-800 text-xs">Date Range Filter</span>
+                  <span className="font-semibold text-gray-800 text-[0.875rem]">Date Range Filter</span>
                   {(datePreset !== 'All' || startDate || endDate) && (
                     <button
                       onClick={() => applyDatePreset('All')}
-                      className="text-blue-600 hover:text-blue-800 text-[11px] font-bold cursor-pointer"
+                      className="text-blue-600 hover:text-blue-800 text-xs font-semibold cursor-pointer"
                     >
                       Reset
                     </button>
@@ -1311,7 +1326,7 @@ export const DispatchModule: React.FC = () => {
                     <button
                       key={preset}
                       onClick={() => applyDatePreset(preset)}
-                      className={`px-2.5 py-1.5 text-xs font-bold rounded-lg text-center transition-colors cursor-pointer ${
+                      className={`px-2.5 py-1.5 text-[0.875rem] font-semibold rounded-lg text-center cursor-pointer ${
                         datePreset === preset ? 'bg-blue-600 text-white' : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
                       }`}
                     >
@@ -1323,21 +1338,21 @@ export const DispatchModule: React.FC = () => {
                 {/* Custom Date Pickers */}
                 <div className="space-y-1.5 pt-2 border-t border-gray-100">
                   <div>
-                    <label className="text-[10px] font-bold text-gray-500 block mb-0.5">From Date</label>
+                    <label className="text-xs font-semibold text-gray-500 block mb-0.5">From Date</label>
                     <input
                       type="date"
                       value={startDate}
                       onChange={e => { setStartDate(e.target.value); setDatePreset('Custom'); }}
-                      className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono"
+                      className="w-full px-2 py-1 border border-gray-200 rounded-lg text-[0.875rem] font-mono"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-gray-500 block mb-0.5">To Date</label>
+                    <label className="text-xs font-semibold text-gray-500 block mb-0.5">To Date</label>
                     <input
                       type="date"
                       value={endDate}
                       onChange={e => { setEndDate(e.target.value); setDatePreset('Custom'); }}
-                      className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono"
+                      className="w-full px-2 py-1 border border-gray-200 rounded-lg text-[0.875rem] font-mono"
                     />
                   </div>
                 </div>
@@ -1354,7 +1369,7 @@ export const DispatchModule: React.FC = () => {
                 setShowDateFilter(false);
                 setShowSortMenu(false);
               }}
-              className={`p-2 rounded-xl border transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+              className={`p-2 rounded-xl border flex items-center justify-center cursor-pointer shadow-2xs ${
                 (selectedCustomer !== 'ALL' || selectedRegion !== 'ALL' || selectedStatus !== 'ALL')
                   ? 'bg-blue-50 border-blue-300 text-blue-700 ring-2 ring-blue-100'
                   : 'bg-white hover:bg-blue-50/60 border-gray-200 hover:border-blue-200 text-blue-600'
@@ -1366,11 +1381,11 @@ export const DispatchModule: React.FC = () => {
 
             {showFilterMenu && (
               <div 
-                className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-xs text-left animate-in fade-in zoom-in-95 duration-100"
+                className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-[0.875rem] text-left"
                 onClick={e => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
-                  <span className="font-bold text-gray-800 text-xs">Filter Attributes</span>
+                  <span className="font-semibold text-gray-800 text-[0.875rem]">Filter Attributes</span>
                   {(selectedCustomer !== 'ALL' || selectedRegion !== 'ALL' || selectedStatus !== 'ALL') && (
                     <button
                       onClick={() => {
@@ -1378,7 +1393,7 @@ export const DispatchModule: React.FC = () => {
                         setSelectedRegion('ALL');
                         setSelectedStatus('ALL');
                       }}
-                      className="text-blue-600 hover:text-blue-800 text-[11px] font-bold cursor-pointer"
+                      className="text-blue-600 hover:text-blue-800 text-xs font-semibold cursor-pointer"
                     >
                       Reset All
                     </button>
@@ -1387,11 +1402,11 @@ export const DispatchModule: React.FC = () => {
 
                 {/* Customer Filter */}
                 <div>
-                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Customer / Party</label>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">Customer / Party</label>
                   <select
                     value={selectedCustomer}
                     onChange={e => { setSelectedCustomer(e.target.value); setCurrentPage(1); }}
-                    className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
                   >
                     <option value="ALL">All Customers ({customerOptions.length})</option>
                     {customerOptions.map(c => (
@@ -1402,11 +1417,11 @@ export const DispatchModule: React.FC = () => {
 
                 {/* Region Filter */}
                 <div>
-                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Region</label>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">Region</label>
                   <select
                     value={selectedRegion}
                     onChange={e => { setSelectedRegion(e.target.value); setCurrentPage(1); }}
-                    className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
                   >
                     <option value="ALL">All Regions ({regionOptions.length})</option>
                     {regionOptions.map(r => (
@@ -1417,11 +1432,11 @@ export const DispatchModule: React.FC = () => {
 
                 {/* Transporter Filter */}
                 <div>
-                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Transporter</label>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">Transporter</label>
                   <select
                     value={selectedTransporter}
                     onChange={e => { setSelectedTransporter(e.target.value); setCurrentPage(1); }}
-                    className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
                   >
                     <option value="ALL">All Transporters ({transporterOptions.length})</option>
                     {transporterOptions.map(t => (
@@ -1432,11 +1447,11 @@ export const DispatchModule: React.FC = () => {
 
                 {/* Readiness Status */}
                 <div>
-                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Readiness Status</label>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">Readiness Status</label>
                   <select
                     value={selectedStatus}
                     onChange={e => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
-                    className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
                   >
                     <option value="ALL">All Status</option>
                     <option value="Ready">Ready (In Stock)</option>
@@ -1457,7 +1472,7 @@ export const DispatchModule: React.FC = () => {
                 setShowFilterMenu(false);
                 setShowDateFilter(false);
               }}
-              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
               title="Sort Orders"
             >
               <ArrowUpDown className="w-4 h-4 text-blue-600" />
@@ -1465,10 +1480,10 @@ export const DispatchModule: React.FC = () => {
 
             {showSortMenu && (
               <div 
-                className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs text-left animate-in fade-in zoom-in-95 duration-100"
+                className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-[0.875rem] text-left"
                 onClick={e => e.stopPropagation()}
               >
-                <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block px-2 py-1">Sort Orders</span>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block px-2 py-1">Sort Orders</span>
                 <button
                   onClick={() => { handleSort('orderNumber'); setShowSortMenu(false); }}
                   className="w-full px-2.5 py-1.5 text-left rounded-xl hover:bg-gray-50 flex items-center justify-between font-semibold text-gray-700"
@@ -1512,7 +1527,7 @@ export const DispatchModule: React.FC = () => {
           <button
             onClick={() => { fetchData(false); showToast('Refreshed dispatch data', 'info'); }}
             disabled={refreshing}
-            className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs disabled:opacity-50"
+            className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs disabled:opacity-50"
             title="Refresh"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -1523,14 +1538,14 @@ export const DispatchModule: React.FC = () => {
       {/* ── 3. TABLE VIEW ── */}
       {activeTab === 'history' ? (
         /* History View of Created Delivery Challans */
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
+        <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-[0.875rem]">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50/80 text-[11px] font-bold uppercase tracking-wider text-gray-500 select-none">
+                <tr className="border-b border-gray-200 bg-gray-50/80 text-xs font-medium uppercase tracking-wider text-gray-500 select-none">
                   <th 
                     onClick={() => handleChallanSort('dcNumber')}
-                    className="py-3 px-4 cursor-pointer hover:text-gray-900 transition-colors"
+                    className="py-3 px-4 cursor-pointer hover:text-gray-900"
                   >
                     <div className="flex items-center gap-1">
                       <span>DC NUMBER</span>
@@ -1539,7 +1554,7 @@ export const DispatchModule: React.FC = () => {
                   </th>
                   <th 
                     onClick={() => handleChallanSort('date')}
-                    className="py-3 px-4 cursor-pointer hover:text-gray-900 transition-colors"
+                    className="py-3 px-4 cursor-pointer hover:text-gray-900"
                   >
                     <div className="flex items-center gap-1">
                       <span>DATE</span>
@@ -1548,7 +1563,7 @@ export const DispatchModule: React.FC = () => {
                   </th>
                   <th 
                     onClick={() => handleChallanSort('orderNumber')}
-                    className="py-3 px-4 cursor-pointer hover:text-gray-900 transition-colors"
+                    className="py-3 px-4 cursor-pointer hover:text-gray-900"
                   >
                     <div className="flex items-center gap-1">
                       <span>SO REF</span>
@@ -1557,7 +1572,7 @@ export const DispatchModule: React.FC = () => {
                   </th>
                   <th 
                     onClick={() => handleChallanSort('customerName')}
-                    className="py-3 px-4 cursor-pointer hover:text-gray-900 transition-colors"
+                    className="py-3 px-4 cursor-pointer hover:text-gray-900"
                   >
                     <div className="flex items-center gap-1">
                       <span>CUSTOMER</span>
@@ -1566,7 +1581,7 @@ export const DispatchModule: React.FC = () => {
                   </th>
                   <th 
                     onClick={() => handleChallanSort('transporterName')}
-                    className="py-3 px-4 cursor-pointer hover:text-gray-900 transition-colors"
+                    className="py-3 px-4 cursor-pointer hover:text-gray-900"
                   >
                     <div className="flex items-center gap-1">
                       <span>TRANSPORTER</span>
@@ -1575,7 +1590,7 @@ export const DispatchModule: React.FC = () => {
                   </th>
                   <th 
                     onClick={() => handleChallanSort('vehicleNumber')}
-                    className="py-3 px-4 cursor-pointer hover:text-gray-900 transition-colors"
+                    className="py-3 px-4 cursor-pointer hover:text-gray-900"
                   >
                     <div className="flex items-center gap-1">
                       <span>VEHICLE</span>
@@ -1584,7 +1599,7 @@ export const DispatchModule: React.FC = () => {
                   </th>
                   <th 
                     onClick={() => handleChallanSort('items')}
-                    className="py-3 px-4 text-center cursor-pointer hover:text-gray-900 transition-colors"
+                    className="py-3 px-4 text-center cursor-pointer hover:text-gray-900"
                   >
                     <div className="flex items-center justify-center gap-1">
                       <span>ITEMS</span>
@@ -1593,44 +1608,44 @@ export const DispatchModule: React.FC = () => {
                   </th>
                   <th 
                     onClick={() => handleChallanSort('status')}
-                    className="py-3 px-4 text-center cursor-pointer hover:text-gray-900 transition-colors"
+                    className="py-3 px-4 text-center cursor-pointer hover:text-gray-900"
                   >
                     <div className="flex items-center justify-center gap-1">
                       <span>STATUS</span>
                       {challanSortField === 'status' ? (challanSortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />) : <ArrowUpDown className="w-3 h-3 text-gray-400" />}
                     </div>
                   </th>
-                  <th className="py-3 px-4 text-center min-w-[220px]">ACTIONS</th>
+                  <th className="py-3 px-4 text-center min-w-[13.75rem]">ACTIONS</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="bg-white divide-y divide-gray-100">
                 {sortedChallansList.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-12 text-center text-gray-400">
                       <Truck className="w-8 h-8 mx-auto text-gray-300 mb-2" />
                       <p className="font-semibold text-gray-600">No delivery challans created yet</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Click "+ Direct Dispatch" or create a dispatch from any sales order.</p>
+                      <p className="text-[0.875rem] text-gray-400 mt-0.5">Click "+ Direct Dispatch" or create a dispatch from any sales order.</p>
                     </td>
                   </tr>
                 ) : (
                   sortedChallansList.map((ch, idx) => (
-                    <tr key={ch._id || idx} className="hover:bg-blue-50/30 transition-colors">
-                      <td className="py-3.5 px-4 font-mono font-bold text-blue-600 whitespace-nowrap">
+                    <tr key={ch._id || idx} className="hover:bg-blue-50/30">
+                      <td className="py-3.5 px-4 font-mono font-semibold text-blue-600 whitespace-nowrap">
                         {ch.dcNumber || `DO-${String(idx + 1).padStart(3, '0')}`}
                       </td>
                       <td className="py-3.5 px-4 font-medium text-gray-700 whitespace-nowrap font-mono">
                         {ch.date || '—'}
                       </td>
-                      <td className="py-3.5 px-4 font-mono font-bold whitespace-nowrap">
+                      <td className="py-3.5 px-4 font-mono font-semibold whitespace-nowrap">
                         {ch.orderNumber && ch.orderNumber !== 'DIRECT' ? (
                           <span className="text-gray-800">{ch.orderNumber}</span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                             Direct Dispatch
                           </span>
                         )}
                       </td>
-                      <td className="py-3.5 px-4 font-bold text-gray-900">
+                      <td className="py-3.5 px-4 font-semibold text-gray-900">
                         {ch.customerName || '—'}
                       </td>
                       <td className="py-3.5 px-4 text-gray-700">
@@ -1640,12 +1655,12 @@ export const DispatchModule: React.FC = () => {
                         {ch.vehicleNumber || '—'}
                       </td>
                       <td className="py-3.5 px-4 text-center">
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700">
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">
                           {ch.items?.length || 0} items
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold uppercase ${
                           ch.status === 'draft'
                             ? 'bg-amber-50 text-amber-700 border border-amber-200'
                             : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
@@ -1658,7 +1673,7 @@ export const DispatchModule: React.FC = () => {
                           {/* Revert Delivery Challan */}
                           <button
                             onClick={() => handleRevertChallan(ch)}
-                            className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 rounded-lg transition-all flex items-center gap-1 cursor-pointer border border-rose-200/80 shadow-2xs hover:scale-105 active:scale-95 text-xs font-bold"
+                            className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 rounded-lg flex items-center gap-1 cursor-pointer border border-rose-200/80 shadow-2xs text-[0.875rem] font-semibold"
                             title="Revert Delivery Challan (Restores Inventory Stock & Returns Sales Order to Pending)"
                           >
                             <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
@@ -1668,7 +1683,7 @@ export const DispatchModule: React.FC = () => {
                           {/* Edit Dispatch - accessible in Challan History only */}
                           <button
                             onClick={() => handleEditChallan(ch)}
-                            className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 rounded-lg transition-all flex items-center justify-center cursor-pointer border border-amber-200/80 shadow-2xs hover:scale-105 active:scale-95"
+                            className="icon-btn"
                             title="Edit Delivery Challan"
                           >
                             <Edit3 className="w-3.5 h-3.5 text-amber-600" />
@@ -1680,7 +1695,7 @@ export const DispatchModule: React.FC = () => {
                               setActiveChallan(ch);
                               setIsChallanModalOpen(true);
                             }}
-                            className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 rounded-lg transition-all flex items-center justify-center cursor-pointer border border-blue-200/80 shadow-2xs hover:scale-105 active:scale-95"
+                            className="icon-btn"
                             title="Print Delivery Challan"
                           >
                             <Printer className="w-3.5 h-3.5 text-blue-600" />
@@ -1696,11 +1711,11 @@ export const DispatchModule: React.FC = () => {
         </div>
       ) : (
         /* Orders Master Table with Clickable Column Header Sorting & Expandable Items Accordion Dropdown */
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
+        <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-[0.875rem]">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50/80 text-[11px] font-bold text-gray-500 uppercase tracking-wider select-none">
+                <tr className="border-b border-gray-200 bg-gray-50/80 text-xs font-medium text-gray-500 uppercase tracking-wider select-none">
                   <th className="py-3 px-3 w-12 text-center">
                     <input
                       type="checkbox"
@@ -1709,12 +1724,12 @@ export const DispatchModule: React.FC = () => {
                       className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     />
                   </th>
-                  <th className="py-3 px-2 w-10 text-center font-bold">#</th>
+                  <th className="py-3 px-2 w-10 text-center font-semibold">#</th>
 
                   {/* 1. SO NO */}
                   <th 
                     onClick={() => handleSort('orderNumber')}
-                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-900 whitespace-nowrap transition-colors"
+                    className="py-3 px-3 font-semibold cursor-pointer hover:text-gray-900 whitespace-nowrap"
                   >
                     <div className="flex items-center space-x-1">
                       <span>SO NO.</span>
@@ -1729,7 +1744,7 @@ export const DispatchModule: React.FC = () => {
                   {/* 2. DATE */}
                   <th 
                     onClick={() => handleSort('rawDate')}
-                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-900 whitespace-nowrap transition-colors"
+                    className="py-3 px-3 font-semibold cursor-pointer hover:text-gray-900 whitespace-nowrap"
                   >
                     <div className="flex items-center space-x-1">
                       <span>DATE</span>
@@ -1744,7 +1759,7 @@ export const DispatchModule: React.FC = () => {
                   {/* 3. CUSTOMER / PARTY */}
                   <th 
                     onClick={() => handleSort('customerName')}
-                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-900 min-w-[200px] transition-colors"
+                    className="py-3 px-3 font-semibold cursor-pointer hover:text-gray-900 min-w-[12.5rem]"
                   >
                     <div className="flex items-center space-x-1">
                       <span>CUSTOMER / PARTY</span>
@@ -1759,7 +1774,7 @@ export const DispatchModule: React.FC = () => {
                   {/* 4. REGION */}
                   <th 
                     onClick={() => handleSort('region')}
-                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-900 whitespace-nowrap transition-colors"
+                    className="py-3 px-3 font-semibold cursor-pointer hover:text-gray-900 whitespace-nowrap"
                   >
                     <div className="flex items-center space-x-1">
                       <span>REGION</span>
@@ -1774,7 +1789,7 @@ export const DispatchModule: React.FC = () => {
                   {/* 5. TRANSPORTER */}
                   <th 
                     onClick={() => handleSort('transporter')}
-                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-900 whitespace-nowrap transition-colors"
+                    className="py-3 px-3 font-semibold cursor-pointer hover:text-gray-900 whitespace-nowrap"
                   >
                     <div className="flex items-center space-x-1">
                       <span>TRANSPORTER</span>
@@ -1789,7 +1804,7 @@ export const DispatchModule: React.FC = () => {
                   {/* 6. ITEMS COUNT */}
                   <th 
                     onClick={() => handleSort('itemCount')}
-                    className="py-3 px-3 font-bold text-center cursor-pointer hover:text-gray-900 whitespace-nowrap w-32 transition-colors"
+                    className="py-3 px-3 font-semibold text-center cursor-pointer hover:text-gray-900 whitespace-nowrap w-32"
                   >
                     <div className="flex items-center justify-center space-x-1">
                       <span>ITEMS</span>
@@ -1804,7 +1819,7 @@ export const DispatchModule: React.FC = () => {
                   {/* 6. PENDING GBL */}
                   <th 
                     onClick={() => handleSort('pendingGbl')}
-                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-900 text-right whitespace-nowrap transition-colors"
+                    className="py-3 px-3 font-semibold cursor-pointer hover:text-gray-900 text-right whitespace-nowrap"
                   >
                     <div className="flex items-center justify-end space-x-1">
                       <span>PENDING (GBL)</span>
@@ -1819,7 +1834,7 @@ export const DispatchModule: React.FC = () => {
                   {/* 7. PENDING PCS */}
                   <th 
                     onClick={() => handleSort('pendingPcs')}
-                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-900 text-right whitespace-nowrap transition-colors"
+                    className="py-3 px-3 font-semibold cursor-pointer hover:text-gray-900 text-right whitespace-nowrap"
                   >
                     <div className="flex items-center justify-end space-x-1">
                       <span>PENDING (PCS)</span>
@@ -1834,7 +1849,7 @@ export const DispatchModule: React.FC = () => {
                   {/* 8. READY STATUS */}
                   <th 
                     onClick={() => handleSort('readyStatus')}
-                    className="py-3 px-3 font-bold text-center cursor-pointer hover:text-gray-900 whitespace-nowrap min-w-[140px] transition-colors"
+                    className="py-3 px-3 font-semibold text-center cursor-pointer hover:text-gray-900 whitespace-nowrap min-w-[8.75rem]"
                   >
                     <div className="flex items-center justify-center space-x-1">
                       <span>READY STATUS</span>
@@ -1846,17 +1861,17 @@ export const DispatchModule: React.FC = () => {
                     </div>
                   </th>
 
-                  <th className="py-3 px-3 text-center font-bold whitespace-nowrap">ACTIONS</th>
+                  <th className="py-3 px-3 text-center font-semibold whitespace-nowrap">ACTIONS</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 text-xs">
+              <tbody className="bg-white divide-y divide-gray-100 text-[0.875rem]">
                 {paginatedRows.length === 0 ? (
                   <tr>
                     <td colSpan={12} className="py-12 text-center text-gray-400">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <Truck className="w-8 h-8 text-gray-300 stroke-[1.5]" />
-                        <span className="font-semibold text-sm">No pending orders matching filters</span>
-                        <span className="text-xs text-gray-400">Try adjusting your search terms or filters</span>
+                        <span className="font-semibold text-[0.875rem]">No pending orders matching filters</span>
+                        <span className="text-[0.875rem] text-gray-400">Try adjusting your search terms or filters</span>
                       </div>
                     </td>
                   </tr>
@@ -1872,7 +1887,7 @@ export const DispatchModule: React.FC = () => {
                       <React.Fragment key={row._id}>
                         <tr
                           onClick={() => toggleOrderExpand(row._id)}
-                          className={`hover:bg-blue-50/40 transition-colors group cursor-pointer ${
+                          className={`hover:bg-blue-50/40 group cursor-pointer ${
                             isChecked ? 'bg-blue-50/60' : isExpanded ? 'bg-blue-50/20' : ''
                           }`}
                         >
@@ -1892,10 +1907,10 @@ export const DispatchModule: React.FC = () => {
                           </td>
 
                           {/* SO Number - Clickable */}
-                          <td className="py-3.5 px-3 font-bold whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          <td className="py-3.5 px-3 font-semibold whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => setSelectedOrderDetailRow(row)}
-                              className="hover:text-blue-600 hover:underline transition-colors text-left font-bold cursor-pointer font-mono text-xs block text-blue-700"
+                              className="hover:text-blue-600 hover:underline text-left font-semibold cursor-pointer font-mono text-[0.875rem] block text-blue-700"
                             >
                               {row.orderNumber}
                             </button>
@@ -1903,9 +1918,9 @@ export const DispatchModule: React.FC = () => {
 
                           {/* Order Date & Time */}
                           <td className="py-3.5 px-3 text-gray-600 whitespace-nowrap">
-                            <div className="font-mono text-xs font-semibold text-gray-900">{row.orderDate}</div>
+                            <div className="font-mono text-[0.875rem] font-semibold text-gray-900">{row.orderDate}</div>
                             {row.orderTime ? (
-                              <div className="font-mono text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
+                              <div className="font-mono text-xs text-gray-400 mt-0.5 flex items-center gap-1">
                                 <Clock className="w-2.5 h-2.5 text-gray-400 shrink-0" />
                                 <span>{row.orderTime}</span>
                               </div>
@@ -1913,9 +1928,9 @@ export const DispatchModule: React.FC = () => {
                           </td>
 
                           {/* Customer Block */}
-                          <td className="py-3.5 px-3 min-w-[200px]">
-                            <div className="font-bold text-gray-900 leading-snug">{row.customerName}</div>
-                            <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-0.5">
+                          <td className="py-3.5 px-3 min-w-[12.5rem]">
+                            <div className="font-semibold text-gray-900 leading-snug">{row.customerName}</div>
+                            <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
                               {row.customerPhone && (
                                 <span className="font-mono flex items-center gap-1">
                                   <Phone className="w-2.5 h-2.5 text-gray-400" />
@@ -1941,10 +1956,10 @@ export const DispatchModule: React.FC = () => {
                             {row.transporter && row.transporter !== '—' ? (
                               <div className="flex items-center gap-1.5">
                                 <Truck className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                                <span className="font-semibold text-gray-800 text-xs">{row.transporter}</span>
+                                <span className="font-semibold text-gray-800 text-[0.875rem]">{row.transporter}</span>
                               </div>
                             ) : (
-                              <span className="text-gray-400 font-normal text-xs">—</span>
+                              <span className="text-gray-400 font-normal text-[0.875rem]">—</span>
                             )}
                           </td>
 
@@ -1953,7 +1968,7 @@ export const DispatchModule: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => toggleOrderExpand(row._id)}
-                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer shadow-3xs ${
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[0.875rem] font-semibold border cursor-pointer shadow-3xs ${
                                 isExpanded
                                   ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                                   : 'bg-blue-50/80 hover:bg-blue-100 text-blue-700 border-blue-200/80 hover:border-blue-300'
@@ -1962,35 +1977,35 @@ export const DispatchModule: React.FC = () => {
                             >
                               <Package className={`w-3.5 h-3.5 ${isExpanded ? 'text-white' : 'text-blue-600'}`} />
                               <span>{row.itemCount} {row.itemCount === 1 ? 'Item' : 'Items'}</span>
-                              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180 text-white' : 'text-blue-500'}`} />
+                              <ChevronDown className={`w-3.5 h-3.5 ${isExpanded ? 'rotate-180 text-white' : 'text-blue-500'}`} />
                             </button>
                           </td>
 
                           {/* Pending QTY: GBL */}
-                          <td className="py-3.5 px-3 text-right font-bold text-gray-900 font-mono text-xs whitespace-nowrap">
+                          <td className="py-3.5 px-3 text-right font-semibold text-gray-900 font-mono text-[0.875rem] whitespace-nowrap">
                             {row.pendingGbl.toLocaleString()}
                           </td>
 
                           {/* Pending QTY: PCS */}
-                          <td className="py-3.5 px-3 text-right font-medium text-gray-600 font-mono text-xs whitespace-nowrap">
+                          <td className="py-3.5 px-3 text-right font-medium text-gray-600 font-mono text-[0.875rem] whitespace-nowrap">
                             {row.pendingPcs.toLocaleString()}
                           </td>
 
                           {/* Ready Status Badge */}
                           <td className="py-3.5 px-3 text-center whitespace-nowrap">
                             {row.readyStatus === 'Ready' && (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
                                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                                 Ready (In Stock)
                               </span>
                             )}
                             {row.readyStatus === 'Partially Ready' && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/80">
                                 Partially Ready
                               </span>
                             )}
                             {row.readyStatus === 'Not Ready' && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/80">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200/80">
                                 Not Ready
                               </span>
                             )}
@@ -2002,7 +2017,7 @@ export const DispatchModule: React.FC = () => {
                               {/* 1. Dispatch Icon Button */}
                               <button
                                 onClick={() => handleOpenDispatch(row)}
-                                className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all flex items-center justify-center shadow-2xs cursor-pointer hover:scale-105 active:scale-95"
+                                className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center shadow-2xs cursor-pointer"
                                 title="Create Dispatch for this order"
                               >
                                 <Truck className="w-4 h-4" />
@@ -2011,7 +2026,7 @@ export const DispatchModule: React.FC = () => {
                               {/* 2. Print Delivery Challan Icon Button */}
                               <button
                                 onClick={() => handlePrintOrderChallan(row)}
-                                className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 border border-blue-200/80 rounded-lg transition-all flex items-center justify-center shadow-2xs cursor-pointer hover:scale-105 active:scale-95"
+                                className="icon-btn"
                                 title="Print Delivery Challan"
                               >
                                 <Printer className="w-4 h-4 text-blue-600" />
@@ -2024,7 +2039,7 @@ export const DispatchModule: React.FC = () => {
                                     e.stopPropagation();
                                     setOpenActionDropdownId(isMenuOpen ? null : row._id);
                                   }}
-                                  className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg transition-colors cursor-pointer hover:scale-105 active:scale-95"
+                                  className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg cursor-pointer"
                                   title="More actions"
                                 >
                                   <ChevronDown className="w-4 h-4" />
@@ -2033,7 +2048,7 @@ export const DispatchModule: React.FC = () => {
                               {/* Dropdown Options */}
                               {isMenuOpen && (
                                 <div
-                                  className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-1.5 z-50 text-left animate-in fade-in zoom-in-95 duration-100"
+                                  className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-1.5 z-50 text-left"
                                   onClick={e => e.stopPropagation()}
                                 >
                                   {/* 1. Dispatch Actions */}
@@ -2042,7 +2057,7 @@ export const DispatchModule: React.FC = () => {
                                       setOpenActionDropdownId(null);
                                       handleOpenDispatch(row);
                                     }}
-                                    className="w-full px-3 py-1.5 text-xs text-left font-bold text-gray-800 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                                    className="w-full px-3 py-1.5 text-[0.875rem] text-left font-semibold text-gray-800 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
                                   >
                                     <Truck className="w-3.5 h-3.5 text-blue-600" />
                                     <span>Dispatch (Custom)</span>
@@ -2052,7 +2067,7 @@ export const DispatchModule: React.FC = () => {
                                       setOpenActionDropdownId(null);
                                       handleQuickFullDispatch(row);
                                     }}
-                                    className="w-full px-3 py-1.5 text-xs text-left font-bold text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer"
+                                    className="w-full px-3 py-1.5 text-[0.875rem] text-left font-semibold text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer"
                                   >
                                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                                     <span>Dispatch All Pending</span>
@@ -2062,7 +2077,7 @@ export const DispatchModule: React.FC = () => {
                                       setOpenActionDropdownId(null);
                                       handlePrintOrderChallan(row);
                                     }}
-                                    className="w-full px-3 py-1.5 text-xs text-left font-bold text-blue-700 hover:bg-blue-50 flex items-center gap-2 cursor-pointer"
+                                    className="w-full px-3 py-1.5 text-[0.875rem] text-left font-semibold text-blue-700 hover:bg-blue-50 flex items-center gap-2 cursor-pointer"
                                   >
                                     <Printer className="w-3.5 h-3.5 text-blue-600" />
                                     <span>Print Delivery Challan</span>
@@ -2072,7 +2087,7 @@ export const DispatchModule: React.FC = () => {
                                       setOpenActionDropdownId(null);
                                       setSelectedOrderDetailRow(row);
                                     }}
-                                    className="w-full px-3 py-1.5 text-xs text-left font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
+                                    className="w-full px-3 py-1.5 text-[0.875rem] text-left font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 cursor-pointer"
                                   >
                                     <Eye className="w-3.5 h-3.5 text-gray-400" />
                                     <span>View Order Details</span>
@@ -2081,12 +2096,12 @@ export const DispatchModule: React.FC = () => {
                                   {/* 2. Existing Dispatches for this order (Print / View Only) */}
                                   {rowChallans.length > 0 && (
                                     <>
-                                      <div className="border-t border-gray-100 my-1 px-3 py-1 bg-gray-50/80 text-[10px] font-black uppercase tracking-wider text-gray-500">
+                                      <div className="border-t border-gray-100 my-1 px-3 py-1 bg-gray-50/80 text-xs font-medium uppercase tracking-wider text-gray-500">
                                         Dispatches ({rowChallans.length})
                                       </div>
                                       {rowChallans.map((ch: any) => (
                                         <div key={ch._id || ch.dcNumber} className="px-1 py-0.5">
-                                          <div className="flex items-center justify-between px-2 py-1 text-[11px] font-bold text-blue-700 bg-blue-50/50 rounded-lg">
+                                          <div className="flex items-center justify-between px-2 py-1 text-xs font-semibold text-blue-700 bg-blue-50/50 rounded-lg">
                                             <span className="font-mono">{ch.dcNumber}</span>
                                             <div className="flex items-center gap-1">
                                               {/* Print DC */}
@@ -2096,7 +2111,7 @@ export const DispatchModule: React.FC = () => {
                                                   setActiveChallan(ch);
                                                   setIsChallanModalOpen(true);
                                                 }}
-                                                className="p-1 text-gray-600 hover:text-blue-700 hover:bg-white rounded transition-colors"
+                                                className="icon-btn"
                                                 title="Print Delivery Challan"
                                               >
                                                 <Printer className="w-3.5 h-3.5" />
@@ -2116,17 +2131,17 @@ export const DispatchModule: React.FC = () => {
 
                         {/* ── EXPANDED DETAILED ITEMS SUB-TABLE (ACCORDION DROPDOWN) ── */}
                         {isExpanded && (
-                          <tr className="bg-slate-50/80 border-b border-gray-200 animate-in fade-in duration-150">
+                          <tr className="bg-slate-50/80 border-b border-gray-200">
                             <td colSpan={12} className="p-3 pl-8 pr-4">
-                              <div className="bg-white rounded-xl border border-gray-200 shadow-2xs overflow-hidden">
-                                <div className="px-4 py-2.5 bg-gray-50/90 border-b border-gray-200 flex items-center justify-between text-xs font-semibold text-gray-700">
+                              <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2">
+                                <div className="px-4 py-2.5 bg-gray-50/90 border-b border-gray-200 flex items-center justify-between text-[0.875rem] font-semibold text-gray-700">
                                   <span className="flex items-center gap-2">
                                     <Package className="w-4 h-4 text-blue-600" />
                                     <span>All Items in Sales Order <strong className="text-gray-900 font-mono">{row.orderNumber}</strong> ({row.items.length} items)</span>
                                   </span>
-                                  <div className="flex items-center gap-3 text-[11px] font-mono">
+                                  <div className="flex items-center gap-3 text-xs font-mono">
                                     <span className="text-gray-500">Total Pending: {row.pendingGbl} GBL ({row.pendingPcs.toLocaleString()} PCS)</span>
-                                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${
+                                    <span className={`px-2 py-0.5 rounded-full text-[0.875rem] font-semibold border ${
                                       row.readyStatus === 'Ready'
                                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                         : row.readyStatus === 'Partially Ready'
@@ -2137,7 +2152,7 @@ export const DispatchModule: React.FC = () => {
                                     </span>
                                     <button
                                       onClick={() => handlePrintOrderChallan(row)}
-                                      className="px-2.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-md text-xs font-bold flex items-center gap-1 cursor-pointer transition-all hover:scale-105 active:scale-95"
+                                      className="px-2.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-md text-[0.875rem] font-semibold flex items-center gap-1 cursor-pointer"
                                       title="Print Delivery Challan"
                                     >
                                       <Printer className="w-3.5 h-3.5" />
@@ -2146,41 +2161,41 @@ export const DispatchModule: React.FC = () => {
                                   </div>
                                 </div>
 
-                                <table className="w-full text-left text-xs divide-y divide-gray-150">
-                                  <thead className="bg-gray-50/70 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider">
+                                <table className="w-full text-left text-[0.875rem] divide-y divide-gray-150">
+                                  <thead className="bg-gray-50/70 text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     <tr>
                                       <th className="py-2.5 px-3">Item Description</th>
                                       <th className="py-2.5 px-3">SKU Code</th>
                                       <th className="py-2.5 px-3 text-right">Ordered</th>
                                       <th className="py-2.5 px-3 text-right">Dispatched</th>
-                                      <th className="py-2.5 px-3 text-right font-bold text-blue-700">Pending</th>
+                                      <th className="py-2.5 px-3 text-right font-semibold text-blue-700">Pending</th>
                                       <th className="py-2.5 px-3 text-right font-semibold text-slate-700">Warehouse Stock</th>
                                       <th className="py-2.5 px-3 text-center">Status</th>
                                       <th className="py-2.5 px-3 text-right">Action</th>
                                     </tr>
                                   </thead>
-                                  <tbody className="divide-y divide-gray-100 font-medium">
+                                  <tbody className="bg-white divide-y divide-gray-100 font-medium">
                                     {row.items.map((it, iIdx) => (
-                                      <tr key={it.skuCode || iIdx} className="hover:bg-blue-50/40 transition-colors">
+                                      <tr key={it.skuCode || iIdx} className="hover:bg-blue-50/40">
                                         <td className="py-2.5 px-3 font-semibold text-gray-900">
                                           {it.itemName}
                                         </td>
-                                        <td className="py-2.5 px-3 font-mono text-gray-500 text-[11px]">
+                                        <td className="py-2.5 px-3 font-mono text-gray-500 text-xs">
                                           {it.skuCode || '—'}
                                         </td>
                                         <td className="py-2.5 px-3 text-right font-mono text-gray-700">
-                                          {it.orderedQty.toLocaleString()} <span className="text-[10px] text-gray-400">{it.uom}</span>
+                                          {it.orderedQty.toLocaleString()} <span className="text-xs text-gray-400">{it.uom}</span>
                                         </td>
                                         <td className="py-2.5 px-3 text-right font-mono text-gray-500">
                                           {it.dispatchedQty.toLocaleString()}
                                         </td>
-                                        <td className="py-2.5 px-3 text-right font-mono font-bold text-blue-700">
-                                          {it.gbl} GBL <span className="text-[10px] text-gray-400">({it.pcs.toLocaleString()} pcs)</span>
+                                        <td className="py-2.5 px-3 text-right font-mono font-semibold text-blue-700">
+                                          {it.gbl} GBL <span className="text-xs text-gray-400">({it.pcs.toLocaleString()} pcs)</span>
                                         </td>
                                         <td className="py-2.5 px-3 text-right font-mono font-semibold">
                                           {(it.stockOnHandGbl ?? 0) > 0 ? (
                                             <span className="text-emerald-700">
-                                              {it.stockOnHandGbl} GBL <span className="text-[10px] text-gray-400">({(it.stockOnHandPcs ?? 0).toLocaleString()} pcs)</span>
+                                              {it.stockOnHandGbl} GBL <span className="text-xs text-gray-400">({(it.stockOnHandPcs ?? 0).toLocaleString()} pcs)</span>
                                             </span>
                                           ) : (
                                             <span className="text-rose-600">0 GBL</span>
@@ -2188,17 +2203,17 @@ export const DispatchModule: React.FC = () => {
                                         </td>
                                         <td className="py-2.5 px-3 text-center">
                                           {it.isAvailable ? (
-                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                               <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                                               In Stock (Ready)
                                             </span>
                                           ) : (it.stockOnHandGbl ?? 0) > 0 ? (
-                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                                               <Clock className="w-3 h-3 text-amber-600" />
                                               Partial Stock
                                             </span>
                                           ) : (
-                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
                                               <AlertCircle className="w-3 h-3 text-rose-600" />
                                               Needs Production
                                             </span>
@@ -2207,7 +2222,7 @@ export const DispatchModule: React.FC = () => {
                                         <td className="py-2.5 px-3 text-right">
                                           <button
                                             onClick={() => handleOpenDispatch(row)}
-                                            className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded text-xs font-semibold cursor-pointer transition-colors inline-flex items-center gap-1"
+                                            className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded text-[0.875rem] font-semibold cursor-pointer inline-flex items-center gap-1"
                                           >
                                             <Truck className="w-3 h-3" />
                                             <span>Dispatch</span>
@@ -2234,8 +2249,8 @@ export const DispatchModule: React.FC = () => {
 
       {/* ── BULK ACTION BAR ── */}
       {selectedOrderIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-bottom-5 duration-200 border border-gray-800">
-          <span className="text-xs font-bold">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 border border-gray-800">
+          <span className="text-[0.875rem] font-semibold">
             {selectedOrderIds.size} orders selected
           </span>
           <div className="h-4 w-px bg-gray-700" />
@@ -2244,14 +2259,14 @@ export const DispatchModule: React.FC = () => {
               const selected = filteredRows.filter(r => selectedOrderIds.has(r._id));
               handleExportExcel(selected);
             }}
-            className="text-xs font-bold text-gray-200 hover:text-white flex items-center gap-1.5 cursor-pointer"
+            className="text-[0.875rem] font-semibold text-gray-200 hover:text-white flex items-center gap-1.5 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export Selected</span>
           </button>
           <button
             onClick={() => setSelectedOrderIds(new Set())}
-            className="text-xs font-bold text-gray-400 hover:text-gray-200 cursor-pointer ml-2"
+            className="text-[0.875rem] font-semibold text-gray-400 hover:text-gray-200 cursor-pointer ml-2"
           >
             Deselect All
           </button>

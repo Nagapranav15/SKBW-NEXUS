@@ -17,8 +17,7 @@ import {
 } from './purchaseService';
 import { showToast } from '../../ui/Toast';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { generateListPdf } from '../../../utils/pdfReport';
 import Modal from '../../ui/Modal';
 import { LocationSelectPopup } from '../../stock_v2/LocationSelectPopup';
 import { convertAltToPrimary, convertPrimaryToAlt, formatUomFormula } from '../../../utils/uomConversion';
@@ -77,7 +76,7 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64 bg-white">
-        <div className="inline-flex items-center gap-2 text-xs font-semibold text-gray-500">
+        <div className="inline-flex items-center gap-2 text-[0.875rem] font-semibold text-gray-500">
           <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
           <span>Loading purchase batches...</span>
         </div>
@@ -90,7 +89,7 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
       {invoices.length > 0 ? (
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider select-none">
+            <tr className="border-b border-gray-200 text-xs font-medium text-gray-600 uppercase tracking-wider select-none">
               <th className="py-3 px-3.5 text-left whitespace-nowrap">Batch No.</th>
               <th className="py-3 px-3.5 text-left whitespace-nowrap">Date</th>
               <th className="py-3 px-3.5 text-left whitespace-nowrap">Supplier</th>
@@ -104,7 +103,7 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
               <th className="py-3 px-3.5 text-center w-20 whitespace-nowrap">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 text-xs text-gray-700 bg-white">
+          <tbody className="bg-white divide-y divide-gray-100 text-[0.875rem] text-gray-700 bg-white">
             {invoices.map((inv) => {
               const supplierName = typeof inv.vendorId === 'object' && inv.vendorId !== null
                 ? (inv.vendorId.firmName || inv.vendorId.ownerName || 'Unknown') 
@@ -135,40 +134,40 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
               return (
                 <tr 
                   key={inv._id} 
-                  className={`hover:bg-blue-50/20 transition-all cursor-pointer whitespace-nowrap ${
+                  className={`hover:bg-blue-50/20 cursor-pointer whitespace-nowrap ${
                     isCancelled ? 'bg-red-50/30' : ''
                   }`}
                   onClick={() => onViewDetails(inv)}
                 >
-                  <td className="py-3 px-3.5 font-mono font-bold text-blue-700 text-xs whitespace-nowrap">
+                  <td className="py-3 px-3.5 font-mono font-semibold text-blue-700 text-[0.875rem] whitespace-nowrap">
                     {inv.invoiceNumber}
                   </td>
-                  <td className="py-3 px-3.5 text-gray-500 font-medium text-xs whitespace-nowrap">
+                  <td className="py-3 px-3.5 text-gray-500 font-medium text-[0.875rem] whitespace-nowrap">
                     {inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                   </td>
-                  <td className="py-3 px-3.5 font-semibold text-gray-900 text-xs whitespace-nowrap">{supplierName}</td>
+                  <td className="py-3 px-3.5 font-semibold text-gray-900 text-[0.875rem] whitespace-nowrap">{supplierName}</td>
                   <td className="py-3 px-3.5 whitespace-nowrap">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60 shadow-2xs">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 shadow-2xs">
                       {lotsLabel}
                     </span>
                   </td>
-                  <td className="py-3 px-3.5 font-mono font-semibold text-gray-700 text-xs text-center whitespace-nowrap">
+                  <td className="py-3 px-3.5 font-mono font-semibold text-gray-700 text-[0.875rem] text-center whitespace-nowrap">
                     {totalReelsCount || '—'}
                   </td>
-                  <td className="py-3 px-3.5 font-mono font-semibold text-gray-700 text-xs text-center whitespace-nowrap">
+                  <td className="py-3 px-3.5 font-mono font-semibold text-gray-700 text-[0.875rem] text-center whitespace-nowrap">
                     {totalReamsCount > 0 ? totalReamsCount.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '—'}
                   </td>
-                  <td className="py-3 px-3.5 font-mono font-bold text-gray-900 text-xs whitespace-nowrap">
+                  <td className="py-3 px-3.5 font-mono font-semibold text-gray-900 text-[0.875rem] whitespace-nowrap">
                     {totalKgWeight > 0 ? `${totalKgWeight.toLocaleString('en-IN', { maximumFractionDigits: 2 })} KG` : '—'}
                   </td>
-                  <td className="py-3 px-3.5 font-mono font-bold text-blue-700 text-xs text-right whitespace-nowrap">
+                  <td className="py-3 px-3.5 font-mono font-semibold text-blue-700 text-[0.875rem] text-right whitespace-nowrap">
                     {landedRatePerKg > 0 ? `₹${landedRatePerKg.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
                   </td>
-                  <td className="py-3 px-3.5 font-mono font-black text-gray-900 text-xs text-right whitespace-nowrap">
+                  <td className="py-3 px-3.5 font-mono font-semibold text-gray-900 text-[0.875rem] text-right whitespace-nowrap">
                     ₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   </td>
                   <td className="py-3 px-3.5 text-center whitespace-nowrap">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[0.875rem] font-semibold ${
                       isPosted 
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' 
                         : isDraft 
@@ -183,7 +182,7 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                     <div className="flex items-center justify-center gap-1">
                       <button
                         onClick={() => onViewDetails(inv)}
-                        className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer"
+                        className="icon-btn"
                         title="View Details"
                       >
                         <Eye className="w-4 h-4" />
@@ -191,7 +190,7 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                       {onPrintInvoice && (
                         <button
                           onClick={() => onPrintInvoice(inv)}
-                          className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
+                          className="icon-btn"
                           title="Print Purchase Batch"
                         >
                           <Printer className="w-4 h-4" />
@@ -200,7 +199,7 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                       {!isCancelled && onEditInvoice && (
                         <button
                           onClick={() => onEditInvoice(inv)}
-                          className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                          className={`p-1.5 rounded-lg cursor-pointer ${
                             isDraft 
                               ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50' 
                               : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'
@@ -213,7 +212,7 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                       {!isCancelled && (
                         <button
                           onClick={() => onCancelInvoice(inv)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
+                          className="icon-btn-danger"
                           title="Cancel Purchase Batch"
                         >
                           <Ban className="w-4 h-4" />
@@ -229,8 +228,8 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
       ) : (
         <div className="text-center py-16 text-gray-400 bg-white">
           <FileText className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-gray-600">No purchase batches found</p>
-          <p className="text-xs text-gray-400 mt-1">Click the "+ New Purchase" button to record material receipts.</p>
+          <p className="text-[0.875rem] font-semibold text-gray-600">No purchase batches found</p>
+          <p className="text-[0.875rem] text-gray-400 mt-1">Click the "+ New Purchase" button to record material receipts.</p>
         </div>
       )}
     </div>
@@ -877,32 +876,9 @@ const PurchaseInvoicePage: React.FC = () => {
     const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
     try {
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-      const pageWidth = doc.internal.pageSize.getWidth();
-
-      // Header Banner Box
-      doc.setFillColor(30, 58, 138); // Deep Navy Blue
-      doc.rect(0, 0, pageWidth, 20, 'F');
-
-      // Header Text inside banner
-      doc.setFontSize(13);
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`${companyName.toUpperCase()} — PURCHASE BATCHES REPORT`, 14, 13);
-
-      // Metadata Bar below banner
-      doc.setFontSize(8.5);
-      doc.setTextColor(100, 116, 139);
-      doc.setFont('helvetica', 'bold');
       const totalRecs = invoices.length;
       const receivedCount = invoices.filter(i => i.status === 'Posted').length;
       const grandTotalVal = invoices.filter(i => i.status !== 'Cancelled').reduce((sum, i) => sum + (i.grandTotal || i.subTotal || 0), 0);
-
-      doc.text(
-        `Generated: ${dateStr}   |   Total Batches: ${totalRecs}   |   Received: ${receivedCount}   |   Total Value: Rs. ${grandTotalVal.toLocaleString('en-IN')}`,
-        14,
-        27
-      );
 
       // Table headers matching UI columns accurately
       const headers = [
@@ -991,51 +967,16 @@ const PurchaseInvoicePage: React.FC = () => {
         ''
       ];
 
-      autoTable(doc, {
-        startY: 32,
-        head: [headers],
-        body: [...rows, summaryRow],
-        theme: 'grid',
-        headStyles: {
-          fillColor: [37, 99, 235],
-          textColor: 255,
-          fontSize: 8,
-          fontStyle: 'bold',
-          halign: 'center',
-          valign: 'middle',
-          cellPadding: 2.5
-        },
-        bodyStyles: {
-          fontSize: 7.5,
-          textColor: 40,
-          valign: 'middle',
-          cellPadding: 2
-        },
-        columnStyles: {
-          0: { halign: 'center', cellWidth: 10 },
-          1: { halign: 'left', fontStyle: 'bold', cellWidth: 26 },
-          2: { halign: 'center', cellWidth: 22 },
-          3: { halign: 'left', cellWidth: 40 },
-          4: { halign: 'left', cellWidth: 48 },
-          5: { halign: 'center', cellWidth: 18 },
-          6: { halign: 'center', cellWidth: 20 },
-          7: { halign: 'right', fontStyle: 'bold', cellWidth: 26 },
-          8: { halign: 'right', cellWidth: 26 },
-          9: { halign: 'right', fontStyle: 'bold', cellWidth: 28 },
-          10: { halign: 'center', fontStyle: 'bold', cellWidth: 18 }
-        },
-        didParseCell: (data) => {
-          if (data.section === 'body' && data.row.index === rows.length) {
-            data.cell.styles.fontStyle = 'bold';
-            data.cell.styles.fillColor = [241, 245, 249];
-            data.cell.styles.textColor = [15, 23, 42];
-          }
-        },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        margin: { top: 32, left: 10, right: 10, bottom: 14 }
+      generateListPdf({
+        companyName,
+        title: 'Purchase Batches Report',
+        meta: [`Total Batches: ${totalRecs}`, `Received: ${receivedCount}`, `Total Value: Rs. ${grandTotalVal.toLocaleString('en-IN')}`],
+        head: headers,
+        body: rows,
+        foot: summaryRow,
+        fileName: `Purchase_Batches_${new Date().toISOString().slice(0, 10)}`,
+        rightAlignColumns: [7, 8, 9],
       });
-
-      doc.save(`Purchase_Batches_${new Date().toISOString().slice(0, 10)}.pdf`);
       showToast('Exported Purchase Batches PDF successfully', 'success');
     } catch (err: any) {
       console.error('PDF Export Error:', err);
@@ -2054,26 +1995,23 @@ const PurchaseInvoicePage: React.FC = () => {
   }, [invoices, skuMap]);
 
   return (
-    <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+    <div className="min-h-[calc(100*var(--vh,1vh))] bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
       {/* Main Content Layout */}
-      <div className="transition-all duration-300">
+      <div className="transition-all">
         {/* ── SUB-PAGE 3: MAIN LIST VIEW ──────────────────────────────────────── */}
         <div className="space-y-4">
           
           {/* 1. Header Banner (Matching SkuMasterV2 Header Banner exactly) */}
-          <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
+          <div className="flex flex-row items-center justify-between gap-4 px-1 relative">
             <div className="flex items-center gap-3.5">
-              <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
-                <Receipt className="w-6 h-6 stroke-[2.2]" />
-              </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+                <h1 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                   <span>Purchase Batches</span>
-                  <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold transition-all">
+                  <span className="text-xs font-medium text-gray-500">
                     {total} Total
                   </span>
                 </h1>
-                <p className="text-xs text-gray-500 font-medium">
+                <p className="text-[0.875rem] text-gray-500 font-medium">
                   Unified master directory for supplier invoices, material lots, and godown inward allocations.
                 </p>
               </div>
@@ -2081,7 +2019,7 @@ const PurchaseInvoicePage: React.FC = () => {
           </div>
 
           {/* ── 2. Top Navigation Tabs Bar & Action Toolbar (Exact match to SkuMasterV2 / Business Directory) ── */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-4 rounded-2xl shadow-2xs relative">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-1 relative">
             {/* Backdrop overlay to close open popovers on outside click */}
             {showToolsDropdown && (
               <div
@@ -2095,53 +2033,53 @@ const PurchaseInvoicePage: React.FC = () => {
               {/* Tab 1: All Batches */}
               <button
                 onClick={() => { setStatusFilter(''); setPage(1); }}
-                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
                   statusFilter === ''
-                    ? 'border-teal-700 text-teal-700 bg-transparent'
+                    ? 'border-blue-700 text-blue-700 bg-transparent'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
                 }`}
               >
-                <Receipt className={`w-4 h-4 ${statusFilter === '' ? 'text-teal-700' : 'text-slate-400'}`} />
+                <Receipt className={`w-4 h-4 ${statusFilter === '' ? 'text-blue-700' : 'text-slate-400'}`} />
                 <span>All Batches</span>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-800">{total}</span>
+                <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-800">{total}</span>
               </button>
 
               {/* Tab 2: Received Batches */}
               <button
                 onClick={() => { setStatusFilter('Posted'); setPage(1); }}
-                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
                   statusFilter === 'Posted'
-                    ? 'border-teal-700 text-teal-700 bg-transparent'
+                    ? 'border-blue-700 text-blue-700 bg-transparent'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
                 }`}
               >
-                <CheckCircle className={`w-4 h-4 ${statusFilter === 'Posted' ? 'text-teal-700' : 'text-slate-400'}`} />
+                <CheckCircle className={`w-4 h-4 ${statusFilter === 'Posted' ? 'text-blue-700' : 'text-slate-400'}`} />
                 <span>Received</span>
               </button>
 
               {/* Tab 3: Draft / Pending */}
               <button
                 onClick={() => { setStatusFilter('Draft'); setPage(1); }}
-                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
                   statusFilter === 'Draft'
-                    ? 'border-teal-700 text-teal-700 bg-transparent'
+                    ? 'border-blue-700 text-blue-700 bg-transparent'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
                 }`}
               >
-                <Clock className={`w-4 h-4 ${statusFilter === 'Draft' ? 'text-teal-700' : 'text-slate-400'}`} />
+                <Clock className={`w-4 h-4 ${statusFilter === 'Draft' ? 'text-blue-700' : 'text-slate-400'}`} />
                 <span>Draft / Pending</span>
               </button>
 
               {/* Tab 4: Cancelled */}
               <button
                 onClick={() => { setStatusFilter('Cancelled'); setPage(1); }}
-                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
                   statusFilter === 'Cancelled'
-                    ? 'border-teal-700 text-teal-700 bg-transparent'
+                    ? 'border-blue-700 text-blue-700 bg-transparent'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
                 }`}
               >
-                <Ban className={`w-4 h-4 ${statusFilter === 'Cancelled' ? 'text-teal-700' : 'text-slate-400'}`} />
+                <Ban className={`w-4 h-4 ${statusFilter === 'Cancelled' ? 'text-blue-700' : 'text-slate-400'}`} />
                 <span>Cancelled</span>
               </button>
             </div>
@@ -2157,7 +2095,7 @@ const PurchaseInvoicePage: React.FC = () => {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search batches, suppliers..."
-                  className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-36 md:w-44 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                  className="pl-8 pr-7 py-1.5 text-[0.875rem] bg-gray-50 border border-gray-200 rounded-xl w-36 md:w-44 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
                 />
                 {search && (
                   <button 
@@ -2178,7 +2116,7 @@ const PurchaseInvoicePage: React.FC = () => {
                     setShowSortMenu(false);
                     setShowColumnPicker(false);
                   }}
-                  className={`p-2 rounded-xl border transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+                  className={`p-2 rounded-xl border flex items-center justify-center cursor-pointer shadow-2xs ${
                     (vendorFilter || statusFilter || startDate || endDate)
                       ? 'bg-blue-50 border-blue-300 text-blue-700 ring-2 ring-blue-100'
                       : 'bg-white hover:bg-blue-50/60 border-gray-200 hover:border-blue-200 text-blue-600'
@@ -2188,15 +2126,10 @@ const PurchaseInvoicePage: React.FC = () => {
                 >
                   <Filter className="w-4 h-4 text-blue-600" />
                 </button>
-                {!showFilterMenu && (
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    Filter Batches
-                  </div>
-                )}
                 {showFilterMenu && (
-                  <div className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-xs text-left">
+                  <div className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-[0.875rem] text-left">
                     <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
-                      <span className="font-bold text-gray-800 text-xs">Filter Purchases</span>
+                      <span className="font-semibold text-gray-800 text-[0.875rem]">Filter Purchases</span>
                       {(vendorFilter || statusFilter || startDate || endDate) && (
                         <button
                           onClick={() => {
@@ -2206,7 +2139,7 @@ const PurchaseInvoicePage: React.FC = () => {
                             setEndDate('');
                             setPage(1);
                           }}
-                          className="text-blue-600 hover:text-blue-800 text-[11px] font-bold cursor-pointer"
+                          className="text-blue-600 hover:text-blue-800 text-xs font-semibold cursor-pointer"
                         >
                           Reset All
                         </button>
@@ -2215,11 +2148,11 @@ const PurchaseInvoicePage: React.FC = () => {
 
                     {/* Supplier */}
                     <div>
-                      <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Supplier</label>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">Supplier</label>
                       <select
                         value={vendorFilter}
                         onChange={e => { setVendorFilter(e.target.value); setPage(1); }}
-                        className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                        className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
                       >
                         <option value="">All Suppliers ({vendors.length})</option>
                         {vendors.map(v => (
@@ -2230,31 +2163,31 @@ const PurchaseInvoicePage: React.FC = () => {
 
                     {/* Date Range */}
                     <div>
-                      <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Date Range</label>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">Date Range</label>
                       <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl p-1.5">
                         <input
                           type="date"
                           value={startDate}
                           onChange={e => { setStartDate(e.target.value); setPage(1); }}
-                          className="text-xs border-0 bg-transparent focus:ring-0 p-0 text-gray-700 font-mono font-bold w-full"
+                          className="text-[0.875rem] border-0 bg-transparent focus:ring-0 p-0 text-gray-700 font-mono font-semibold w-full"
                         />
-                        <span className="text-gray-400 font-bold text-xs">–</span>
+                        <span className="text-gray-400 font-semibold text-[0.875rem]">–</span>
                         <input
                           type="date"
                           value={endDate}
                           onChange={e => { setEndDate(e.target.value); setPage(1); }}
-                          className="text-xs border-0 bg-transparent focus:ring-0 p-0 text-gray-700 font-mono font-bold w-full"
+                          className="text-[0.875rem] border-0 bg-transparent focus:ring-0 p-0 text-gray-700 font-mono font-semibold w-full"
                         />
                       </div>
                     </div>
 
                     {/* Status */}
                     <div>
-                      <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Status</label>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">Status</label>
                       <select
                         value={statusFilter}
                         onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
-                        className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                        className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
                       >
                         <option value="">All Batches</option>
                         <option value="Posted">Received / Posted</option>
@@ -2275,19 +2208,14 @@ const PurchaseInvoicePage: React.FC = () => {
                     setShowFilterMenu(false);
                     setShowColumnPicker(false);
                   }}
-                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
                   title="Sort Order"
                   aria-label="Sort Order"
                 >
                   <ArrowUpDown className="w-4 h-4 text-blue-600" />
                 </button>
-                {!showSortMenu && (
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    Sort Batches
-                  </div>
-                )}
                 {showSortMenu && (
-                  <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs text-left">
+                  <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-[0.875rem] text-left">
                     <button
                       onClick={() => { setSortConfig({ field: 'createdAt', direction: 'desc' }); setShowSortMenu(false); }}
                       className="w-full text-left px-2.5 py-1.5 rounded-xl font-medium hover:bg-gray-50 text-gray-700"
@@ -2325,20 +2253,15 @@ const PurchaseInvoicePage: React.FC = () => {
                     setShowSortMenu(false);
                     setShowFilterMenu(false);
                   }}
-                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
                   title="Column Visibility"
                   aria-label="Column Visibility"
                 >
                   <Columns className="w-4 h-4 text-blue-600" />
                 </button>
-                {!showColumnPicker && (
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    Column Visibility
-                  </div>
-                )}
                 {showColumnPicker && (
-                  <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2.5 space-y-1.5 text-xs text-left">
-                    <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block border-b border-gray-100 pb-1">Visible Columns</span>
+                  <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2.5 space-y-1.5 text-[0.875rem] text-left">
+                    <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block border-b border-gray-100 pb-1">Visible Columns</span>
                     <label className="flex items-center gap-2 p-1 text-gray-700 cursor-pointer hover:bg-gray-50 rounded-lg">
                       <input type="checkbox" defaultChecked className="rounded text-blue-600" />
                       <span>Batch Details</span>
@@ -2364,15 +2287,12 @@ const PurchaseInvoicePage: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleExportExcel}
-                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
                   title="Export to Excel Spreadsheet"
                   aria-label="Export to Excel Spreadsheet"
                 >
                   <Download className="w-4 h-4 text-blue-600" />
                 </button>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                  Export Excel (.xlsx)
-                </div>
               </div>
 
               {/* 5. Export PDF Icon Button */}
@@ -2380,15 +2300,12 @@ const PurchaseInvoicePage: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleExportPDF}
-                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
                   title="Export to PDF Report"
                   aria-label="Export to PDF Report"
                 >
                   <FileText className="w-4 h-4 text-blue-600" />
                 </button>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                  Export PDF (.pdf)
-                </div>
               </div>
 
               {/* 6. Activity Logs Icon Button */}
@@ -2396,15 +2313,12 @@ const PurchaseInvoicePage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => { fetchActivityLogs(); setShowActivityLog(true); }}
-                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
                   title="View Activity Logs"
                   aria-label="View Activity Logs"
                 >
                   <History className="w-4 h-4 text-blue-600" />
                 </button>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                  Activity Logs
-                </div>
               </div>
 
               {/* 7. Circular + Add Button */}
@@ -2412,15 +2326,12 @@ const PurchaseInvoicePage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleNewPurchaseClick()}
-                  className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold shrink-0"
+                  className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs cursor-pointer font-semibold shrink-0"
                   title="New Purchase Batch"
                   aria-label="New Purchase Batch"
                 >
                   <Plus className="w-4 h-4 text-blue-600 stroke-[2.5]" />
                 </button>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                  New Purchase Batch
-                </div>
               </div>
             </div>
           </div>
@@ -2429,38 +2340,38 @@ const PurchaseInvoicePage: React.FC = () => {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <button
               onClick={() => { setStatusFilter(''); setPage(1); }}
-              className={`w-full text-left rounded-2xl shadow-2xs border p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+              className={`w-full text-left rounded-2xl shadow-2xs border p-4 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
                 statusFilter === '' 
                   ? 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-100' 
                   : 'bg-white border-gray-200/80 hover:border-gray-300'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Batches</span>
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Batches</span>
                 <span className="w-2 h-2 rounded-full bg-blue-600"></span>
               </div>
-              <p className="text-2xl font-black text-gray-900 mt-1 font-mono">{dashboardTotalBatches}</p>
+              <p className="text-2xl font-semibold text-gray-900 mt-1 font-mono">{dashboardTotalBatches}</p>
             </button>
 
             <button
               onClick={() => { setStatusFilter('Posted'); setPage(1); }}
-              className={`w-full text-left rounded-2xl shadow-2xs border p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+              className={`w-full text-left rounded-2xl shadow-2xs border p-4 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
                 statusFilter === 'Posted' 
                   ? 'bg-emerald-50/40 border-emerald-400 ring-2 ring-emerald-100' 
                   : 'bg-white border-gray-200/80 hover:border-gray-300'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Received Batches</span>
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Received Batches</span>
                 <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
               </div>
-              <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">{dashboardStats.dashboardReceivedBatches}</p>
+              <p className="text-2xl font-semibold text-emerald-600 mt-1 font-mono">{dashboardStats.dashboardReceivedBatches}</p>
             </button>
 
             {/* Dynamic Reels / Sheets Info Card */}
             <div className="w-full text-left rounded-2xl shadow-2xs border p-4 bg-white border-gray-200/80">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                   {dashboardStats.hasAnyReels && dashboardStats.hasAnySheets 
                     ? 'Total Reels & Reams' 
                     : dashboardStats.hasAnySheets 
@@ -2471,35 +2382,35 @@ const PurchaseInvoicePage: React.FC = () => {
               </div>
               <div className="mt-1 flex items-baseline gap-2 flex-wrap">
                 {dashboardStats.hasAnyReels && (
-                  <span className="text-2xl font-black text-amber-600 font-mono">
-                    {dashboardStats.dashboardTotalReels} <span className="text-xs font-bold text-gray-500 font-sans">Reels</span>
+                  <span className="text-2xl font-semibold text-amber-600 font-mono">
+                    {dashboardStats.dashboardTotalReels} <span className="text-[0.875rem] font-semibold text-gray-500 font-sans">Reels</span>
                   </span>
                 )}
-                {dashboardStats.hasAnyReels && dashboardStats.hasAnySheets && <span className="text-gray-300 font-bold">•</span>}
+                {dashboardStats.hasAnyReels && dashboardStats.hasAnySheets && <span className="text-gray-300 font-semibold">•</span>}
                 {dashboardStats.hasAnySheets && (
-                  <span className="text-2xl font-black text-teal-600 font-mono" title={`${dashboardStats.dashboardTotalSheets.toLocaleString('en-IN')} Sheets`}>
-                    {dashboardStats.dashboardTotalReams.toLocaleString('en-IN', { maximumFractionDigits: 1 })} <span className="text-xs font-bold text-gray-500 font-sans">Reams</span>
+                  <span className="text-2xl font-semibold text-blue-600 font-mono" title={`${dashboardStats.dashboardTotalSheets.toLocaleString('en-IN')} Sheets`}>
+                    {dashboardStats.dashboardTotalReams.toLocaleString('en-IN', { maximumFractionDigits: 1 })} <span className="text-[0.875rem] font-semibold text-gray-500 font-sans">Reams</span>
                   </span>
                 )}
                 {!dashboardStats.hasAnyReels && !dashboardStats.hasAnySheets && (
-                  <span className="text-2xl font-black text-gray-400 font-mono">0</span>
+                  <span className="text-2xl font-semibold text-gray-400 font-mono">0</span>
                 )}
               </div>
             </div>
 
             <div className="w-full text-left rounded-2xl shadow-2xs border p-4 bg-white border-gray-200/80">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Value</span>
-                <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Value</span>
+                <span className="w-2 h-2 rounded-full bg-blue-600"></span>
               </div>
-              <p className="text-2xl font-black text-purple-700 mt-1 font-mono">₹{dashboardStats.dashboardTotalValue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
+              <p className="text-2xl font-semibold text-blue-700 mt-1 font-mono">₹{dashboardStats.dashboardTotalValue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
             </div>
           </div>
 
           {/* 4. Table Card Container */}
-          <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden space-y-0">
+          <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2 space-y-0">
             {/* Table Sub-bar: Metadata */}
-            <div className="bg-gray-50/50 border-b border-gray-200 px-4 py-2 flex items-center justify-between flex-wrap gap-2 text-xs font-semibold text-gray-600">
+            <div className="bg-gray-50/50 border-b border-gray-200 px-4 py-2 flex items-center justify-between flex-wrap gap-2 text-[0.875rem] font-semibold text-gray-600">
               <div className="flex items-center gap-2">
                 <span>Showing {invoices.length} purchase batches</span>
                 {(vendorFilter || search || statusFilter || startDate || endDate) && (
@@ -2512,7 +2423,7 @@ const PurchaseInvoicePage: React.FC = () => {
                       setEndDate('');
                       setPage(1);
                     }}
-                    className="text-blue-600 hover:text-blue-800 text-[11px] font-bold px-1.5 py-0.5 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+                    className="text-blue-600 hover:text-blue-800 text-xs font-semibold px-1.5 py-0.5 hover:bg-blue-50 rounded cursor-pointer"
                   >
                     Clear Filters
                   </button>
@@ -2559,22 +2470,22 @@ const PurchaseInvoicePage: React.FC = () => {
 
             {/* Pagination Footer */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between bg-white px-4 py-3 border-t border-gray-100 text-xs font-semibold text-gray-500">
+              <div className="flex items-center justify-between bg-white px-4 py-3 border-t border-gray-100 text-[0.875rem] font-semibold text-gray-500">
                 <span>
-                  Showing Page <span className="text-gray-900 font-bold">{page}</span> of <span className="text-gray-900 font-bold">{totalPages}</span>
+                  Showing Page <span className="text-gray-900 font-semibold">{page}</span> of <span className="text-gray-900 font-semibold">{totalPages}</span>
                 </span>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setPage(prev => Math.max(prev - 1, 1))}
                     disabled={page === 1}
-                    className="p-1.5 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 disabled:opacity-40 transition-colors shadow-2xs flex items-center cursor-pointer"
+                    className="p-1.5 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 disabled:opacity-40 shadow-2xs flex items-center cursor-pointer"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
                     disabled={page === totalPages}
-                    className="p-1.5 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 disabled:opacity-40 transition-colors shadow-2xs flex items-center cursor-pointer"
+                    className="p-1.5 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 disabled:opacity-40 shadow-2xs flex items-center cursor-pointer"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
@@ -2584,12 +2495,12 @@ const PurchaseInvoicePage: React.FC = () => {
           </div>
 
           {/* 5. Informational Bottom Card */}
-          <div className="bg-white p-5 border border-gray-200/80 rounded-2xl shadow-2xs space-y-2.5 text-xs">
-            <h4 className="font-bold text-gray-900 flex items-center gap-2">
+          <div className="bg-white p-5 border border-gray-200/80 rounded-2xl shadow-2xs space-y-2.5 text-[0.875rem]">
+            <h4 className="font-semibold text-gray-900 flex items-center gap-2">
               <HelpCircle className="w-4 h-4 text-blue-600 shrink-0" />
               <span>About Purchase Batches</span>
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 font-medium text-gray-600 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 font-medium text-gray-600 text-[0.875rem]">
               <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
                 <span>Each purchase batch can contain multiple materials (different brand, GSM, width, etc.)</span>
@@ -2625,14 +2536,14 @@ const PurchaseInvoicePage: React.FC = () => {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-gray-900 text-sm">
+                <span className="font-semibold text-gray-900 text-[0.875rem]">
                   {isEditing ? 'Edit Purchase Batch' : 'Add New Purchase Batch'}
                 </span>
-                <span className="text-[9px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
+                <span className="text-xs font-medium px-2 py-0.5 rounded-md flex items-center gap-1 uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
                   {invoiceForm.purchaseType || 'Raw Material'}
                 </span>
               </div>
-              <p className="text-[10px] text-gray-500 font-medium">
+              <p className="text-xs text-gray-500 font-medium">
                 {isEditing ? 'Modify purchase invoice records, material lots, and storage allocations' : 'Record a new supplier material lot delivery and godown storage allocation'}
               </p>
             </div>
@@ -2643,7 +2554,7 @@ const PurchaseInvoicePage: React.FC = () => {
           {/* Scrollable Form Body with Balanced Spacing */}
           <div className="overflow-y-auto flex-1 p-4 sm:p-5 space-y-4 custom-scrollbar">
             {addError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs font-semibold text-red-700 flex items-center gap-2">
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-[0.875rem] font-semibold text-red-700 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
                 <span>{addError}</span>
               </div>
@@ -2651,36 +2562,36 @@ const PurchaseInvoicePage: React.FC = () => {
 
             {/* 1. Purchase Batch & Supplier Details */}
             <div className="space-y-3">
-              <h3 className="text-xs font-bold text-gray-900 border-b border-gray-100 pb-1.5 flex items-center gap-2 uppercase tracking-wide">
+              <h3 className="text-[0.875rem] font-medium text-gray-900 border-b border-gray-100 pb-1.5 flex items-center gap-2 uppercase tracking-wide">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
                 1. Batch & Supplier Information
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase tracking-wide">BATCH NO. *</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide">BATCH NO. *</label>
                   <input
                     type="text"
                     placeholder="e.g. PB2407001"
                     value={invoiceForm.invoiceNumber}
                     onChange={e => setInvoiceForm({ ...invoiceForm, invoiceNumber: e.target.value })}
-                    className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-mono font-bold text-gray-900 transition-all shadow-3xs"
+                    className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-mono font-semibold text-gray-900 shadow-3xs"
                   />
-                  <span className="text-[9px] text-gray-400 font-medium mt-1 block">Auto-generated if empty</span>
+                  <span className="text-xs text-gray-400 font-medium mt-1 block">Auto-generated if empty</span>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase tracking-wide">PURCHASE DATE *</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide">PURCHASE DATE *</label>
                   <input
                     type="date"
                     value={invoiceForm.dueDate}
                     onChange={e => setInvoiceForm({ ...invoiceForm, dueDate: e.target.value })}
-                    className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 transition-all shadow-3xs"
+                    className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 shadow-3xs"
                     required
                   />
                 </div>
 
                 <div className="relative">
-                  <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase tracking-wide">SUPPLIER / VENDOR *</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide">SUPPLIER / VENDOR *</label>
                   <div className="relative">
                     <input
                       type="text"
@@ -2697,7 +2608,7 @@ const PurchaseInvoicePage: React.FC = () => {
                           setSupplierFocused(false);
                         }, 250);
                       }}
-                      className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 transition-all shadow-3xs"
+                      className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 shadow-3xs"
                       required
                     />
                     {supplierFocused && (
@@ -2718,11 +2629,11 @@ const PurchaseInvoicePage: React.FC = () => {
                                 setSupplierFocused(false);
                                 setSupplierSearchText('');
                               }}
-                              className="w-full px-3 py-2 text-left hover:bg-blue-50 hover:text-blue-700 transition-colors block text-xs cursor-pointer"
+                              className="w-full px-3 py-2 text-left hover:bg-blue-50 hover:text-blue-700 block text-[0.875rem] cursor-pointer"
                             >
-                              <div className="font-bold text-gray-900">{v.firmName || v.ownerName}</div>
+                              <div className="font-semibold text-gray-900">{v.firmName || v.ownerName}</div>
                               {v.firmName && v.ownerName && (
-                                <div className="text-[10px] text-gray-500 mt-0.5">Contact: {v.ownerName}</div>
+                                <div className="text-xs text-gray-500 mt-0.5">Contact: {v.ownerName}</div>
                               )}
                             </button>
                           ))
@@ -2733,7 +2644,7 @@ const PurchaseInvoicePage: React.FC = () => {
                           return (v.firmName || '').toLowerCase().includes(term) || 
                                  (v.ownerName || '').toLowerCase().includes(term);
                         }).length === 0 && (
-                          <div className="px-3 py-3 text-xs text-gray-400 italic text-center">No suppliers found</div>
+                          <div className="px-3 py-3 text-[0.875rem] text-gray-400 italic text-center">No suppliers found</div>
                         )}
                       </div>
                     )}
@@ -2741,11 +2652,11 @@ const PurchaseInvoicePage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase tracking-wide">PURCHASE TYPE</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1 uppercase tracking-wide">PURCHASE TYPE</label>
                   <select
                     value={invoiceForm.purchaseType || 'Raw Material'}
                     onChange={e => setInvoiceForm({ ...invoiceForm, purchaseType: e.target.value })}
-                    className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 transition-all shadow-3xs"
+                    className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 shadow-3xs"
                   >
                     <option value="Raw Material">Raw Material</option>
                     <option value="Semi Finished">Semi-Finished</option>
@@ -2759,14 +2670,14 @@ const PurchaseInvoicePage: React.FC = () => {
             {/* 2. Material Lots & Reel Allocations */}
             <div className="space-y-3">
               <div className="flex justify-between items-center border-b border-gray-100 pb-1.5">
-                <h3 className="text-xs font-bold text-gray-900 flex items-center gap-2 uppercase tracking-wide">
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
+                <h3 className="text-[0.875rem] font-medium text-gray-900 flex items-center gap-2 uppercase tracking-wide">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
                   2. Material Lots & Items ({invoiceForm.items.length})
                 </h3>
                 <button
                   type="button"
                   onClick={handleAddItemRow}
-                  className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-3xs"
+                  className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-[0.875rem] font-semibold flex items-center gap-1.5 cursor-pointer shadow-3xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add Material Lot</span>
@@ -2780,17 +2691,17 @@ const PurchaseInvoicePage: React.FC = () => {
                   const paperType = selectedSku?.paperType || 'None';
                   const unitLabel = selectedSku?.unit || 'KG';
                   return (
-                    <div key={idx} className="bg-slate-50/60 border border-slate-200/90 rounded-2xl p-5 shadow-3xs space-y-5 text-left transition-all">
+                    <div key={idx} className="bg-slate-50/60 border border-slate-200/90 rounded-2xl p-5 shadow-3xs space-y-5 text-left">
                       <div className="flex justify-between items-center border-b border-slate-200/80 pb-3">
                         <div className="flex items-center gap-2.5">
-                          <span className="text-xs font-black text-gray-900 uppercase font-mono bg-slate-200/80 px-3 py-1 rounded-lg border border-slate-300/60 shadow-3xs">
+                          <span className="text-[0.875rem] font-semibold text-gray-900 uppercase font-mono bg-slate-200/80 px-3 py-1 rounded-lg border border-slate-300/60 shadow-3xs">
                             LOT #{idx + 1}
                           </span>
                           {paperType !== 'None' && (
-                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-md uppercase tracking-wider ${
+                            <span className={`text-xs font-medium px-2.5 py-0.5 rounded-md uppercase tracking-wider ${
                               paperType === 'Reels' 
                                 ? 'bg-amber-50 text-amber-700 border border-amber-200' 
-                                : 'bg-purple-50 text-purple-700 border border-purple-200'
+                                : 'bg-blue-50 text-blue-700 border border-blue-200'
                             }`}>
                               {paperType}
                             </span>
@@ -2800,7 +2711,7 @@ const PurchaseInvoicePage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleRemoveItemRow(idx)}
-                            className="text-red-500 hover:text-red-700 px-2.5 py-1 hover:bg-red-50 rounded-lg transition-colors text-xs font-bold flex items-center gap-1 cursor-pointer"
+                            className="text-red-500 hover:text-red-700 px-2.5 py-1 hover:bg-red-50 rounded-lg text-[0.875rem] font-semibold flex items-center gap-1 cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" /> Remove Lot
                           </button>
@@ -2808,9 +2719,9 @@ const PurchaseInvoicePage: React.FC = () => {
                       </div>
 
                     {/* Lot Form Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs text-gray-900">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-[0.875rem] text-gray-900">
                       <div className="col-span-1 sm:col-span-2 lg:col-span-3">
-                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">
                           ITEM SKU *
                         </label>
                         <div className="relative">
@@ -2831,7 +2742,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                 }
                               }, 250);
                             }}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white font-semibold text-gray-800 text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-3xs"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white font-semibold text-gray-800 text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-3xs"
                             required
                           />
                           {focusedRowIdx === idx && (() => {
@@ -2864,36 +2775,36 @@ const PurchaseInvoicePage: React.FC = () => {
                                         setFocusedRowIdx(null);
                                         setSkuSearchText('');
                                       }}
-                                      className={`w-full px-3.5 py-2.5 text-left transition-colors block text-xs cursor-pointer ${
+                                      className={`w-full px-3.5 py-2.5 text-left block text-[0.875rem] cursor-pointer ${
                                         isSelected ? 'bg-blue-50/80 text-blue-900 border-l-4 border-blue-600' : 'hover:bg-blue-50/40 text-gray-900'
                                       }`}
                                     >
                                       <div className="flex items-center justify-between gap-2">
-                                        <div className="font-bold text-gray-900 text-xs">{s.name}</div>
-                                        <span className="font-mono text-[10px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                                        <div className="font-semibold text-gray-900 text-[0.875rem]">{s.name}</div>
+                                        <span className="font-mono text-xs font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
                                           {s.skuCode}
                                         </span>
                                       </div>
                                       <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                                        <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
                                           {s.category || getItemType(s)}
                                         </span>
                                         {paperLabel && (
-                                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
+                                          <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
                                             {paperLabel}
                                           </span>
                                         )}
                                         {s.gsm && (
-                                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                                          <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
                                             {s.gsm} GSM
                                           </span>
                                         )}
                                         {sizeLabel && (
-                                          <span className="text-[9px] text-gray-500 font-mono">
+                                          <span className="text-xs text-gray-500 font-mono">
                                             {sizeLabel}
                                           </span>
                                         )}
-                                        <span className="text-[9px] text-gray-400 font-medium ml-auto">
+                                        <span className="text-xs text-gray-400 font-medium ml-auto">
                                           Unit: {s.unit || 'KG'}
                                         </span>
                                       </div>
@@ -2901,7 +2812,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                   );
                                 })}
                                 {matchingSkus.length === 0 && (
-                                  <div className="px-3 py-4 text-xs text-gray-400 italic text-center">
+                                  <div className="px-3 py-4 text-[0.875rem] text-gray-400 italic text-center">
                                     No {activeType} SKUs found
                                   </div>
                                 )}
@@ -2912,47 +2823,47 @@ const PurchaseInvoicePage: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">GSM</label>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">GSM</label>
                         <input
                           type="number"
                           value={item.gsm}
                           onChange={e => handleItemRowChange(idx, 'gsm', e.target.value)}
                           placeholder="e.g. 230"
-                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono text-center font-bold focus:ring-2 focus:ring-blue-500 bg-white"
+                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] font-mono text-center font-semibold focus:ring-2 focus:ring-blue-500 bg-white"
                         />
                       </div>
 
                       {paperType === 'Reels' && (
                         <>
                           <div>
-                            <label className="block text-[11px] font-semibold text-gray-600 mb-1">WIDTH (CM)</label>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">WIDTH (CM)</label>
                             <input
                               type="number"
                               value={item.width}
                               onChange={e => handleItemRowChange(idx, 'width', e.target.value)}
                               placeholder="Width in cm"
-                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono text-center font-bold focus:ring-2 focus:ring-blue-500 bg-white"
+                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] font-mono text-center font-semibold focus:ring-2 focus:ring-blue-500 bg-white"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[11px] font-semibold text-gray-600 mb-1">REELS COUNT</label>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">REELS COUNT</label>
                             <input
                               type="number"
                               value={item.reelsCount}
                               onChange={e => handleItemRowChange(idx, 'reelsCount', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono text-center font-bold focus:ring-2 focus:ring-blue-500 bg-white"
+                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] font-mono text-center font-semibold focus:ring-2 focus:ring-blue-500 bg-white"
                               placeholder="0"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[11px] font-semibold text-gray-600 mb-1">TOTAL {unitLabel}</label>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">TOTAL {unitLabel}</label>
                             <input
                               type="number"
                               value={item.quantity}
                               onChange={e => handleItemRowChange(idx, 'quantity', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono text-right font-black focus:ring-2 focus:ring-blue-500 bg-white"
+                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] font-mono text-right font-semibold focus:ring-2 focus:ring-blue-500 bg-white"
                               placeholder="0"
                               disabled={reelsCount > 0}
                               required
@@ -2960,12 +2871,12 @@ const PurchaseInvoicePage: React.FC = () => {
                           </div>
 
                           <div>
-                            <label className="block text-[11px] font-semibold text-gray-600 mb-1">RATE / {unitLabel} (₹)</label>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">RATE / {unitLabel} (₹)</label>
                             <input
                               type="number"
                               value={item.purchasePrice}
                               onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono text-right font-bold focus:ring-2 focus:ring-blue-500 bg-white"
+                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] font-mono text-right font-semibold focus:ring-2 focus:ring-blue-500 bg-white"
                               placeholder="0.00"
                               required
                             />
@@ -3020,9 +2931,9 @@ const PurchaseInvoicePage: React.FC = () => {
                             {/* 1st line: QTY IN GBL (First), RATE / KG (Second), QTY IN REAMS (Third), SHEETS / REAM (Fourth) */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                               <div>
-                                <label className="block text-[11px] font-semibold text-blue-600 mb-1 flex items-center justify-between">
+                                <label className="block text-xs font-semibold text-blue-600 mb-1 flex items-center justify-between">
                                   <span>QTY IN GBL *</span>
-                                  <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">PRIMARY</span>
+                                  <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">PRIMARY</span>
                                 </label>
                                 <input
                                   type="number"
@@ -3052,13 +2963,13 @@ const PurchaseInvoicePage: React.FC = () => {
                                     }
                                     setInvoiceForm({ ...invoiceForm, items: updatedItems });
                                   }}
-                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-right font-black text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-[0.875rem] text-right font-semibold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
                                   required
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-[11px] font-semibold text-blue-600 mb-1">RATE / KG (₹) *</label>
+                                <label className="block text-xs font-semibold text-blue-600 mb-1">RATE / KG (₹) *</label>
                                 <input
                                   type="number"
                                   step="any"
@@ -3075,15 +2986,15 @@ const PurchaseInvoicePage: React.FC = () => {
                                     }
                                     setInvoiceForm({ ...invoiceForm, items: updatedItems });
                                   }}
-                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-right font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-[0.875rem] text-right font-semibold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
                                   required
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-[11px] font-semibold text-indigo-600 mb-1 flex items-center justify-between">
+                                <label className="block text-xs font-semibold text-blue-600 mb-1 flex items-center justify-between">
                                   <span>QTY IN REAMS</span>
-                                  <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100">SYNC</span>
+                                  <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">SYNC</span>
                                 </label>
                                 <input
                                   type="number"
@@ -3114,12 +3025,12 @@ const PurchaseInvoicePage: React.FC = () => {
                                     }
                                     setInvoiceForm({ ...invoiceForm, items: updatedItems });
                                   }}
-                                  className="w-full px-3 py-2 border border-indigo-200 bg-indigo-50/20 rounded-xl text-xs text-right font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 shadow-2xs"
+                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-[0.875rem] text-right font-semibold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-[11px] font-semibold text-blue-600 mb-1">SHEETS / REAM *</label>
+                                <label className="block text-xs font-semibold text-blue-600 mb-1">SHEETS / REAM *</label>
                                 <input
                                   type="number"
                                   step="any"
@@ -3144,7 +3055,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                     }
                                     setInvoiceForm({ ...invoiceForm, items: updatedItems });
                                   }}
-                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-center font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-[0.875rem] text-center font-semibold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
                                   required
                                 />
                               </div>
@@ -3153,10 +3064,10 @@ const PurchaseInvoicePage: React.FC = () => {
                             {/* 2nd line: ream weight, sheets / GBL, rate per sheet, rate per GBL */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                               <div>
-                                <label className="block text-[11px] font-semibold text-blue-600 mb-1 flex items-center justify-between">
+                                <label className="block text-xs font-semibold text-blue-600 mb-1 flex items-center justify-between">
                                   <span>REAM WEIGHT (KG) *</span>
                                   {dynamicCalculatedRw > 0 && (
-                                    <span className="text-[9px] font-normal text-blue-600 bg-blue-50 px-1 py-0.2 rounded border border-blue-100">Dynamic</span>
+                                    <span className="text-xs font-normal text-blue-600 bg-blue-50 px-1 py-0.2 rounded border border-blue-100">Dynamic</span>
                                   )}
                                 </label>
                                 <input
@@ -3175,13 +3086,13 @@ const PurchaseInvoicePage: React.FC = () => {
                                     }
                                     setInvoiceForm({ ...invoiceForm, items: updatedItems });
                                   }}
-                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-right font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-[0.875rem] text-right font-semibold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
                                   required
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-[11px] font-semibold text-indigo-600 mb-1">SHEETS / GBL</label>
+                                <label className="block text-xs font-semibold text-blue-600 mb-1">SHEETS / GBL</label>
                                 <input
                                   type="number"
                                   step="any"
@@ -3192,12 +3103,12 @@ const PurchaseInvoicePage: React.FC = () => {
                                     updatedItems[idx].pcsPerGbl = String(val);
                                     setInvoiceForm({ ...invoiceForm, items: updatedItems });
                                   }}
-                                  className="w-full px-3 py-2 border border-indigo-200 bg-indigo-50/20 rounded-xl text-xs text-center font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 shadow-2xs"
+                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-[0.875rem] text-center font-semibold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-[11px] font-semibold text-blue-600 mb-1">RATE / KG (₹) *</label>
+                                <label className="block text-xs font-semibold text-blue-600 mb-1">RATE / KG (₹) *</label>
                                 <input
                                   type="number"
                                   step="any"
@@ -3214,13 +3125,13 @@ const PurchaseInvoicePage: React.FC = () => {
                                     }
                                     setInvoiceForm({ ...invoiceForm, items: updatedItems });
                                   }}
-                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-right font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-[0.875rem] text-right font-semibold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
                                   required
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-[11px] font-semibold text-blue-600 mb-1">RATE / SHEET (₹) *</label>
+                                <label className="block text-xs font-semibold text-blue-600 mb-1">RATE / SHEET (₹) *</label>
                                 <input
                                   type="number"
                                   step="any"
@@ -3236,13 +3147,13 @@ const PurchaseInvoicePage: React.FC = () => {
                                     }
                                     setInvoiceForm({ ...invoiceForm, items: updatedItems });
                                   }}
-                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-right font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-[0.875rem] text-right font-semibold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
                                   required
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-[11px] font-semibold text-indigo-600 mb-1">RATE / GBL (₹)</label>
+                                <label className="block text-xs font-semibold text-blue-600 mb-1">RATE / GBL (₹)</label>
                                 <input
                                   type="number"
                                   step="any"
@@ -3259,7 +3170,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                     }
                                     setInvoiceForm({ ...invoiceForm, items: updatedItems });
                                   }}
-                                  className="w-full px-3 py-2 border border-indigo-200 bg-indigo-50/20 rounded-xl text-xs text-right font-bold text-indigo-900 focus:ring-2 focus:ring-indigo-500 shadow-2xs"
+                                  className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-[0.875rem] text-right font-semibold text-blue-900 focus:ring-2 focus:ring-blue-500 shadow-2xs"
                                 />
                               </div>
                             </div>
@@ -3267,32 +3178,32 @@ const PurchaseInvoicePage: React.FC = () => {
                             {/* 3rd line: total sheets, Total weight, Total cost */}
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                               <div>
-                                <label className="block text-[11px] font-semibold text-gray-500 mb-1">TOTAL SHEETS</label>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1">TOTAL SHEETS</label>
                                 <input
                                   type="text"
                                   value={totalSheets.toLocaleString('en-IN') + ' Sheets'}
                                   disabled
-                                  className="w-full px-3 py-2 border border-gray-200 bg-gray-100/60 rounded-xl text-xs text-right font-black text-gray-700 cursor-not-allowed"
+                                  className="w-full px-3 py-2 border border-gray-200 bg-gray-100/60 rounded-xl text-[0.875rem] text-right font-semibold text-gray-700 cursor-not-allowed"
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-[11px] font-semibold text-gray-500 mb-1">TOTAL WEIGHT (KG)</label>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1">TOTAL WEIGHT (KG)</label>
                                 <input
                                   type="text"
                                   value={totalWeightKg.toLocaleString('en-IN', { maximumFractionDigits: 2 }) + ' kg'}
                                   disabled
-                                  className="w-full px-3 py-2 border border-gray-200 bg-gray-100/60 rounded-xl text-xs text-right font-bold text-gray-600 cursor-not-allowed"
+                                  className="w-full px-3 py-2 border border-gray-200 bg-gray-100/60 rounded-xl text-[0.875rem] text-right font-semibold text-gray-600 cursor-not-allowed"
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-[11px] font-semibold text-gray-500 mb-1">TOTAL COST (₹)</label>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1">TOTAL COST (₹)</label>
                                 <input
                                   type="text"
                                   value={'₹' + totalCost.toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}
                                   disabled
-                                  className="w-full px-3 py-2 border border-gray-200 bg-gray-100/60 rounded-xl text-xs text-right font-black text-gray-800 cursor-not-allowed"
+                                  className="w-full px-3 py-2 border border-gray-200 bg-gray-100/60 rounded-xl text-[0.875rem] text-right font-semibold text-gray-800 cursor-not-allowed"
                                 />
                               </div>
                             </div>
@@ -3327,9 +3238,9 @@ const PurchaseInvoicePage: React.FC = () => {
                             {selectedSku?.altUnit && selectedSku?.altUnitConversion ? (
                               <>
                                 <div className="col-span-1 sm:col-span-2">
-                                  <label className="block text-[11px] font-semibold text-blue-600 mb-1">
+                                  <label className="block text-xs font-semibold text-blue-600 mb-1">
                                     QTY IN {isFg ? (selectedSku.unit || 'GBL') : unitLabel} *
-                                    <span className="text-[10px] font-normal text-gray-400 ml-1 font-mono">({formatUomFormula(selectedSku)})</span>
+                                    <span className="text-xs font-normal text-gray-400 ml-1 font-mono">({formatUomFormula(selectedSku)})</span>
                                   </label>
                                   <input
                                     type="number"
@@ -3360,12 +3271,12 @@ const PurchaseInvoicePage: React.FC = () => {
                                       setInvoiceForm({ ...invoiceForm, items: updatedItems });
                                     }}
                                     disabled={Boolean(item.splits && item.splits.length > 1)}
-                                    className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-xs text-right font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+                                    className="w-full px-3 py-2 border border-blue-200 bg-blue-50/20 rounded-xl text-[0.875rem] text-right font-semibold text-blue-900 focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
                                     required
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-[11px] font-semibold text-gray-600 mb-1 flex items-center justify-between">
+                                  <label className="block text-xs font-semibold text-gray-600 mb-1 flex items-center justify-between">
                                     <span>TOTAL {isFg ? (selectedSku.altUnit || 'PCS') : selectedSku.altUnit}</span>
                                   </label>
                                   <input
@@ -3404,11 +3315,11 @@ const PurchaseInvoicePage: React.FC = () => {
                                       setInvoiceForm({ ...invoiceForm, items: updatedItems });
                                     }}
                                     disabled={Boolean(item.splits && item.splits.length > 1)}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-right font-black focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-60"
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] text-right font-semibold focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-60"
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                                  <label className="block text-xs font-semibold text-gray-600 mb-1">
                                     {rateLabel} *
                                   </label>
                                   <input
@@ -3416,7 +3327,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                     step="any"
                                     value={item.purchasePrice !== undefined && item.purchasePrice !== null ? item.purchasePrice : ''}
                                     onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-right font-bold focus:ring-2 focus:ring-blue-500 bg-white"
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] text-right font-semibold focus:ring-2 focus:ring-blue-500 bg-white"
                                     placeholder="0.00"
                                     required
                                   />
@@ -3425,7 +3336,7 @@ const PurchaseInvoicePage: React.FC = () => {
                             ) : (
                               <>
                                 <div className="col-span-1 sm:col-span-2">
-                                  <label className="block text-[11px] font-semibold text-gray-600 mb-1">TOTAL {unitLabel}</label>
+                                  <label className="block text-xs font-semibold text-gray-600 mb-1">TOTAL {unitLabel}</label>
                                   <input
                                     type="number"
                                     step="any"
@@ -3442,20 +3353,20 @@ const PurchaseInvoicePage: React.FC = () => {
                                       setInvoiceForm({ ...invoiceForm, items: updatedItems });
                                     }}
                                     disabled={Boolean(item.splits && item.splits.length > 1)}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-right font-black focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-60"
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] text-right font-semibold focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-60"
                                     placeholder="0"
                                     required
                                   />
                                 </div>
 
                                 <div className="col-span-1 sm:col-span-2">
-                                  <label className="block text-[11px] font-semibold text-gray-600 mb-1">{rateLabel} *</label>
+                                  <label className="block text-xs font-semibold text-gray-600 mb-1">{rateLabel} *</label>
                                   <input
                                     type="number"
                                     step="any"
                                     value={item.purchasePrice !== undefined && item.purchasePrice !== null ? item.purchasePrice : ''}
                                     onChange={e => handleItemRowChange(idx, 'purchasePrice', e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-right font-bold focus:ring-2 focus:ring-blue-500 bg-white"
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] text-right font-semibold focus:ring-2 focus:ring-blue-500 bg-white"
                                     placeholder="0.00"
                                     required
                                   />
@@ -3482,10 +3393,10 @@ const PurchaseInvoicePage: React.FC = () => {
                           <div className="flex items-center justify-between flex-wrap gap-2">
                             <div className="flex items-center gap-2">
                               <Building2 className="w-4 h-4 text-blue-600" />
-                              <span className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                              <span className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">
                                 Storage & Godown Allocations
                               </span>
-                              <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
+                              <span className="text-xs font-semibold px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
                                 {splits.length} Godown{splits.length > 1 ? 's' : ''}
                               </span>
                             </div>
@@ -3494,7 +3405,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleEvenlySplitGodowns(idx)}
-                                  className="text-xs font-bold text-blue-700 hover:text-blue-800 flex items-center gap-1 cursor-pointer bg-white hover:bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200 shadow-3xs transition-colors"
+                                  className="text-[0.875rem] font-semibold text-blue-700 hover:text-blue-800 flex items-center gap-1 cursor-pointer bg-white hover:bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200 shadow-3xs"
                                   title="Distribute total quantity evenly across godowns"
                                 >
                                   ⚡ Split Evenly
@@ -3503,7 +3414,7 @@ const PurchaseInvoicePage: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => handleAddSplitRow(idx)}
-                                className="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 flex items-center gap-1 cursor-pointer px-3 py-1.5 rounded-lg shadow-3xs transition-colors"
+                                className="text-[0.875rem] font-semibold text-white bg-blue-600 hover:bg-blue-700 flex items-center gap-1 cursor-pointer px-3 py-1.5 rounded-lg shadow-3xs"
                               >
                                 <Plus className="w-3.5 h-3.5" /> Add Location / Godown
                               </button>
@@ -3512,11 +3423,11 @@ const PurchaseInvoicePage: React.FC = () => {
 
                           {/* Allocation Matrix Table */}
                           <div className="overflow-x-auto border border-gray-200 rounded-xl bg-slate-50/50 shadow-3xs">
-                            <table className="w-full text-left text-xs border-collapse">
+                            <table className="w-full text-left text-[0.875rem] border-collapse">
                               <thead>
-                                <tr className="bg-gray-50 text-gray-500 font-bold uppercase text-[10px] tracking-wider border-b border-gray-200">
+                                <tr className="bg-gray-50 text-gray-500 font-medium uppercase text-xs tracking-wider border-b border-gray-200">
                                   <th className="py-2.5 px-3 w-12 text-center">#</th>
-                                  <th className="py-2.5 px-3 min-w-[220px]">Target Godown / Storage Location *</th>
+                                  <th className="py-2.5 px-3 min-w-[13.75rem]">Target Godown / Storage Location *</th>
                                   {isSheets && (
                                     <th className="py-2.5 px-3 w-28 text-right">Reams</th>
                                   )}
@@ -3533,7 +3444,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                   <th className="py-2.5 px-2 w-10 text-center"></th>
                                 </tr>
                               </thead>
-                              <tbody className="divide-y divide-gray-150 bg-white">
+                              <tbody className="bg-white divide-y divide-gray-150 bg-white">
                                 {splits.map((split: any, sIdx: number) => {
                                   const splitSheets = Number(split.quantity) || 0;
                                   const splitReams = isSheets ? (splitSheets / stdSheets) : 0;
@@ -3548,8 +3459,8 @@ const PurchaseInvoicePage: React.FC = () => {
                                   const splitAmount = splitSheets * (Number(item.purchasePrice) || 0);
 
                                   return (
-                                    <tr key={sIdx} className="hover:bg-blue-50/30 transition-colors">
-                                      <td className="py-2 px-3 text-center font-bold text-gray-400 text-[11px]">{sIdx + 1}</td>
+                                    <tr key={sIdx} className="hover:bg-blue-50/30">
+                                      <td className="py-2 px-3 text-center font-semibold text-gray-400 text-xs">{sIdx + 1}</td>
                                       <td className="py-2 px-3">
                                         <LocationSelectPopup
                                           locations={locations}
@@ -3568,7 +3479,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                             value={splitReams || ''}
                                             onChange={e => handleSplitRowChange(idx, sIdx, 'reams', e.target.value)}
                                             placeholder="0"
-                                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-right text-gray-900 focus:ring-2 focus:ring-blue-500 bg-white"
+                                            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-right text-gray-900 focus:ring-2 focus:ring-blue-500 bg-white"
                                           />
                                         </td>
                                       )}
@@ -3583,7 +3494,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                             })()}
                                             onChange={e => handleSplitRowChange(idx, sIdx, 'gbl', e.target.value)}
                                             placeholder="0"
-                                            className="w-full px-2.5 py-1.5 border border-indigo-200 rounded-lg text-xs font-bold text-right text-indigo-900 focus:ring-2 focus:ring-indigo-500 bg-indigo-50/20"
+                                            className="w-full px-2.5 py-1.5 border border-blue-200 rounded-lg text-[0.875rem] font-semibold text-right text-blue-900 focus:ring-2 focus:ring-blue-500 bg-blue-50/20"
                                           />
                                         </td>
                                       )}
@@ -3594,7 +3505,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                           value={split.quantity !== undefined && split.quantity !== null ? split.quantity : ''}
                                           onChange={e => handleSplitRowChange(idx, sIdx, 'quantity', e.target.value)}
                                           placeholder="0"
-                                          className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-black text-right text-blue-700 focus:ring-2 focus:ring-blue-500 bg-white"
+                                          className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-right text-blue-700 focus:ring-2 focus:ring-blue-500 bg-white"
                                         />
                                       </td>
                                       {isSheets && Number(item.reamWeight) > 0 && (
@@ -3602,7 +3513,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                           {splitWeight > 0 ? splitWeight.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '0'} kg
                                         </td>
                                       )}
-                                      <td className="py-2 px-3 text-right font-black text-gray-900">
+                                      <td className="py-2 px-3 text-right font-semibold text-gray-900">
                                         ₹{splitAmount.toLocaleString('en-IN')}
                                       </td>
                                       <td className="py-2 px-2 text-center">
@@ -3610,13 +3521,13 @@ const PurchaseInvoicePage: React.FC = () => {
                                           <button
                                             type="button"
                                             onClick={() => handleRemoveSplitRow(idx, sIdx)}
-                                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                                            className="icon-btn-danger"
                                             title="Remove location allocation"
                                           >
                                             <Trash2 className="w-3.5 h-3.5" />
                                           </button>
                                         ) : (
-                                          <span className="text-gray-300 font-bold text-xs">—</span>
+                                          <span className="text-gray-300 font-semibold text-[0.875rem]">—</span>
                                         )}
                                       </td>
                                     </tr>
@@ -3627,18 +3538,18 @@ const PurchaseInvoicePage: React.FC = () => {
                           </div>
 
                           {/* Live Reconciliation Bar */}
-                          <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-2.5 rounded-xl border border-gray-200 text-xs">
+                          <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-2.5 rounded-xl border border-gray-200 text-[0.875rem]">
                             <div className="flex items-center gap-3">
-                              <span className="font-bold text-gray-500 uppercase text-[10px]">Total Allocated:</span>
-                              <span className="font-black text-blue-700 text-sm">
+                              <span className="font-semibold text-gray-500 uppercase text-xs">Total Allocated:</span>
+                              <span className="font-semibold text-blue-700 text-[0.875rem]">
                                 {isSheets
                                   ? `${totalAllocated.toLocaleString()} Sheets (${(totalAllocated / stdSheets).toLocaleString('en-IN', { maximumFractionDigits: 2 })} Reams)`
                                   : `${totalAllocated.toLocaleString()} ${unitLabel}`}
                               </span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-bold text-gray-500 uppercase">Lot Subtotal:</span>
-                              <span className="font-black text-gray-900 text-sm">
+                              <span className="text-xs font-semibold text-gray-500 uppercase">Lot Subtotal:</span>
+                              <span className="font-semibold text-gray-900 text-[0.875rem]">
                                 {(() => {
                                   const isFg = invoiceForm.purchaseType === 'Finished Goods' || 
                                                getItemType(selectedSku) === 'products' || 
@@ -3657,14 +3568,14 @@ const PurchaseInvoicePage: React.FC = () => {
                     {reelsCount > 0 && (
                       <div className="pt-3 border-t border-slate-200/80 space-y-2">
                         <div className="flex items-center justify-between flex-wrap gap-2">
-                          <span className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+                          <span className="block text-xs font-medium text-gray-600 uppercase tracking-wider">
                             Reel Specifications & Storage Allocation:
                           </span>
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
                               onClick={() => handleApplyLocationToAllReels(idx)}
-                              className="text-xs font-bold text-slate-700 hover:text-slate-900 flex items-center gap-1 cursor-pointer bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg border border-slate-300 transition-colors"
+                              className="text-[0.875rem] font-semibold text-slate-700 hover:text-slate-900 flex items-center gap-1 cursor-pointer bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg border border-slate-300"
                               title="Copy first reel's storage location to all other reels"
                             >
                               📍 Location to All
@@ -3673,16 +3584,16 @@ const PurchaseInvoicePage: React.FC = () => {
                         </div>
 
                         <div className="overflow-x-auto border border-gray-200 rounded-xl bg-white shadow-3xs">
-                          <table className="w-full text-left text-xs border-collapse">
+                          <table className="w-full text-left text-[0.875rem] border-collapse">
                             <thead>
-                              <tr className="bg-gray-50/80 text-gray-500 font-bold uppercase text-[10px] tracking-wider border-b border-gray-200">
+                              <tr className="bg-gray-50/80 text-gray-500 font-medium uppercase text-xs tracking-wider border-b border-gray-200">
                                 <th className="py-2 px-3 w-16">Reel</th>
                                 <th className="py-2 px-3 w-32">Weight (KG) *</th>
                                 <th className="py-2 px-3 w-32">Width (cm) *</th>
                                 <th className="py-2 px-3">Storage Allocation *</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 font-semibold text-gray-700">
+                            <tbody className="bg-white divide-y divide-gray-100 font-semibold text-gray-700">
                               {Array.from({ length: reelsCount }).map((_, rIdx) => {
                                 const reelObj = item.reels?.[rIdx] || {};
                                 const reelWeightVal = reelObj.weight !== undefined && reelObj.weight !== null ? reelObj.weight : '';
@@ -3690,15 +3601,15 @@ const PurchaseInvoicePage: React.FC = () => {
                                 const reelLocId = reelObj.locationId || item.locationId || '';
 
                                 return (
-                                  <tr key={rIdx} className="hover:bg-gray-50/50 transition-colors">
-                                    <td className="py-2 px-3 font-mono text-gray-500 font-bold">R-{rIdx + 1}</td>
+                                  <tr key={rIdx} className="hover:bg-gray-50/50">
+                                    <td className="py-2 px-3 font-mono text-gray-500 font-semibold">R-{rIdx + 1}</td>
                                     <td className="py-2 px-3">
                                       <input
                                         type="number"
                                         value={reelWeightVal}
                                         onChange={e => handleReelChange(idx, rIdx, 'weight', e.target.value)}
                                         placeholder="0.0"
-                                        className="w-full px-2.5 py-1 border border-gray-200 rounded-lg text-xs font-mono font-bold text-gray-900 focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-2.5 py-1 border border-gray-200 rounded-lg text-[0.875rem] font-mono font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500"
                                         required
                                       />
                                     </td>
@@ -3708,11 +3619,11 @@ const PurchaseInvoicePage: React.FC = () => {
                                         value={reelWidthVal}
                                         onChange={e => handleReelChange(idx, rIdx, 'width', e.target.value)}
                                         placeholder="Width"
-                                        className="w-full px-2.5 py-1 border border-gray-200 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-2.5 py-1 border border-gray-200 rounded-lg text-[0.875rem] font-mono focus:ring-2 focus:ring-blue-500"
                                         required
                                       />
                                     </td>
-                                    <td className="py-2 px-3 min-w-[200px]">
+                                    <td className="py-2 px-3 min-w-[12.5rem]">
                                       <LocationSelectPopup
                                         locations={locations}
                                         locationId={reelLocId}
@@ -3734,7 +3645,7 @@ const PurchaseInvoicePage: React.FC = () => {
                           const validCount = enteredReels.filter((r: any) => r && (r.weight > 0 || r.reelNumber)).length;
                           const totalWeight = enteredReels.reduce((sum: number, r: any) => sum + (Number(r.weight) || 0), 0);
                           return (
-                            <div className="mt-2 bg-blue-50/80 border border-blue-200/80 rounded-xl px-3.5 py-2 flex items-center justify-between text-xs font-bold text-blue-900">
+                            <div className="mt-2 bg-blue-50/80 border border-blue-200/80 rounded-xl px-3.5 py-2 flex items-center justify-between text-[0.875rem] font-semibold text-blue-900">
                               <span className="flex items-center gap-1.5">
                                 <Layers className="w-3.5 h-3.5 text-blue-600" />
                                 Reconciliation:
@@ -3755,97 +3666,97 @@ const PurchaseInvoicePage: React.FC = () => {
 
           {/* 3. Summary & Other Charges */}
           <div className="space-y-4">
-            <h3 className="text-xs font-bold text-gray-900 border-b border-gray-100 pb-1.5 flex items-center gap-2">
+            <h3 className="text-[0.875rem] font-semibold text-gray-900 border-b border-gray-100 pb-1.5 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
               3. Summary & Additional Charges
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
-                <label className="block text-[11px] font-semibold text-gray-600 mb-1">FREIGHT CHARGES (₹)</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">FREIGHT CHARGES (₹)</label>
                 <input
                   type="number"
                   value={invoiceForm.freight}
                   onChange={e => setInvoiceForm({ ...invoiceForm, freight: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-mono font-semibold text-right focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] font-mono font-semibold text-right focus:ring-2 focus:ring-blue-500 bg-white"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-gray-600 mb-1">CRANE CHARGES (₹)</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">CRANE CHARGES (₹)</label>
                 <input
                   type="number"
                   value={invoiceForm.craneCharges}
                   onChange={e => setInvoiceForm({ ...invoiceForm, craneCharges: e.target.value })}
-                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono font-semibold text-right focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] font-mono font-semibold text-right focus:ring-2 focus:ring-blue-500 bg-white"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-gray-600 mb-1">LOADING / UNLOADING (₹)</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">LOADING / UNLOADING (₹)</label>
                 <input
                   type="number"
                   value={invoiceForm.loadingUnloading}
                   onChange={e => setInvoiceForm({ ...invoiceForm, loadingUnloading: e.target.value })}
-                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono font-semibold text-right focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] font-mono font-semibold text-right focus:ring-2 focus:ring-blue-500 bg-white"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-gray-600 mb-1">OTHER CHARGES (₹)</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">OTHER CHARGES (₹)</label>
                 <input
                   type="number"
                   value={invoiceForm.otherCharges}
                   onChange={e => setInvoiceForm({ ...invoiceForm, otherCharges: e.target.value })}
-                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono font-semibold text-right focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] font-mono font-semibold text-right focus:ring-2 focus:ring-blue-500 bg-white"
                   placeholder="Labour, Misc etc."
                 />
               </div>
             </div>
 
             {/* Total calculations */}
-            <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-lg space-y-2 text-xs font-semibold text-slate-700">
+            <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-lg space-y-2 text-[0.875rem] font-semibold text-slate-700">
               <div className="flex justify-between items-center">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Lots:</span>
-                <span className="text-gray-900 font-bold">{formLotsCount} Lots</span>
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Lots:</span>
+                <span className="text-gray-900 font-semibold">{formLotsCount} Lots</span>
               </div>
               {formHasReels && (
                 <>
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Reels:</span>
-                    <span className="text-gray-900 font-bold">{formReelsCount} Reels</span>
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Reels:</span>
+                    <span className="text-gray-900 font-semibold">{formReelsCount} Reels</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Reel Weight:</span>
-                    <span className="text-gray-900 font-bold">{formReelsWeight.toLocaleString('en-IN')} KG</span>
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Reel Weight:</span>
+                    <span className="text-gray-900 font-semibold">{formReelsWeight.toLocaleString('en-IN')} KG</span>
                   </div>
                 </>
               )}
               {formHasSheets && (
                 <>
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Reams:</span>
-                    <span className="text-gray-900 font-bold">{formReamsCount.toLocaleString('en-IN', { maximumFractionDigits: 2 })} Reams</span>
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Reams:</span>
+                    <span className="text-gray-900 font-semibold">{formReamsCount.toLocaleString('en-IN', { maximumFractionDigits: 2 })} Reams</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Sheets:</span>
-                    <span className="text-gray-900 font-bold">{formSheetsCount.toLocaleString('en-IN')} Sheets</span>
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Sheets:</span>
+                    <span className="text-gray-900 font-semibold">{formSheetsCount.toLocaleString('en-IN')} Sheets</span>
                   </div>
                 </>
               )}
               {!formHasReels && !formHasSheets && (
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Qty:</span>
-                  <span className="text-gray-900 font-bold">{formTotalWeight.toLocaleString('en-IN')}</span>
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Qty:</span>
+                  <span className="text-gray-900 font-semibold">{formTotalWeight.toLocaleString('en-IN')}</span>
                 </div>
               )}
               <div className="flex justify-between items-center border-t border-slate-200/80 pt-1.5">
                 <span>Material Total:</span>
-                <span className="font-mono text-gray-900 font-bold">₹{formMatTotal.toLocaleString('en-IN')}</span>
+                <span className="font-mono text-gray-900 font-semibold">₹{formMatTotal.toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span>Other Charges Total:</span>
-                <span className="font-mono text-gray-900 font-bold">₹{formOtherCharges.toLocaleString('en-IN')}</span>
+                <span className="font-mono text-gray-900 font-semibold">₹{formOtherCharges.toLocaleString('en-IN')}</span>
               </div>
-              <div className="flex justify-between items-center border-t border-slate-200/80 pt-1.5 font-bold text-xs text-gray-950">
+              <div className="flex justify-between items-center border-t border-slate-200/80 pt-1.5 font-semibold text-[0.875rem] text-gray-950">
                 <span>Grand Total:</span>
-                <span className="font-mono text-blue-600 text-sm font-black">₹{(formMatTotal + formOtherCharges).toLocaleString('en-IN')}</span>
+                <span className="font-mono text-blue-600 text-[0.875rem] font-semibold">₹{(formMatTotal + formOtherCharges).toLocaleString('en-IN')}</span>
               </div>
             </div>
           </div>
@@ -3853,13 +3764,13 @@ const PurchaseInvoicePage: React.FC = () => {
           </div>
 
           {/* Sticky Non-Scrolling Pinned Footer (Always Visible) */}
-          <div className="px-5 py-3 bg-white/95 backdrop-blur-sm border-t border-slate-200/90 flex items-center justify-between shrink-0 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] z-20">
+          <div className="px-5 py-3 bg-white/95 border-t border-slate-200/90 flex items-center justify-between shrink-0 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] z-20">
             <div className="flex items-center gap-2.5">
-              <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Grand Total:</span>
-              <span className="font-mono text-blue-600 text-sm font-black">
+              <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Grand Total:</span>
+              <span className="font-mono text-blue-600 text-[0.875rem] font-semibold">
                 ₹{(formMatTotal + formOtherCharges).toLocaleString('en-IN')}
               </span>
-              <span className="text-[11px] text-slate-400 font-medium">
+              <span className="text-xs text-slate-400 font-medium">
                 ({formLotsCount} {formLotsCount === 1 ? 'Lot' : 'Lots'})
               </span>
             </div>
@@ -3867,7 +3778,7 @@ const PurchaseInvoicePage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setActiveSubPage('list')}
-                className="px-3.5 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-300 transition-colors cursor-pointer"
+                className="px-3.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-300 cursor-pointer"
               >
                 Cancel
               </button>
@@ -3875,7 +3786,7 @@ const PurchaseInvoicePage: React.FC = () => {
                 type="button"
                 disabled={addLoading}
                 onClick={(e) => handleInvoiceSubmit(e, 'Draft')}
-                className="px-3.5 py-1.5 border border-amber-300 bg-amber-50 hover:bg-amber-100 disabled:opacity-50 text-amber-800 rounded-lg text-xs font-bold shadow-2xs active:scale-[0.98] flex items-center gap-1.5 transition-all cursor-pointer"
+                className="px-3.5 py-1.5 border border-amber-300 bg-amber-50 hover:bg-amber-100 disabled:opacity-50 text-amber-800 rounded-lg text-[0.875rem] font-semibold shadow-2xs active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
               >
                 <FileText className="w-3.5 h-3.5 text-amber-700" />
                 <span>Save Draft Order</span>
@@ -3884,7 +3795,7 @@ const PurchaseInvoicePage: React.FC = () => {
                 type="button"
                 disabled={addLoading}
                 onClick={(e) => handleInvoiceSubmit(e, 'Posted')}
-                className="px-5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold shadow-md shadow-blue-500/20 active:scale-[0.98] flex items-center gap-1.5 transition-all cursor-pointer"
+                className="px-5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-[0.875rem] font-semibold shadow-md shadow-blue-500/20 active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
               >
                 {addLoading ? (
                   <>
@@ -3905,46 +3816,46 @@ const PurchaseInvoicePage: React.FC = () => {
 
       {/* ── SUB-PAGE 2: BATCH DETAILS DIALOG BOX POPUP ────────────────────────── */}
       {activeSubPage === 'details' && selectedInvoice && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[9999] transition-all duration-200 animate-fadeIn">
+        <div className="fixed inset-0 z-[9999]">
           {/* Backdrop Blur Overlay covering 100% of the viewport edge-to-edge */}
           <div 
-            className="fixed inset-0 bg-slate-950/60 backdrop-blur-md transition-opacity cursor-pointer"
+            className="fixed inset-0 bg-gray-900/40 cursor-pointer"
             onClick={() => setActiveSubPage('list')}
           />
 
           {/* Modal Container */}
           <div className="fixed inset-0 overflow-y-auto flex items-center justify-center p-3 sm:p-5 pointer-events-none">
-            <div className="relative bg-white rounded-2xl shadow-2xl shadow-slate-950/20 border border-slate-200 w-full max-w-5xl xl:max-w-6xl max-h-[92vh] flex flex-col overflow-hidden animate-modalPop font-sans text-xs pointer-events-auto">
+            <div className="relative bg-white w-full max-w-5xl xl:max-w-6xl max-h-[calc(92*var(--vh,1vh))] flex flex-col overflow-hidden font-sans text-[0.875rem] pointer-events-auto dlg-panel">
             {/* Header */}
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
               <div>
-                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-blue-600 animate-pulse-slow" />
+                <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-blue-600" />
                   Purchase Batch Details
                 </h2>
-                <p className="text-[10px] text-gray-500 mt-0.5 font-medium">
+                <p className="text-xs text-gray-500 mt-0.5 font-medium">
                   Registered on {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleString('en-IN') : '—'} by Admin
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setPrintInvoiceTarget(selectedInvoice)}
-                  className="px-3 py-1.5 border border-indigo-200 text-indigo-700 hover:bg-indigo-50 bg-white rounded-lg text-xs font-bold shadow-3xs flex items-center gap-1.5 transition-all cursor-pointer"
+                  className="px-3 py-1.5 border border-blue-200 text-blue-700 hover:bg-blue-50 bg-white rounded-lg text-[0.875rem] font-semibold shadow-3xs flex items-center gap-1.5 cursor-pointer"
                   title="Print Purchase Batch Receipt"
                 >
-                  <Printer className="w-3.5 h-3.5 text-indigo-600" /> Print Batch
+                  <Printer className="w-3.5 h-3.5 text-blue-600" /> Print Batch
                 </button>
                 {selectedInvoice.status !== 'Cancelled' && (
                   <button
                     onClick={() => handleEditInvoice(selectedInvoice)}
-                    className="px-3 py-1.5 border border-gray-200 text-gray-700 hover:bg-gray-100 bg-white rounded-lg text-xs font-bold shadow-3xs flex items-center gap-1.5 transition-all cursor-pointer"
+                    className="px-3 py-1.5 border border-gray-200 text-gray-700 hover:bg-gray-100 bg-white rounded-lg text-[0.875rem] font-semibold shadow-3xs flex items-center gap-1.5 cursor-pointer"
                   >
                     <Edit className="w-3.5 h-3.5 text-amber-500" /> Edit Batch
                   </button>
                 )}
                 <button
                   onClick={() => setActiveSubPage('list')}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded-lg transition-colors cursor-pointer"
+                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded-lg cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -4009,32 +3920,32 @@ const PurchaseInvoicePage: React.FC = () => {
                 <div className={`grid grid-cols-2 sm:grid-cols-4 ${hasReels && hasSheets ? 'lg:grid-cols-8' : 'lg:grid-cols-7'} gap-2.5 shrink-0`}>
                   {/* Card 1: Batch Number */}
                   <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                    <span className="block text-[10px] text-blue-600 font-bold uppercase tracking-wider leading-tight">Batch Number</span>
-                    <span className="block text-xs text-blue-900 font-extrabold mt-1 truncate px-1" title={selectedInvoice.invoiceNumber}>
+                    <span className="block text-xs text-blue-600 font-medium uppercase tracking-wider leading-tight">Batch Number</span>
+                    <span className="block text-[0.875rem] text-blue-900 font-semibold mt-1 truncate px-1" title={selectedInvoice.invoiceNumber}>
                       {selectedInvoice.invoiceNumber}
                     </span>
                   </div>
 
                   {/* Card 2: Supplier / Vendor */}
-                  <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                    <span className="block text-[10px] text-indigo-650 font-bold uppercase tracking-wider leading-tight">Supplier</span>
-                    <span className="block text-xs text-indigo-900 font-extrabold mt-1 truncate px-1" title={typeof selectedInvoice.vendorId === 'object' && selectedInvoice.vendorId !== null ? (selectedInvoice.vendorId.firmName || selectedInvoice.vendorId.ownerName) : 'Supplier'}>
+                  <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+                    <span className="block text-xs text-blue-650 font-medium uppercase tracking-wider leading-tight">Supplier</span>
+                    <span className="block text-[0.875rem] text-blue-900 font-semibold mt-1 truncate px-1" title={typeof selectedInvoice.vendorId === 'object' && selectedInvoice.vendorId !== null ? (selectedInvoice.vendorId.firmName || selectedInvoice.vendorId.ownerName) : 'Supplier'}>
                       {typeof selectedInvoice.vendorId === 'object' && selectedInvoice.vendorId !== null ? (selectedInvoice.vendorId.firmName || selectedInvoice.vendorId.ownerName) : 'Supplier'}
                     </span>
                   </div>
 
                   {/* Card 3: Purchase Date */}
                   <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                    <span className="block text-[10px] text-blue-650 font-bold uppercase tracking-wider leading-tight">Date</span>
-                    <span className="block text-xs text-blue-900 font-extrabold mt-1 truncate px-1">
+                    <span className="block text-xs text-blue-650 font-medium uppercase tracking-wider leading-tight">Date</span>
+                    <span className="block text-[0.875rem] text-blue-900 font-semibold mt-1 truncate px-1">
                       {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleDateString('en-IN') : '—'}
                     </span>
                   </div>
 
                   {/* Card 4: Total Lots */}
                   <div className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                    <span className="block text-[10px] text-emerald-700 font-bold uppercase tracking-wider leading-tight">Lots</span>
-                    <span className="block text-base text-emerald-900 font-extrabold mt-0.5">
+                    <span className="block text-xs text-emerald-700 font-medium uppercase tracking-wider leading-tight">Lots</span>
+                    <span className="block text-base text-emerald-900 font-semibold mt-0.5">
                       {selectedInvoice.items?.length || 0}
                     </span>
                   </div>
@@ -4042,8 +3953,8 @@ const PurchaseInvoicePage: React.FC = () => {
                   {/* Dynamic Card 5: Total Reels (when batch has reels) */}
                   {hasReels && (
                     <div className="bg-amber-50/40 border border-amber-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                      <span className="block text-[10px] text-amber-700 font-bold uppercase tracking-wider leading-tight">Total Reels</span>
-                      <span className="block text-base text-amber-900 font-extrabold mt-0.5">
+                      <span className="block text-xs text-amber-700 font-medium uppercase tracking-wider leading-tight">Total Reels</span>
+                      <span className="block text-base text-amber-900 font-semibold mt-0.5">
                         {totalReelsCount || '0'}
                       </span>
                     </div>
@@ -4051,13 +3962,13 @@ const PurchaseInvoicePage: React.FC = () => {
 
                   {/* Dynamic Card 6: Total Reams (when batch has sheets) */}
                   {hasSheets && (
-                    <div className="bg-teal-50/40 border border-teal-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                      <span className="block text-[10px] text-teal-700 font-bold uppercase tracking-wider leading-tight">Total Reams</span>
-                      <span className="block text-base text-teal-900 font-extrabold mt-0.5" title={`${totalSheetsCount.toLocaleString('en-IN')} Sheets`}>
+                    <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+                      <span className="block text-xs text-blue-700 font-medium uppercase tracking-wider leading-tight">Total Reams</span>
+                      <span className="block text-base text-blue-900 font-semibold mt-0.5" title={`${totalSheetsCount.toLocaleString('en-IN')} Sheets`}>
                         {totalReamsCount > 0 ? totalReamsCount.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '0'}
                       </span>
                       {totalSheetsCount > 0 && (
-                        <span className="block text-[9px] text-teal-600 font-medium truncate mt-0.5">
+                        <span className="block text-xs text-blue-600 font-medium truncate mt-0.5">
                           {totalSheetsCount.toLocaleString('en-IN')} Sheets
                         </span>
                       )}
@@ -4067,8 +3978,8 @@ const PurchaseInvoicePage: React.FC = () => {
                   {/* Dynamic Card: Total FG Units (when batch has Finished Goods) */}
                   {hasFg && (
                     <div className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                      <span className="block text-[10px] text-emerald-700 font-bold uppercase tracking-wider leading-tight">Total FG</span>
-                      <span className="block text-base text-emerald-900 font-extrabold mt-0.5">
+                      <span className="block text-xs text-emerald-700 font-medium uppercase tracking-wider leading-tight">Total FG</span>
+                      <span className="block text-base text-emerald-900 font-semibold mt-0.5">
                         {totalFgPcs.toLocaleString('en-IN')} Pcs
                       </span>
                     </div>
@@ -4077,19 +3988,19 @@ const PurchaseInvoicePage: React.FC = () => {
                   {/* Card 7: Total Weight (KG) - displayed when batch has weight or non-FG */}
                   {(!hasFg || totalKgWeight > 0) && (
                     <div className="bg-red-50/40 border border-red-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                      <span className="block text-[10px] text-red-650 font-bold uppercase tracking-wider leading-tight">Total KG</span>
-                      <span className="block text-base text-red-900 font-extrabold mt-0.5">
+                      <span className="block text-xs text-red-650 font-medium uppercase tracking-wider leading-tight">Total KG</span>
+                      <span className="block text-base text-red-900 font-semibold mt-0.5">
                         {totalKgWeight.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                       </span>
                     </div>
                   )}
 
                   {/* Card 8: Landed Rate (₹) */}
-                  <div className="bg-purple-50/40 border border-purple-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                    <span className="block text-[10px] text-purple-700 font-bold uppercase tracking-wider leading-tight">
+                  <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 text-center shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+                    <span className="block text-xs text-blue-700 font-medium uppercase tracking-wider leading-tight">
                       {hasFg && !hasReels && !hasSheets ? 'Landed Rate/PCS' : 'Landed Rate/KG'}
                     </span>
-                    <span className="block text-base text-purple-900 font-extrabold mt-0.5 font-mono">
+                    <span className="block text-base text-blue-900 font-semibold mt-0.5 font-mono">
                       ₹{hasFg && !hasReels && !hasSheets
                         ? (totalFgPcs > 0 ? (invoiceGrandTotal / totalFgPcs) : 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                         : batchAvgLandedRate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -4102,7 +4013,7 @@ const PurchaseInvoicePage: React.FC = () => {
                   <div className="flex gap-2 border-b border-gray-200 pb-px">
                 <button
                   onClick={() => setDetailsTab('lots')}
-                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                  className={`px-4 py-2 text-[0.875rem] font-semibold border-b-2 flex items-center gap-1.5 ${
                     detailsTab === 'lots' 
                       ? 'border-blue-600 text-blue-600' 
                       : 'border-transparent text-gray-400 hover:text-gray-700'
@@ -4112,7 +4023,7 @@ const PurchaseInvoicePage: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setDetailsTab('allocation')}
-                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                  className={`px-4 py-2 text-[0.875rem] font-semibold border-b-2 flex items-center gap-1.5 ${
                     detailsTab === 'allocation' 
                       ? 'border-blue-600 text-blue-600' 
                       : 'border-transparent text-gray-400 hover:text-gray-700'
@@ -4122,7 +4033,7 @@ const PurchaseInvoicePage: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setDetailsTab('history')}
-                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                  className={`px-4 py-2 text-[0.875rem] font-semibold border-b-2 flex items-center gap-1.5 ${
                     detailsTab === 'history' 
                       ? 'border-blue-600 text-blue-600' 
                       : 'border-transparent text-gray-400 hover:text-gray-700'
@@ -4132,7 +4043,7 @@ const PurchaseInvoicePage: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setDetailsTab('production')}
-                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                  className={`px-4 py-2 text-[0.875rem] font-semibold border-b-2 flex items-center gap-1.5 ${
                     detailsTab === 'production' 
                       ? 'border-blue-600 text-blue-600' 
                       : 'border-transparent text-gray-400 hover:text-gray-700'
@@ -4146,9 +4057,9 @@ const PurchaseInvoicePage: React.FC = () => {
               {detailsTab === 'lots' && (
                 <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4 shadow-3xs">
                   <div className="overflow-x-auto border border-gray-100 rounded-xl">
-                    <table className="w-full text-left text-xs border-collapse">
+                    <table className="w-full text-left text-[0.875rem] border-collapse">
                       <thead>
-                        <tr className="bg-gray-50 text-gray-500 uppercase font-black border-b border-gray-200 text-[10px] tracking-wider">
+                        <tr className="bg-gray-50 text-gray-500 uppercase font-medium border-b border-gray-200 text-xs tracking-wider">
                           <th className="px-3 py-2.5">#</th>
                           <th className="px-3 py-2.5">Item</th>
                           <th className="px-3 py-2.5 text-center">GSM</th>
@@ -4162,7 +4073,7 @@ const PurchaseInvoicePage: React.FC = () => {
                           <th className="px-3 py-2.5 text-right">{hasFg && !hasReels && !hasSheets ? 'Landed Rate/GBL (₹)' : 'Landed Rate/KG (₹)'}</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100 text-gray-700 font-medium">
+                      <tbody className="bg-white divide-y divide-gray-100 text-gray-700 font-medium">
                         {selectedInvoice.items?.map((item, idx) => {
                           const skuIdVal = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any)._id : item.skuId;
                           const resolvedSku = typeof item.skuId === 'object' && item.skuId !== null ? (item.skuId as any) : null;
@@ -4227,30 +4138,30 @@ const PurchaseInvoicePage: React.FC = () => {
 
                           return (
                             <tr key={idx} className="hover:bg-gray-50/50">
-                              <td className="px-3 py-2.5 text-gray-450 font-bold">{idx + 1}</td>
-                              <td className="px-3 py-2.5 font-bold text-gray-900">
+                              <td className="px-3 py-2.5 text-gray-450 font-semibold">{idx + 1}</td>
+                              <td className="px-3 py-2.5 font-semibold text-gray-900">
                                 <div>{skuName}</div>
                                 {brand && brand !== '—' && (
-                                  <div className="text-[10px] text-gray-400 font-normal">{brand}</div>
+                                  <div className="text-xs text-gray-400 font-normal">{brand}</div>
                                 )}
                               </td>
-                              <td className="px-3 py-2.5 text-center font-bold text-gray-700">{gsmVal || '—'}</td>
-                              <td className="px-3 py-2.5 text-center font-bold text-gray-700">
+                              <td className="px-3 py-2.5 text-center font-semibold text-gray-700">{gsmVal || '—'}</td>
+                              <td className="px-3 py-2.5 text-center font-semibold text-gray-700">
                                 {widthVal ? `${widthVal} cm` : '—'}
                               </td>
-                              <td className="px-3 py-2.5 text-center font-bold text-gray-800">
+                              <td className="px-3 py-2.5 text-center font-semibold text-gray-800">
                                 {itemUnitDisplay}
                               </td>
-                              <td className="px-3 py-2.5 text-right font-black text-gray-955">
+                              <td className="px-3 py-2.5 text-right font-semibold text-gray-955">
                                 {displayQtyKg.toLocaleString('en-IN', { maximumFractionDigits: 2 })} {isFgItem ? 'Pcs' : ''}
                               </td>
-                              <td className="px-3 py-2.5 text-right font-bold text-gray-800 font-mono">
+                              <td className="px-3 py-2.5 text-right font-semibold text-gray-800 font-mono">
                                 ₹{baseRate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
-                              <td className="px-3 py-2.5 text-right font-black text-gray-955">
+                              <td className="px-3 py-2.5 text-right font-semibold text-gray-955">
                                 ₹{(item.totalPrice || 0).toLocaleString('en-IN')}
                               </td>
-                              <td className="px-3 py-2.5 text-right font-black text-blue-700 font-mono">
+                              <td className="px-3 py-2.5 text-right font-semibold text-blue-700 font-mono">
                                 ₹{landedRate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                             </tr>
@@ -4268,30 +4179,30 @@ const PurchaseInvoicePage: React.FC = () => {
                   {/* Top Summary Card (Live Consolidated Total) */}
                   <div className="bg-white rounded-2xl border border-gray-200/90 p-4 shadow-2xs space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10.5px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                         LIVE TOTAL ON-HAND
                       </span>
-                      <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                         Live Consolidated
                       </span>
                     </div>
-                    <div className="font-mono font-extrabold text-emerald-600 text-lg">
+                    <div className="font-mono font-semibold text-emerald-600 text-lg">
                       {totalKgWeight > 0 ? `${totalKgWeight.toLocaleString('en-IN', { maximumFractionDigits: 2 })} KG` : `${totalSheetsCount.toLocaleString('en-IN')} Sheets`}
                     </div>
-                    <p className="text-[10.5px] text-gray-400">Consolidated quantity currently held across all warehouse locations for Batch {selectedInvoice.invoiceNumber}</p>
+                    <p className="text-xs text-gray-400">Consolidated quantity currently held across all warehouse locations for Batch {selectedInvoice.invoiceNumber}</p>
                   </div>
 
                   {/* Multi-Location Live Breakdown Table Card */}
                   <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs overflow-hidden">
                     <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                        <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                           <Layers className="w-3.5 h-3.5" />
                         </div>
                         <div>
-                          <h4 className="font-bold text-gray-900 text-xs">Live Multi-Location Inventory Breakdown</h4>
-                          <p className="text-[10.5px] text-gray-500">Same item distributed across warehouse bins, bays, and racks</p>
+                          <h4 className="font-semibold text-gray-900 text-[0.875rem]">Live Multi-Location Inventory Breakdown</h4>
+                          <p className="text-xs text-gray-500">Same item distributed across warehouse bins, bays, and racks</p>
                         </div>
                       </div>
                       {(() => {
@@ -4319,7 +4230,7 @@ const PurchaseInvoicePage: React.FC = () => {
 
                         if (isInvoiceFullyAllocated) {
                           return (
-                            <div className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1.5 shadow-3xs" title="Stock and reels have been fully allocated to storage locations and locked">
+                            <div className="text-[0.875rem] font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1.5 shadow-3xs" title="Stock and reels have been fully allocated to storage locations and locked">
                               <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
                               <span>Allocated (Locked)</span>
                             </div>
@@ -4330,7 +4241,7 @@ const PurchaseInvoicePage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setShowAllocateModal(true)}
-                            className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl border border-blue-200 transition-all cursor-pointer shadow-3xs"
+                            className="text-[0.875rem] font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl border border-blue-200 cursor-pointer shadow-3xs"
                             title="Allocate location & reels"
                           >
                             <MapPinIcon className="w-3.5 h-3.5 text-blue-600" />
@@ -4341,9 +4252,9 @@ const PurchaseInvoicePage: React.FC = () => {
                     </div>
 
                     <div className="divide-y divide-gray-100 overflow-x-auto">
-                      <table className="w-full text-left text-xs">
+                      <table className="w-full text-left text-[0.875rem]">
                         <thead>
-                          <tr className="bg-slate-50/80 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                          <tr className="bg-slate-50/80 text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-100">
                             <th className="py-2.5 px-4">Location Name & Code</th>
                             <th className="py-2.5 px-4">Full Hierarchy Path</th>
                             <th className="py-2.5 px-4 text-right">On-Hand Stock</th>
@@ -4351,7 +4262,7 @@ const PurchaseInvoicePage: React.FC = () => {
                             <th className="py-2.5 px-4 text-right">Est. Value</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 bg-white">
+                        <tbody className="bg-white divide-y divide-gray-100 bg-white">
                           {(() => {
                             const batchBalances = inventoryBalances
                               .filter(b => b.batchNumber === selectedInvoice.invoiceNumber)
@@ -4385,34 +4296,34 @@ const PurchaseInvoicePage: React.FC = () => {
                                 const estValue = qtyVal * priceVal;
 
                                 return (
-                                  <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                                  <tr key={idx} className="hover:bg-slate-50/60">
                                     <td className="py-3 px-4">
                                       <div className="flex items-center gap-2">
                                         <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></div>
-                                        <span className="font-bold text-gray-900">{locName}</span>
+                                        <span className="font-semibold text-gray-900">{locName}</span>
                                         {locCode && (
-                                          <span className="font-mono text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
+                                          <span className="font-mono text-xs bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
                                             {locCode}
                                           </span>
                                         )}
                                       </div>
                                     </td>
                                     <td className="py-3 px-4">
-                                      <span className="text-[11px] text-gray-600 font-medium">
+                                      <span className="text-xs text-gray-600 font-medium">
                                         {fullPath} ➔ {locName}
                                       </span>
                                     </td>
                                     <td className="py-3 px-4 text-right">
-                                      <span className="font-mono font-bold text-emerald-700 text-xs">
+                                      <span className="font-mono font-semibold text-emerald-700 text-[0.875rem]">
                                         {qtyVal.toLocaleString('en-IN')} {skuObj?.unit || 'KG'}
                                       </span>
                                     </td>
                                     <td className="py-3 px-4 text-right">
-                                      <span className="font-mono font-bold text-blue-700 text-xs">
+                                      <span className="font-mono font-semibold text-blue-700 text-[0.875rem]">
                                         {availVal.toLocaleString('en-IN')} {skuObj?.unit || 'KG'}
                                       </span>
                                     </td>
-                                    <td className="py-3 px-4 text-right font-mono font-bold text-gray-900 text-xs">
+                                    <td className="py-3 px-4 text-right font-mono font-semibold text-gray-900 text-[0.875rem]">
                                       ₹{estValue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                     </td>
                                   </tr>
@@ -4443,34 +4354,34 @@ const PurchaseInvoicePage: React.FC = () => {
                               const itemVal = qtyVal * (Number(item.purchasePrice) || 0);
 
                               return (
-                                <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                                <tr key={idx} className="hover:bg-slate-50/60">
                                   <td className="py-3 px-4">
                                     <div className="flex items-center gap-2">
                                       <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></div>
-                                      <span className="font-bold text-gray-900">{locName}</span>
+                                      <span className="font-semibold text-gray-900">{locName}</span>
                                       {locCode && (
-                                        <span className="font-mono text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
+                                        <span className="font-mono text-xs bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
                                           {locCode}
                                         </span>
                                       )}
                                     </div>
                                   </td>
                                   <td className="py-3 px-4">
-                                    <span className="text-[11px] text-gray-600 font-medium">
+                                    <span className="text-xs text-gray-600 font-medium">
                                       {fullPath} ➔ {locName}
                                     </span>
                                   </td>
                                   <td className="py-3 px-4 text-right">
-                                    <span className="font-mono font-bold text-emerald-700 text-xs">
+                                    <span className="font-mono font-semibold text-emerald-700 text-[0.875rem]">
                                       {qtyVal.toLocaleString('en-IN')} {skuObj?.unit || 'KG'}
                                     </span>
                                   </td>
                                   <td className="py-3 px-4 text-right">
-                                    <span className="font-mono font-bold text-blue-700 text-xs">
+                                    <span className="font-mono font-semibold text-blue-700 text-[0.875rem]">
                                       {qtyVal.toLocaleString('en-IN')} {skuObj?.unit || 'KG'}
                                     </span>
                                   </td>
-                                  <td className="py-3 px-4 text-right font-mono font-bold text-gray-900 text-xs">
+                                  <td className="py-3 px-4 text-right font-mono font-semibold text-gray-900 text-[0.875rem]">
                                     ₹{itemVal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                   </td>
                                 </tr>
@@ -4488,15 +4399,15 @@ const PurchaseInvoicePage: React.FC = () => {
               {detailsTab === 'history' && (
                 <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4 shadow-3xs">
                   <div className="space-y-4">
-                    <div className="border-l-2 border-blue-500 pl-3 py-1 space-y-1 text-xs">
-                      <div className="flex justify-between font-bold text-gray-800">
+                    <div className="border-l-2 border-blue-500 pl-3 py-1 space-y-1 text-[0.875rem]">
+                      <div className="flex justify-between font-semibold text-gray-800">
                         <span>Invoice Registered</span>
-                        <span className="text-[10px] text-gray-400 font-normal">
+                        <span className="text-xs text-gray-400 font-normal">
                           {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleString('en-IN') : '—'}
                         </span>
                       </div>
                       <p className="text-gray-500 font-medium">Batch recorded successfully in supplier inward ledger.</p>
-                      <p className="text-[10px] text-gray-400 font-medium">Performed By: System Admin</p>
+                      <p className="text-xs text-gray-400 font-medium">Performed By: System Admin</p>
                     </div>
                   </div>
                 </div>
@@ -4521,12 +4432,12 @@ const PurchaseInvoicePage: React.FC = () => {
                   <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4 shadow-3xs">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="text-xs font-black text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <h4 className="text-[0.875rem] font-medium text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
                           <Factory className="w-3.5 h-3.5 text-blue-600" />
                           Production Material Consumption Flow
                         </h4>
-                        <p className="text-[11px] text-gray-500 mt-0.5">
-                          Cross-module traceability connecting Purchase Batch <span className="font-mono font-bold text-gray-700">{invoiceNo}</span> with manufacturing work orders.
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Cross-module traceability connecting Purchase Batch <span className="font-mono font-semibold text-gray-700">{invoiceNo}</span> with manufacturing work orders.
                         </p>
                       </div>
                       <button
@@ -4536,7 +4447,7 @@ const PurchaseInvoicePage: React.FC = () => {
                           setSelectedInvoice(null);
                           navigate(`/production?view=new&purchaseInvoiceNo=${encodeURIComponent(invoiceNo)}&skuCode=${encodeURIComponent(firstSkuCode)}`);
                         }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[0.875rem] font-semibold shadow-xs cursor-pointer"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Plan Production with this Batch</span>
@@ -4545,9 +4456,9 @@ const PurchaseInvoicePage: React.FC = () => {
 
                     {matchingOrders.length > 0 ? (
                       <div className="overflow-x-auto border border-gray-100 rounded-xl">
-                        <table className="w-full text-left text-xs border-collapse">
+                        <table className="w-full text-left text-[0.875rem] border-collapse">
                           <thead>
-                            <tr className="bg-gray-50 text-gray-500 uppercase font-black border-b border-gray-200 text-[10px] tracking-wider">
+                            <tr className="bg-gray-50 text-gray-500 uppercase font-medium border-b border-gray-200 text-xs tracking-wider">
                               <th className="px-3 py-2.5">Production Order</th>
                               <th className="px-3 py-2.5">Item Name</th>
                               <th className="px-3 py-2.5">Demand Source / Ref</th>
@@ -4557,7 +4468,7 @@ const PurchaseInvoicePage: React.FC = () => {
                               <th className="px-3 py-2.5 text-right">Action</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-gray-100 font-medium">
+                          <tbody className="bg-white divide-y divide-gray-100 font-medium">
                             {matchingOrders.map((po, pIdx) => {
                               const consumedItems = (po.bom || []).filter((b: any) =>
                                 b.purchaseInvoiceNo === invoiceNo ||
@@ -4568,14 +4479,14 @@ const PurchaseInvoicePage: React.FC = () => {
                               const uom = consumedItems[0]?.uom || 'KG';
 
                               return (
-                                <tr key={po._id || pIdx} className="hover:bg-blue-50/30 transition-colors">
-                                  <td className="px-3 py-2.5 font-mono font-bold text-blue-600">
+                                <tr key={po._id || pIdx} className="hover:bg-blue-50/30">
+                                  <td className="px-3 py-2.5 font-mono font-semibold text-blue-600">
                                     {po.orderNumber}
                                   </td>
-                                  <td className="px-3 py-2.5 font-bold text-gray-800">
+                                  <td className="px-3 py-2.5 font-semibold text-gray-800">
                                     {po.itemName || 'Finished Goods'}
                                   </td>
-                                  <td className="px-3 py-2.5 text-gray-600 text-[11px]">
+                                  <td className="px-3 py-2.5 text-gray-600 text-xs">
                                     {po.reference ? (
                                       <span className="font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">
                                         {po.reference}
@@ -4584,14 +4495,14 @@ const PurchaseInvoicePage: React.FC = () => {
                                       <span className="text-gray-400">Make to Stock</span>
                                     )}
                                   </td>
-                                  <td className="px-3 py-2.5 text-center font-mono font-bold text-amber-700">
+                                  <td className="px-3 py-2.5 text-center font-mono font-semibold text-amber-700">
                                     {totalConsumed} {uom}
                                   </td>
                                   <td className="px-3 py-2.5 text-center font-mono text-gray-700">
                                     {po.plannedQty} {po.plannedUom}
                                   </td>
                                   <td className="px-3 py-2.5 text-center">
-                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                                       po.status === 'Completed'
                                         ? 'bg-emerald-100 text-emerald-800'
                                         : po.status === 'In Progress'
@@ -4609,7 +4520,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                         setSelectedInvoice(null);
                                         navigate(`/production?orderId=${po._id || po.orderNumber}`);
                                       }}
-                                      className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
+                                      className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-semibold hover:underline cursor-pointer"
                                     >
                                       <span>View</span>
                                       <ExternalLink className="w-3 h-3" />
@@ -4627,8 +4538,8 @@ const PurchaseInvoicePage: React.FC = () => {
                           <Factory className="w-6 h-6" />
                         </div>
                         <div>
-                          <p className="font-bold text-sm text-gray-800">No Production Consumptions Yet</p>
-                          <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                          <p className="font-semibold text-[0.875rem] text-gray-800">No Production Consumptions Yet</p>
+                          <p className="text-[0.875rem] text-gray-500 mt-1 max-w-md mx-auto">
                             All materials in batch <strong className="font-mono text-gray-700">{invoiceNo}</strong> are intact in warehouse stock. Click below to plan and issue these materials into manufacturing.
                           </p>
                         </div>
@@ -4639,7 +4550,7 @@ const PurchaseInvoicePage: React.FC = () => {
                             setSelectedInvoice(null);
                             navigate(`/production?view=new&purchaseInvoiceNo=${encodeURIComponent(invoiceNo)}&skuCode=${encodeURIComponent(firstSkuCode)}`);
                           }}
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[0.875rem] font-semibold shadow-xs cursor-pointer"
                         >
                           <Plus className="w-3.5 h-3.5" />
                           <span>Plan Production with this Batch</span>
@@ -4653,22 +4564,22 @@ const PurchaseInvoicePage: React.FC = () => {
             
             {/* Payment / Tax details card */}
             <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3.5 shadow-3xs">
-              <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider">Financial Breakdown</h3>
-              <div className="space-y-2 text-xs font-semibold text-gray-600">
+              <h3 className="text-[0.875rem] font-medium text-gray-800 uppercase tracking-wider">Financial Breakdown</h3>
+              <div className="space-y-2 text-[0.875rem] font-semibold text-gray-600">
                 <div className="flex justify-between">
                   <span>Material Amount (Subtotal):</span>
-                  <span className="text-gray-900 font-bold">₹{(selectedInvoice.subTotal || 0).toLocaleString('en-IN')}</span>
+                  <span className="text-gray-900 font-semibold">₹{(selectedInvoice.subTotal || 0).toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Tax Amount:</span>
-                  <span className="text-gray-900 font-bold">₹{(selectedInvoice.taxAmount || 0).toLocaleString('en-IN')}</span>
+                  <span className="text-gray-900 font-semibold">₹{(selectedInvoice.taxAmount || 0).toLocaleString('en-IN')}</span>
                 </div>
-                <div className="flex justify-between border-t border-b py-2 text-green-700 font-black text-xs bg-green-50/50 px-2 rounded-lg my-1">
+                <div className="flex justify-between border-t border-b py-2 text-green-700 font-semibold text-[0.875rem] bg-green-50/50 px-2 rounded-lg my-1">
                   <span>Total Due to Supplier:</span>
-                  <span className="font-mono text-sm">₹{((selectedInvoice.subTotal || 0) + (selectedInvoice.taxAmount || 0)).toLocaleString('en-IN')}</span>
+                  <span className="font-mono text-[0.875rem]">₹{((selectedInvoice.subTotal || 0) + (selectedInvoice.taxAmount || 0)).toLocaleString('en-IN')}</span>
                 </div>
-                <div className="pt-1.5 space-y-1.5 text-[11px] text-gray-500">
-                  <span className="block font-bold text-[10px] text-gray-400 uppercase tracking-wider">Internal Costs (Paid by Us):</span>
+                <div className="pt-1.5 space-y-1.5 text-xs text-gray-500">
+                  <span className="block font-medium text-xs text-gray-400 uppercase tracking-wider">Internal Costs (Paid by Us):</span>
                   <div className="flex justify-between pl-2">
                     <span>Freight Charges:</span>
                     <span className="text-gray-800 font-semibold">₹{(selectedInvoice.freight || 0).toLocaleString('en-IN')}</span>
@@ -4682,15 +4593,15 @@ const PurchaseInvoicePage: React.FC = () => {
                     <span className="text-gray-800 font-semibold">₹{(selectedInvoice.otherCharges || 0).toLocaleString('en-IN')}</span>
                   </div>
                   {extraInwardPerKg > 0 && (
-                    <div className="flex justify-between pl-2 text-blue-700 font-bold border-t border-dashed pt-1 mt-1">
+                    <div className="flex justify-between pl-2 text-blue-700 font-semibold border-t border-dashed pt-1 mt-1">
                       <span>Inward Additional Expenses / KG:</span>
                       <span className="font-mono">+₹{extraInwardPerKg.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/KG</span>
                     </div>
                   )}
                 </div>
-                <div className="flex justify-between border-t pt-2 text-gray-955 font-black">
+                <div className="flex justify-between border-t pt-2 text-gray-955 font-semibold">
                   <span>Total Landed Invoice Cost:</span>
-                  <span className="text-blue-600 font-black">₹{(selectedInvoice.grandTotal || 0).toLocaleString('en-IN')}</span>
+                  <span className="text-blue-600 font-semibold">₹{(selectedInvoice.grandTotal || 0).toLocaleString('en-IN')}</span>
                 </div>
               </div>
             </div>
@@ -4699,29 +4610,29 @@ const PurchaseInvoicePage: React.FC = () => {
         })()}
 
             {/* Footer actions wrapper */}
-            <div className="px-6 py-3.5 border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
+            <div className="px-6 py-3.5 border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0 dlg-footer">
               {selectedInvoice.status !== 'Cancelled' ? (
                 <button
                   onClick={() => handleCancelInvoice(selectedInvoice)}
-                  className="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 bg-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-3xs"
+                  className="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 bg-white rounded-xl text-[0.875rem] font-semibold flex items-center gap-1.5 cursor-pointer shadow-3xs"
                 >
                   <Ban className="w-3.5 h-3.5" /> Cancel Batch
                 </button>
               ) : (
-                <span className="px-3 py-1.5 bg-red-100/70 text-red-800 border border-red-200 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <span className="px-3 py-1.5 bg-red-100/70 text-red-800 border border-red-200 rounded-xl text-[0.875rem] font-medium uppercase tracking-wider flex items-center gap-1.5">
                   <Ban className="w-3.5 h-3.5" /> Batch Cancelled
                 </span>
               )}
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setPrintInvoiceTarget(selectedInvoice)}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-3xs flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-[0.875rem] shadow-3xs flex items-center gap-1.5 cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" /> Print Batch Slip
                 </button>
                 <button
                   onClick={() => setActiveSubPage('list')}
-                  className="px-5 py-2 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 text-gray-700 font-bold text-xs shadow-3xs cursor-pointer"
+                  className="px-5 py-2 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 text-gray-700 font-semibold text-[0.875rem] shadow-3xs cursor-pointer"
                 >
                   Close Window
                 </button>
@@ -4751,17 +4662,17 @@ const PurchaseInvoicePage: React.FC = () => {
             onClose={() => setSplittingItemIdx(null)}
             title="Split Location Allocation"
           >
-            <div className="space-y-4 text-xs text-gray-900 text-left">
+            <div className="space-y-4 text-[0.875rem] text-gray-900 text-left">
               <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 space-y-1">
-                <div className="font-bold text-sm text-gray-900">{selectedSku?.name || 'Raw Material'}</div>
+                <div className="font-semibold text-[0.875rem] text-gray-900">{selectedSku?.name || 'Raw Material'}</div>
                 <div className="text-gray-500 font-semibold">GSM: {selectedSku?.gsm || '—'} | Format: {selectedSku?.paperType || '—'}</div>
               </div>
 
               <div className="space-y-3 bg-blue-50/10 border border-blue-100 rounded-xl p-4">
-                <div className="text-[10px] font-black text-blue-800 uppercase tracking-wider">Add Godown Allocation Line</div>
+                <div className="text-xs font-medium text-blue-800 uppercase tracking-wider">Add Godown Allocation Line</div>
                 
                 <div>
-                  <label className="block text-[9px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Storage Location *</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wider">Storage Location *</label>
                   <LocationSelectPopup
                     locations={locations}
                     locationId={splitDraftLocId}
@@ -4776,7 +4687,7 @@ const PurchaseInvoicePage: React.FC = () => {
                 {isSheets ? (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[9px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Reams</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wider">Reams</label>
                       <input
                         type="number"
                         placeholder="e.g. 10"
@@ -4787,27 +4698,27 @@ const PurchaseInvoicePage: React.FC = () => {
                           const sheetsInput = document.getElementById("split_sheets_input") as HTMLInputElement;
                           if (sheetsInput) sheetsInput.value = reams > 0 ? String(sheets) : '';
                         }}
-                        className="w-full px-2.5 py-1.5 border border-gray-200 bg-white rounded-lg text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-2.5 py-1.5 border border-gray-200 bg-white rounded-lg text-[0.875rem] font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Sheets *</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wider">Sheets *</label>
                       <input
                         type="number"
                         placeholder="Total sheets quantity"
                         id="split_sheets_input"
-                        className="w-full px-2.5 py-1.5 border border-gray-200 bg-white rounded-lg text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-2.5 py-1.5 border border-gray-200 bg-white rounded-lg text-[0.875rem] font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
                 ) : (
                   <div>
-                    <label className="block text-[9px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider">Quantity ({unitLabel}) *</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">Quantity ({unitLabel}) *</label>
                     <input
                       type="number"
                       placeholder="Enter quantity"
                       id="split_qty_input"
-                      className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-[0.875rem] font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 )}
@@ -4846,7 +4757,7 @@ const PurchaseInvoicePage: React.FC = () => {
                       const qtyInput = document.getElementById("split_qty_input") as HTMLInputElement;
                       if (qtyInput) qtyInput.value = '';
                     }}
-                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-extrabold transition-all cursor-pointer"
+                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[0.875rem] font-semibold cursor-pointer"
                   >
                     + Add Allocation
                   </button>
@@ -4855,7 +4766,7 @@ const PurchaseInvoicePage: React.FC = () => {
 
               {/* Allocations Table */}
               <div className="space-y-2">
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">Allocated Locations</label>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Allocated Locations</label>
                 {tempSplits.length === 0 ? (
                   <div className="text-center py-4 bg-gray-50 rounded-xl border border-gray-150 text-gray-400 font-semibold italic">
                     No allocations added yet.
@@ -4865,12 +4776,12 @@ const PurchaseInvoicePage: React.FC = () => {
                     <table className="min-w-full divide-y divide-gray-250">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-3 py-1.5 text-left text-[9px] font-bold text-gray-400 uppercase tracking-wider font-sans">Godown/Location</th>
-                          <th className="px-3 py-1.5 text-right text-[9px] font-bold text-gray-400 uppercase tracking-wider font-sans">Quantity</th>
-                          <th className="px-3 py-1.5 text-center text-[9px] font-bold text-gray-400 uppercase tracking-wider font-sans w-10"></th>
+                          <th className="px-3 py-1.5 text-left text-xs font-medium text-gray-400 uppercase tracking-wider font-sans">Godown/Location</th>
+                          <th className="px-3 py-1.5 text-right text-xs font-medium text-gray-400 uppercase tracking-wider font-sans">Quantity</th>
+                          <th className="px-3 py-1.5 text-center text-xs font-medium text-gray-400 uppercase tracking-wider font-sans w-10"></th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-150 bg-white">
+                      <tbody className="bg-white divide-y divide-gray-150 bg-white">
                         {tempSplits.map((split, index) => {
                           const paths = resolveLocationPath(split.locationId || '');
                           const hierarchy = [paths.factory, paths.floor, paths.zone].filter(p => p && p !== '—').join(' > ');
@@ -4879,8 +4790,8 @@ const PurchaseInvoicePage: React.FC = () => {
                           const qtyVal = Number(split.quantity) || 0;
                           return (
                             <tr key={index}>
-                              <td className="px-3 py-2 font-bold text-gray-900">{displayLoc}</td>
-                              <td className="px-3 py-2 text-right font-black text-gray-800">
+                              <td className="px-3 py-2 font-semibold text-gray-900">{displayLoc}</td>
+                              <td className="px-3 py-2 text-right font-semibold text-gray-800">
                                 {isSheets 
                                   ? `${qtyVal.toLocaleString()} Sheets (${qtyVal / stdSheets} Reams)`
                                   : `${qtyVal.toLocaleString()} ${unitLabel}`}
@@ -4889,7 +4800,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => setTempSplits(tempSplits.filter((_, i) => i !== index))}
-                                  className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
+                                  className="icon-btn-danger"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -4905,8 +4816,8 @@ const PurchaseInvoicePage: React.FC = () => {
 
               {/* Total Calculation Row */}
               <div className="flex justify-between items-center bg-gray-50 border border-gray-200 rounded-xl p-3">
-                <span className="font-bold text-gray-550 uppercase font-sans">Total Allocated Quantity:</span>
-                <span className="font-black text-sm text-blue-600">
+                <span className="font-semibold text-gray-550 uppercase font-sans">Total Allocated Quantity:</span>
+                <span className="font-semibold text-[0.875rem] text-blue-600">
                   {isSheets 
                     ? `${totalTempQty.toLocaleString()} Sheets (${totalTempQty / stdSheets} Reams)`
                     : `${totalTempQty.toLocaleString()} ${unitLabel}`}
@@ -4914,11 +4825,11 @@ const PurchaseInvoicePage: React.FC = () => {
               </div>
 
               {/* Footer Buttons */}
-              <div className="sticky bottom-0 bg-white pt-3 pb-0.5 border-t border-gray-150 flex justify-end gap-3 z-10 mt-2">
+              <div className="sticky bottom-0 bg-white pt-3 pb-0.5 border-t border-gray-150 flex justify-end gap-3 z-10 mt-2 dlg-footer">
                 <button
                   type="button"
                   onClick={() => setSplittingItemIdx(null)}
-                  className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 font-semibold text-xs text-gray-700"
+                  className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 font-semibold text-[0.875rem] text-gray-700"
                 >
                   Cancel
                 </button>
@@ -4935,7 +4846,7 @@ const PurchaseInvoicePage: React.FC = () => {
                     setInvoiceForm({ ...invoiceForm, items: updated });
                     setSplittingItemIdx(null);
                   }}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition-all disabled:opacity-50 text-xs"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-md disabled:opacity-50 text-[0.875rem]"
                 >
                   Confirm Allocations
                 </button>
@@ -5029,9 +4940,9 @@ const PurchaseInvoicePage: React.FC = () => {
 
         return typeof document !== 'undefined' ? createPortal(
           <div className="fixed inset-0 z-[100000] flex items-center justify-center p-3 sm:p-5 pointer-events-none">
-            <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md pointer-events-auto cursor-pointer" onClick={() => !allocateSubmitting && setShowAllocateModal(false)} />
+            <div className="fixed inset-0 bg-gray-900/40 pointer-events-auto cursor-pointer" onClick={() => !allocateSubmitting && setShowAllocateModal(false)} />
 
-            <div className="relative bg-white rounded-2xl shadow-2xl shadow-slate-950/20 border border-slate-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-modalPop font-sans text-xs pointer-events-auto">
+            <div className="relative bg-white rounded-2xl shadow-2xl shadow-slate-950/20 border border-slate-200 w-full max-w-4xl max-h-[calc(92*var(--vh,1vh))] flex flex-col overflow-hidden font-sans text-[0.875rem] pointer-events-auto">
               {/* Modal Header matching app standard */}
               <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2.5">
@@ -5039,32 +4950,32 @@ const PurchaseInvoicePage: React.FC = () => {
                     <MapPinIcon className="w-4 h-4" />
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold uppercase tracking-wider text-gray-900">
+                    <h2 className="text-[0.875rem] font-medium uppercase tracking-wider text-gray-900">
                       Allocate Location & Reels
                     </h2>
-                    <p className="text-[10px] text-gray-500 font-medium">Multi-Godown Inventory Allocation & Distribution</p>
+                    <p className="text-xs text-gray-500 font-medium">Multi-Godown Inventory Allocation & Distribution</p>
                   </div>
                 </div>
                 <button
                   disabled={allocateSubmitting}
                   onClick={() => setShowAllocateModal(false)}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded-lg transition-colors cursor-pointer"
+                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded-lg cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <form onSubmit={handleAllocateSubmit} className="flex flex-col flex-1 overflow-hidden">
-                <div className="p-5 sm:p-6 space-y-4 text-left text-xs overflow-y-auto flex-1 bg-white">
+                <div className="p-5 sm:p-6 space-y-4 text-left text-[0.875rem] overflow-y-auto flex-1 bg-white">
                   {allocateError && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-bold text-red-700 flex items-center gap-2">
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-[0.875rem] font-semibold text-red-700 flex items-center gap-2">
                       <HelpCircle className="w-4 h-4 shrink-0 text-red-600" />
                       <span>{allocateError}</span>
                     </div>
                   )}
 
                   {maxAllocatable <= 0 && (
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-800 flex items-center gap-2">
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[0.875rem] font-semibold text-amber-800 flex items-center gap-2">
                       <Lock className="w-4 h-4 shrink-0 text-amber-600" />
                       <span>All stock and reels for this Material Lot have already been allocated to storage locations and locked. Further allocation is locked.</span>
                     </div>
@@ -5074,7 +4985,7 @@ const PurchaseInvoicePage: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 shrink-0">
                     {/* Card 1: Material Lot */}
                     <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                      <span className="block text-[10px] text-blue-600 font-bold uppercase tracking-wider leading-tight mb-1">
+                      <span className="block text-xs text-blue-600 font-medium uppercase tracking-wider leading-tight mb-1">
                         Material Lot
                       </span>
                       {selectedInvoice.items && selectedInvoice.items.length > 1 ? (
@@ -5086,7 +4997,7 @@ const PurchaseInvoicePage: React.FC = () => {
                             setAllocationsList([{ toLocationId: '', quantity: '', reels: [] }]);
                             setActiveReelPickerRowIdx(null);
                           }}
-                          className="w-full px-2 py-1 border border-blue-200 rounded-lg text-xs font-bold text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-2 py-1 border border-blue-200 rounded-lg text-[0.875rem] font-semibold text-gray-900 bg-white focus:ring-2 focus:ring-blue-500"
                           disabled={allocateSubmitting}
                         >
                           {selectedInvoice.items.map((item, idx) => {
@@ -5100,28 +5011,28 @@ const PurchaseInvoicePage: React.FC = () => {
                           })}
                         </select>
                       ) : (
-                        <div className="font-extrabold text-gray-900 text-xs truncate">
+                        <div className="font-semibold text-gray-900 text-[0.875rem] truncate">
                           {typeof lotItem?.skuId === 'object' && lotItem?.skuId !== null ? (lotItem?.skuId as any).name : 'Raw Material'}
                         </div>
                       )}
                     </div>
 
                     {/* Card 2: Receiving Bay */}
-                    <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-3 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                      <span className="block text-[10px] text-indigo-650 font-bold uppercase tracking-wider leading-tight">
+                    <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+                      <span className="block text-xs text-blue-650 font-medium uppercase tracking-wider leading-tight">
                         Receiving Bay (From)
                       </span>
-                      <span className="block text-xs text-indigo-900 font-extrabold mt-1 truncate">
+                      <span className="block text-[0.875rem] text-blue-900 font-semibold mt-1 truncate">
                         {defaultLocName}
                       </span>
                     </div>
 
                     {/* Card 3: Available to Allocate */}
                     <div className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-3 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-                      <span className="block text-[10px] text-emerald-700 font-bold uppercase tracking-wider leading-tight">
+                      <span className="block text-xs text-emerald-700 font-medium uppercase tracking-wider leading-tight">
                         Available to Allocate
                       </span>
-                      <span className="block text-sm text-emerald-900 font-extrabold mt-0.5 font-mono">
+                      <span className="block text-[0.875rem] text-emerald-900 font-semibold mt-0.5 font-mono">
                         {maxAllocatable.toLocaleString('en-IN')} {unitLabel}
                       </span>
                     </div>
@@ -5129,11 +5040,11 @@ const PurchaseInvoicePage: React.FC = () => {
 
                   {/* Allocation Table */}
                   <div className="border border-gray-200 rounded-xl overflow-hidden shadow-3xs bg-white">
-                    <table className="w-full text-left text-xs border-collapse">
+                    <table className="w-full text-left text-[0.875rem] border-collapse">
                       <thead>
-                        <tr className="bg-gray-50 text-gray-500 uppercase font-black border-b border-gray-200 text-[10px] tracking-wider">
+                        <tr className="bg-gray-50 text-gray-500 uppercase font-medium border-b border-gray-200 text-xs tracking-wider">
                           <th className="py-2.5 px-3 w-10 text-center">#</th>
-                          <th className="py-2.5 px-3 min-w-[220px]">Target Godown / Storage Area *</th>
+                          <th className="py-2.5 px-3 min-w-[13.75rem]">Target Godown / Storage Area *</th>
                           {hasReels && (
                             <th className="py-2.5 px-3 w-48 text-center">Reels Assigned</th>
                           )}
@@ -5146,15 +5057,15 @@ const PurchaseInvoicePage: React.FC = () => {
                           <th className="py-2.5 px-2 w-10 text-center"></th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100 font-medium">
+                      <tbody className="bg-white divide-y divide-gray-100 font-medium">
                         {currentList.map((row, index) => {
                           const rowReels = row.reels || [];
                           const rowReelsWeight = rowReels.reduce((s: number, r: any) => s + (Number(r.weight || r.weightKg || r.netWeight) || 0), 0);
                           const rowReams = selectedSku?.paperType === 'Sheets' && row.quantity ? (Number(row.quantity) / stdSheetsPerReam) : 0;
 
                           return (
-                            <tr key={index} className="hover:bg-blue-50/20 transition-colors">
-                              <td className="py-2.5 px-3 text-center font-bold text-gray-400 text-xs">
+                            <tr key={index} className="hover:bg-blue-50/20">
+                              <td className="py-2.5 px-3 text-center font-semibold text-gray-400 text-[0.875rem]">
                                 {index + 1}
                               </td>
 
@@ -5176,7 +5087,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => setActiveReelPickerRowIdx(index)}
-                                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 w-full transition-all cursor-pointer shadow-3xs ${
+                                    className={`px-2.5 py-1.5 rounded-lg text-[0.875rem] font-semibold border flex items-center justify-center gap-1.5 w-full cursor-pointer shadow-3xs ${
                                       rowReels.length > 0
                                         ? 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'
                                         : 'bg-white text-gray-600 border-dashed border-gray-300 hover:border-blue-400 hover:text-blue-600'
@@ -5204,7 +5115,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                       const reams = Number(e.target.value) || 0;
                                       handleUpdateRow(index, 'quantity', reams > 0 ? String(reams * stdSheetsPerReam) : '');
                                     }}
-                                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-right text-gray-800 focus:ring-2 focus:ring-blue-500 bg-white"
+                                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-right text-gray-800 focus:ring-2 focus:ring-blue-500 bg-white"
                                   />
                                 </td>
                               )}
@@ -5217,7 +5128,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                   value={row.quantity || ''}
                                   onChange={e => handleUpdateRow(index, 'quantity', e.target.value)}
                                   disabled={hasReels}
-                                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-right text-blue-900 focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-slate-50 disabled:cursor-not-allowed"
+                                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-right text-blue-900 focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-slate-50 disabled:cursor-not-allowed"
                                 />
                               </td>
 
@@ -5225,7 +5136,7 @@ const PurchaseInvoicePage: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveRow(index)}
-                                  className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                                  className="icon-btn-danger"
                                   title="Delete godown row"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -5243,7 +5154,7 @@ const PurchaseInvoicePage: React.FC = () => {
                     <button
                       type="button"
                       onClick={handleAddRow}
-                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-3xs transition-colors"
+                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-lg text-[0.875rem] font-semibold flex items-center gap-1.5 cursor-pointer shadow-3xs"
                     >
                       <Plus className="w-3.5 h-3.5" /> Add Godown Row
                     </button>
@@ -5253,7 +5164,7 @@ const PurchaseInvoicePage: React.FC = () => {
                         <button
                           type="button"
                           onClick={handleDistributeEvenly}
-                          className="px-2.5 py-1.5 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-3xs"
+                          className="px-2.5 py-1.5 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 rounded-lg text-[0.875rem] font-semibold flex items-center gap-1 cursor-pointer shadow-3xs"
                           title="Evenly distribute available quantity across godowns"
                         >
                           ⚡ Split Evenly
@@ -5264,7 +5175,7 @@ const PurchaseInvoicePage: React.FC = () => {
                         <button
                           type="button"
                           onClick={handleAllocateRemaining}
-                          className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-3xs"
+                          className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-lg text-[0.875rem] font-semibold flex items-center gap-1 cursor-pointer shadow-3xs"
                           title="Allocate remaining balance to a godown row"
                         >
                           ⚡ Fill Remaining ({remainingBalance.toLocaleString('en-IN')} {unitLabel})
@@ -5276,24 +5187,24 @@ const PurchaseInvoicePage: React.FC = () => {
 
                 {/* Balance Summary Footer matching ERP design */}
                 <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between flex-wrap gap-3 flex-shrink-0 rounded-b-2xl">
-                  <div className="flex items-center gap-4 text-xs">
+                  <div className="flex items-center gap-4 text-[0.875rem]">
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-gray-400 block leading-tight">Available</span>
-                      <span className="font-mono font-bold text-gray-800 text-xs">
+                      <span className="text-xs uppercase font-semibold text-gray-400 block leading-tight">Available</span>
+                      <span className="font-mono font-semibold text-gray-800 text-[0.875rem]">
                         {maxAllocatable.toLocaleString('en-IN')} {unitLabel}
                       </span>
                     </div>
 
                     <div className="border-l border-gray-200 pl-4">
-                      <span className="text-[10px] uppercase font-bold text-gray-400 block leading-tight">Total Allocated</span>
-                      <span className="font-mono font-bold text-blue-650 text-xs">
+                      <span className="text-xs uppercase font-semibold text-gray-400 block leading-tight">Total Allocated</span>
+                      <span className="font-mono font-semibold text-blue-650 text-[0.875rem]">
                         {totalAllocated.toLocaleString('en-IN')} {unitLabel}
                       </span>
                     </div>
 
                     <div className="border-l border-gray-200 pl-4">
-                      <span className="text-[10px] uppercase font-bold text-gray-400 block leading-tight">Balance Remaining</span>
-                      <span className={`font-mono font-bold text-xs ${
+                      <span className="text-xs uppercase font-semibold text-gray-400 block leading-tight">Balance Remaining</span>
+                      <span className={`font-mono font-semibold text-[0.875rem] ${
                         isFullyAllocated 
                           ? 'text-emerald-600' 
                           : isOverallocated 
@@ -5306,17 +5217,17 @@ const PurchaseInvoicePage: React.FC = () => {
 
                     <div>
                       {isFullyAllocated && (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 border border-emerald-200 text-emerald-700">
                           ✓ Fully Allocated
                         </span>
                       )}
                       {remainingBalance > 0 && totalAllocated > 0 && (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 border border-amber-200 text-amber-700">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 border border-amber-200 text-amber-700">
                           ⏳ Partial ({remainingBalance} {unitLabel} left)
                         </span>
                       )}
                       {isOverallocated && (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-50 border border-red-200 text-red-700">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 border border-red-200 text-red-700">
                           ⚠️ Overallocated
                         </span>
                       )}
@@ -5328,14 +5239,14 @@ const PurchaseInvoicePage: React.FC = () => {
                       type="button"
                       disabled={allocateSubmitting}
                       onClick={() => setShowAllocateModal(false)}
-                      className="px-4 py-2 border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-100 bg-white transition-colors cursor-pointer shadow-3xs disabled:opacity-50"
+                      className="px-4 py-2 border border-gray-300 rounded-xl text-[0.875rem] font-semibold text-gray-700 hover:bg-gray-100 bg-white cursor-pointer shadow-3xs disabled:opacity-50"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={allocateSubmitting || !hasValidAllocations || isOverallocated || maxAllocatable <= 0}
-                      className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
+                      className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[0.875rem] font-semibold shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                     >
                       {allocateSubmitting ? (
                         <>
@@ -5388,8 +5299,8 @@ const PurchaseInvoicePage: React.FC = () => {
 
                 return typeof document !== 'undefined' ? createPortal(
                   <div className="fixed inset-0 z-[100050] flex items-center justify-center p-3 sm:p-5 pointer-events-none">
-                    <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs pointer-events-auto cursor-pointer" onClick={() => setActiveReelPickerRowIdx(null)} />
-                    <div className="relative bg-white rounded-2xl border border-gray-200 shadow-2xl shadow-slate-950/20 max-w-lg w-full z-10 animate-modalPop overflow-hidden flex flex-col max-h-[85vh] pointer-events-auto font-sans text-xs">
+                    <div className="fixed inset-0 bg-gray-900/40 pointer-events-auto cursor-pointer" onClick={() => setActiveReelPickerRowIdx(null)} />
+                    <div className="relative bg-white rounded-2xl border border-gray-200 shadow-2xl shadow-slate-950/20 max-w-lg w-full z-10 overflow-hidden flex flex-col max-h-[calc(85*var(--vh,1vh))] pointer-events-auto font-sans text-[0.875rem]">
                       {/* Sub-Modal Header */}
                       <div className="px-5 py-3.5 border-b border-gray-200 flex items-center justify-between bg-gray-50 shrink-0">
                         <div className="flex items-center gap-2">
@@ -5397,16 +5308,16 @@ const PurchaseInvoicePage: React.FC = () => {
                             <Layers className="w-4 h-4" />
                           </div>
                           <div>
-                            <h3 className="text-xs font-bold text-gray-900">
+                            <h3 className="text-[0.875rem] font-semibold text-gray-900">
                               Select Reels for {godownName}
                             </h3>
-                            <p className="text-[10px] text-gray-500 font-medium">Row #{activeReelPickerRowIdx + 1} Godown Allocation</p>
+                            <p className="text-xs text-gray-500 font-medium">Row #{activeReelPickerRowIdx + 1} Godown Allocation</p>
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => setActiveReelPickerRowIdx(null)}
-                          className="p-1 hover:bg-gray-200 rounded-lg text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+                          className="p-1 hover:bg-gray-200 rounded-lg text-gray-400 hover:text-gray-700 cursor-pointer"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -5419,26 +5330,26 @@ const PurchaseInvoicePage: React.FC = () => {
                           placeholder="Search reel number..."
                           value={reelSearchText}
                           onChange={e => setReelSearchText(e.target.value)}
-                          className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-white text-gray-800 flex-1 focus:ring-2 focus:ring-blue-500"
+                          className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] bg-white text-gray-800 flex-1 focus:ring-2 focus:ring-blue-500"
                         />
                         <button
                           type="button"
                           onClick={handleSelectAllAvailable}
-                          className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-lg text-[11px] font-bold cursor-pointer shadow-3xs"
+                          className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-lg text-xs font-semibold cursor-pointer shadow-3xs"
                         >
                           Select All Available
                         </button>
                         <button
                           type="button"
                           onClick={handleClearReels}
-                          className="px-2.5 py-1.5 bg-white hover:bg-gray-100 border border-gray-200 text-gray-600 rounded-lg text-[11px] font-bold cursor-pointer shadow-3xs"
+                          className="px-2.5 py-1.5 bg-white hover:bg-gray-100 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold cursor-pointer shadow-3xs"
                         >
                           Clear
                         </button>
                       </div>
 
                       {/* Reels List */}
-                      <div className="p-3 overflow-y-auto flex-1 space-y-1.5 max-h-[50vh] bg-slate-50/50">
+                      <div className="p-3 overflow-y-auto flex-1 space-y-1.5 max-h-[calc(50*var(--vh,1vh))] bg-slate-50/50">
                         {filteredReels.map((r: any) => {
                           const isChecked = chosenReels.some(sr => sr.reelNumber === r.reelNumber);
                           const assignedOtherIdx = currentList.findIndex((other, oIdx) => oIdx !== activeReelPickerRowIdx && other.reels?.some(sr => sr.reelNumber === r.reelNumber));
@@ -5448,11 +5359,11 @@ const PurchaseInvoicePage: React.FC = () => {
                           return (
                             <label
                               key={r.reelNumber}
-                              className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all ${
+                              className={`flex items-center justify-between p-2.5 rounded-xl border text-[0.875rem] ${
                                 isAssignedOther
                                   ? 'bg-slate-100/60 border-slate-200 text-gray-400 cursor-not-allowed opacity-60'
                                   : isChecked
-                                    ? 'bg-blue-50 border-blue-300 text-blue-950 font-bold cursor-pointer shadow-3xs'
+                                    ? 'bg-blue-50 border-blue-300 text-blue-950 font-semibold cursor-pointer shadow-3xs'
                                     : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 cursor-pointer shadow-3xs'
                               }`}
                             >
@@ -5465,16 +5376,16 @@ const PurchaseInvoicePage: React.FC = () => {
                                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
                                 />
                                 <div>
-                                  <span className="font-mono font-bold text-xs">{r.reelNumber}</span>
+                                  <span className="font-mono font-semibold text-[0.875rem]">{r.reelNumber}</span>
                                   {isAssignedOther && (
-                                    <span className="ml-2 text-[9px] font-semibold text-gray-400 italic">
+                                    <span className="ml-2 text-xs font-semibold text-gray-400 italic">
                                       (Assigned to Row #{assignedOtherIdx + 1})
                                     </span>
                                   )}
                                 </div>
                               </div>
 
-                              <span className="font-mono font-black text-xs px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800">
+                              <span className="font-mono font-semibold text-[0.875rem] px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800">
                                 {rWeight > 0 ? `${rWeight.toLocaleString()} KG` : '—'}
                               </span>
                             </label>
@@ -5483,14 +5394,14 @@ const PurchaseInvoicePage: React.FC = () => {
                       </div>
 
                       {/* Sub-Modal Footer */}
-                      <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
-                        <span className="text-xs font-bold text-gray-700">
+                      <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between shrink-0 dlg-footer">
+                        <span className="text-[0.875rem] font-semibold text-gray-700">
                           Selected: <strong className="text-blue-700">{chosenReels.length}</strong> Reels ({totalWeightChosen.toLocaleString()} KG)
                         </span>
                         <button
                           type="button"
                           onClick={() => setActiveReelPickerRowIdx(null)}
-                          className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer shadow-3xs"
+                          className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[0.875rem] font-semibold cursor-pointer shadow-3xs"
                         >
                           Confirm & Done
                         </button>
@@ -5509,14 +5420,14 @@ const PurchaseInvoicePage: React.FC = () => {
       {/* Activity Log Drawer */}
       {showActivityLog && (
         <div className="fixed inset-0 z-[100000] overflow-hidden !mt-0">
-          <div className="absolute inset-0 overflow-hidden bg-slate-950/40 backdrop-blur-xs transition-opacity" onClick={() => setShowActivityLog(false)}></div>
+          <div className="absolute inset-0 overflow-hidden bg-slate-950/40" onClick={() => setShowActivityLog(false)}></div>
           <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
             <div className="pointer-events-auto w-screen max-w-md">
-              <div className="flex h-full flex-col bg-white shadow-2xl animate-in slide-in-from-right duration-250">
+              <div className="flex h-full flex-col bg-white shadow-2xl slide-in-from-right">
                 <div className="bg-gray-50 px-4 py-5 border-b flex justify-between items-center">
                   <div>
-                    <h2 className="text-base font-bold text-gray-900">Purchase Activity Log</h2>
-                    <p className="text-[10px] text-gray-500 mt-0.5 font-medium">Audit logs for purchase batch bookings, payments, and cancellations</p>
+                    <h2 className="text-base font-semibold text-gray-900">Purchase Activity Log</h2>
+                    <p className="text-xs text-gray-500 mt-0.5 font-medium">Audit logs for purchase batch bookings, payments, and cancellations</p>
                   </div>
                   <button onClick={() => setShowActivityLog(false)} className="text-gray-400 hover:text-gray-600">
                     <X className="h-5 w-5" />
@@ -5528,18 +5439,18 @@ const PurchaseInvoicePage: React.FC = () => {
                       <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
                     </div>
                   ) : activityLogs.length === 0 ? (
-                    <p className="text-center text-xs text-gray-500 py-8">No recent activity logs recorded.</p>
+                    <p className="text-center text-[0.875rem] text-gray-500 py-8">No recent activity logs recorded.</p>
                   ) : (
                     <div className="space-y-4">
                       {activityLogs.map((log, idx) => (
-                        <div key={log._id || idx} className="border-l-2 border-blue-500 pl-3 py-1 space-y-1 text-xs">
-                          <div className="flex justify-between font-bold text-gray-800">
-                            <span className="uppercase text-[10px] font-black text-blue-600">{log.action}</span>
-                            <span className="text-[10px] text-gray-400 font-normal">{new Date(log.createdAt).toLocaleString('en-IN')}</span>
+                        <div key={log._id || idx} className="border-l-2 border-blue-500 pl-3 py-1 space-y-1 text-[0.875rem]">
+                          <div className="flex justify-between font-semibold text-gray-800">
+                            <span className="uppercase text-xs font-semibold text-blue-600">{log.action}</span>
+                            <span className="text-xs text-gray-400 font-normal">{new Date(log.createdAt).toLocaleString('en-IN')}</span>
                           </div>
-                          <p className="text-gray-600 font-bold">Batch: {log.entityName}</p>
-                          <p className="text-gray-500 text-[11px]">{log.details}</p>
-                          <p className="text-[10px] text-gray-400 font-medium">Performed By: {log.performedBy}</p>
+                          <p className="text-gray-600 font-semibold">Batch: {log.entityName}</p>
+                          <p className="text-gray-500 text-xs">{log.details}</p>
+                          <p className="text-xs text-gray-400 font-medium">Performed By: {log.performedBy}</p>
                         </div>
                       ))}
                     </div>
@@ -5553,10 +5464,10 @@ const PurchaseInvoicePage: React.FC = () => {
 
       {/* Find Duplicates Modal */}
       {showDuplicates && (
-        <div className="fixed inset-0 z-[100000] overflow-y-auto flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-xs !mt-0 animate-in fade-in duration-200">
-          <div className="relative bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+        <div className="fixed inset-0 z-[100000] overflow-y-auto flex items-center justify-center p-4 bg-slate-950/40 !mt-0">
+          <div className="relative bg-white max-w-2xl w-full flex flex-col max-h-[calc(85*var(--vh,1vh))] overflow-hidden dlg-panel">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center">
-              <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+              <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-yellow-500" />
                 Find Duplicates for Purchase Batches
               </h2>
@@ -5564,12 +5475,12 @@ const PurchaseInvoicePage: React.FC = () => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-6 overflow-y-auto flex-1 space-y-4 text-xs">
+            <div className="p-6 overflow-y-auto flex-1 space-y-4 text-[0.875rem]">
               {duplicateGroups.length === 0 ? (
                 <div className="text-center py-8">
                   <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
                   <p className="font-semibold text-gray-800">No duplicates detected!</p>
-                  <p className="text-sm text-gray-400 mt-1">All Batch / Invoice numbers are completely unique.</p>
+                  <p className="text-[0.875rem] text-gray-400 mt-1">All Batch / Invoice numbers are completely unique.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -5577,19 +5488,19 @@ const PurchaseInvoicePage: React.FC = () => {
                   {duplicateGroups.map((group, gIdx) => (
                     <div key={gIdx} className="border border-red-100 bg-red-50/10 rounded-xl p-4 space-y-3">
                       <div className="flex justify-between items-center border-b pb-2">
-                        <span className="font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded uppercase text-[10px]">
+                        <span className="font-semibold text-red-700 bg-red-50 px-2 py-0.5 rounded uppercase text-xs">
                           Duplicate Invoice: {group.value}
                         </span>
-                        <span className="text-[10px] text-gray-400 font-bold">{group.items.length} duplicate entries</span>
+                        <span className="text-xs text-gray-400 font-semibold">{group.items.length} duplicate entries</span>
                       </div>
                       <div className="space-y-2">
                         {group.items.map((item, iIdx) => (
-                          <div key={item._id || iIdx} className="flex justify-between items-center text-[11px] text-gray-600 bg-white p-2 rounded-lg border border-gray-150">
+                          <div key={item._id || iIdx} className="flex justify-between items-center text-xs text-gray-600 bg-white p-2 rounded-lg border border-gray-150">
                             <div>
-                              <p className="font-bold text-gray-900">{item.invoiceNumber}</p>
-                              <p className="font-mono text-gray-400 text-[10px]">Grand Total: ₹{item.grandTotal?.toLocaleString('en-IN')}</p>
+                              <p className="font-semibold text-gray-900">{item.invoiceNumber}</p>
+                              <p className="font-mono text-gray-400 text-xs">Grand Total: ₹{item.grandTotal?.toLocaleString('en-IN')}</p>
                             </div>
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700">{item.status}</span>
+                            <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-700">{item.status}</span>
                           </div>
                         ))}
                       </div>
@@ -5605,17 +5516,17 @@ const PurchaseInvoicePage: React.FC = () => {
       {/* Recycle Bin Drawer */}
       {showRecycleBin && (
         <div className="fixed inset-0 z-[100000] overflow-hidden !mt-0">
-          <div className="absolute inset-0 overflow-hidden bg-black/10 transition-opacity" onClick={() => setShowRecycleBin(false)}></div>
+          <div className="absolute inset-0 overflow-hidden bg-black/10" onClick={() => setShowRecycleBin(false)}></div>
           <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
             <div className="pointer-events-auto w-screen max-w-md">
-              <div className="flex h-full flex-col bg-white shadow-2xl animate-in slide-in-from-right duration-250">
+              <div className="flex h-full flex-col bg-white shadow-2xl slide-in-from-right">
                 <div className="bg-gray-50 px-4 py-5 border-b flex justify-between items-center">
                   <div>
-                    <h2 className="text-base font-bold text-gray-900 flex items-center gap-1.5">
+                    <h2 className="text-base font-semibold text-gray-900 flex items-center gap-1.5">
                       <Trash2 className="w-4 h-4 text-gray-500" />
                       Purchase Recycle Bin (Draft/Cancelled)
                     </h2>
-                    <p className="text-[10px] text-gray-500 mt-0.5 font-medium font-sans">Draft/Cancelled batches can be restored back to Posted</p>
+                    <p className="text-xs text-gray-500 mt-0.5 font-medium font-sans">Draft/Cancelled batches can be restored back to Posted</p>
                   </div>
                   <button onClick={() => setShowRecycleBin(false)} className="text-gray-400 hover:text-gray-600">
                     <X className="h-5 w-5" />
@@ -5630,19 +5541,19 @@ const PurchaseInvoicePage: React.FC = () => {
                     <div className="text-center py-12 text-gray-450">
                       <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
                       <p className="font-semibold text-gray-700">Recycle Bin is Empty!</p>
-                      <p className="text-xs text-gray-400 mt-1">No draft or cancelled purchase invoices found.</p>
+                      <p className="text-[0.875rem] text-gray-400 mt-1">No draft or cancelled purchase invoices found.</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
                       {recycleBinItems.map((item, idx) => (
-                        <div key={item._id || idx} className="flex justify-between items-center p-3 border border-gray-200 rounded-xl bg-gray-50/50 hover:bg-white transition-all text-xs">
+                        <div key={item._id || idx} className="flex justify-between items-center p-3 border border-gray-200 rounded-xl bg-gray-50/50 hover:bg-white text-[0.875rem]">
                           <div className="space-y-1">
-                            <p className="font-bold text-gray-800">{item.invoiceNumber}</p>
-                            <p className="font-mono text-gray-400 text-[10px]">Grand Total: ₹{item.grandTotal?.toLocaleString('en-IN')} • {item.status}</p>
+                            <p className="font-semibold text-gray-800">{item.invoiceNumber}</p>
+                            <p className="font-mono text-gray-400 text-xs">Grand Total: ₹{item.grandTotal?.toLocaleString('en-IN')} • {item.status}</p>
                           </div>
                           <button
                             onClick={() => handleRestoreInvoice(item)}
-                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-bold transition-colors"
+                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-[0.875rem] font-semibold"
                           >
                             Restore
                           </button>
@@ -5670,15 +5581,15 @@ const PurchaseInvoicePage: React.FC = () => {
             </div>
 
             <div>
-              <h3 className="text-base font-black text-slate-900 tracking-tight">
+              <h3 className="text-base font-semibold text-slate-900 tracking-tight">
                 Cancel Purchase Batch
               </h3>
-              <span className="inline-block mt-1 text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+              <span className="inline-block mt-1 text-xs font-mono font-semibold px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
                 {cancelConfirmInvoice.invoiceNumber}
               </span>
             </div>
 
-            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 text-xs text-slate-600 leading-relaxed font-medium">
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 text-[0.875rem] text-slate-600 leading-relaxed font-medium">
               Are you sure you want to cancel purchase batch '{cancelConfirmInvoice.invoiceNumber}'? This will mark the batch as Cancelled and remove its stock from Stock and Stock Ledger modules.
             </div>
 
@@ -5686,14 +5597,14 @@ const PurchaseInvoicePage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setCancelConfirmInvoice(null)}
-                className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 transition-all cursor-pointer"
+                className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-[0.875rem] font-semibold hover:bg-slate-50 cursor-pointer"
               >
                 No, Keep it
               </button>
               <button
                 type="button"
                 onClick={executeCancelInvoice}
-                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-600/20 flex items-center gap-1.5 transition-all cursor-pointer"
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[0.875rem] font-semibold shadow-md shadow-rose-600/20 flex items-center gap-1.5 cursor-pointer"
               >
                 <Ban className="w-3.5 h-3.5" />
                 <span>Yes, Cancel Batch</span>

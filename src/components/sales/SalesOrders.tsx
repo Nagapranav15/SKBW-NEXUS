@@ -24,8 +24,7 @@ import RecordPaymentModal from './RecordPaymentModal';
 import { showToast } from '../ui/Toast';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { generateListPdf } from '../../utils/pdfReport';
 import { generateFullDashboardOrders, INITIAL_FEATURED_ORDERS } from './salesOrderSampleData';
 import { PendingOrdersProductionView } from './PendingOrdersProductionView';
 import { getCustomSalesOrders, saveCustomSalesOrder } from '../../utils/salesOrderStorage';
@@ -33,7 +32,7 @@ import { formatDateDDMMYYYY, getOrderTime } from '../../utils/dateUtils';
 
 // Custom SVG WhatsApp icon matching site vibe
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ 
-  className = "w-4 h-4 text-emerald-500 hover:text-emerald-600 transition-all duration-300 transform hover:scale-110 block shrink-0" 
+  className = "w-4 h-4 text-emerald-500 hover:text-emerald-600 block shrink-0" 
 }) => (
   <svg 
     className={className} 
@@ -645,26 +644,6 @@ const SalesOrders: React.FC = () => {
   // Print Report as PDF
   const handlePrintReport = () => {
     try {
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-      const pageWidth = doc.internal.pageSize.getWidth();
-
-      // Top Banner
-      doc.setFillColor(37, 99, 235); // Vibrant blue
-      doc.rect(0, 0, pageWidth, 20, 'F');
-
-      doc.setFontSize(14);
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`${(selectedCompany?.name || 'SKBW CORE').toUpperCase()} — SALES ORDERS REPORT`, 14, 13);
-
-      doc.setFontSize(8.5);
-      doc.setTextColor(100, 116, 139);
-      doc.text(
-        `Generated: ${new Date().toLocaleDateString('en-IN')}  |  Orders: ${filteredOrders.length}  |  Total Value: Rs. ${metrics.totalAmount.toLocaleString('en-IN')}`,
-        14,
-        27
-      );
-
       const tableData = sortedOrders.map((o, idx) => [
         idx + 1,
         o.orderNumber,
@@ -678,16 +657,15 @@ const SalesOrders: React.FC = () => {
         o.status || 'Confirmed'
       ]);
 
-      autoTable(doc, {
-        head: [['#', 'SO No.', 'Date', 'Customer', 'Mobile', 'City', 'Delivery Due', 'Amount', 'Fulfilment', 'Status']],
+      generateListPdf({
+        companyName: selectedCompany?.name || 'SKBW CORE',
+        title: 'Sales Orders Report',
+        meta: [`Orders: ${filteredOrders.length}`, `Total Value: Rs. ${metrics.totalAmount.toLocaleString('en-IN')}`],
+        head: ['#', 'SO No.', 'Date', 'Customer', 'Mobile', 'City', 'Delivery Due', 'Amount', 'Fulfilment', 'Status'],
         body: tableData,
-        startY: 32,
-        styles: { fontSize: 8, cellPadding: 2.5 },
-        headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [248, 250, 252] }
+        fileName: `Sales_Orders_Report_${new Date().toISOString().split('T')[0]}`,
+        rightAlignColumns: [7],
       });
-
-      doc.save(`Sales_Orders_Report_${new Date().toISOString().split('T')[0]}.pdf`);
       showToast('Sales Orders PDF report downloaded', 'success');
     } catch (e) {
       console.error(e);
@@ -811,9 +789,9 @@ const SalesOrders: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+    <div className="min-h-[calc(100*var(--vh,1vh))] bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
       {/* Main Content Layout */}
-      <div className="transition-all duration-300">
+      <div className="transition-all">
         <div className="space-y-4">
           
           {/* ── IN-PAGE SUCCESS PAGE (Exact match to Screenshot 1:1) ── */}
@@ -843,19 +821,16 @@ const SalesOrders: React.FC = () => {
           ) : (
             <>
               {/* 1. Header Banner (Matching Purchase Batches Header Banner exactly) */}
-          <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
+          <div className="flex flex-row items-center justify-between gap-4 px-1 relative">
             <div className="flex items-center gap-3.5">
-              <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
-                <Receipt className="w-6 h-6 stroke-[2.2]" />
-              </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+                <h1 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                   <span>Sales Orders</span>
-                  <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold transition-all">
+                  <span className="text-xs font-medium text-gray-500">
                     {metrics.totalOrders} Total
                   </span>
                 </h1>
-                <p className="text-xs text-gray-500 font-medium">
+                <p className="text-[0.875rem] text-gray-500 font-medium">
                   Unified master directory for customer sales orders, item dispatches, and order fulfillments.
                 </p>
               </div>
@@ -863,70 +838,70 @@ const SalesOrders: React.FC = () => {
           </div>
 
           {/* 2. Top Navigation Tabs Bar & Action Toolbar (Exact match to Purchase Batches) */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-4 rounded-2xl shadow-2xs relative">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-1 relative">
             {/* Tab Selection */}
             <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full">
               {/* Tab 1: All Orders */}
               <button
                 onClick={() => { setStatusFilter('all'); }}
-                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
                   statusFilter === 'all'
-                    ? 'border-teal-700 text-teal-700 bg-transparent'
+                    ? 'border-blue-700 text-blue-700 bg-transparent'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
                 }`}
               >
-                <Receipt className={`w-4 h-4 ${statusFilter === 'all' ? 'text-teal-700' : 'text-slate-400'}`} />
+                <Receipt className={`w-4 h-4 ${statusFilter === 'all' ? 'text-blue-700' : 'text-slate-400'}`} />
                 <span>All Orders</span>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-800">{metrics.totalOrders}</span>
+                <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-800">{metrics.totalOrders}</span>
               </button>
 
               {/* Tab 2: Confirmed */}
               <button
                 onClick={() => { setStatusFilter('Confirmed'); }}
-                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
                   statusFilter === 'Confirmed'
-                    ? 'border-teal-700 text-teal-700 bg-transparent'
+                    ? 'border-blue-700 text-blue-700 bg-transparent'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
                 }`}
               >
-                <CheckCircle className={`w-4 h-4 ${statusFilter === 'Confirmed' ? 'text-teal-700' : 'text-slate-400'}`} />
+                <CheckCircle className={`w-4 h-4 ${statusFilter === 'Confirmed' ? 'text-blue-700' : 'text-slate-400'}`} />
                 <span>Confirmed</span>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800">{metrics.confirmedCount}</span>
+                <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800">{metrics.confirmedCount}</span>
               </button>
 
               {/* Tab 3: Pending */}
               <button
                 onClick={() => { setStatusFilter('Pending'); }}
-                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
                   statusFilter === 'Pending'
-                    ? 'border-teal-700 text-teal-700 bg-transparent'
+                    ? 'border-blue-700 text-blue-700 bg-transparent'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
                 }`}
               >
-                <Clock className={`w-4 h-4 ${statusFilter === 'Pending' ? 'text-teal-700' : 'text-slate-400'}`} />
+                <Clock className={`w-4 h-4 ${statusFilter === 'Pending' ? 'text-blue-700' : 'text-slate-400'}`} />
                 <span>Pending</span>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800">{metrics.pendingCount}</span>
+                <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800">{metrics.pendingCount}</span>
               </button>
 
               {/* Tab 4: Draft */}
               <button
                 onClick={() => { setStatusFilter('Draft'); }}
-                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
                   statusFilter === 'Draft'
-                    ? 'border-teal-700 text-teal-700 bg-transparent'
+                    ? 'border-blue-700 text-blue-700 bg-transparent'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
                 }`}
               >
-                <FileText className={`w-4 h-4 ${statusFilter === 'Draft' ? 'text-teal-700' : 'text-slate-400'}`} />
+                <FileText className={`w-4 h-4 ${statusFilter === 'Draft' ? 'text-blue-700' : 'text-slate-400'}`} />
                 <span>Draft</span>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700">{metrics.draftCount}</span>
+                <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700">{metrics.draftCount}</span>
               </button>
 
               {/* Tab 5: Cancelled */}
               {metrics.cancelledCount > 0 && (
                 <button
                   onClick={() => { setStatusFilter('Cancelled'); }}
-                  className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                  className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
                     statusFilter === 'Cancelled'
                       ? 'border-rose-600 text-rose-600 bg-transparent'
                       : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
@@ -934,7 +909,7 @@ const SalesOrders: React.FC = () => {
                 >
                   <Ban className={`w-4 h-4 ${statusFilter === 'Cancelled' ? 'text-rose-600' : 'text-slate-400'}`} />
                   <span>Cancelled</span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700">{metrics.cancelledCount}</span>
+                  <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700">{metrics.cancelledCount}</span>
                 </button>
               )}
             </div>
@@ -949,7 +924,7 @@ const SalesOrders: React.FC = () => {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search orders, customers..."
-                  className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-40 md:w-52 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                  className="pl-8 pr-7 py-1.5 text-[0.875rem] bg-gray-50 border border-gray-200 rounded-xl w-40 md:w-52 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
                 />
                 {search && (
                   <button 
@@ -970,7 +945,7 @@ const SalesOrders: React.FC = () => {
                     setShowSortMenu(false);
                     setShowColumnPicker(false);
                   }}
-                  className={`p-2 rounded-xl border transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+                  className={`p-2 rounded-xl border flex items-center justify-center cursor-pointer shadow-2xs ${
                     (regionFilter !== 'all' || agentFilter !== 'all' || dateRangeFilter !== 'sep_2026' || statusFilter !== 'all')
                       ? 'bg-blue-50 border-blue-300 text-blue-700 ring-2 ring-blue-100'
                       : 'bg-white hover:bg-blue-50/60 border-gray-200 hover:border-blue-200 text-blue-600'
@@ -980,19 +955,14 @@ const SalesOrders: React.FC = () => {
                 >
                   <Filter className="w-4 h-4 text-blue-600" />
                 </button>
-                {!showFilterMenu && (
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    Filter Orders
-                  </div>
-                )}
                 {showFilterMenu && (
-                  <div className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-xs text-left">
+                  <div className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-[0.875rem] text-left">
                     <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
-                      <span className="font-bold text-gray-800 text-xs">Filter Sales Orders</span>
+                      <span className="font-semibold text-gray-800 text-[0.875rem]">Filter Sales Orders</span>
                       {(regionFilter !== 'all' || agentFilter !== 'all' || dateRangeFilter !== 'sep_2026' || statusFilter !== 'all') && (
                         <button
                           onClick={handleResetFilters}
-                          className="text-blue-600 hover:text-blue-800 text-[11px] font-bold cursor-pointer"
+                          className="text-blue-600 hover:text-blue-800 text-xs font-semibold cursor-pointer"
                         >
                           Reset All
                         </button>
@@ -1001,11 +971,11 @@ const SalesOrders: React.FC = () => {
 
                     {/* Region */}
                     <div>
-                      <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Region</label>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">Region</label>
                       <select
                         value={regionFilter}
                         onChange={e => setRegionFilter(e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                        className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
                       >
                         <option value="all">All Regions ({availableRegions.length})</option>
                         {availableRegions.map(r => (
@@ -1016,11 +986,11 @@ const SalesOrders: React.FC = () => {
 
                     {/* Agent */}
                     <div>
-                      <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Agent</label>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">Agent</label>
                       <select
                         value={agentFilter}
                         onChange={e => setAgentFilter(e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                        className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
                       >
                         <option value="all">All Agents ({availableAgents.length})</option>
                         {availableAgents.map(a => (
@@ -1031,11 +1001,11 @@ const SalesOrders: React.FC = () => {
 
                     {/* Date Range */}
                     <div>
-                      <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Date Range</label>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">Date Range</label>
                       <select
                         value={dateRangeFilter}
                         onChange={e => setDateRangeFilter(e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                        className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
                       >
                         <option value="sep_2026">01/09/2026 – 30/09/2026</option>
                         <option value="this_month">This Month</option>
@@ -1047,11 +1017,11 @@ const SalesOrders: React.FC = () => {
 
                     {/* Status */}
                     <div>
-                      <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Status</label>
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">Status</label>
                       <select
                         value={statusFilter}
                         onChange={e => setStatusFilter(e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                        className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
                       >
                         <option value="all">All Orders</option>
                         <option value="Confirmed">Confirmed</option>
@@ -1074,19 +1044,14 @@ const SalesOrders: React.FC = () => {
                     setShowFilterMenu(false);
                     setShowColumnPicker(false);
                   }}
-                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
                   title="Sort Order"
                   aria-label="Sort Order"
                 >
                   <ArrowUpDown className="w-4 h-4 text-blue-600" />
                 </button>
-                {!showSortMenu && (
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    Sort Orders
-                  </div>
-                )}
                 {showSortMenu && (
-                  <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs text-left">
+                  <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-[0.875rem] text-left">
                     <button
                       onClick={() => { setSortField('orderDate'); setSortOrder('desc'); setShowSortMenu(false); }}
                       className="w-full text-left px-2.5 py-1.5 rounded-xl font-medium hover:bg-gray-50 text-gray-700"
@@ -1130,20 +1095,15 @@ const SalesOrders: React.FC = () => {
                     setShowSortMenu(false);
                     setShowFilterMenu(false);
                   }}
-                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
                   title="Column Visibility"
                   aria-label="Column Visibility"
                 >
                   <Columns className="w-4 h-4 text-blue-600" />
                 </button>
-                {!showColumnPicker && (
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    Column Visibility
-                  </div>
-                )}
                 {showColumnPicker && (
-                  <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2.5 space-y-1.5 text-xs text-left">
-                    <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block border-b border-gray-100 pb-1">Visible Columns</span>
+                  <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2.5 space-y-1.5 text-[0.875rem] text-left">
+                    <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block border-b border-gray-100 pb-1">Visible Columns</span>
                     {columns.map(col => (
                       <label key={col.id} className="flex items-center gap-2 p-1 text-gray-700 cursor-pointer hover:bg-gray-50 rounded-lg">
                         <input
@@ -1166,15 +1126,12 @@ const SalesOrders: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleExportExcel}
-                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
                   title="Export to Excel Spreadsheet"
                   aria-label="Export to Excel Spreadsheet"
                 >
                   <Download className="w-4 h-4 text-blue-600" />
                 </button>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                  Export Excel (.xlsx)
-                </div>
               </div>
 
               {/* 5. Export PDF Icon Button */}
@@ -1182,15 +1139,12 @@ const SalesOrders: React.FC = () => {
                 <button
                   type="button"
                   onClick={handlePrintReport}
-                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
                   title="Export to PDF Report"
                   aria-label="Export to PDF Report"
                 >
                   <FileText className="w-4 h-4 text-blue-600" />
                 </button>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                  Export PDF (.pdf)
-                </div>
               </div>
 
               {/* 6. Activity Logs Icon Button */}
@@ -1198,15 +1152,12 @@ const SalesOrders: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => { fetchActivityLogs(); setShowActivityLogModal(true); }}
-                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
                   title="View Activity Logs"
                   aria-label="View Activity Logs"
                 >
                   <History className="w-4 h-4 text-blue-600" />
                 </button>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                  Activity Logs
-                </div>
               </div>
 
               {/* 7. Circular + Add Button */}
@@ -1214,15 +1165,12 @@ const SalesOrders: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => { setEditingOrder(null); setShowDrawer(true); }}
-                  className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold shrink-0"
+                  className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs cursor-pointer font-semibold shrink-0"
                   title="New Sales Order"
                   aria-label="New Sales Order"
                 >
                   <Plus className="w-4 h-4 text-blue-600 stroke-[2.5]" />
                 </button>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                  New Sales Order
-                </div>
               </div>
             </div>
           </div>
@@ -1233,74 +1181,74 @@ const SalesOrders: React.FC = () => {
               {/* Card 1: TOTAL ORDERS */}
               <button
                 onClick={() => { setStatusFilter('all'); }}
-                className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+                className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
                   statusFilter === 'all' 
                     ? 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-100' 
                     : 'bg-white border-gray-200/80 hover:border-gray-300'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Orders</span>
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Orders</span>
                   <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                 </div>
-                <p className="text-2xl font-black text-gray-900 mt-1 font-mono">{metrics.totalOrders}</p>
+                <p className="text-2xl font-semibold text-gray-900 mt-1 font-mono">{metrics.totalOrders}</p>
               </button>
 
               {/* Card 2: CONFIRMED ORDERS */}
               <button
                 onClick={() => { setStatusFilter('Confirmed'); }}
-                className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+                className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
                   statusFilter === 'Confirmed' 
                     ? 'bg-emerald-50/40 border-emerald-400 ring-2 ring-emerald-100' 
                     : 'bg-white border-gray-200/80 hover:border-gray-300'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Confirmed</span>
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Confirmed</span>
                   <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
                 </div>
-                <p className="text-2xl font-black text-emerald-600 mt-1 font-mono">{orders.filter(o => o.status === 'Confirmed').length}</p>
+                <p className="text-2xl font-semibold text-emerald-600 mt-1 font-mono">{orders.filter(o => o.status === 'Confirmed').length}</p>
               </button>
 
               {/* Card 3: PENDING ORDERS */}
               <button
                 onClick={() => { setStatusFilter('Pending'); }}
-                className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+                className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
                   statusFilter === 'Pending' 
                     ? 'bg-amber-50/40 border-amber-400 ring-2 ring-amber-100' 
                     : 'bg-white border-gray-200/80 hover:border-gray-300'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Pending</span>
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Pending</span>
                   <span className="w-2 h-2 rounded-full bg-amber-500"></span>
                 </div>
-                <p className="text-2xl font-black text-amber-600 mt-1 font-mono">{metrics.pendingCount}</p>
+                <p className="text-2xl font-semibold text-amber-600 mt-1 font-mono">{metrics.pendingCount}</p>
               </button>
 
               {/* Card 4: DRAFT ORDERS */}
               <button
                 onClick={() => { setStatusFilter('Draft'); }}
-                className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+                className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
                   statusFilter === 'Draft' 
                     ? 'bg-slate-100/60 border-slate-400 ring-2 ring-slate-100' 
                     : 'bg-white border-gray-200/80 hover:border-gray-300'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Draft</span>
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Draft</span>
                   <span className="w-2 h-2 rounded-full bg-slate-500"></span>
                 </div>
-                <p className="text-2xl font-black text-slate-700 mt-1 font-mono">{metrics.draftCount}</p>
+                <p className="text-2xl font-semibold text-slate-700 mt-1 font-mono">{metrics.draftCount}</p>
               </button>
 
               {/* Card 5: TOTAL VALUE */}
               <div className="w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 bg-white border-gray-200/80">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Value</span>
-                  <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Value</span>
+                  <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                 </div>
-                <p className="text-2xl font-black text-purple-700 mt-1 font-mono">₹{Math.round(metrics.totalAmount).toLocaleString('en-IN')}</p>
+                <p className="text-2xl font-semibold text-blue-700 mt-1 font-mono">₹{Math.round(metrics.totalAmount).toLocaleString('en-IN')}</p>
               </div>
             </div>
           )}
@@ -1309,23 +1257,23 @@ const SalesOrders: React.FC = () => {
 
       {/* ── ADVANCED FILTERS DRAWER (COLLAPSIBLE) ── */}
       {showAdvancedFilters && (
-        <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-3.5 flex flex-wrap items-center gap-4 text-xs">
-          <span className="font-bold text-blue-900 uppercase tracking-wider text-[11px]">Quick Views:</span>
+        <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-3.5 flex flex-wrap items-center gap-4 text-[0.875rem]">
+          <span className="font-medium text-blue-900 uppercase tracking-wider text-xs">Quick Views:</span>
           <button
             onClick={() => { setStatusFilter('Confirmed'); }}
-            className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${statusFilter === 'Confirmed' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200'}`}
+            className={`px-2.5 py-1 rounded-lg font-semibold ${statusFilter === 'Confirmed' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200'}`}
           >
             Confirmed Orders ({orders.filter(o => o.status === 'Confirmed').length})
           </button>
           <button
             onClick={() => { setStatusFilter('Partially Dispatched'); }}
-            className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${statusFilter === 'Partially Dispatched' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200'}`}
+            className={`px-2.5 py-1 rounded-lg font-semibold ${statusFilter === 'Partially Dispatched' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200'}`}
           >
             Partially Dispatched ({metrics.partialCount})
           </button>
           <button
             onClick={() => { setStatusFilter('Draft'); }}
-            className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${statusFilter === 'Draft' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200'}`}
+            className={`px-2.5 py-1 rounded-lg font-semibold ${statusFilter === 'Draft' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200'}`}
           >
             Draft Orders ({metrics.draftCount})
           </button>
@@ -1343,13 +1291,13 @@ const SalesOrders: React.FC = () => {
       ) : (
         <>
           {/* ── TABLE TOOLBAR: METADATA & ACTIONS (1:1 with Screenshot) ── */}
-      <div className="flex items-center justify-between pt-1 text-xs">
+      <div className="flex items-center justify-between pt-1 text-[0.875rem]">
         <div className="font-semibold text-gray-600 flex items-center gap-2">
           <span>Showing all {sortedOrders.length} sales orders</span>
           {(search || statusFilter !== 'all' || regionFilter !== 'all' || agentFilter !== 'all' || dateRangeFilter !== 'sep_2026') && (
             <button
               onClick={handleResetFilters}
-              className="text-blue-600 hover:text-blue-800 text-[11px] font-bold px-1.5 py-0.5 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+              className="text-blue-600 hover:text-blue-800 text-xs font-semibold px-1.5 py-0.5 hover:bg-blue-50 rounded cursor-pointer"
             >
               Clear Filters
             </button>
@@ -1362,22 +1310,22 @@ const SalesOrders: React.FC = () => {
           <div className="relative" ref={columnPickerRef}>
             <button
               onClick={() => setShowColumnPicker(!showColumnPicker)}
-              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-semibold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
             >
               <FileText className="w-3.5 h-3.5 text-gray-500" />
               <span>Columns</span>
             </button>
 
             {showColumnPicker && (
-              <div className="absolute right-0 mt-1.5 w-52 bg-white rounded-2xl shadow-xl border border-gray-200 p-2 z-50 animate-fadeIn">
-                <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1 mb-1">
+              <div className="absolute right-0 mt-1.5 w-52 bg-white rounded-2xl shadow-xl border border-gray-200 p-2 z-50">
+                <div className="text-xs font-medium text-gray-400 uppercase tracking-wider px-2 py-1 mb-1">
                   Toggle Columns
                 </div>
                 <div className="space-y-1 max-h-60 overflow-y-auto">
                   {columns.map(col => (
                     <label
                       key={col.id}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer text-xs font-semibold text-gray-700"
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer text-[0.875rem] font-semibold text-gray-700"
                     >
                       <input
                         type="checkbox"
@@ -1396,7 +1344,7 @@ const SalesOrders: React.FC = () => {
           {/* Export Button */}
           <button
             onClick={handleExportExcel}
-            className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-semibold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
             title="Export to Excel Spreadsheet"
           >
             <Download className="w-3.5 h-3.5 text-gray-500" />
@@ -1406,7 +1354,7 @@ const SalesOrders: React.FC = () => {
           {/* Print Button */}
           <button
             onClick={handlePrintReport}
-            className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-semibold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
             title="Print or Export PDF Report"
           >
             <Printer className="w-3.5 h-3.5 text-gray-500" />
@@ -1417,13 +1365,13 @@ const SalesOrders: React.FC = () => {
       </div>
 
       {/* ── SALES ORDERS MAIN TABLE (1:1 with Screenshot) ── */}
-      <div className="bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs">
-        <div className="overflow-x-auto min-h-[380px]">
+      <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2">
+        <div className="overflow-x-auto min-h-[23.75rem]">
           <table className="w-full text-left divide-y divide-gray-200">
-            <thead className="bg-gray-50/80 text-[11px] font-bold text-gray-600 uppercase tracking-wider select-none">
+            <thead className="text-xs font-medium text-gray-600 uppercase tracking-wider select-none">
               <tr>
                 {/* Bulk Select Checkbox */}
-                <th className="py-3.5 px-3.5 w-10 text-center">
+                <th className="py-3.5 px-2 w-10 text-center">
                   <input
                     type="checkbox"
                     checked={selectedOrderIds.size === sortedOrders.length && sortedOrders.length > 0}
@@ -1436,7 +1384,7 @@ const SalesOrders: React.FC = () => {
                 {isColVisible('orderNumber') && (
                   <th 
                     onClick={() => handleSort('orderNumber')}
-                    className="py-3.5 px-3 cursor-pointer hover:bg-gray-100/70 transition-colors whitespace-nowrap"
+                    className="py-3.5 px-2 cursor-pointer hover:bg-gray-100/70 whitespace-nowrap"
                   >
                     <div className="flex items-center gap-1">
                       <span>SO No.</span>
@@ -1449,7 +1397,7 @@ const SalesOrders: React.FC = () => {
                 {isColVisible('orderDate') && (
                   <th 
                     onClick={() => handleSort('orderDate')}
-                    className="py-3.5 px-3 cursor-pointer hover:bg-gray-100/70 transition-colors whitespace-nowrap"
+                    className="py-3.5 px-2 cursor-pointer hover:bg-gray-100/70 whitespace-nowrap"
                   >
                     <div className="flex items-center gap-1">
                       <span>Date</span>
@@ -1462,7 +1410,7 @@ const SalesOrders: React.FC = () => {
                 {isColVisible('customer') && (
                   <th 
                     onClick={() => handleSort('customerName')}
-                    className="py-3.5 px-4 cursor-pointer hover:bg-gray-100/70 transition-colors whitespace-nowrap"
+                    className="py-3.5 px-2.5 cursor-pointer hover:bg-gray-100/70 whitespace-nowrap"
                   >
                     <div className="flex items-center gap-1">
                       <span>Customer</span>
@@ -1475,7 +1423,7 @@ const SalesOrders: React.FC = () => {
                 {isColVisible('cityRegion') && (
                   <th 
                     onClick={() => handleSort('city')}
-                    className="py-3.5 px-3 cursor-pointer hover:bg-gray-100/70 transition-colors whitespace-nowrap"
+                    className="py-3.5 px-2 cursor-pointer hover:bg-gray-100/70 whitespace-nowrap"
                   >
                     <div className="flex items-center gap-1">
                       <span>City / Region</span>
@@ -1488,7 +1436,7 @@ const SalesOrders: React.FC = () => {
                 {isColVisible('transporter') && (
                   <th 
                     onClick={() => handleSort('transporter')}
-                    className="py-3.5 px-3 cursor-pointer hover:bg-gray-100/70 transition-colors whitespace-nowrap"
+                    className="py-3.5 px-2 cursor-pointer hover:bg-gray-100/70 whitespace-nowrap"
                   >
                     <div className="flex items-center gap-1">
                       <span>Transporter</span>
@@ -1501,7 +1449,7 @@ const SalesOrders: React.FC = () => {
                 {isColVisible('promisedDate') && (
                   <th 
                     onClick={() => handleSort('promisedDate')}
-                    className="py-3.5 px-3 cursor-pointer hover:bg-gray-100/70 transition-colors whitespace-nowrap"
+                    className="py-3.5 px-2 cursor-pointer hover:bg-gray-100/70 whitespace-nowrap"
                   >
                     <div className="flex items-center gap-1">
                       <span>Expected Delivery</span>
@@ -1514,7 +1462,7 @@ const SalesOrders: React.FC = () => {
                 {isColVisible('grandTotal') && (
                   <th 
                     onClick={() => handleSort('grandTotal')}
-                    className="py-3.5 px-3 text-right cursor-pointer hover:bg-gray-100/70 transition-colors whitespace-nowrap"
+                    className="py-3.5 px-2 text-right cursor-pointer hover:bg-gray-100/70 whitespace-nowrap"
                   >
                     <div className="flex items-center justify-end gap-1">
                       <span>Amount (₹)</span>
@@ -1527,7 +1475,7 @@ const SalesOrders: React.FC = () => {
                 {isColVisible('fulfillmentStatus') && (
                   <th 
                     onClick={() => handleSort('fulfillmentStatus')}
-                    className="py-3.5 px-3 cursor-pointer hover:bg-gray-100/70 transition-colors whitespace-nowrap"
+                    className="py-3.5 px-2 cursor-pointer hover:bg-gray-100/70 whitespace-nowrap"
                   >
                     <div className="flex items-center gap-1">
                       <span>Fulfilment Status</span>
@@ -1540,7 +1488,7 @@ const SalesOrders: React.FC = () => {
                 {isColVisible('status') && (
                   <th 
                     onClick={() => handleSort('status')}
-                    className="py-3.5 px-3 cursor-pointer hover:bg-gray-100/70 transition-colors whitespace-nowrap"
+                    className="py-3.5 px-2 cursor-pointer hover:bg-gray-100/70 whitespace-nowrap"
                   >
                     <div className="flex items-center gap-1">
                       <span>Order Status</span>
@@ -1551,14 +1499,14 @@ const SalesOrders: React.FC = () => {
 
                 {/* Actions */}
                 {isColVisible('actions') && (
-                  <th className="py-3.5 px-3 text-center whitespace-nowrap">
+                  <th className="py-3.5 px-2 text-center whitespace-nowrap">
                     <span>Actions</span>
                   </th>
                 )}
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-gray-100 bg-white text-xs">
+            <tbody className="bg-white divide-y divide-gray-100 bg-white text-[0.875rem]">
               {sortedOrders.map((order) => {
                 const isSelected = order._id ? selectedOrderIds.has(order._id) : false;
                 const isMenuOpen = activeMenuOrderId === order._id;
@@ -1574,12 +1522,12 @@ const SalesOrders: React.FC = () => {
                         setSelectedOrderDetail(order);
                       }
                     }}
-                    className={`hover:bg-blue-50/40 focus:bg-blue-50/60 focus:outline-none transition-colors cursor-pointer group ${
+                    className={`hover:bg-blue-50/40 focus:bg-blue-50/60 focus:outline-none cursor-pointer group ${
                       order.status === 'Cancelled' ? 'bg-rose-50/25 opacity-75' : isSelected ? 'bg-blue-50/60' : ''
                     }`}
                   >
                     {/* Checkbox */}
-                    <td className="py-3.5 px-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                    <td className="py-3.5 px-2 text-center" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={isSelected}
@@ -1590,17 +1538,17 @@ const SalesOrders: React.FC = () => {
 
                     {/* SO No. */}
                     {isColVisible('orderNumber') && (
-                      <td className="py-3.5 px-3 font-mono font-bold text-blue-600 whitespace-nowrap group-hover:underline">
+                      <td className="py-3.5 px-2 font-mono font-semibold text-blue-600 whitespace-nowrap group-hover:underline">
                         {order.orderNumber}
                       </td>
                     )}
 
                     {/* Date */}
                     {isColVisible('orderDate') && (
-                      <td className="py-3.5 px-3 text-gray-600 font-medium whitespace-nowrap font-mono">
+                      <td className="py-3.5 px-2 text-gray-600 font-medium whitespace-nowrap font-mono">
                         <div className="font-semibold text-gray-900">{formatDateDDMMYYYY(order.orderDate)}</div>
                         {getOrderTime(order) ? (
-                          <div className="text-[11px] text-gray-400 font-normal flex items-center gap-1 mt-0.5">
+                          <div className="text-xs text-gray-400 font-normal flex items-center gap-1 mt-0.5">
                             <Clock className="w-2.5 h-2.5 text-gray-400 shrink-0" />
                             <span>{getOrderTime(order)}</span>
                           </div>
@@ -1610,16 +1558,16 @@ const SalesOrders: React.FC = () => {
 
                     {/* Customer Name & Mobile */}
                     {isColVisible('customer') && (
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <div className="font-bold text-gray-900 group-hover:text-blue-900 transition-colors">
+                      <td className="py-3.5 px-2.5 whitespace-nowrap">
+                        <div className="font-semibold text-gray-900 group-hover:text-blue-900">
                           {order.customerName}
                         </div>
-                        <div className="text-[11px] font-mono text-gray-500 font-medium mt-0.5 flex items-center gap-1.5">
+                        <div className="text-xs font-mono text-gray-500 font-medium mt-0.5 flex items-center gap-1.5">
                           {order.contactPerson && (
                             <span className="font-sans font-semibold text-gray-700">{order.contactPerson}</span>
                           )}
                           {order.contactPerson && (order.customerPhone || '9966259732') && (
-                            <span className="text-gray-400 font-bold">•</span>
+                            <span className="text-gray-400 font-semibold">•</span>
                           )}
                           <span>{order.customerPhone || '9966259732'}</span>
                         </div>
@@ -1628,11 +1576,11 @@ const SalesOrders: React.FC = () => {
 
                     {/* City / Region */}
                     {isColVisible('cityRegion') && (
-                      <td className="py-3.5 px-3 whitespace-nowrap">
+                      <td className="py-3.5 px-2 whitespace-nowrap">
                         <div className="font-semibold text-gray-900">
                           {order.city || 'Tirupati'}
                         </div>
-                        <div className="text-[11px] text-gray-500 mt-0.5 font-medium">
+                        <div className="text-xs text-gray-500 mt-0.5 font-medium">
                           {order.region || 'Andhra Pradesh'}
                         </div>
                       </td>
@@ -1640,29 +1588,29 @@ const SalesOrders: React.FC = () => {
 
                     {/* Transporter */}
                     {isColVisible('transporter') && (
-                      <td className="py-3.5 px-3 whitespace-nowrap">
+                      <td className="py-3.5 px-2 whitespace-nowrap">
                         {order.transporter ? (
                           <div className="flex items-center gap-1.5">
                             <Truck className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                            <span className="font-semibold text-gray-800 text-xs">{order.transporter}</span>
+                            <span className="font-semibold text-gray-800 text-[0.875rem]">{order.transporter}</span>
                           </div>
                         ) : (
-                          <span className="text-gray-400 font-normal text-xs">—</span>
+                          <span className="text-gray-400 font-normal text-[0.875rem]">—</span>
                         )}
                       </td>
                     )}
 
                     {/* Expected Delivery */}
                     {isColVisible('promisedDate') && (
-                      <td className="py-3.5 px-3 text-gray-700 font-medium whitespace-nowrap font-mono">
+                      <td className="py-3.5 px-2 text-gray-700 font-medium whitespace-nowrap font-mono">
                         {formatDateDDMMYYYY(order.promisedDate)}
                       </td>
                     )}
 
                     {/* Amount (₹) */}
                     {isColVisible('grandTotal') && (
-                      <td className="py-3.5 px-3 text-right whitespace-nowrap">
-                        <div className="font-black text-gray-900 font-mono">
+                      <td className="py-3.5 px-2 text-right whitespace-nowrap">
+                        <div className="font-semibold text-gray-900 font-mono">
                           <span className={order.status === 'Cancelled' ? 'line-through text-gray-400 font-normal' : ''}>
                             ₹{(order.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </span>
@@ -1670,18 +1618,18 @@ const SalesOrders: React.FC = () => {
                         {order.status !== 'Cancelled' && (
                           <div className="mt-0.5 flex items-center justify-end gap-1">
                             {order.paymentStatus === 'Paid' ? (
-                              <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              <span className="px-1.5 py-0.2 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                 Paid
                               </span>
                             ) : (order.paidAmount || 0) > 0 ? (
                               <span 
-                                className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-blue-100 text-blue-800 border border-blue-200"
+                                className="px-1.5 py-0.2 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200"
                                 title={`Paid: ₹${order.paidAmount} | Remaining Due: ₹${order.balanceDue !== undefined ? order.balanceDue : ((order.grandTotal || 0) - (order.paidAmount || 0))}`}
                               >
                                 Due: ₹{((order.balanceDue !== undefined ? order.balanceDue : ((order.grandTotal || 0) - (order.paidAmount || 0)))).toLocaleString('en-IN')}
                               </span>
                             ) : (
-                              <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                              <span className="px-1.5 py-0.2 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
                                 {order.orderType === 'Cash' ? 'Cash' : 'Credit'}
                               </span>
                             )}
@@ -1692,21 +1640,21 @@ const SalesOrders: React.FC = () => {
 
                     {/* Fulfilment Status */}
                     {isColVisible('fulfillmentStatus') && (
-                      <td className="py-3.5 px-3 whitespace-nowrap">
+                      <td className="py-3.5 px-2 whitespace-nowrap">
                         {order.fulfillmentStatus === 'Fully Dispatched' || order.fulfillmentStatus === 'Fulfilled' ? (
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100/70 text-emerald-800 border border-emerald-200/50">
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100/70 text-emerald-800 border border-emerald-200/50">
                             Fully Dispatched
                           </span>
                         ) : order.fulfillmentStatus === 'Partially Dispatched' || order.fulfillmentStatus === 'Partial' ? (
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100/70 text-blue-800 border border-blue-200/50">
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100/70 text-blue-800 border border-blue-200/50">
                             Partially Dispatched
                           </span>
                         ) : order.fulfillmentStatus === 'In Production' ? (
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100/70 text-purple-800 border border-purple-200/50">
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100/70 text-blue-800 border border-blue-200/50">
                             In Production
                           </span>
                         ) : (
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100/70 text-amber-800 border border-amber-200/50">
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100/70 text-amber-800 border border-amber-200/50">
                             Pending
                           </span>
                         )}
@@ -1715,21 +1663,21 @@ const SalesOrders: React.FC = () => {
 
                     {/* Order Status */}
                     {isColVisible('status') && (
-                      <td className="py-3.5 px-3 whitespace-nowrap">
+                      <td className="py-3.5 px-2 whitespace-nowrap">
                         {order.status === 'Confirmed' ? (
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                             Confirmed
                           </span>
                         ) : order.status === 'Draft' ? (
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-700 border border-gray-200">
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
                             Draft
                           </span>
                         ) : order.status === 'Cancelled' ? (
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
                             Cancelled
                           </span>
                         ) : (
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                             {order.status}
                           </span>
                         )}
@@ -1738,14 +1686,14 @@ const SalesOrders: React.FC = () => {
 
                     {/* Actions: Edit, Print, Download, WhatsApp, More dropdown (Cancel extra); Cancelled shows only View */}
                     {isColVisible('actions') && (
-                      <td className="py-3.5 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-center gap-1">
+                      <td className="py-3.5 px-2 text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex flex-nowrap items-center justify-center gap-1 mx-auto">
                           {order.status === 'Cancelled' ? (
                             /* In Cancelled orders, only show View */
                             <button
                               type="button"
                               onClick={() => setSelectedOrderDetail(order)}
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                              className="icon-btn !border-transparent !bg-transparent hover:!bg-gray-100"
                               title="View Order"
                             >
                               <Eye className="w-4 h-4" />
@@ -1756,7 +1704,7 @@ const SalesOrders: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => { setEditingOrder(order); setShowDrawer(true); }}
-                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                className="icon-btn !border-transparent !bg-transparent hover:!bg-gray-100"
                                 title="Edit Order"
                               >
                                 <Edit className="w-4 h-4" />
@@ -1766,40 +1714,10 @@ const SalesOrders: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => setEstimationOrder(order)}
-                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                className="icon-btn !border-transparent !bg-transparent hover:!bg-gray-100"
                                 title="Print Order Estimation"
                               >
                                 <Printer className="w-4 h-4" />
-                              </button>
-
-                              {/* 3. Download */}
-                              <button
-                                type="button"
-                                onClick={() => setEstimationOrder(order)}
-                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                                title="Download PDF"
-                              >
-                                <Download className="w-4 h-4" />
-                              </button>
-
-                              {/* 4. Record Payment */}
-                              <button
-                                type="button"
-                                onClick={() => { setPaymentModalOrder(order); setShowRecordPaymentModal(true); }}
-                                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                                title="Record Payment (Cash, Cheque, UPI)"
-                              >
-                                <Receipt className="w-4 h-4" />
-                              </button>
-
-                              {/* 5. WhatsApp */}
-                              <button
-                                type="button"
-                                onClick={() => handleTriggerWhatsApp(order)}
-                                className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                                title="Send on WhatsApp"
-                              >
-                                <WhatsAppIcon className="w-4 h-4 text-emerald-500 hover:text-emerald-600" />
                               </button>
 
                               {/* 6. Three-dots More Menu */}
@@ -1807,7 +1725,7 @@ const SalesOrders: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => setActiveMenuOrderId(isMenuOpen ? null : (order._id || ''))}
-                                  className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                                  className="icon-btn !border-transparent !bg-transparent !text-gray-500 hover:!bg-gray-100"
                                   title="More Options"
                                 >
                                   <MoreVertical className="w-4 h-4" />
@@ -1817,12 +1735,12 @@ const SalesOrders: React.FC = () => {
                                 {isMenuOpen && (
                                   <div 
                                     ref={actionMenuRef}
-                                    className="absolute right-0 mt-1 w-52 bg-white rounded-2xl shadow-xl border border-gray-200/90 py-1.5 z-50 animate-fadeIn text-left"
+                                    className="absolute right-0 mt-1 w-52 bg-white rounded-2xl shadow-xl border border-gray-200/90 py-1.5 z-50 text-left"
                                   >
                                     <button
                                       type="button"
                                       onClick={() => { setSelectedOrderDetail(order); setActiveMenuOrderId(null); }}
-                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                      className="w-full flex items-center gap-2.5 px-2 py-2 text-[0.875rem] font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700"
                                     >
                                       <Eye className="w-4 h-4 text-blue-600" />
                                       <span>View Order</span>
@@ -1831,7 +1749,7 @@ const SalesOrders: React.FC = () => {
                                     <button
                                       type="button"
                                       onClick={() => { setPaymentModalOrder(order); setShowRecordPaymentModal(true); setActiveMenuOrderId(null); }}
-                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition-colors"
+                                      className="w-full flex items-center gap-2.5 px-2 py-2 text-[0.875rem] font-semibold text-emerald-700 hover:bg-emerald-50"
                                     >
                                       <Receipt className="w-4 h-4 text-emerald-600" />
                                       <span>Record Payment</span>
@@ -1841,7 +1759,7 @@ const SalesOrders: React.FC = () => {
                                       <button
                                         type="button"
                                         onClick={() => { handleConfirmDraftOrder(order); setActiveMenuOrderId(null); }}
-                                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition-colors"
+                                        className="w-full flex items-center gap-2.5 px-2 py-2 text-[0.875rem] font-semibold text-emerald-700 hover:bg-emerald-50"
                                       >
                                         <Check className="w-4 h-4 text-emerald-600 stroke-[3]" />
                                         <span>Confirm Order</span>
@@ -1851,7 +1769,7 @@ const SalesOrders: React.FC = () => {
                                     <button
                                       type="button"
                                       onClick={() => { setEditingOrder(order); setShowDrawer(true); setActiveMenuOrderId(null); }}
-                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                      className="w-full flex items-center gap-2.5 px-2 py-2 text-[0.875rem] font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700"
                                     >
                                       <Edit className="w-4 h-4 text-blue-600" />
                                       <span>Edit</span>
@@ -1860,7 +1778,7 @@ const SalesOrders: React.FC = () => {
                                     <button
                                       type="button"
                                       onClick={() => { setEstimationOrder(order); setActiveMenuOrderId(null); }}
-                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                      className="w-full flex items-center gap-2.5 px-2 py-2 text-[0.875rem] font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700"
                                     >
                                       <Printer className="w-4 h-4 text-blue-600" />
                                       <span>Print Order Estimation</span>
@@ -1869,7 +1787,7 @@ const SalesOrders: React.FC = () => {
                                     <button
                                       type="button"
                                       onClick={() => { setEstimationOrder(order); setActiveMenuOrderId(null); }}
-                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                      className="w-full flex items-center gap-2.5 px-2 py-2 text-[0.875rem] font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700"
                                     >
                                       <Download className="w-4 h-4 text-blue-600" />
                                       <span>Download PDF</span>
@@ -1878,7 +1796,7 @@ const SalesOrders: React.FC = () => {
                                     <button
                                       type="button"
                                       onClick={() => { handleTriggerWhatsApp(order); setActiveMenuOrderId(null); }}
-                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                      className="w-full flex items-center gap-2.5 px-2 py-2 text-[0.875rem] font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700"
                                     >
                                       <WhatsAppIcon className="w-4 h-4 text-emerald-500" />
                                       <span>Send on WhatsApp</span>
@@ -1889,7 +1807,7 @@ const SalesOrders: React.FC = () => {
                                     <button
                                       type="button"
                                       onClick={() => { setCancellingOrder(order); setActiveMenuOrderId(null); }}
-                                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors"
+                                      className="w-full flex items-center gap-2.5 px-2 py-2 text-[0.875rem] font-semibold text-rose-600 hover:bg-rose-50"
                                     >
                                       <Trash2 className="w-4 h-4 text-rose-600" />
                                       <span>Cancel Order</span>
@@ -1911,7 +1829,7 @@ const SalesOrders: React.FC = () => {
                   <td colSpan={12} className="py-20 text-center">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <div className="w-9 h-9 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-xs font-bold text-gray-600 uppercase tracking-wider">Loading Sales Orders...</p>
+                      <p className="text-[0.875rem] font-medium text-gray-600 uppercase tracking-wider">Loading Sales Orders...</p>
                     </div>
                   </td>
                 </tr>
@@ -1923,7 +1841,7 @@ const SalesOrders: React.FC = () => {
                       <p className="font-semibold text-gray-500">No Sales Orders found matching your criteria</p>
                       <button
                         onClick={handleResetFilters}
-                        className="text-blue-600 hover:underline font-bold text-xs mt-1 cursor-pointer"
+                        className="text-blue-600 hover:underline font-semibold text-[0.875rem] mt-1 cursor-pointer"
                       >
                         Reset all filters
                       </button>
@@ -2004,30 +1922,30 @@ const SalesOrders: React.FC = () => {
 
       {/* ── CANCEL ORDER CONFIRMATION MODAL ── */}
       {cancellingOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4 text-left">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="bg-white max-w-md w-full p-6 space-y-4 text-left dlg-panel">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shrink-0">
                 <Trash2 className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-gray-900">Cancel Sales Order?</h3>
-                <p className="text-xs text-gray-500">Order: <span className="font-mono font-bold text-gray-800">{cancellingOrder.orderNumber}</span></p>
+                <h3 className="text-base font-semibold text-gray-900">Cancel Sales Order?</h3>
+                <p className="text-[0.875rem] text-gray-500">Order: <span className="font-mono font-semibold text-gray-800">{cancellingOrder.orderNumber}</span></p>
               </div>
             </div>
 
-            <p className="text-xs text-gray-600 leading-relaxed">
-              Are you sure you want to cancel this sales order for <span className="font-bold text-gray-900">{cancellingOrder.customerName}</span>? The status will be marked as Cancelled.
+            <p className="text-[0.875rem] text-gray-600 leading-relaxed">
+              Are you sure you want to cancel this sales order for <span className="font-semibold text-gray-900">{cancellingOrder.customerName}</span>? The status will be marked as Cancelled.
             </p>
 
             <div>
-              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
                 Reason for cancellation
               </label>
               <select
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-white border border-gray-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className="w-full px-3 py-2 text-[0.875rem] bg-white border border-gray-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
               >
                 <option value="Customer Request">Customer Request / Changed Mind</option>
                 <option value="Price Discrepancy">Price Discrepancy</option>
@@ -2037,18 +1955,18 @@ const SalesOrders: React.FC = () => {
               </select>
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-2">
+            <div className="flex items-center justify-end gap-2.5 pt-2 dlg-footer">
               <button
                 type="button"
                 onClick={() => setCancellingOrder(null)}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[0.875rem] font-semibold rounded-xl cursor-pointer"
               >
                 Go Back
               </button>
               <button
                 type="button"
                 onClick={handleConfirmCancelOrder}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-[0.875rem] font-semibold rounded-xl shadow-xs cursor-pointer"
               >
                 Yes, Cancel Order
               </button>
@@ -2082,16 +2000,16 @@ const SalesOrders: React.FC = () => {
 
       {/* ── SALES ACTIVITY LOGS MODAL ── */}
       {showActivityLogModal && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 max-w-xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/40 flex items-center justify-center p-4">
+          <div className="bg-white max-w-xl w-full max-h-[calc(85*var(--vh,1vh))] flex flex-col overflow-hidden dlg-panel">
             <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50/80">
               <div className="flex items-center space-x-2.5">
                 <div className="p-2 rounded-xl bg-blue-100/80 text-blue-700">
                   <History className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-gray-900 text-sm">Sales Orders Activity Log</h3>
-                  <p className="text-xs text-gray-500">Audit trail and event records</p>
+                  <h3 className="font-semibold text-gray-900 text-[0.875rem]">Sales Orders Activity Log</h3>
+                  <p className="text-[0.875rem] text-gray-500">Audit trail and event records</p>
                 </div>
               </div>
               <button
@@ -2103,7 +2021,7 @@ const SalesOrders: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-5 overflow-y-auto space-y-3 flex-1 text-xs">
+            <div className="p-5 overflow-y-auto space-y-3 flex-1 text-[0.875rem]">
               {activityLogLoading ? (
                 <div className="py-12 text-center text-gray-400">Loading activity logs...</div>
               ) : activityLogs.length === 0 ? (
@@ -2112,21 +2030,21 @@ const SalesOrders: React.FC = () => {
                 activityLogs.map((log) => (
                   <div key={log._id} className="p-3.5 rounded-xl border border-gray-100 bg-gray-50/50 space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-blue-600 font-mono">{log.entityName || log.action}</span>
-                      <span className="text-[10px] text-gray-400">{log.createdAt ? new Date(log.createdAt).toLocaleString('en-IN') : 'Recent'}</span>
+                      <span className="font-semibold text-blue-600 font-mono">{log.entityName || log.action}</span>
+                      <span className="text-xs text-gray-400">{log.createdAt ? new Date(log.createdAt).toLocaleString('en-IN') : 'Recent'}</span>
                     </div>
                     <p className="text-gray-700 font-medium">{log.details}</p>
-                    <p className="text-[10px] text-gray-400">By {log.performedBy || 'System'}</p>
+                    <p className="text-xs text-gray-400">By {log.performedBy || 'System'}</p>
                   </div>
                 ))
               )}
             </div>
 
-            <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50 flex justify-end">
+            <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50 flex justify-end dlg-footer">
               <button
                 type="button"
                 onClick={() => setShowActivityLogModal(false)}
-                className="px-4 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                className="px-4 py-1.5 text-[0.875rem] font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
               >
                 Close
               </button>

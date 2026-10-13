@@ -3,6 +3,7 @@ import { X, Printer, Ban, CheckCircle, Clock, Building2, MapPin } from 'lucide-r
 import { PurchaseInvoiceV2 } from './purchaseService';
 import { SkuV2, WarehouseLocationV2 } from '../../../api/mfgApiV2';
 import { getItemMetrics } from './purchaseMetrics';
+import { UniversalPrintVoucherModal } from '../../ui/UniversalPrintVoucherModal';
 
 interface PurchaseBatchPrintModalProps {
   invoice: PurchaseInvoiceV2 | null;
@@ -112,7 +113,7 @@ export const PurchaseBatchPrintModal: React.FC<PurchaseBatchPrintModalProps> = (
       render: (item: any) => (
         <div>
           <div className="font-bold text-slate-900">{item.skuName}</div>
-          <div className="text-[10px] text-slate-500 font-mono">
+          <div className="text-[0.625rem] text-slate-500 font-mono">
             {item.skuCode}
             {item.gsm ? ` • ${item.gsm} GSM` : ''}
             {item.width ? ` • ${item.width}"` : ''}
@@ -125,7 +126,7 @@ export const PurchaseBatchPrintModal: React.FC<PurchaseBatchPrintModalProps> = (
       header: 'Breakdown',
       align: 'center' as const,
       render: (item: any) => (
-        <span className="text-[10px] text-slate-600">
+        <span className="text-[0.625rem] text-slate-600">
           {item.reelsCount > 0
             ? `${item.reelsCount} Reel${item.reelsCount > 1 ? 's' : ''}`
             : item.paperType === 'Sheets'

@@ -2236,77 +2236,77 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
   };
 
   return (
-    <div className="space-y-3.5 animate-in fade-in-50 duration-200">
+    <div className="space-y-3.5 fade-in-50">
       {/* ── TOP KPI BAR (MINIMAL CLEAN SUMMARY) ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {/* KPI 1: Pending Orders */}
         <div className="bg-white border border-gray-200/90 rounded-xl p-3 shadow-2xs">
-          <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
             Pending Orders
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-gray-900 font-mono tracking-tight">{kpis.totalOrders}</span>
-            <span className="text-xs text-gray-500 font-medium">orders</span>
+            <span className="text-2xl font-semibold text-gray-900 font-mono tracking-tight">{kpis.totalOrders}</span>
+            <span className="text-[0.875rem] text-gray-500 font-medium">orders</span>
           </div>
-          <p className="text-[11px] text-gray-400 mt-0.5">
+          <p className="text-xs text-gray-400 mt-0.5">
             Active in queue
           </p>
         </div>
 
         {/* KPI 2: Pending Demand */}
         <div className="bg-white border border-gray-200/90 rounded-xl p-3 shadow-2xs">
-          <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
             Pending Demand
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-gray-900 font-mono tracking-tight">{kpis.totalPendingGbl.toLocaleString()}</span>
-            <span className="text-xs font-semibold text-gray-500">GBL</span>
+            <span className="text-2xl font-semibold text-gray-900 font-mono tracking-tight">{kpis.totalPendingGbl.toLocaleString()}</span>
+            <span className="text-[0.875rem] font-semibold text-gray-500">GBL</span>
           </div>
-          <p className="text-[11px] text-gray-400 mt-0.5 font-mono">
+          <p className="text-xs text-gray-400 mt-0.5 font-mono">
             {kpis.totalPendingPcs.toLocaleString()} pcs demanded
           </p>
         </div>
 
         {/* KPI 3: Stock in Hand */}
         <div className="bg-white border border-gray-200/90 rounded-xl p-3 shadow-2xs">
-          <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
             Stock In Hand
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-emerald-600 font-mono tracking-tight">{kpis.totalStockGbl.toLocaleString()}</span>
-            <span className="text-xs font-semibold text-gray-500">GBL</span>
+            <span className="text-2xl font-semibold text-emerald-600 font-mono tracking-tight">{kpis.totalStockGbl.toLocaleString()}</span>
+            <span className="text-[0.875rem] font-semibold text-gray-500">GBL</span>
           </div>
-          <p className="text-[11px] text-gray-400 mt-0.5">
+          <p className="text-xs text-gray-400 mt-0.5">
             Warehouse inventory
           </p>
         </div>
 
         {/* KPI 4: Shortfall */}
         <div className="bg-white border border-gray-200/90 rounded-xl p-3 shadow-2xs">
-          <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
             To Produce (Shortfall)
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className={`text-2xl font-bold font-mono tracking-tight ${kpis.totalShortfallGbl > 0 ? 'text-rose-600' : 'text-gray-900'}`}>
+            <span className={`text-2xl font-semibold font-mono tracking-tight ${kpis.totalShortfallGbl > 0 ? 'text-rose-600' : 'text-gray-900'}`}>
               {kpis.totalShortfallGbl.toLocaleString()}
             </span>
-            <span className="text-xs font-semibold text-gray-500">GBL</span>
+            <span className="text-[0.875rem] font-semibold text-gray-500">GBL</span>
           </div>
-          <p className="text-[11px] text-gray-400 mt-0.5 font-mono">
+          <p className="text-xs text-gray-400 mt-0.5 font-mono">
             {kpis.totalShortfallPcs.toLocaleString()} pcs needed
           </p>
         </div>
 
         {/* KPI 5: Ready to Dispatch */}
         <div className="bg-white border border-gray-200/90 rounded-xl p-3 shadow-2xs col-span-2 sm:col-span-1">
-          <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
             Ready To Dispatch
           </div>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-gray-900 font-mono tracking-tight">{kpis.readyOrdersCount}</span>
-            <span className="text-xs text-gray-500 font-medium">/ {pendingOrders.length} orders</span>
+            <span className="text-2xl font-semibold text-gray-900 font-mono tracking-tight">{kpis.readyOrdersCount}</span>
+            <span className="text-[0.875rem] text-gray-500 font-medium">/ {pendingOrders.length} orders</span>
           </div>
-          <p className="text-[11px] text-gray-400 mt-0.5">
+          <p className="text-xs text-gray-400 mt-0.5">
             100% stock available
           </p>
         </div>
@@ -2320,7 +2320,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
             {/* Tab 1: Material View */}
             <button
               onClick={() => setViewMode('material_view')}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-md text-[0.875rem] font-semibold flex items-center gap-1.5 cursor-pointer ${
                 viewMode === 'material_view'
                   ? 'bg-white text-gray-900 shadow-2xs'
                   : 'text-gray-600 hover:text-gray-900'
@@ -2328,13 +2328,13 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
             >
               <Box className="w-3.5 h-3.5 text-gray-500" />
               <span>Material View</span>
-              <span className="text-[10px] text-gray-400 font-mono">({filteredMaterials.length})</span>
+              <span className="text-xs text-gray-400 font-mono">({filteredMaterials.length})</span>
             </button>
 
             {/* Tab 2: Production View */}
             <button
               onClick={() => setViewMode('production_view')}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-md text-[0.875rem] font-semibold flex items-center gap-1.5 cursor-pointer ${
                 viewMode === 'production_view'
                   ? 'bg-white text-gray-900 shadow-2xs'
                   : 'text-gray-600 hover:text-gray-900'
@@ -2342,13 +2342,13 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
             >
               <Factory className="w-3.5 h-3.5 text-gray-500" />
               <span>Production View</span>
-              <span className="text-[10px] text-gray-400 font-mono">({filteredRequirements.length})</span>
+              <span className="text-xs text-gray-400 font-mono">({filteredRequirements.length})</span>
             </button>
 
             {/* Tab 3: Customer view */}
             <button
               onClick={() => setViewMode('customer_view')}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-md text-[0.875rem] font-semibold flex items-center gap-1.5 cursor-pointer ${
                 viewMode === 'customer_view'
                   ? 'bg-white text-gray-900 shadow-2xs'
                   : 'text-gray-600 hover:text-gray-900'
@@ -2356,16 +2356,16 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
             >
               <Building className="w-3.5 h-3.5 text-gray-500" />
               <span>Customer view</span>
-              <span className="text-[10px] text-gray-400 font-mono">({pendingOrders.length})</span>
+              <span className="text-xs text-gray-400 font-mono">({pendingOrders.length})</span>
             </button>
           </div>
         </div>
 
         {/* Center: Quick Shortfall Filters */}
-        <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg text-xs">
+        <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg text-[0.875rem]">
           <button
             onClick={() => setFilterMode('all')}
-            className={`px-2.5 py-1 rounded-md transition-all cursor-pointer font-medium ${
+            className={`px-2.5 py-1 rounded-md cursor-pointer font-medium ${
               filterMode === 'all'
                 ? 'bg-white text-gray-900 shadow-2xs font-semibold'
                 : 'text-gray-600 hover:text-gray-900'
@@ -2375,7 +2375,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
           </button>
           <button
             onClick={() => setFilterMode('shortfall')}
-            className={`px-2.5 py-1 rounded-md transition-all cursor-pointer font-medium ${
+            className={`px-2.5 py-1 rounded-md cursor-pointer font-medium ${
               filterMode === 'shortfall'
                 ? 'bg-white text-rose-700 shadow-2xs font-semibold'
                 : 'text-gray-600 hover:text-gray-900'
@@ -2393,7 +2393,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
           </button>
           <button
             onClick={() => setFilterMode('in_stock')}
-            className={`px-2.5 py-1 rounded-md transition-all cursor-pointer font-medium ${
+            className={`px-2.5 py-1 rounded-md cursor-pointer font-medium ${
               filterMode === 'in_stock'
                 ? 'bg-white text-emerald-700 shadow-2xs font-semibold'
                 : 'text-gray-600 hover:text-gray-900'
@@ -2423,7 +2423,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
               placeholder="Search..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="pl-8 pr-7 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-800 focus:outline-none focus:border-gray-400 w-36 sm:w-48 transition-all"
+              className="pl-8 pr-7 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-[0.875rem] text-gray-800 focus:outline-none focus:border-gray-400 w-36 sm:w-48"
             />
             {searchTerm && (
               <button
@@ -2438,7 +2438,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
           {/* Export to Excel (Alt+E) */}
           <button
             onClick={handleExportExcel}
-            className="px-2.5 py-1.5 bg-white hover:bg-emerald-50/70 border border-gray-200 hover:border-emerald-200 rounded-lg text-emerald-700 text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5 shadow-2xs"
+            className="px-2.5 py-1.5 bg-white hover:bg-emerald-50/70 border border-gray-200 hover:border-emerald-200 rounded-lg text-emerald-700 text-[0.875rem] font-semibold cursor-pointer flex items-center gap-1.5 shadow-2xs"
             title="Export to Excel (Alt+E)"
           >
             <Download className="w-3.5 h-3.5 text-emerald-600" />
@@ -2448,7 +2448,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
           {/* Export PDF */}
           <button
             onClick={handleExportPdf}
-            className="px-2.5 py-1.5 bg-white hover:bg-rose-50/70 border border-gray-200 hover:border-rose-200 rounded-lg text-rose-700 text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5 shadow-2xs"
+            className="px-2.5 py-1.5 bg-white hover:bg-rose-50/70 border border-gray-200 hover:border-rose-200 rounded-lg text-rose-700 text-[0.875rem] font-semibold cursor-pointer flex items-center gap-1.5 shadow-2xs"
             title="Export / Download PDF Report"
           >
             <FileText className="w-3.5 h-3.5 text-rose-600" />
@@ -2458,7 +2458,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
           {/* Print (Alt+P) */}
           <button
             onClick={handlePrint}
-            className="px-2.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5 shadow-2xs"
+            className="px-2.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-[0.875rem] font-semibold cursor-pointer flex items-center gap-1.5 shadow-2xs"
             title="Print Report (Alt+P)"
           >
             <Printer className="w-3.5 h-3.5 text-gray-600" />
@@ -2474,9 +2474,9 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
            VIEW 1: MATERIAL VIEW (RAW MATERIAL / BOM REQUIREMENT ANALYSIS)
         ═══════════════════════════════════════════════════════════════ */
         <div className="bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs">
-          <div className="overflow-x-auto min-h-[350px]">
+          <div className="overflow-x-auto min-h-[21.875rem]">
             <table className="w-full text-left divide-y divide-gray-200">
-              <thead className="bg-gray-50/90 text-[11px] font-bold text-gray-600 uppercase tracking-wider select-none">
+              <thead className="bg-gray-50/90 text-xs font-medium text-gray-600 uppercase tracking-wider select-none">
                 <tr>
                   <th className="py-3 px-3 w-8 text-center">#</th>
                   <th className="py-3 px-4">Raw Material / Component Description</th>
@@ -2491,7 +2491,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-150 text-xs font-medium">
+              <tbody className="divide-y divide-gray-150 text-[0.875rem] font-medium">
                 {filteredMaterials.map((mat, idx) => {
                   const isExpanded = expandedMaterials.has(mat.materialCode);
                   const hasDeficit = mat.deficit > 0;
@@ -2500,7 +2500,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                     <React.Fragment key={mat.materialCode}>
                       <tr
                         onClick={() => toggleSingleMaterial(mat.materialCode)}
-                        className="hover:bg-gray-50/80 transition-colors cursor-pointer border-b border-gray-100"
+                        className="hover:bg-gray-50/80 cursor-pointer border-b border-gray-100"
                       >
                         {/* Expand Button & Index */}
                         <td className="py-2.5 px-3 text-center text-gray-400 font-mono">
@@ -2509,9 +2509,9 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                               e.stopPropagation();
                               toggleSingleMaterial(mat.materialCode);
                             }}
-                            className="p-1 hover:bg-gray-200 rounded cursor-pointer transition-colors"
+                            className="p-1 hover:bg-gray-200 rounded cursor-pointer"
                           >
-                            <ChevronRight className={`w-3.5 h-3.5 text-gray-600 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                            <ChevronRight className={`w-3.5 h-3.5 text-gray-600 ${isExpanded ? 'rotate-90' : ''}`} />
                           </button>
                         </td>
 
@@ -2520,32 +2520,32 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                           <div className="font-semibold text-gray-900">
                             {mat.materialName}
                           </div>
-                          <div className="text-[10.5px] text-gray-400 font-mono mt-0.5">
+                          <div className="text-xs text-gray-400 font-mono mt-0.5">
                             {mat.materialCode} • {mat.uom}
                           </div>
                         </td>
 
                         {/* Category */}
                         <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                          <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-semibold inline-block">
+                          <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-semibold inline-block">
                             {mat.category || 'Raw Material'}
                           </span>
                         </td>
 
                         {/* Stock In Hand */}
                         <td className="py-2.5 px-3 text-center">
-                          <div className={`font-bold font-mono text-xs ${mat.stockInHand > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
-                            {mat.stockInHand.toLocaleString()} <span className="text-[10px] text-gray-500 font-normal">{mat.uom}</span>
+                          <div className={`font-semibold font-mono text-[0.875rem] ${mat.stockInHand > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
+                            {mat.stockInHand.toLocaleString()} <span className="text-xs text-gray-500 font-normal">{mat.uom}</span>
                           </div>
                         </td>
 
                         {/* Total Required Qty */}
                         <td className="py-2.5 px-3 text-center">
-                          <div className="font-semibold font-mono text-gray-900 text-xs">
-                            {mat.totalRequiredQty.toLocaleString()} <span className="text-[10px] text-gray-400 font-normal">{mat.uom}</span>
+                          <div className="font-semibold font-mono text-gray-900 text-[0.875rem]">
+                            {mat.totalRequiredQty.toLocaleString()} <span className="text-xs text-gray-400 font-normal">{mat.uom}</span>
                           </div>
                           {mat.shortfallRequiredQty > 0 && mat.shortfallRequiredQty !== mat.totalRequiredQty && (
-                            <div className="text-[10px] text-gray-400 font-mono">
+                            <div className="text-xs text-gray-400 font-mono">
                               ({mat.shortfallRequiredQty.toLocaleString()} {mat.uom} for deficit)
                             </div>
                           )}
@@ -2555,15 +2555,15 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                         <td className="py-2.5 px-4 text-center">
                           {hasDeficit ? (
                             <div>
-                              <span className="font-mono text-xs font-bold text-rose-600">
+                              <span className="font-mono text-[0.875rem] font-semibold text-rose-600">
                                 {mat.deficit.toLocaleString()} {mat.uom} Deficit
                               </span>
-                              <div className="text-[10px] text-rose-500 font-mono">
+                              <div className="text-xs text-rose-500 font-mono">
                                 Required for pending orders
                               </div>
                             </div>
                           ) : (
-                            <span className="font-mono text-xs text-emerald-600 font-medium">
+                            <span className="font-mono text-[0.875rem] text-emerald-600 font-medium">
                               In Stock
                             </span>
                           )}
@@ -2572,19 +2572,19 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                         {/* Status */}
                         <td className="py-2.5 px-3 text-center whitespace-nowrap">
                           {mat.status === 'In Stock' && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-mono">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-mono">
                               <Check className="w-3 h-3 text-emerald-600" />
                               <span>Sufficient</span>
                             </span>
                           )}
                           {mat.status === 'Partial' && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/60 font-mono">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/60 font-mono">
                               <Clock className="w-3 h-3 text-amber-600" />
                               <span>Partial</span>
                             </span>
                           )}
                           {mat.status === 'Shortfall' && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/60 font-mono">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200/60 font-mono">
                               <AlertTriangle className="w-3 h-3 text-rose-600" />
                               <span>Shortfall</span>
                             </span>
@@ -2593,7 +2593,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
 
                         {/* Contributing Demands */}
                         <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                          <span className="text-[11px] text-gray-700 font-mono font-medium bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-md">
+                          <span className="text-xs text-gray-700 font-mono font-medium bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-md">
                             {mat.contributingFgCount} FG • {mat.contributingOrderCount} order{mat.contributingOrderCount > 1 ? 's' : ''}
                           </span>
                         </td>
@@ -2604,7 +2604,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                             {hasDeficit ? (
                               <button
                                 onClick={() => navigate('/purchases/batches')}
-                                className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1"
+                                className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[0.875rem] font-semibold cursor-pointer flex items-center gap-1"
                                 title="Create Purchase Batch for this raw material"
                               >
                                 <span>Procure</span>
@@ -2612,7 +2612,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                             ) : (
                               <button
                                 onClick={() => navigate('/stock')}
-                                className="px-2.5 py-1 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded text-xs font-semibold cursor-pointer transition-colors"
+                                className="px-2.5 py-1 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded text-[0.875rem] font-semibold cursor-pointer"
                                 title="View inventory stock"
                               >
                                 <span>View Stock</span>
@@ -2621,7 +2621,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
 
                             <button
                               onClick={() => toggleSingleMaterial(mat.materialCode)}
-                              className="px-2 py-1 text-gray-500 hover:text-gray-800 text-xs font-medium cursor-pointer"
+                              className="px-2 py-1 text-gray-500 hover:text-gray-800 text-[0.875rem] font-medium cursor-pointer"
                             >
                               {isExpanded ? 'Hide' : 'Orders'}
                             </button>
@@ -2635,16 +2635,16 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                           <td colSpan={10} className="p-3 pl-8">
                             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
                               <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                                <span className="text-xs font-bold text-gray-700">
+                                <span className="text-[0.875rem] font-semibold text-gray-700">
                                   Orders & Products Demanding {mat.materialName} ({mat.contributions.length} allocations)
                                 </span>
-                                <span className="text-[11px] text-gray-500 font-mono">
+                                <span className="text-xs text-gray-500 font-mono">
                                   Gross Required: {mat.totalRequiredQty.toLocaleString()} {mat.uom}
                                 </span>
                               </div>
 
-                              <table className="w-full text-left text-xs divide-y divide-gray-150">
-                                <thead className="bg-gray-50/70 text-[10.5px] font-semibold text-gray-500 uppercase tracking-wider">
+                              <table className="w-full text-left text-[0.875rem] divide-y divide-gray-150">
+                                <thead className="bg-gray-50/70 text-xs font-medium text-gray-500 uppercase tracking-wider">
                                   <tr>
                                     <th className="py-2 px-3">SO No.</th>
                                     <th className="py-2 px-3">Customer / Party Name</th>
@@ -2661,9 +2661,9 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                     <tr 
                                       key={`${c.orderId}-${c.fgSkuCode}-${cIdx}`}
                                       onClick={() => onViewOrder(c.rawOrder)}
-                                      className="hover:bg-blue-50/40 transition-colors cursor-pointer"
+                                      className="hover:bg-blue-50/40 cursor-pointer"
                                     >
-                                      <td className="py-2 px-3 font-mono font-bold text-blue-700 hover:text-blue-900">
+                                      <td className="py-2 px-3 font-mono font-semibold text-blue-700 hover:text-blue-900">
                                         {c.orderNumber}
                                       </td>
                                       <td className="py-2 px-3 font-semibold text-gray-900">
@@ -2671,24 +2671,24 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                       </td>
                                       <td className="py-2 px-3">
                                         <div className="font-semibold text-gray-800">{c.fgSkuName}</div>
-                                        <div className="text-[10px] text-gray-400 font-mono">{c.fgSkuCode}</div>
+                                        <div className="text-xs text-gray-400 font-mono">{c.fgSkuCode}</div>
                                       </td>
                                       <td className="py-2 px-3 text-center font-mono text-gray-600">
                                         {formatDateDDMMYYYY(c.promisedDate)}
                                       </td>
                                       <td className="py-2 px-3 text-center font-mono text-gray-700">
-                                        {c.pendingGbl} GBL <span className="text-[10px] text-gray-400">({c.pendingPcs.toLocaleString()} pcs)</span>
+                                        {c.pendingGbl} GBL <span className="text-xs text-gray-400">({c.pendingPcs.toLocaleString()} pcs)</span>
                                       </td>
                                       <td className="py-2 px-3 text-center font-mono text-gray-500">
                                         {c.perBookBasis} {mat.uom}/pc
                                       </td>
-                                      <td className="py-2 px-3 text-center font-mono font-bold text-rose-600">
+                                      <td className="py-2 px-3 text-center font-mono font-semibold text-rose-600">
                                         {c.requiredQty.toLocaleString()} {mat.uom}
                                       </td>
                                       <td className="py-2 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                                         <button
                                           onClick={() => onViewOrder(c.rawOrder)}
-                                          className="px-2 py-0.5 text-blue-600 hover:text-blue-800 text-xs font-semibold cursor-pointer hover:underline"
+                                          className="px-2 py-0.5 text-blue-600 hover:text-blue-800 text-[0.875rem] font-semibold cursor-pointer hover:underline"
                                         >
                                           View SO
                                         </button>
@@ -2709,8 +2709,8 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                   <tr>
                     <td colSpan={10} className="py-12 text-center text-gray-500">
                       <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-400 mb-2" />
-                      <p className="font-bold text-sm text-gray-800">No material requirements found!</p>
-                      <p className="text-xs text-gray-400">All materials are either in stock or there are no pending customer sales orders.</p>
+                      <p className="font-semibold text-[0.875rem] text-gray-800">No material requirements found!</p>
+                      <p className="text-[0.875rem] text-gray-400">All materials are either in stock or there are no pending customer sales orders.</p>
                     </td>
                   </tr>
                 )}
@@ -2723,9 +2723,9 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
            VIEW 2: STOCK ITEM PRODUCTION VIEW (ITEM-WISE MRP)
         ═══════════════════════════════════════════════════════════════ */
         <div className="bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs">
-          <div className="overflow-x-auto min-h-[350px]">
+          <div className="overflow-x-auto min-h-[21.875rem]">
             <table className="w-full text-left divide-y divide-gray-200">
-              <thead className="bg-gray-50/90 text-[11px] font-bold text-gray-600 uppercase tracking-wider select-none">
+              <thead className="bg-gray-50/90 text-xs font-medium text-gray-600 uppercase tracking-wider select-none">
                 <tr>
                   <th className="py-3 px-3 w-8 text-center">#</th>
                   <th className="py-3 px-4">Stock Item / SKU Description</th>
@@ -2741,7 +2741,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-150 text-xs font-medium">
+              <tbody className="divide-y divide-gray-150 text-[0.875rem] font-medium">
                 {filteredRequirements.map((req, idx) => {
                   const isExpanded = expandedSkus.has(req.skuCode);
                   const hasShortfall = req.shortfallGbl > 0;
@@ -2751,7 +2751,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                       <tr 
                         key={req.skuCode}
                         onClick={() => toggleSingleSku(req.skuCode)}
-                        className="hover:bg-gray-50/80 transition-colors cursor-pointer border-b border-gray-100"
+                        className="hover:bg-gray-50/80 cursor-pointer border-b border-gray-100"
                       >
                         {/* Expand Button & Index */}
                         <td className="py-2.5 px-3 text-center text-gray-400 font-mono">
@@ -2760,9 +2760,9 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                               e.stopPropagation();
                               toggleSingleSku(req.skuCode);
                             }}
-                            className="p-1 hover:bg-gray-200 rounded cursor-pointer transition-colors"
+                            className="p-1 hover:bg-gray-200 rounded cursor-pointer"
                           >
-                            <ChevronRight className={`w-3.5 h-3.5 text-gray-600 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                            <ChevronRight className={`w-3.5 h-3.5 text-gray-600 ${isExpanded ? 'rotate-90' : ''}`} />
                           </button>
                         </td>
 
@@ -2771,54 +2771,54 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                           <div className="font-semibold text-gray-900">
                             {req.skuName}
                           </div>
-                          <div className="text-[10.5px] text-gray-400 font-mono mt-0.5">
+                          <div className="text-xs text-gray-400 font-mono mt-0.5">
                             {req.skuCode} • {req.orderCount} pending order{req.orderCount > 1 ? 's' : ''}
                           </div>
                         </td>
 
                         {/* Conversion */}
                         <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                          <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-semibold inline-block">
+                          <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-semibold inline-block">
                             {req.pcsPerGbl} pcs/GBL
                           </span>
                         </td>
 
                         {/* Stock In Hand */}
                         <td className="py-2.5 px-3 text-center">
-                          <div className="font-bold font-mono text-emerald-600 text-xs">
-                            {req.stockInHandGbl} <span className="text-[10px] text-gray-500">GBL</span>
+                          <div className="font-semibold font-mono text-emerald-600 text-[0.875rem]">
+                            {req.stockInHandGbl} <span className="text-xs text-gray-500">GBL</span>
                           </div>
-                          <div className="text-[10px] text-gray-400 font-mono">
+                          <div className="text-xs text-gray-400 font-mono">
                             {req.stockInHandPcs.toLocaleString()} pcs
                           </div>
                         </td>
 
                         {/* Total Ordered */}
                         <td className="py-2.5 px-3 text-center">
-                          <div className="font-semibold font-mono text-gray-900 text-xs">
-                            {req.totalOrderedGbl} <span className="text-[10px] text-gray-400">GBL</span>
+                          <div className="font-semibold font-mono text-gray-900 text-[0.875rem]">
+                            {req.totalOrderedGbl} <span className="text-xs text-gray-400">GBL</span>
                           </div>
-                          <div className="text-[10px] text-gray-400 font-mono">
+                          <div className="text-xs text-gray-400 font-mono">
                             {req.totalOrderedPcs.toLocaleString()} pcs
                           </div>
                         </td>
 
                         {/* Dispatched */}
                         <td className="py-2.5 px-3 text-center">
-                          <div className="font-mono text-gray-500 text-xs">
-                            {req.totalDispatchedGbl} <span className="text-[10px] text-gray-400">GBL</span>
+                          <div className="font-mono text-gray-500 text-[0.875rem]">
+                            {req.totalDispatchedGbl} <span className="text-xs text-gray-400">GBL</span>
                           </div>
-                          <div className="text-[10px] text-gray-400 font-mono">
+                          <div className="text-xs text-gray-400 font-mono">
                             {req.totalDispatchedPcs.toLocaleString()} pcs
                           </div>
                         </td>
 
                         {/* Balance Due */}
                         <td className="py-2.5 px-3 text-center">
-                          <div className="font-semibold font-mono text-amber-700 text-xs">
-                            {req.balancePendingGbl} <span className="text-[10px] text-amber-600">GBL</span>
+                          <div className="font-semibold font-mono text-amber-700 text-[0.875rem]">
+                            {req.balancePendingGbl} <span className="text-xs text-amber-600">GBL</span>
                           </div>
-                          <div className="text-[10px] text-amber-600/80 font-mono">
+                          <div className="text-xs text-amber-600/80 font-mono">
                             {req.balancePendingPcs.toLocaleString()} pcs
                           </div>
                         </td>
@@ -2827,15 +2827,15 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                         <td className="py-2.5 px-4 text-center">
                           {hasShortfall ? (
                             <div>
-                              <span className="font-mono text-xs font-bold text-rose-600">
+                              <span className="font-mono text-[0.875rem] font-semibold text-rose-600">
                                 {req.shortfallGbl} GBL Deficit
                               </span>
-                              <div className="text-[10px] text-rose-500 font-mono">
+                              <div className="text-xs text-rose-500 font-mono">
                                 {req.shortfallPcs.toLocaleString()} pcs to mfg
                               </div>
                             </div>
                           ) : (
-                            <span className="font-mono text-xs text-emerald-600 font-medium">
+                            <span className="font-mono text-[0.875rem] text-emerald-600 font-medium">
                               In Stock
                             </span>
                           )}
@@ -2844,15 +2844,15 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                         {/* Status */}
                         <td className="py-2.5 px-3 text-center">
                           {req.productionStatus === 'In Production' ? (
-                            <span className="text-[11px] font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
+                            <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
                               In Production
                             </span>
                           ) : req.productionStatus === 'Ready' ? (
-                            <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                            <span className="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
                               Ready
                             </span>
                           ) : (
-                            <span className="text-[11px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
+                            <span className="text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
                               Needs Mfg
                             </span>
                           )}
@@ -2873,7 +2873,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                     req.orders[0]?.orderId
                                   );
                                 }}
-                                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors cursor-pointer"
+                                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[0.875rem] font-medium cursor-pointer"
                                 title="Start production batch for this shortfall"
                               >
                                 Produce
@@ -2884,7 +2884,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                   e.stopPropagation();
                                   navigate('/dispatch');
                                 }}
-                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition-colors cursor-pointer flex items-center gap-1"
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[0.875rem] font-medium cursor-pointer flex items-center gap-1"
                                 title="Stock is available — proceed to Dispatch"
                               >
                                 <Truck className="w-3.5 h-3.5" />
@@ -2897,7 +2897,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                 e.stopPropagation();
                                 toggleSingleSku(req.skuCode);
                               }}
-                              className="px-2 py-1 text-gray-600 hover:text-gray-900 text-xs font-medium cursor-pointer"
+                              className="px-2 py-1 text-gray-600 hover:text-gray-900 text-[0.875rem] font-medium cursor-pointer"
                               title="Toggle customer orders"
                             >
                               {isExpanded ? 'Hide' : 'Orders'}
@@ -2911,18 +2911,18 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                         <tr className="bg-slate-50/50 border-b border-gray-200">
                           <td colSpan={10} className="p-3 pl-8 pr-4">
                             <div className="bg-white rounded-lg border border-gray-200 shadow-2xs overflow-hidden">
-                              <div className="px-3.5 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between text-xs font-semibold text-gray-700">
+                              <div className="px-3.5 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between text-[0.875rem] font-semibold text-gray-700">
                                 <span className="flex items-center gap-1.5">
                                   <Building className="w-3.5 h-3.5 text-blue-600" />
                                   <span>Customer Orders Awaiting <strong className="text-gray-900">{req.skuName}</strong> ({req.orders.length})</span>
                                 </span>
-                                <span className="text-[11px] text-gray-500 font-mono">
+                                <span className="text-xs text-gray-500 font-mono">
                                   Pending: {req.balancePendingGbl} GBL ({req.balancePendingPcs.toLocaleString()} Pcs)
                                 </span>
                               </div>
 
-                              <table className="w-full text-left text-xs divide-y divide-gray-150">
-                                <thead className="bg-gray-50/70 text-[10.5px] font-semibold text-gray-500 uppercase tracking-wider">
+                              <table className="w-full text-left text-[0.875rem] divide-y divide-gray-150">
+                                <thead className="bg-gray-50/70 text-xs font-medium text-gray-500 uppercase tracking-wider">
                                   <tr>
                                     <th className="py-2 px-3">SO No.</th>
                                     <th className="py-2 px-3">Order Date</th>
@@ -2940,7 +2940,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                     <tr 
                                       key={o.orderId} 
                                       onClick={() => onViewOrder(o.rawOrder)}
-                                      className="hover:bg-blue-50/40 transition-colors cursor-pointer"
+                                      className="hover:bg-blue-50/40 cursor-pointer"
                                     >
                                       <td className="py-2 px-3">
                                         <button
@@ -2948,7 +2948,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                             e.stopPropagation();
                                             onViewOrder(o.rawOrder);
                                           }}
-                                          className="font-bold text-blue-700 hover:text-blue-900 font-mono cursor-pointer hover:underline"
+                                          className="font-semibold text-blue-700 hover:text-blue-900 font-mono cursor-pointer hover:underline"
                                         >
                                           {o.orderNumber}
                                         </button>
@@ -2956,7 +2956,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                       <td className="py-2 px-3 font-mono text-gray-600">
                                         <div className="font-semibold text-gray-900">{formatDateDDMMYYYY(o.orderDate)}</div>
                                         {getOrderTime(o.rawOrder || o) ? (
-                                          <div className="text-[11px] text-gray-400 font-normal flex items-center gap-1 mt-0.5">
+                                          <div className="text-xs text-gray-400 font-normal flex items-center gap-1 mt-0.5">
                                             <Clock className="w-2.5 h-2.5 text-gray-400 shrink-0" />
                                             <span>{getOrderTime(o.rawOrder || o)}</span>
                                           </div>
@@ -2972,7 +2972,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                                 e.stopPropagation();
                                                 openWhatsAppChat(o.customerName, o.customerPhone, o.orderNumber, o.pendingGbl, o.promisedDate);
                                               }}
-                                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-mono cursor-pointer transition-colors"
+                                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-mono cursor-pointer"
                                               title="Send WhatsApp update to customer"
                                             >
                                               <MessageSquare className="w-2.5 h-2.5 text-emerald-600" />
@@ -2982,18 +2982,18 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                         </div>
                                       </td>
                                       <td className="py-2 px-3 text-center font-mono text-gray-700">
-                                        <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700 text-[11px] font-medium">
+                                        <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700 text-xs font-medium">
                                           {formatDateDDMMYYYY(o.promisedDate)}
                                         </span>
                                       </td>
                                       <td className="py-2 px-3 text-center font-mono text-gray-700">
-                                        {o.orderedGbl} GBL <span className="text-[10px] text-gray-400">({o.orderedPcs} pcs)</span>
+                                        {o.orderedGbl} GBL <span className="text-xs text-gray-400">({o.orderedPcs} pcs)</span>
                                       </td>
                                       <td className="py-2 px-3 text-center font-mono text-gray-500">
                                         {o.dispatchedGbl} GBL
                                       </td>
                                       <td className="py-2 px-3 text-center font-mono font-semibold text-amber-700">
-                                        {o.pendingGbl} GBL <span className="text-[10px] text-amber-600">({o.pendingPcs} pcs)</span>
+                                        {o.pendingGbl} GBL <span className="text-xs text-amber-600">({o.pendingPcs} pcs)</span>
                                       </td>
                                       <td className="py-2 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                                         <div className="flex items-center justify-end gap-2">
@@ -3002,7 +3002,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                               e.stopPropagation();
                                               onViewOrder(o.rawOrder);
                                             }}
-                                            className="px-2 py-0.5 text-blue-600 hover:text-blue-800 text-xs font-semibold cursor-pointer hover:underline"
+                                            className="px-2 py-0.5 text-blue-600 hover:text-blue-800 text-[0.875rem] font-semibold cursor-pointer hover:underline"
                                           >
                                             View SO
                                           </button>
@@ -3012,7 +3012,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                                 e.stopPropagation();
                                                 handleStartProduction(req.skuCode, req.skuName, o.pendingGbl, o.orderNumber, o.orderId);
                                               }}
-                                              className="px-2 py-0.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-xs font-semibold cursor-pointer transition-colors flex items-center gap-0.5"
+                                              className="px-2 py-0.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded text-[0.875rem] font-semibold cursor-pointer flex items-center gap-0.5"
                                               title={`Produce ${o.pendingGbl} GBL for ${o.orderNumber}`}
                                             >
                                               <Factory className="w-3 h-3" />
@@ -3025,7 +3025,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                                 e.stopPropagation();
                                                 navigate(`/dispatch?orderId=${encodeURIComponent(o.orderId)}`);
                                               }}
-                                              className="px-2 py-0.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded text-xs font-semibold cursor-pointer transition-colors flex items-center gap-0.5"
+                                              className="px-2 py-0.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded text-[0.875rem] font-semibold cursor-pointer flex items-center gap-0.5"
                                               title="Dispatch this sales order"
                                             >
                                               <Truck className="w-3 h-3" />
@@ -3050,8 +3050,8 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                   <tr>
                     <td colSpan={10} className="py-12 text-center text-gray-500">
                       <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-400 mb-2" />
-                      <p className="font-bold text-sm text-gray-800">No pending production shortfalls!</p>
-                      <p className="text-xs text-gray-400">All pending orders are either fulfilled or have sufficient finished stock in warehouse.</p>
+                      <p className="font-semibold text-[0.875rem] text-gray-800">No pending production shortfalls!</p>
+                      <p className="text-[0.875rem] text-gray-400">All pending orders are either fulfilled or have sufficient finished stock in warehouse.</p>
                     </td>
                   </tr>
                 )}
@@ -3064,20 +3064,20 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
            VIEW 3: CUSTOMER VIEW (ORDER-WISE DRILLDOWN)
         ═══════════════════════════════════════════════════════════════ */
         <div className="bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs">
-          <div className="overflow-x-auto min-h-[350px]">
+          <div className="overflow-x-auto min-h-[21.875rem]">
             <table className="w-full text-left divide-y divide-gray-200">
-              <thead className="bg-gray-50/90 text-[11px] font-bold text-gray-600 uppercase tracking-wider select-none">
+              <thead className="bg-gray-50/90 text-xs font-medium text-gray-600 uppercase tracking-wider select-none">
                 <tr>
                   <th className="py-3.5 px-4 w-28 whitespace-nowrap">SO No.</th>
                   <th className="py-3.5 px-3 w-28 text-center whitespace-nowrap">Order Date</th>
-                  <th className="py-3.5 px-4 min-w-[190px]">Party / Customer Name</th>
+                  <th className="py-3.5 px-4 min-w-[11.875rem]">Party / Customer Name</th>
                   <th className="py-3.5 px-3 w-28 whitespace-nowrap">City / Region</th>
                   <th className="py-3.5 px-3 w-28 text-center whitespace-nowrap">Due On</th>
-                  <th className="py-3.5 px-4 min-w-[360px]">Items Required & Balance</th>
+                  <th className="py-3.5 px-4 min-w-[22.5rem]">Items Required & Balance</th>
                   <th className="py-3.5 px-3 w-32 text-right whitespace-nowrap">Amount (₹)</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-150 text-xs font-medium">
+              <tbody className="divide-y divide-gray-150 text-[0.875rem] font-medium">
                 {filteredCustomerOrders.map(order => {
                   const items = order.items || [];
                   const totalPendingGbl = items.reduce((sum, item) => {
@@ -3090,7 +3090,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                     <tr 
                       key={order._id || order.orderNumber} 
                       onClick={() => onViewOrder(order)}
-                      className="hover:bg-gray-50/70 transition-colors cursor-pointer border-b border-gray-100"
+                      className="hover:bg-gray-50/70 cursor-pointer border-b border-gray-100"
                     >
                       {/* SO Number */}
                       <td className="align-middle py-3 px-4 w-28 whitespace-nowrap">
@@ -3099,17 +3099,17 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                             e.stopPropagation();
                             onViewOrder(order);
                           }}
-                          className="font-bold text-blue-700 hover:text-blue-900 font-mono text-xs cursor-pointer hover:underline"
+                          className="font-semibold text-blue-700 hover:text-blue-900 font-mono text-[0.875rem] cursor-pointer hover:underline"
                         >
                           {order.orderNumber}
                         </button>
                       </td>
 
                       {/* Date */}
-                      <td className="align-middle py-3 px-3 w-28 text-center whitespace-nowrap font-mono text-xs text-gray-600">
+                      <td className="align-middle py-3 px-3 w-28 text-center whitespace-nowrap font-mono text-[0.875rem] text-gray-600">
                         <div className="font-semibold text-gray-900">{formatDateDDMMYYYY(order.orderDate)}</div>
                         {getOrderTime(order.rawOrder || order) ? (
-                          <div className="text-[11px] text-gray-400 font-normal flex items-center justify-center gap-1 mt-0.5">
+                          <div className="text-xs text-gray-400 font-normal flex items-center justify-center gap-1 mt-0.5">
                             <Clock className="w-2.5 h-2.5 text-gray-400 shrink-0" />
                             <span>{getOrderTime(order.rawOrder || order)}</span>
                           </div>
@@ -3117,7 +3117,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                       </td>
 
                       {/* Customer */}
-                      <td className="align-middle py-3 px-4 min-w-[190px]">
+                      <td className="align-middle py-3 px-4 min-w-[11.875rem]">
                         <div className="font-semibold text-gray-900">{order.customerName}</div>
                         {order.customerPhone && (
                           <div className="mt-1">
@@ -3126,7 +3126,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                 e.stopPropagation();
                                 openWhatsAppChat(order.customerName, order.customerPhone, order.orderNumber, totalPendingGbl, order.promisedDate);
                               }}
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-mono cursor-pointer transition-colors"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-mono cursor-pointer"
                               title="Send WhatsApp update to customer"
                             >
                               <MessageSquare className="w-2.5 h-2.5 text-emerald-600" />
@@ -3142,13 +3142,13 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                       </td>
 
                       {/* Due On */}
-                      <td className="align-middle py-3 px-3 w-28 text-center whitespace-nowrap font-mono text-xs text-gray-600">
+                      <td className="align-middle py-3 px-3 w-28 text-center whitespace-nowrap font-mono text-[0.875rem] text-gray-600">
                         {formatDateDDMMYYYY(order.promisedDate)}
                       </td>
 
                       {/* Items Required & Balance */}
-                      <td className="align-middle py-2.5 px-4 min-w-[360px]">
-                        <div className="space-y-1 max-h-[220px] overflow-y-auto pr-1">
+                      <td className="align-middle py-2.5 px-4 min-w-[22.5rem]">
+                        <div className="space-y-1 max-h-[13.75rem] overflow-y-auto pr-1">
                           {items.map((item, iIdx) => {
                             const pcsPerGbl = item.pcsPerGbl || 100;
                             const orderedPcs = Number(item.quantity) || 0;
@@ -3166,7 +3166,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                 <div
                                   style={{ animationDelay: `${iIdx * 35}ms` }}
                                   title={`${item.itemName || item.skuCode} | Code: ${item.skuCode} | Conversion: ${pcsPerGbl} pcs/GBL | Pending: ${pendingGbl} GBL (${pendingPcs.toLocaleString()} pcs) | Stock: ${isInStock ? 'In Stock' : 'Needs Production'}`}
-                                  className="group/item flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-slate-50/90 hover:bg-blue-50/60 border border-slate-200/70 hover:border-blue-300/80 shadow-3xs hover:shadow-2xs transition-all duration-150 animate-in fade-in"
+                                  className="group/item flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-slate-50/90 hover:bg-blue-50/60 border border-slate-200/70 hover:border-blue-300/80 shadow-3xs hover:shadow-2xs"
                                 >
                                   <div className="flex items-center gap-2 min-w-0 flex-1">
                                     {/* Live pulse status dot */}
@@ -3184,7 +3184,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                     </span>
 
                                     <span
-                                      className="font-bold text-slate-800 group-hover/item:text-blue-900 text-[11.5px] leading-tight whitespace-normal break-words"
+                                      className="font-semibold text-slate-800 group-hover/item:text-blue-900 text-xs leading-tight whitespace-normal break-words"
                                       title={item.itemName || item.skuCode}
                                     >
                                       {item.itemName || item.skuCode}
@@ -3206,17 +3206,17 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                                             order._id
                                           );
                                         }}
-                                        className="px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded text-[10.5px] font-semibold cursor-pointer transition-colors flex items-center gap-0.5 shadow-3xs"
+                                        className="px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded text-xs font-semibold cursor-pointer flex items-center gap-0.5 shadow-3xs"
                                         title={`Produce ${pendingGbl} GBL for ${order.orderNumber}`}
                                       >
                                         <Factory className="w-3 h-3 text-blue-600" />
                                         <span>Produce</span>
                                       </button>
                                     )}
-                                    <span className="font-bold text-blue-700 bg-white group-hover/item:bg-blue-50 px-1.5 py-0.5 rounded border border-slate-200/90 text-xs shadow-3xs transition-colors">
-                                      {pendingGbl} <span className="text-[9.5px] font-semibold text-slate-500">GBL</span>
+                                    <span className="font-semibold text-blue-700 bg-white group-hover/item:bg-blue-50 px-1.5 py-0.5 rounded border border-slate-200/90 text-[0.875rem] shadow-3xs">
+                                      {pendingGbl} <span className="text-xs font-semibold text-slate-500">GBL</span>
                                     </span>
-                                    <span className="text-[10px] text-slate-400 font-medium">
+                                    <span className="text-xs text-slate-400 font-medium">
                                       ({pendingPcs.toLocaleString()} pcs)
                                     </span>
                                   </div>
@@ -3224,18 +3224,18 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
 
                                 {/* Render constituent sub-items for Loose Books / mixed stock */}
                                 {comps.length > 0 && (
-                                  <div className="ml-4 pl-2 border-l-2 border-indigo-200/90 space-y-1 my-1">
+                                  <div className="ml-4 pl-2 border-l-2 border-blue-200/90 space-y-1 my-1">
                                     {comps.map((c: any, cIdx: number) => {
                                       const cQty = Number(c.quantity) || 1;
                                       const cPcsPerGbl = Number(c.pcsPerGbl) || 100;
                                       const cEqGbl = cQty > 0 ? +(cQty / cPcsPerGbl).toFixed(1) : 0;
                                       return (
-                                        <div key={cIdx} className="flex items-center justify-between gap-2 px-2 py-1 rounded bg-indigo-50/50 border border-indigo-100/60 text-[11px]">
-                                          <span className="font-semibold text-indigo-900 flex items-center gap-1">
-                                            <span className="text-indigo-500 font-black">&bull;</span>
+                                        <div key={cIdx} className="flex items-center justify-between gap-2 px-2 py-1 rounded bg-blue-50/50 border border-blue-100/60 text-xs">
+                                          <span className="font-semibold text-blue-900 flex items-center gap-1">
+                                            <span className="text-blue-500 font-semibold">&bull;</span>
                                             <span>{(c.name || c.skuCode || '').toUpperCase()}</span>
                                           </span>
-                                          <span className="font-mono text-[10px] font-semibold text-indigo-700">
+                                          <span className="font-mono text-xs font-semibold text-blue-700">
                                             {cQty} {(c.uom && String(c.uom).toUpperCase() !== 'GBL') ? c.uom : 'pcs'} {cEqGbl > 0 ? `(${cEqGbl} GBL)` : ''}
                                           </span>
                                         </div>
@@ -3247,7 +3247,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                             );
                           })}
                           {items.length === 0 && (
-                            <span className="text-gray-400 italic text-xs">No items listed</span>
+                            <span className="text-gray-400 italic text-[0.875rem]">No items listed</span>
                           )}
                         </div>
                       </td>
@@ -3264,8 +3264,8 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-gray-500">
                       <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-400 mb-2" />
-                      <p className="font-bold text-sm text-gray-800">No pending sales orders!</p>
-                      <p className="text-xs text-gray-400">No orders match the current filter or search criteria.</p>
+                      <p className="font-semibold text-[0.875rem] text-gray-800">No pending sales orders!</p>
+                      <p className="text-[0.875rem] text-gray-400">No orders match the current filter or search criteria.</p>
                     </td>
                   </tr>
                 )}
@@ -3278,7 +3278,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
       {/* ── PRODUCTION ORDER WIZARD MODAL (In-place inside Sales Order module) ── */}
       {productionWizardConfig?.isOpen && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[9000] flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden animate-in fade-in duration-200"
+          className="fixed inset-0 z-[9000] flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden"
           style={{
             backgroundColor: 'rgba(15, 23, 42, 0.65)',
             backdropFilter: 'blur(6px)',
@@ -3291,7 +3291,7 @@ export const PendingOrdersProductionView: React.FC<PendingOrdersProductionViewPr
           onClick={() => setProductionWizardConfig(null)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 animate-in zoom-in-95 duration-200 overflow-hidden relative"
+            className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 overflow-hidden relative"
             style={{ maxWidth: 1260, height: '94vh', maxHeight: '94vh' }}
             onClick={e => e.stopPropagation()}
           >

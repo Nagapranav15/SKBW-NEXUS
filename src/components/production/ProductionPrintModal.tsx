@@ -21,7 +21,7 @@ export const ProductionPrintModal: React.FC<ProductionPrintModalProps> = ({ orde
       render: (item: any) => (
         <div>
           <div className="font-bold text-slate-900">{item.component}</div>
-          <div className="text-[10px] text-slate-500 font-mono">
+          <div className="text-[0.625rem] text-slate-500 font-mono">
             {item.code ? `Code: ${item.code}` : ''}
             {item.itemType ? ` • Type: ${item.itemType}` : ''}
           </div>
@@ -54,7 +54,7 @@ export const ProductionPrintModal: React.FC<ProductionPrintModalProps> = ({ orde
       header: 'Issued Status',
       align: 'center' as const,
       render: (item: any) => (
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+        <span className="text-[0.625rem] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
           {item.issuedStatus || 'Issued'}
         </span>
       ),

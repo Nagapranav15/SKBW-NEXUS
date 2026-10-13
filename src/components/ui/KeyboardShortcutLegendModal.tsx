@@ -69,9 +69,9 @@ export const KeyboardShortcutLegendModal: React.FC<KeyboardShortcutLegendModalPr
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-gray-900/40 animate-in fade-in duration-200">
       <div 
-        className="bg-white rounded-3xl shadow-2xl border border-gray-150 w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+        className="bg-white w-full max-w-4xl max-h-[calc(85*var(--vh,1vh))] flex flex-col overflow-hidden dlg-panel"
         onClick={e => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -81,7 +81,7 @@ export const KeyboardShortcutLegendModal: React.FC<KeyboardShortcutLegendModalPr
               <Keyboard className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+              <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
                 <span>Keyboard Shortcuts & Key Allocations Legend</span>
               </h2>
               <p className="text-xs text-gray-500 font-medium mt-0.5">
@@ -93,7 +93,7 @@ export const KeyboardShortcutLegendModal: React.FC<KeyboardShortcutLegendModalPr
           <div className="flex items-center gap-2">
             <button
               onClick={handleGoToSettings}
-              className="px-3.5 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-teal-200"
+              className="px-3.5 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer border border-teal-200"
             >
               <Settings className="w-3.5 h-3.5" />
               <span>Customize Mappings</span>
@@ -115,7 +115,7 @@ export const KeyboardShortcutLegendModal: React.FC<KeyboardShortcutLegendModalPr
               <button
                 key={mod}
                 onClick={() => setSelectedModule(mod)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                   selectedModule === mod
                     ? 'bg-gray-900 text-white shadow-2xs'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200/70 hover:text-gray-900'
@@ -155,19 +155,19 @@ export const KeyboardShortcutLegendModal: React.FC<KeyboardShortcutLegendModalPr
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider bg-gray-200/70 text-gray-700 shrink-0">
+                        <span className="px-2 py-0.5 rounded-md text-[0.625rem] font-medium uppercase tracking-wider bg-gray-200/70 text-gray-700 shrink-0">
                           {sc.module}
                         </span>
                         {sc.subCategory && (
-                          <span className="text-[10px] text-gray-400 font-semibold truncate">
+                          <span className="text-[0.625rem] text-gray-400 font-semibold truncate">
                             {sc.subCategory}
                           </span>
                         )}
                       </div>
-                      <h4 className="text-xs font-bold text-gray-900 mt-1 truncate">
+                      <h4 className="text-xs font-semibold text-gray-900 mt-1 truncate">
                         {sc.actionName}
                       </h4>
-                      <p className="text-[11px] text-gray-500 font-medium truncate mt-0.5">
+                      <p className="text-[0.6875rem] text-gray-500 font-medium truncate mt-0.5">
                         {sc.description}
                       </p>
                     </div>
@@ -176,8 +176,8 @@ export const KeyboardShortcutLegendModal: React.FC<KeyboardShortcutLegendModalPr
                     <div className="flex items-center gap-1 shrink-0">
                       {keys.map((k, idx) => (
                         <React.Fragment key={idx}>
-                          {idx > 0 && <span className="text-xs font-bold text-gray-400">+</span>}
-                          <kbd className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg border shadow-2xs transition-colors ${
+                          {idx > 0 && <span className="text-xs font-semibold text-gray-400">+</span>}
+                          <kbd className={`px-2.5 py-1 text-xs font-mono font-semibold rounded-lg border shadow-2xs transition-colors ${
                             isCustomized
                               ? 'bg-amber-50 text-amber-800 border-amber-300'
                               : 'bg-white text-gray-800 border-gray-300'
@@ -198,7 +198,7 @@ export const KeyboardShortcutLegendModal: React.FC<KeyboardShortcutLegendModalPr
             <div className="text-center py-16 text-gray-400">
               <Keyboard className="w-10 h-10 mx-auto text-gray-300 mb-2" />
               <p className="text-xs font-semibold">No shortcuts match your filter</p>
-              <p className="text-[11px] mt-1 text-gray-400">Try clearing your search query or switching tabs</p>
+              <p className="text-[0.6875rem] mt-1 text-gray-400">Try clearing your search query or switching tabs</p>
             </div>
           )}
         </div>
@@ -206,16 +206,16 @@ export const KeyboardShortcutLegendModal: React.FC<KeyboardShortcutLegendModalPr
         {/* Modal Footer */}
         <div className="px-6 py-4 border-t border-gray-100 bg-slate-50 flex items-center justify-between text-xs text-gray-500 font-medium shrink-0">
           <div className="flex items-center gap-2">
-            <kbd className="px-2 py-0.5 bg-white border border-gray-200 rounded-md font-mono text-[10px] font-bold text-gray-700">Tab</kbd>
+            <kbd className="px-2 py-0.5 bg-white border border-gray-200 rounded-md font-mono text-[0.625rem] font-semibold text-gray-700">Tab</kbd>
             <span>Navigate fields</span>
             <span className="text-gray-300">|</span>
-            <kbd className="px-2 py-0.5 bg-white border border-gray-200 rounded-md font-mono text-[10px] font-bold text-gray-700">Shift+?</kbd>
+            <kbd className="px-2 py-0.5 bg-white border border-gray-200 rounded-md font-mono text-[0.625rem] font-semibold text-gray-700">Shift+?</kbd>
             <span>Toggle Legend</span>
           </div>
 
           <button
             onClick={handleGoToSettings}
-            className="text-teal-700 hover:text-teal-800 font-bold flex items-center gap-1 transition-colors cursor-pointer"
+            className="text-teal-700 hover:text-teal-800 font-semibold flex items-center gap-1 transition-colors cursor-pointer"
           >
             <span>Open Key Allocation Manager</span>
             <ArrowRight className="w-3.5 h-3.5" />

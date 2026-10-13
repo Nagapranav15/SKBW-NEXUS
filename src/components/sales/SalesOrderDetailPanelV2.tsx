@@ -404,8 +404,8 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
       case 'Draft': return 'bg-amber-50 text-amber-700 border-amber-200';
       case 'Delivered': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       case 'Cancelled': return 'bg-rose-50 text-rose-700 border-rose-200';
-      case 'In Production': return 'bg-purple-50 text-purple-700 border-purple-200';
-      case 'Invoiced': return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+      case 'In Production': return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'Invoiced': return 'bg-blue-50 text-blue-700 border-blue-200';
       default: return 'bg-gray-100 text-gray-600 border-gray-200';
     }
   };
@@ -414,9 +414,9 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
     emerald: { bg: 'bg-emerald-100', ring: 'ring-emerald-400', text: 'text-emerald-600' },
     amber:   { bg: 'bg-amber-100',   ring: 'ring-amber-400',   text: 'text-amber-600'   },
     blue:    { bg: 'bg-blue-100',    ring: 'ring-blue-400',    text: 'text-blue-600'    },
-    indigo:  { bg: 'bg-indigo-100',  ring: 'ring-indigo-400',  text: 'text-indigo-600'  },
-    violet:  { bg: 'bg-violet-100',  ring: 'ring-violet-400',  text: 'text-violet-600'  },
-    purple:  { bg: 'bg-purple-100',  ring: 'ring-purple-400',  text: 'text-purple-600'  },
+    indigo:  { bg: 'bg-blue-100',  ring: 'ring-blue-400',  text: 'text-blue-600'  },
+    violet:  { bg: 'bg-blue-100',  ring: 'ring-blue-400',  text: 'text-blue-600'  },
+    purple:  { bg: 'bg-blue-100',  ring: 'ring-blue-400',  text: 'text-blue-600'  },
     gray:    { bg: 'bg-gray-100',    ring: 'ring-gray-300',    text: 'text-gray-400'    },
   };
 
@@ -849,7 +849,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 animate-in zoom-in-95 duration-200"
+        className="bg-white w-full flex flex-col my-auto dlg-panel"
         style={{ maxWidth: 1140, maxHeight: '92vh' }}
         onClick={e => e.stopPropagation()}
       >
@@ -861,11 +861,11 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xl font-black text-gray-900">Sales Order {activeOrder.orderNumber}</span>
-                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${statusBadge(activeOrder.status)}`}>
+                <span className="text-xl font-semibold text-gray-900">Sales Order {activeOrder.orderNumber}</span>
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.875rem] font-semibold border ${statusBadge(activeOrder.status)}`}>
                   {activeOrder.status}
                 </span>
-                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.875rem] font-semibold border ${
                   paymentStatusVal === 'Paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                   paymentStatusVal === 'Partially Paid' ? 'bg-blue-50 text-blue-700 border-blue-200' :
                   'bg-amber-50 text-amber-700 border-amber-200'
@@ -874,7 +874,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                   {paymentStatusVal} {balanceDueVal > 0 ? `(Due: ${fmtMoney(balanceDueVal)})` : ''}
                 </span>
               </div>
-              <p className="text-[11px] text-gray-400 mt-0.5">
+              <p className="text-xs text-gray-400 mt-0.5">
                 Created on {fmtDate(activeOrder.orderDate)}{user?.fullName ? `, by ${user.fullName}` : ''}
                 {activeOrder.createdAt && ` | Last updated: ${fmtDate(activeOrder.createdAt)}`}
               </p>
@@ -886,7 +886,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
               <button
                 type="button"
                 onClick={() => setShowPaymentModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+                className="btn-success"
                 title="Record Cash, Cheque, UPI payment"
               >
                 <Receipt className="w-3.5 h-3.5" />
@@ -898,33 +898,33 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                 type="button"
                 onClick={handleConfirmOrder}
                 disabled={isConfirming}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                className="btn-success disabled:opacity-50"
                 title="Convert drafted order into confirmed order"
               >
                 <CheckCircle className="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>{isConfirming ? 'Confirming...' : 'Confirm Order'}</span>
               </button>
             )}
-            <button onClick={() => onEdit(activeOrder)} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer">
+            <button onClick={() => onEdit(activeOrder)} className="btn-secondary">
               <Edit className="w-3.5 h-3.5 text-blue-500" /> Edit
             </button>
-            <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer">
+            <button onClick={() => window.print()} className="btn-secondary">
               <Printer className="w-3.5 h-3.5 text-gray-500" /> Print
             </button>
-            <button onClick={() => showToast('Generating Sales Order PDF...', 'info')} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-all cursor-pointer">
+            <button onClick={() => showToast('Generating Sales Order PDF...', 'info')} className="btn-secondary">
               <FileText className="w-3.5 h-3.5 text-gray-500" /> PDF
             </button>
-            <button onClick={handleWhatsApp} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-emerald-50 border border-gray-200 rounded-lg text-xs font-bold text-emerald-600 transition-all cursor-pointer">
+            <button onClick={handleWhatsApp} className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-emerald-50 border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-emerald-600 cursor-pointer">
               <WhatsAppIcon className="w-3.5 h-3.5" /> WhatsApp
             </button>
-            <button onClick={onClose} className="p-1.5 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg text-gray-400 hover:text-gray-700 transition-all cursor-pointer ml-1">
+            <button onClick={onClose} className="p-1.5 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg text-gray-400 hover:text-gray-700 cursor-pointer ml-1">
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* ── SCROLLABLE BODY ── */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 text-xs">
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 text-[0.875rem]">
 
           {/* ── DRAFT ORDER CONFIRMATION BANNER ── */}
           {activeOrder.status === 'Draft' && (
@@ -935,12 +935,12 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h4 className="text-xs font-black text-amber-950 uppercase tracking-wide">Drafted Sales Order</h4>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/60 text-amber-900 border border-amber-300/50">
+                    <h4 className="text-[0.875rem] font-medium text-amber-950 uppercase tracking-wide">Drafted Sales Order</h4>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-200/60 text-amber-900 border border-amber-300/50">
                       Draft
                     </span>
                   </div>
-                  <p className="text-[11px] text-amber-800/90 mt-0.5">
+                  <p className="text-xs text-amber-800/90 mt-0.5">
                     This order is currently saved as a draft. Click <strong>Confirm Order</strong> to convert it into an active confirmed sales order.
                   </p>
                 </div>
@@ -950,7 +950,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                 type="button"
                 onClick={handleConfirmOrder}
                 disabled={isConfirming}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0 flex items-center gap-1.5 disabled:opacity-50"
+                className="btn-success shrink-0 disabled:opacity-50"
               >
                 <CheckCircle className="w-4 h-4 stroke-[2.5]" />
                 <span>{isConfirming ? 'Confirming...' : 'Confirm Order'}</span>
@@ -960,24 +960,24 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
 
           {/* ── ERP CONNECTION: Linked Production Order or Plan Production ── */}
           {linkedProductionOrder ? (
-            <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 rounded-xl text-xs">
+            <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 rounded-xl text-[0.875rem]">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-300 flex items-center justify-center text-amber-800 font-bold shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-300 flex items-center justify-center text-amber-800 font-semibold shrink-0">
                   <Factory className="w-4 h-4" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-gray-900">Linked Production Order:</span>
-                    <span className="font-mono font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                    <span className="font-semibold text-gray-900">Linked Production Order:</span>
+                    <span className="font-mono font-semibold text-amber-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
                       {linkedProductionOrder.orderNumber}
                     </span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                       linkedProductionOrder.status === 'Completed' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'
                     }`}>
                       {linkedProductionOrder.status}
                     </span>
                   </div>
-                  <div className="text-[11px] text-gray-600 mt-0.5">
+                  <div className="text-xs text-gray-600 mt-0.5">
                     Item: <span className="font-semibold text-gray-800">{linkedProductionOrder.itemName || 'Finished Goods'}</span> • Planned: <span className="font-semibold text-gray-800">{linkedProductionOrder.plannedQty} {linkedProductionOrder.plannedUom}</span>
                     {linkedProductionOrder.dueDate && ` • Target: ${fmtDate(linkedProductionOrder.dueDate)}`}
                   </div>
@@ -989,27 +989,27 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                   onClose();
                   navigate(`/production?orderId=${linkedProductionOrder._id || linkedProductionOrder.orderNumber}`);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-lg font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-semibold text-[0.875rem] shadow-xs cursor-pointer shrink-0"
               >
                 <span>Open in Production</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </button>
             </div>
           ) : activeOrder.status === 'Confirmed' && (
-            <div className="flex items-center justify-between p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs">
+            <div className="flex items-center justify-between p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-xl text-[0.875rem]">
               <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
                   <Factory className="w-3.5 h-3.5" />
                 </div>
                 <div>
-                  <span className="font-bold text-blue-950">Ready for Production Planning</span>
-                  <p className="text-[11px] text-blue-800/80">Order is confirmed. You can plan material BOM and schedule production for this order.</p>
+                  <span className="font-semibold text-blue-950">Ready for Production Planning</span>
+                  <p className="text-xs text-blue-800/80">Order is confirmed. You can plan material BOM and schedule production for this order.</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowProdWizard(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-lg font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
+                className="btn-primary shrink-0"
               >
                 <span>Plan Production Order</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -1021,30 +1021,30 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
 
             {/* Card 1: Customer Details */}
-            <div className="border border-slate-200/90 rounded-2xl p-4 bg-white shadow-3xs flex flex-col justify-between hover:border-slate-300 transition-all">
+            <div className="border border-slate-200/90 rounded-2xl p-4 bg-white shadow-3xs flex flex-col justify-between hover:border-slate-300">
               <div>
                 <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-100">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                  <div className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-slate-900">
                     <div className="w-6 h-6 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
                       <User className="w-3.5 h-3.5" />
                     </div>
                     Customer Details
                   </div>
-                  <span className="px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200/80 rounded-full text-[10px] font-bold">
+                  <span className="px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200/80 rounded-full text-xs font-semibold">
                     {customerGroup}
                   </span>
                 </div>
 
                 <div className="space-y-2.5">
                   <div>
-                    <div className="text-[9.5px] uppercase font-bold tracking-wider text-slate-400 mb-0.5">Customer Name</div>
+                    <div className="text-xs uppercase font-medium tracking-wider text-slate-400 mb-0.5">Customer Name</div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-black text-slate-900 text-sm">{activeOrder.customerName || '—'}</span>
-                      <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-full text-[10px] font-bold">
+                      <span className="font-semibold text-slate-900 text-[0.875rem]">{activeOrder.customerName || '—'}</span>
+                      <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-full text-xs font-semibold">
                         {activeOrder.orderType || 'Credit'}
                       </span>
                       {custTags.map((tag: string, tIdx: number) => (
-                        <span key={tIdx} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200/80 rounded-full text-[10px] font-bold">
+                        <span key={tIdx} className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-full text-xs font-semibold">
                           {tag}
                         </span>
                       ))}
@@ -1053,26 +1053,26 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
 
                   <div className="grid grid-cols-3 gap-1.5 py-2 px-2.5 bg-slate-50/80 rounded-xl border border-slate-150/70">
                     <div>
-                      <div className="text-[9.5px] uppercase font-bold text-slate-400">Credit Limit</div>
-                      <div className="font-bold text-slate-800 text-[11px] mt-0.5">{creditLimitVal}</div>
+                      <div className="text-xs uppercase font-semibold text-slate-400">Credit Limit</div>
+                      <div className="font-semibold text-slate-800 text-xs mt-0.5">{creditLimitVal}</div>
                     </div>
                     <div>
-                      <div className="text-[9.5px] uppercase font-bold text-slate-400">Outstanding</div>
-                      <div className="font-bold text-rose-600 text-[11px] mt-0.5">{outstandingVal}</div>
+                      <div className="text-xs uppercase font-semibold text-slate-400">Outstanding</div>
+                      <div className="font-semibold text-rose-600 text-xs mt-0.5">{outstandingVal}</div>
                     </div>
                     <div>
-                      <div className="text-[9.5px] uppercase font-bold text-slate-400">Last Order</div>
-                      <div className="font-bold text-slate-800 text-[11px] mt-0.5">{lastOrderVal}</div>
+                      <div className="text-xs uppercase font-semibold text-slate-400">Last Order</div>
+                      <div className="font-semibold text-slate-800 text-xs mt-0.5">{lastOrderVal}</div>
                     </div>
                   </div>
 
                   <div>
-                    <div className="text-[9.5px] uppercase font-bold text-slate-400 mb-0.5">Mobile / WhatsApp</div>
+                    <div className="text-xs uppercase font-semibold text-slate-400 mb-0.5">Mobile / WhatsApp</div>
                     <div className="flex items-center gap-2">
                       <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="font-bold text-slate-900 text-[11px]">{activeOrder.customerPhone || custObj?.phone || custObj?.mobile || '—'}</span>
+                      <span className="font-semibold text-slate-900 text-xs">{activeOrder.customerPhone || custObj?.phone || custObj?.mobile || '—'}</span>
                       {(activeOrder.customerPhone || custObj?.phone) && (
-                        <button onClick={handleWhatsApp} title="Open WhatsApp" className="cursor-pointer hover:scale-105 transition-transform">
+                        <button onClick={handleWhatsApp} title="Open WhatsApp" className="cursor-pointer">
                           <WhatsAppIcon className="w-4 h-4 text-emerald-500 hover:text-emerald-600" />
                         </button>
                       )}
@@ -1081,10 +1081,10 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
 
                   {billingAddrStr !== '—' && (
                     <div>
-                      <div className="text-[9.5px] uppercase font-bold text-slate-400 mb-0.5">Address</div>
+                      <div className="text-xs uppercase font-semibold text-slate-400 mb-0.5">Address</div>
                       <div className="flex items-start gap-1.5">
                         <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
-                        <span className="text-slate-700 leading-snug text-[11px]">{billingAddrStr}</span>
+                        <span className="text-slate-700 leading-snug text-xs">{billingAddrStr}</span>
                       </div>
                     </div>
                   )}
@@ -1093,39 +1093,39 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
             </div>
 
             {/* Card 2: Order Information */}
-            <div className="border border-slate-200/90 rounded-2xl p-4 bg-white shadow-3xs flex flex-col justify-between hover:border-slate-300 transition-all">
+            <div className="border border-slate-200/90 rounded-2xl p-4 bg-white shadow-3xs flex flex-col justify-between hover:border-slate-300">
               <div>
                 <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-100">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
-                    <div className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                  <div className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-slate-900">
+                    <div className="w-6 h-6 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
                       <Calendar className="w-3.5 h-3.5" />
                     </div>
                     Order Information
                   </div>
-                  <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${statusBadge(activeOrder.status)}`}>
+                  <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusBadge(activeOrder.status)}`}>
                     {activeOrder.status}
                   </span>
                 </div>
 
                 <div className="space-y-2.5">
-                  <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-500 font-medium">Order Date:</span>
-                    <span className="font-bold text-slate-900">{fmtDate(activeOrder.orderDate)}</span>
+                    <span className="font-semibold text-slate-900">{fmtDate(activeOrder.orderDate)}</span>
                   </div>
 
-                  <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-500 font-medium">Expected Delivery:</span>
-                    <span className="font-bold text-slate-900">{activeOrder.promisedDate ? fmtDate(activeOrder.promisedDate) : 'Not specified'}</span>
+                    <span className="font-semibold text-slate-900">{activeOrder.promisedDate ? fmtDate(activeOrder.promisedDate) : 'Not specified'}</span>
                   </div>
 
                   <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-2">
                     <div className="p-2 bg-slate-50/80 rounded-lg border border-slate-150/70">
-                      <div className="text-[9.5px] uppercase font-bold text-slate-400">PO Number</div>
-                      <div className="font-bold text-slate-800 text-[11px] truncate mt-0.5">{activeOrder.customerPoNumber || '—'}</div>
+                      <div className="text-xs uppercase font-semibold text-slate-400">PO Number</div>
+                      <div className="font-semibold text-slate-800 text-xs truncate mt-0.5">{activeOrder.customerPoNumber || '—'}</div>
                     </div>
                     <div className="p-2 bg-slate-50/80 rounded-lg border border-slate-150/70">
-                      <div className="text-[9.5px] uppercase font-bold text-slate-400">Transporter</div>
-                      <div className="flex items-center gap-1 font-bold text-slate-800 text-[11px] truncate mt-0.5">
+                      <div className="text-xs uppercase font-semibold text-slate-400">Transporter</div>
+                      <div className="flex items-center gap-1 font-semibold text-slate-800 text-xs truncate mt-0.5">
                         <Truck className="w-3 h-3 text-slate-400 shrink-0" />
                         <span className="truncate">{activeOrder.transporter || '—'}</span>
                       </div>
@@ -1136,47 +1136,47 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
             </div>
 
             {/* Card 3: Delivery & Billing Address */}
-            <div className="border border-slate-200/90 rounded-2xl p-4 bg-white shadow-3xs flex flex-col justify-between hover:border-slate-300 transition-all">
+            <div className="border border-slate-200/90 rounded-2xl p-4 bg-white shadow-3xs flex flex-col justify-between hover:border-slate-300">
               <div>
                 <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-100">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                  <div className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-slate-900">
                     <div className="w-6 h-6 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
                       <MapPin className="w-3.5 h-3.5" />
                     </div>
                     Delivery &amp; Billing Address
                   </div>
-                  <button onClick={() => onEdit(activeOrder)} className="flex items-center gap-1 text-[11px] text-blue-600 font-bold hover:text-blue-700 cursor-pointer">
+                  <button onClick={() => onEdit(activeOrder)} className="flex items-center gap-1 text-xs text-blue-600 font-semibold hover:text-blue-700 cursor-pointer">
                     <Edit className="w-3 h-3" /> Edit
                   </button>
                 </div>
 
                 {/* Address Tabs */}
-                <div className="flex rounded-lg bg-slate-100/90 p-0.5 mb-2.5 text-[11px]">
+                <div className="flex rounded-lg bg-slate-100/90 p-0.5 mb-2.5 text-xs">
                   <button
                     onClick={() => setAddressTab('billing')}
-                    className={`flex-1 py-1 rounded-md font-bold transition-all cursor-pointer ${addressTab === 'billing' ? 'bg-white shadow-xs text-blue-700' : 'text-slate-500 hover:text-slate-800'}`}
+                    className={`flex-1 py-1 rounded-md font-semibold cursor-pointer ${addressTab === 'billing' ? 'bg-white shadow-xs text-blue-700' : 'text-slate-500 hover:text-slate-800'}`}
                   >
                     Billing Address
                   </button>
                   <button
                     onClick={() => setAddressTab('delivery')}
-                    className={`flex-1 py-1 rounded-md font-bold transition-all cursor-pointer ${addressTab === 'delivery' ? 'bg-white shadow-xs text-blue-700' : 'text-slate-500 hover:text-slate-800'}`}
+                    className={`flex-1 py-1 rounded-md font-semibold cursor-pointer ${addressTab === 'delivery' ? 'bg-white shadow-xs text-blue-700' : 'text-slate-500 hover:text-slate-800'}`}
                   >
                     Delivery Address
                   </button>
                 </div>
 
-                <div className="space-y-1 text-[11px]">
-                  <div className="font-bold text-slate-900">
+                <div className="space-y-1 text-xs">
+                  <div className="font-semibold text-slate-900">
                     {addressTab === 'billing' ? (ba?.attention || activeOrder.customerName) : (sa?.attention || activeOrder.customerName)}
                   </div>
-                  <div className="text-slate-600 leading-relaxed text-[11px]">
+                  <div className="text-slate-600 leading-relaxed text-xs">
                     {addressTab === 'billing' ? billingAddrStr : deliveryAddrStr}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 mt-2.5 pt-2 border-t border-slate-100 text-[10.5px]">
+              <div className="flex items-center gap-1.5 mt-2.5 pt-2 border-t border-slate-100 text-xs">
                 {sameAddr ? (
                   <span className="text-emerald-700 flex items-center gap-1 font-medium">
                     <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
@@ -1195,23 +1195,23 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
           {/* ── ORDER ITEMS TABLE ── */}
           <div className="border border-slate-200/90 rounded-2xl bg-white overflow-hidden shadow-3xs">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-150">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+              <div className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-slate-900">
                 <Package className="w-3.5 h-3.5 text-blue-600" />
                 Order Items ({(activeOrder.items || []).length})
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => onEdit(activeOrder)} className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold cursor-pointer transition-all shadow-xs">
+                <button onClick={() => onEdit(activeOrder)} className="btn-primary">
                   <Plus className="w-3 h-3" /> Add Product
                 </button>
               </div>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-[11px] text-left">
+              <table className="w-full text-xs text-left">
                 <thead className="bg-slate-50/90 border-b border-slate-200">
-                  <tr className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                  <tr className="text-slate-500 font-medium uppercase tracking-wider text-xs">
                     <th className="px-3 py-2.5 text-center w-8 whitespace-nowrap">#</th>
-                    <th className="px-3 py-2.5 min-w-[280px] whitespace-nowrap text-left">Item / Product</th>
+                    <th className="px-3 py-2.5 min-w-[17.5rem] whitespace-nowrap text-left">Item / Product</th>
                     <th className="px-3 py-2.5 text-center whitespace-nowrap">Stock (GBL)</th>
                     <th className="px-3 py-2.5 text-center whitespace-nowrap">GBL *</th>
                     <th className="px-3 py-2.5 text-center whitespace-nowrap">Pcs / GBL</th>
@@ -1258,19 +1258,19 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                     const looseComps = resolveItemComponents(item, activeOrder);
 
                     return (
-                      <tr key={idx} className="hover:bg-blue-50/20 transition-colors">
-                        <td className="px-3 py-3 text-center align-top text-slate-500 font-bold">{idx + 1}</td>
-                        <td className="px-3 py-3 align-top min-w-[280px]">
-                          <div className="font-bold text-slate-900 text-xs">{item.itemName}</div>
-                          <div className="text-[10.5px] text-slate-400 font-mono mt-0.5">{item.skuCode}</div>
+                      <tr key={idx} className="hover:bg-blue-50/20">
+                        <td className="px-3 py-3 text-center align-top text-slate-500 font-semibold">{idx + 1}</td>
+                        <td className="px-3 py-3 align-top min-w-[17.5rem]">
+                          <div className="font-semibold text-slate-900 text-[0.875rem]">{item.itemName}</div>
+                          <div className="text-xs text-slate-400 font-mono mt-0.5">{item.skuCode}</div>
                           {looseComps && looseComps.length > 0 && (
-                            <div className="mt-2.5 p-2.5 bg-gradient-to-br from-indigo-50/80 via-slate-50 to-purple-50/50 rounded-xl border border-indigo-100/90 text-[11px] shadow-3xs space-y-1.5 w-full min-w-[250px]">
-                              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-indigo-950 pb-1 border-b border-indigo-100/80">
+                            <div className="mt-2.5 p-2.5 bg-gradient-to-br from-blue-50/80 via-slate-50 to-blue-50/50 rounded-xl border border-blue-100/90 text-xs shadow-3xs space-y-1.5 w-full min-w-[15.625rem]">
+                              <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wider text-blue-950 pb-1 border-b border-blue-100/80">
                                 <span className="flex items-center gap-1.5">
-                                  <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                                  <Layers className="w-3.5 h-3.5 text-blue-600" />
                                   <span>Loose Stock Breakdown</span>
                                 </span>
-                                <span className="px-1.5 py-0.5 rounded bg-indigo-100/80 text-indigo-800 text-[9.5px]">
+                                <span className="px-1.5 py-0.5 rounded bg-blue-100/80 text-blue-800 text-xs">
                                   {looseComps.length} Items
                                 </span>
                               </div>
@@ -1285,15 +1285,15 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
 
                                   return (
                                     <div key={comp.componentId || cIdx} className="flex items-center justify-between gap-2 text-slate-700 bg-white/80 p-1.5 rounded-lg border border-slate-100">
-                                      <span className="font-semibold text-slate-800 text-[10.5px] truncate">
+                                      <span className="font-semibold text-slate-800 text-xs truncate">
                                         • {compName}
                                       </span>
                                       <div className="flex items-center gap-1.5 shrink-0">
-                                        <span className="font-mono text-slate-600 text-[10px]">
+                                        <span className="font-mono text-slate-600 text-xs">
                                           {compQty} pcs {compGbl ? `(${compGbl} GBL)` : ''}
                                         </span>
                                         {compRatePerPcs > 0 && (
-                                          <span className="font-mono text-indigo-700 font-bold text-[10px] bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                                          <span className="font-mono text-blue-700 font-semibold text-xs bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
                                             ₹{compRatePerPcs.toFixed(2)}/pc
                                           </span>
                                         )}
@@ -1306,35 +1306,35 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                           )}
                         </td>
                         <td className="px-3 py-3 text-center align-top">
-                          <span className={`font-bold font-mono ${realStockGbl > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                          <span className={`font-semibold font-mono ${realStockGbl > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
                             {realStockGbl}
                           </span>
                         </td>
-                        <td className="px-3 py-3 text-center align-top font-bold font-mono text-slate-900">{gbl || '—'}</td>
+                        <td className="px-3 py-3 text-center align-top font-semibold font-mono text-slate-900">{gbl || '—'}</td>
                         <td className="px-3 py-3 text-center align-top font-mono text-slate-700">{pcsPerGbl || '—'}</td>
-                        <td className="px-3 py-3 text-center align-top font-black font-mono text-slate-900">{item.quantity.toLocaleString('en-IN')}</td>
+                        <td className="px-3 py-3 text-center align-top font-semibold font-mono text-slate-900">{item.quantity.toLocaleString('en-IN')}</td>
                         <td className="px-3 py-3 text-right align-top font-mono text-slate-800">
                           {ratePerPcs > 0 ? `₹${ratePerPcs.toFixed(2)}` : (hasMasterMatch ? '₹0.00' : '—')}
                         </td>
-                        <td className="px-3 py-3 text-right align-top font-bold font-mono text-slate-900">
+                        <td className="px-3 py-3 text-right align-top font-semibold font-mono text-slate-900">
                           {totalAmount > 0 ? `₹${totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : (hasMasterMatch ? '₹0.00' : '—')}
                         </td>
                         <td className="px-3 py-3 text-center align-top">
-                          <span className="font-bold text-slate-700 font-mono">{(item as any).producedQty || 0}</span>
+                          <span className="font-semibold text-slate-700 font-mono">{(item as any).producedQty || 0}</span>
                         </td>
                         <td className="px-3 py-3 text-center align-top font-mono text-slate-700">{dispatched}</td>
                         <td className="px-3 py-3 text-center align-top">
-                          <span className={`font-bold font-mono ${pending > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{pending}</span>
+                          <span className={`font-semibold font-mono ${pending > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{pending}</span>
                         </td>
                         <td className="px-3 py-3 text-center align-top">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${itemStatusColor}`}>{itemStatus}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${itemStatusColor}`}>{itemStatus}</span>
                         </td>
                         <td className="px-3 py-3 text-center align-top">
                           <div className="flex items-center justify-center gap-1.5">
-                            <button onClick={() => onEdit(activeOrder)} className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded cursor-pointer transition-all" title="Edit">
+                            <button onClick={() => onEdit(activeOrder)} className="icon-btn" title="Edit">
                               <Edit className="w-3.5 h-3.5" />
                             </button>
-                            <button onClick={() => showToast('Edit order in full editor to remove items', 'info')} className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-all" title="Remove">
+                            <button onClick={() => showToast('Edit order in full editor to remove items', 'info')} className="icon-btn-danger" title="Remove">
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
@@ -1345,9 +1345,9 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                 </tbody>
               </table>
             </div>
-            <div className="flex justify-end px-4 py-2.5 bg-gray-50 border-t border-gray-100 text-[11px]">
+            <div className="flex justify-end px-4 py-2.5 bg-gray-50 border-t border-gray-100 text-xs">
               <span className="text-gray-500">Items Total:</span>
-              <span className="font-black text-gray-900 ml-2">{fmtMoney(itemsTotal)}</span>
+              <span className="font-semibold text-gray-900 ml-2">{fmtMoney(itemsTotal)}</span>
             </div>
           </div>
 
@@ -1357,19 +1357,19 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
             {/* Other Charges */}
             <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
+                <div className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-gray-800">
                   <CreditCard className="w-3.5 h-3.5 text-blue-600" />
                   Other Charges ({(activeOrder.otherCharges || []).length})
                 </div>
-                <button onClick={() => onEdit(activeOrder)} className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-blue-50 border border-blue-200 text-blue-600 rounded-lg text-[11px] font-bold cursor-pointer transition-all">
+                <button onClick={() => onEdit(activeOrder)} className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-blue-50 border border-blue-200 text-blue-600 rounded-lg text-xs font-semibold cursor-pointer">
                   <Plus className="w-3 h-3" /> Add Charge
                 </button>
               </div>
 
               {(activeOrder.otherCharges || []).length > 0 ? (
-                <table className="w-full text-[11px]">
+                <table className="w-full text-xs">
                   <thead className="bg-gray-50 border-b border-gray-100">
-                    <tr className="text-gray-500 font-bold uppercase tracking-wide text-[10px]">
+                    <tr className="text-gray-500 font-medium uppercase tracking-wide text-xs">
                       <th className="px-3 py-2 w-8">#</th>
                       <th className="px-3 py-2">Charge Name</th>
                       <th className="px-3 py-2 text-center w-20">QTY</th>
@@ -1380,14 +1380,14 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {(activeOrder.otherCharges || []).map((charge, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-3 py-2 text-center text-gray-500 font-bold">{idx + 1}</td>
-                        <td className="px-3 py-2 font-bold text-gray-900">{charge.name}</td>
+                      <tr key={idx} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 text-center text-gray-500 font-semibold">{idx + 1}</td>
+                        <td className="px-3 py-2 font-semibold text-gray-900">{charge.name}</td>
                         <td className="px-3 py-2 text-center font-mono text-gray-700">{charge.quantity}</td>
                         <td className="px-3 py-2 text-right font-mono text-gray-700">₹{(charge.rate || 0).toFixed(2)}</td>
-                        <td className="px-3 py-2 text-right font-bold font-mono text-gray-900">₹{(charge.amount || 0).toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right font-semibold font-mono text-gray-900">₹{(charge.amount || 0).toFixed(2)}</td>
                         <td className="px-3 py-2 text-center">
-                          <button onClick={() => onEdit(activeOrder)} className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer" title="Edit in drawer">
+                          <button onClick={() => onEdit(activeOrder)} className="icon-btn-danger" title="Edit in drawer">
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </td>
@@ -1396,57 +1396,57 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                   </tbody>
                 </table>
               ) : (
-                <div className="px-4 py-5 text-center text-gray-400 italic text-[11px]">No other charges added.</div>
+                <div className="px-4 py-5 text-center text-gray-400 italic text-xs">No other charges added.</div>
               )}
 
               {(activeOrder.otherCharges || []).length > 0 && (
-                <div className="flex justify-end px-4 py-2.5 bg-gray-50 border-t border-gray-100 text-[11px]">
+                <div className="flex justify-end px-4 py-2.5 bg-gray-50 border-t border-gray-100 text-xs">
                   <span className="text-gray-500">Other Charges Total:</span>
-                  <span className="font-black text-gray-900 ml-2">{fmtMoney(chargesTotal)}</span>
+                  <span className="font-semibold text-gray-900 ml-2">{fmtMoney(chargesTotal)}</span>
                 </div>
               )}
             </div>
 
             {/* Order Summary */}
             <div className="border border-gray-200 rounded-xl bg-white p-4">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800 mb-4">
+              <div className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-gray-800 mb-4">
                 <IndianRupee className="w-3.5 h-3.5 text-blue-600" />
                 Order Summary
               </div>
               <div className="space-y-2.5">
-                <div className="flex items-center justify-between text-[11px]">
+                <div className="flex items-center justify-between text-xs">
                   <span className="text-gray-600">Items Total</span>
-                  <span className="font-bold text-gray-900">{fmtMoney(itemsTotal)}</span>
+                  <span className="font-semibold text-gray-900">{fmtMoney(itemsTotal)}</span>
                 </div>
                 {chargesTotal > 0 && (
-                  <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-600">Other Charges</span>
-                    <span className="font-bold text-gray-900">{fmtMoney(chargesTotal)}</span>
+                    <span className="font-semibold text-gray-900">{fmtMoney(chargesTotal)}</span>
                   </div>
                 )}
-                <div className="flex items-center justify-between text-[11px] pt-2 border-t border-gray-100">
+                <div className="flex items-center justify-between text-xs pt-2 border-t border-gray-100">
                   <span className="text-gray-600">Subtotal</span>
-                  <span className="font-bold text-gray-900">{fmtMoney(subtotal)}</span>
+                  <span className="font-semibold text-gray-900">{fmtMoney(subtotal)}</span>
                 </div>
                 {discAmount > 0 && (
-                  <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-600">Discount (Overall)</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-gray-400 text-[10px]">{activeOrder.discountPercent || 0}%</span>
-                      <span className="font-bold text-rose-600">-{fmtMoney(discAmount)}</span>
+                      <span className="text-gray-400 text-xs">{activeOrder.discountPercent || 0}%</span>
+                      <span className="font-semibold text-rose-600">-{fmtMoney(discAmount)}</span>
                     </div>
                   </div>
                 )}
                 <div className="flex items-center justify-between pt-3 border-t border-gray-200 mt-1">
-                  <span className="text-sm font-black text-gray-900">Grand Total</span>
-                  <span className="text-xl font-black text-blue-700">{fmtMoney(grandTotal)}</span>
+                  <span className="text-[0.875rem] font-semibold text-gray-900">Grand Total</span>
+                  <span className="text-xl font-semibold text-blue-700">{fmtMoney(grandTotal)}</span>
                 </div>
 
                 {/* ── PAYMENT STATUS & CASH/CHEQUE/UPI BREAKDOWN ── */}
                 <div className="mt-3 p-3 bg-gray-50/90 rounded-xl border border-gray-200/90 space-y-2">
-                  <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-600 font-semibold">Payment Status:</span>
-                    <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] border ${
+                    <span className={`px-2 py-0.5 rounded-full font-semibold text-xs border ${
                       paymentStatusVal === 'Paid' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
                       paymentStatusVal === 'Partially Paid' ? 'bg-blue-100 text-blue-800 border-blue-300' :
                       'bg-amber-100 text-amber-800 border-amber-300'
@@ -1454,13 +1454,13 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                       {paymentStatusVal}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-600">Paid Amount:</span>
-                    <span className="font-bold text-emerald-700 font-mono">{fmtMoney(paidAmountVal)}</span>
+                    <span className="font-semibold text-emerald-700 font-mono">{fmtMoney(paidAmountVal)}</span>
                   </div>
-                  <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-gray-200">
-                    <span className="text-gray-800 font-bold">Balance Due:</span>
-                    <span className={`font-black font-mono text-sm ${balanceDueVal > 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                  <div className="flex items-center justify-between text-xs pt-1.5 border-t border-gray-200">
+                    <span className="text-gray-800 font-semibold">Balance Due:</span>
+                    <span className={`font-semibold font-mono text-[0.875rem] ${balanceDueVal > 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
                       {fmtMoney(balanceDueVal)}
                     </span>
                   </div>
@@ -1469,7 +1469,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                     <button
                       type="button"
                       onClick={() => setShowPaymentModal(true)}
-                      className="w-full mt-1.5 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                      className="btn-success w-full mt-1.5 justify-center"
                     >
                       <Receipt className="w-3.5 h-3.5" />
                       <span>{balanceDueVal > 0 ? `Record Payment (Due: ${fmtMoney(balanceDueVal)})` : 'Record Additional Payment'}</span>
@@ -1480,7 +1480,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                 {/* ── PAYMENT TRANSACTIONS LOG ── */}
                 {activeOrder.payments && activeOrder.payments.length > 0 && (
                   <div className="mt-3 border border-gray-200 rounded-xl bg-white p-3 space-y-2">
-                    <div className="flex items-center justify-between text-[11px] font-bold text-gray-800 border-b border-gray-100 pb-1.5">
+                    <div className="flex items-center justify-between text-xs font-semibold text-gray-800 border-b border-gray-100 pb-1.5">
                       <span className="flex items-center gap-1">
                         <Receipt className="w-3 h-3 text-emerald-600" />
                         <span>Payment History ({activeOrder.payments.length})</span>
@@ -1489,20 +1489,20 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
                     </div>
                     <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
                       {activeOrder.payments.map((p: any, pIdx: number) => (
-                        <div key={p.paymentId || pIdx} className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-[10px] flex items-center justify-between">
+                        <div key={p.paymentId || pIdx} className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-xs flex items-center justify-between">
                           <div>
                             <div className="flex items-center gap-1.5">
-                              <span className="font-bold uppercase text-gray-700">{p.paymentMethod}</span>
+                              <span className="font-semibold uppercase text-gray-700">{p.paymentMethod}</span>
                               <span className="text-gray-300">•</span>
                               <span className="text-gray-500 font-mono">{fmtDate(p.date)}</span>
                             </div>
                             {(p.referenceId || p.chequeNumber) && (
-                              <div className="text-gray-500 font-mono text-[9px] mt-0.5 truncate max-w-[150px]">
+                              <div className="text-gray-500 font-mono text-xs mt-0.5 truncate max-w-[9.375rem]">
                                 Ref: {p.referenceId || p.chequeNumber} {p.bankName ? `(${p.bankName})` : ''}
                               </div>
                             )}
                           </div>
-                          <span className="font-black text-emerald-700 font-mono text-xs">
+                          <span className="font-semibold text-emerald-700 font-mono text-[0.875rem]">
                             {fmtMoney(p.amount)}
                           </span>
                         </div>
@@ -1516,11 +1516,11 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
 
           {/* ── NOTES ── */}
           <div className="border border-gray-200 rounded-xl bg-white p-4">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800 mb-3">
+            <div className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-gray-800 mb-3">
               <FileText className="w-3.5 h-3.5 text-blue-600" />
               Notes / Internal Remarks
             </div>
-            <div className="text-[11px] text-gray-600 leading-relaxed min-h-[40px]">
+            <div className="text-xs text-gray-600 leading-relaxed min-h-[2.5rem]">
               {activeOrder.internalNotes || <span className="text-gray-400 italic">No notes added.</span>}
             </div>
           </div>
@@ -1528,20 +1528,20 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
         </div>
 
         {/* ── FOOTER ── */}
-        <div className="flex items-center justify-between px-6 py-3.5 border-t border-gray-100 bg-gray-50/60 shrink-0">
-          <button onClick={onClose} className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer">
+        <div className="flex items-center justify-between px-6 py-3.5 border-t border-gray-100 bg-gray-50/60 shrink-0 dlg-footer">
+          <button onClick={onClose} className="btn-secondary">
             Cancel
           </button>
           <div className="flex items-center gap-2.5">
             <button
               onClick={() => onEdit(activeOrder)}
-              className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+              className="btn-secondary"
             >
               Save as Draft
             </button>
             <button
               onClick={() => onEdit(activeOrder)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer"
+              className="btn-primary"
             >
               <Edit className="w-3.5 h-3.5" />
               Update Sales Order
@@ -1561,7 +1561,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
         {/* ── PRODUCTION ORDER WIZARD MODAL (In-place inside Sales Order) ── */}
         {showProdWizard && typeof document !== 'undefined' && createPortal(
           <div
-            className="fixed inset-0 z-[9000] flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden animate-in fade-in duration-200"
+            className="fixed inset-0 z-[9000] flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden"
             style={{
               backgroundColor: 'rgba(15, 23, 42, 0.65)',
               backdropFilter: 'blur(6px)',
@@ -1574,7 +1574,7 @@ export const SalesOrderDetailPanelV2: React.FC<SalesOrderDetailPanelV2Props> = (
             onClick={() => setShowProdWizard(false)}
           >
             <div
-              className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 animate-in zoom-in-95 duration-200 overflow-hidden relative"
+              className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 overflow-hidden relative"
               style={{ maxWidth: 1260, height: '94vh', maxHeight: '94vh' }}
               onClick={e => e.stopPropagation()}
             >

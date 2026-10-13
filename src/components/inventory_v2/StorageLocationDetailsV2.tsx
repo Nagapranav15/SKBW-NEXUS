@@ -42,14 +42,14 @@ const StorageLocationDetailsV2: React.FC<StorageLocationDetailsV2Props> = ({
   if (loading) {
     if (isInline) {
       return (
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-3xs p-6 flex flex-col items-center justify-center min-h-[300px] h-full">
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-3xs p-6 flex flex-col items-center justify-center min-h-[18.75rem] h-full">
           <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
         </div>
       );
     }
     return (
       <div className="fixed inset-0 z-[60] overflow-hidden flex justify-end !mt-0">
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-3xs" onClick={onClose} />
+        <div className="fixed inset-0 bg-gray-900/40" onClick={onClose} />
         <div className="relative w-full max-w-lg bg-white shadow-2xl h-full flex items-center justify-center z-10">
           <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
         </div>
@@ -62,20 +62,20 @@ const StorageLocationDetailsV2: React.FC<StorageLocationDetailsV2Props> = ({
   const { location, storedSkus, recentMovements, totalQty } = data;
 
   const renderContent = () => (
-    <div className={`flex flex-col h-full ${isInline ? '' : 'animate-in slide-in-from-right duration-250'}`}>
+    <div className={`flex flex-col h-full ${isInline ? '' : 'animate-in slide-in-from-right'}`}>
       {/* Header */}
       <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
         <div>
-          <h2 className="text-base font-bold text-gray-900 flex items-center gap-1.5">
+          <h2 className="text-base font-semibold text-gray-900 flex items-center gap-1.5">
             <MapPin className="w-4 h-4 text-emerald-600 animate-pulse-slow" />
             {location.name}
           </h2>
-          <p className="text-[11px] text-gray-500 mt-0.5">Hierarchy Node: <span className="font-semibold text-gray-700">{location.level}</span></p>
+          <p className="text-xs text-gray-500 mt-0.5">Hierarchy Node: <span className="font-semibold text-gray-700">{location.level}</span></p>
         </div>
         {onClose && (
           <button
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-lg"
           >
             <X className="w-5 h-5" />
           </button>
@@ -86,20 +86,20 @@ const StorageLocationDetailsV2: React.FC<StorageLocationDetailsV2Props> = ({
       <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-white text-gray-950">
         {/* Occupied Stock Summary Widget */}
         <div className="bg-gray-50/50 p-4 border border-gray-200 rounded-xl">
-          <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">
             <BarChart2 className="w-3.5 h-3.5 text-blue-600" />
             Stock Occupancy Summary
           </h3>
-          <div className="text-xs text-gray-700">
+          <div className="text-[0.875rem] text-gray-700">
             <p className="text-gray-550 font-semibold">
-              Current Stored Quantity: <span className="font-black text-gray-950 text-sm ml-1">{totalQty.toLocaleString()} {location.unit || 'kg'}</span>
+              Current Stored Quantity: <span className="font-semibold text-gray-950 text-[0.875rem] ml-1">{totalQty.toLocaleString()} {location.unit || 'kg'}</span>
             </p>
           </div>
         </div>
 
         {/* Stored SKUs */}
         <div className="space-y-2.5">
-          <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1.5 flex items-center gap-1.5">
+          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1.5 flex items-center gap-1.5">
             <Layers className="w-3.5 h-3.5 text-blue-600" />
             Stored SKUs in this node
           </h3>
@@ -108,53 +108,53 @@ const StorageLocationDetailsV2: React.FC<StorageLocationDetailsV2Props> = ({
               {storedSkus.map((item, idx) => (
                 <div key={idx} className="bg-white border border-gray-200 p-3 rounded-xl flex items-center justify-between shadow-3xs">
                   <div className="flex-1 pr-3">
-                    <p className="text-[9px] font-mono text-gray-400 font-bold uppercase">{item.sku.skuCode}</p>
-                    <p className="text-xs font-bold text-gray-800 break-words mt-0.5" title={item.sku.name}>{item.sku.name}</p>
+                    <p className="text-xs font-mono text-gray-400 font-semibold uppercase">{item.sku.skuCode}</p>
+                    <p className="text-[0.875rem] font-semibold text-gray-800 break-words mt-0.5" title={item.sku.name}>{item.sku.name}</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-black text-gray-900">{item.quantity.toLocaleString()}</p>
-                    <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">{item.sku.unit}</p>
+                    <p className="text-[0.875rem] font-semibold text-gray-900">{item.quantity.toLocaleString()}</p>
+                    <p className="text-xs text-gray-400 font-semibold uppercase mt-0.5">{item.sku.unit}</p>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-center py-6 text-xs text-gray-400 italic">No physical stock currently stored</p>
+            <p className="text-center py-6 text-[0.875rem] text-gray-400 italic">No physical stock currently stored</p>
           )}
         </div>
 
         {/* Recent Movements in this node */}
         <div className="space-y-2.5">
-          <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1.5 flex items-center gap-1.5">
+          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1.5 flex items-center gap-1.5">
             <ArrowRightLeft className="w-3.5 h-3.5 text-blue-600" />
             Recent Location Movements
           </h3>
           {recentMovements.length > 0 ? (
             <div className="space-y-2">
               {recentMovements.map((tx: any) => (
-                <div key={tx._id} className="bg-white border border-gray-200 p-3 rounded-xl flex items-center justify-between text-xs shadow-3xs">
+                <div key={tx._id} className="bg-white border border-gray-200 p-3 rounded-xl flex items-center justify-between text-[0.875rem] shadow-3xs">
                   <div className="flex-1 pr-3">
-                    <span className={`px-1.5 py-0.5 rounded font-extrabold text-[8px] uppercase tracking-wider border ${
+                    <span className={`px-1.5 py-0.5 rounded font-medium text-xs uppercase tracking-wider border ${
                       tx.direction === 'IN' 
                         ? 'bg-green-50 text-green-700 border-green-100' 
                         : 'bg-red-50 text-red-700 border-red-100'
                     }`}>
                       {tx.transactionType}
                     </span>
-                    <p className="text-[10px] font-bold text-gray-800 mt-1.5 break-words" title={tx.skuId?.name}>{tx.skuId?.name}</p>
-                    <p className="text-[9px] text-gray-400 mt-0.5 font-medium">{new Date(tx.createdAt || tx.timestamp).toLocaleString('en-IN')}</p>
+                    <p className="text-xs font-semibold text-gray-800 mt-1.5 break-words" title={tx.skuId?.name}>{tx.skuId?.name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5 font-medium">{new Date(tx.createdAt || tx.timestamp).toLocaleString('en-IN')}</p>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <p className={`font-black ${tx.direction === 'IN' ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className={`font-semibold ${tx.direction === 'IN' ? 'text-green-600' : 'text-red-600'}`}>
                       {tx.direction === 'IN' ? `+${tx.quantity}` : `-${tx.quantity}`}
                     </p>
-                    <p className="text-[9px] font-mono text-gray-400 font-bold uppercase mt-0.5">REF: {tx.referenceId}</p>
+                    <p className="text-xs font-mono text-gray-400 font-semibold uppercase mt-0.5">REF: {tx.referenceId}</p>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-center py-6 text-xs text-gray-400 italic">No recent movements logged</p>
+            <p className="text-center py-6 text-[0.875rem] text-gray-400 italic">No recent movements logged</p>
           )}
         </div>
       </div>
@@ -164,7 +164,7 @@ const StorageLocationDetailsV2: React.FC<StorageLocationDetailsV2Props> = ({
         <div className="px-5 py-3.5 border-t border-gray-100 bg-gray-50 text-right">
           <button
             onClick={onClose}
-            className="px-5 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-semibold text-xs shadow-3xs"
+            className="btn-secondary"
           >
             Close
           </button>
@@ -184,7 +184,7 @@ const StorageLocationDetailsV2: React.FC<StorageLocationDetailsV2Props> = ({
   return (
     <div className="fixed inset-0 z-[60] overflow-hidden flex justify-end !mt-0">
       {/* Overlay */}
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-3xs" onClick={onClose} />
+      <div className="fixed inset-0 bg-gray-900/40" onClick={onClose} />
 
       {/* Drawer */}
       <div className="relative w-full max-w-lg bg-white shadow-2xl h-full flex flex-col z-10">

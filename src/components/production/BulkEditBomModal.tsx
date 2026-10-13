@@ -553,13 +553,13 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      size="max-w-[98vw] 2xl:max-w-[1780px]"
-      maxWidth="max-w-[98vw] 2xl:max-w-[1780px]"
-      className="max-h-[96vh] h-[95vh] w-full"
+      size="max-w-[98vw] 2xl:max-w-[111.25rem]"
+      maxWidth="max-w-[98vw] 2xl:max-w-[111.25rem]"
+      className="max-h-[calc(96*var(--vh,1vh))] h-[calc(95*var(--vh,1vh))] w-full"
       padding="p-0"
       hideCloseButton={true}
     >
-      <div className="p-4 sm:p-5 space-y-3.5 h-full max-h-[95vh] flex flex-col">
+      <div className="p-4 sm:p-5 space-y-3.5 h-full max-h-[calc(95*var(--vh,1vh))] flex flex-col">
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-3 border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
@@ -567,10 +567,10 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
               <ClipboardList className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 truncate">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2 truncate">
                 <span>Build BOMs</span>
               </h3>
-              <p className="text-xs text-gray-400 font-medium truncate">
+              <p className="text-[0.875rem] text-gray-400 font-medium truncate">
                 Define recipes item by item for Finished Goods & Semi-Finished materials.
               </p>
             </div>
@@ -579,16 +579,16 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
           <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={handleExportCSV}
-              className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+              className="btn-secondary"
             >
               <Download className="w-3.5 h-3.5 text-gray-500" /> Export all (Excel)
             </button>
-            <div className="text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-xl">
+            <div className="text-[0.875rem] font-semibold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-xl">
               {activeWithRecipeCount} of {activeList.length} {activeDomainTab === 'semi' ? 'semi-finished' : 'finished'} items have a recipe
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
+              className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl cursor-pointer"
               title="Close Build BOMs"
             >
               <X className="w-4 h-4" />
@@ -597,9 +597,9 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
         </div>
 
         {/* 3-Column Body Layout */}
-        <div className="flex gap-3.5 flex-1 overflow-hidden min-h-[560px]">
+        <div className="flex gap-3.5 flex-1 overflow-hidden min-h-[35rem]">
           {/* Column 1: Products Selector List */}
-          <div className="w-[360px] xl:w-[410px] 2xl:w-[450px] shrink-0 border border-gray-200 rounded-2xl p-3 flex flex-col gap-2.5 bg-gray-50/40 overflow-hidden">
+          <div className="w-[22.5rem] xl:w-[25.625rem] 2xl:w-[28.125rem] shrink-0 border border-gray-200 rounded-2xl p-3 flex flex-col gap-2.5 bg-gray-50/40 overflow-hidden">
             {/* Domain Switcher: Finished Goods vs Semi-Finished Materials */}
             <div className="flex items-center p-1 bg-gray-200/70 rounded-xl gap-1 shrink-0 select-none">
               <button
@@ -609,14 +609,14 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                   setBuildBomsTitleFilter('');
                   setBuildBomsRulingFilter('');
                 }}
-                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${activeDomainTab === 'products'
+                className={`flex-1 py-1.5 px-2 rounded-lg text-[0.875rem] font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${activeDomainTab === 'products'
                   ? 'bg-white text-gray-900 shadow-2xs'
                   : 'text-gray-500 hover:text-gray-800'
                   }`}
               >
                 <Boxes className="w-3.5 h-3.5 text-blue-600" />
                 <span>Finished Goods</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${activeDomainTab === 'products' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                <span className={`text-xs px-1.5 py-0.2 rounded-full font-mono font-semibold ${activeDomainTab === 'products' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
                   }`}>
                   {productsList.length}
                 </span>
@@ -629,14 +629,14 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                   setBuildBomsTitleFilter('');
                   setBuildBomsRulingFilter('');
                 }}
-                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${activeDomainTab === 'semi'
+                className={`flex-1 py-1.5 px-2 rounded-lg text-[0.875rem] font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${activeDomainTab === 'semi'
                   ? 'bg-white text-gray-900 shadow-2xs'
                   : 'text-gray-500 hover:text-gray-800'
                   }`}
               >
                 <Layers className="w-3.5 h-3.5 text-amber-600" />
                 <span>Semi Finished</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${activeDomainTab === 'semi' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'
+                <span className={`text-xs px-1.5 py-0.2 rounded-full font-mono font-semibold ${activeDomainTab === 'semi' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'
                   }`}>
                   {semiList.length}
                 </span>
@@ -651,7 +651,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                   value={buildBomsSearch}
                   onChange={(e) => setBuildBomsSearch(e.target.value)}
                   placeholder={activeDomainTab === 'semi' ? "Search semi-finished materials..." : "Search products..."}
-                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 shadow-2xs font-medium"
+                  className="w-full pl-8 pr-3 py-1.5 text-[0.875rem] bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 shadow-2xs font-medium"
                 />
               </div>
 
@@ -661,7 +661,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                   <select
                     value={buildBomsTitleFilter}
                     onChange={(e) => setBuildBomsTitleFilter(e.target.value)}
-                    className="w-full px-2 py-1 text-[11px] font-semibold bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs truncate"
+                    className="w-full px-2 py-1 text-xs font-semibold bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs truncate"
                     title="Filter by Brand"
                   >
                     <option value="">All Brands ({buildBomsAvailableTitles.length})</option>
@@ -675,7 +675,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                   <select
                     value={buildBomsRulingFilter}
                     onChange={(e) => setBuildBomsRulingFilter(e.target.value)}
-                    className="w-full px-2 py-1 text-[11px] font-semibold bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs truncate"
+                    className="w-full px-2 py-1 text-xs font-semibold bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs truncate"
                     title="Filter by Ruling"
                   >
                     <option value="">All Rulings ({buildBomsAvailableRulings.length})</option>
@@ -691,7 +691,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                 <select
                   value={buildBomsSortBy}
                   onChange={(e) => setBuildBomsSortBy(e.target.value as any)}
-                  className="w-full px-2 py-1 text-[11px] font-bold bg-blue-50/80 border border-blue-200 rounded-lg text-blue-900 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
+                  className="w-full px-2 py-1 text-xs font-semibold bg-blue-50/80 border border-blue-200 rounded-lg text-blue-900 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
                   title="Sort products list"
                 >
                   <option value="default">Sort: Default Code</option>
@@ -712,7 +712,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                       setBuildBomsSortBy('default');
                       setOnlyNoRecipeFilter(false);
                     }}
-                    className="px-2 py-1 text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg shrink-0 cursor-pointer transition-all"
+                    className="px-2 py-1 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg shrink-0 cursor-pointer"
                     title="Reset all filters"
                   >
                     Reset
@@ -720,7 +720,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                 )}
               </div>
 
-              <label className="flex items-center gap-2 text-[11px] font-semibold text-gray-600 cursor-pointer select-none px-1">
+              <label className="flex items-center gap-2 text-xs font-semibold text-gray-600 cursor-pointer select-none px-1">
                 <input
                   type="checkbox"
                   checked={onlyNoRecipeFilter}
@@ -733,11 +733,11 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
 
             {/* Clipboard Banner */}
             {copiedBom && (
-              <div className="p-2.5 bg-emerald-50/90 border border-emerald-200 rounded-xl flex flex-col gap-2 text-xs shrink-0 shadow-2xs">
+              <div className="p-2.5 bg-emerald-50/90 border border-emerald-200 rounded-xl flex flex-col gap-2 text-[0.875rem] shrink-0 shadow-2xs">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">BOM in Clipboard</span>
-                    <span className="text-xs font-bold text-gray-800 truncate block" title={copiedBom.sourceName}>
+                    <span className="text-xs font-medium text-emerald-800 uppercase tracking-wider block">BOM in Clipboard</span>
+                    <span className="text-[0.875rem] font-semibold text-gray-800 truncate block" title={copiedBom.sourceName}>
                       {copiedBom.sourceName} ({copiedBom.lines.length} items)
                     </span>
                   </div>
@@ -763,7 +763,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                         if (copiedBom.basis) setBuildBatchYieldQty(String(copiedBom.basis));
                         if (copiedBom.basisUnit) setBuildBatchYieldUnit(copiedBom.basisUnit);
                       }}
-                      className="px-2.5 py-1 bg-[#064E3B] hover:bg-[#0B6B63] text-white rounded-md text-[11px] font-medium shrink-0 cursor-pointer shadow-2xs transition-all"
+                      className="px-2.5 py-1 bg-[#064E3B] hover:bg-[#0B6B63] text-white rounded-md text-xs font-medium shrink-0 cursor-pointer shadow-2xs"
                     >
                       Paste to Active
                     </button>
@@ -782,7 +782,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                   <div
                     key={prod._id}
                     onClick={() => handleSelectBomProduct(prod)}
-                    className={`p-2.5 rounded-xl cursor-pointer transition-all flex items-center justify-between border group/item ${isSelected
+                    className={`p-2.5 rounded-xl cursor-pointer flex items-center justify-between border group/item ${isSelected
                       ? 'bg-emerald-50/80 border-emerald-300 shadow-2xs'
                       : 'bg-white border-transparent hover:bg-gray-100/80 hover:border-gray-200'
                       }`}
@@ -790,29 +790,29 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                     <div className="flex items-start gap-2.5 min-w-0 flex-1">
                       <div className="mt-0.5 shrink-0">
                         {hasRecipe ? (
-                          <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px]">
+                          <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-semibold text-xs">
                             ✓
                           </div>
                         ) : (
-                          <div className="w-4 h-4 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-[10px]">
+                          <div className="w-4 h-4 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-semibold text-xs">
                             !
                           </div>
                         )}
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <div className="font-bold text-xs text-gray-900 leading-snug line-clamp-2" title={prod.name}>
+                        <div className="font-semibold text-[0.875rem] text-gray-900 leading-snug line-clamp-2" title={prod.name}>
                           {prod.name}
                         </div>
                         <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                          <span className="text-[10px] text-gray-400 font-mono">{prod.skuCode}</span>
+                          <span className="text-xs text-gray-400 font-mono">{prod.skuCode}</span>
                           {(prod.title || prod.brand) && (
-                            <span className="text-[9.5px] text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded font-medium border border-emerald-200/60 truncate max-w-[140px]" title={prod.title || prod.brand}>
+                            <span className="text-xs text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded font-medium border border-emerald-200/60 truncate max-w-[8.75rem]" title={prod.title || prod.brand}>
                               {prod.title || prod.brand}
                             </span>
                           )}
                           {prod.ruleType && (
-                            <span className="text-[9.5px] text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded font-medium border border-blue-200/60 truncate max-w-[140px]" title={prod.ruleType}>
+                            <span className="text-xs text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded font-medium border border-blue-200/60 truncate max-w-[8.75rem]" title={prod.ruleType}>
                               {prod.ruleType}
                             </span>
                           )}
@@ -821,7 +821,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                     </div>
 
                     {/* Quick Copy / Paste Icons */}
-                    <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1  group-hover/item:opacity-100">
                       {hasRecipe && (
                         <button
                           type="button"
@@ -853,7 +853,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                             });
                             showToast(`BOM copied from "${prod.name || prod.skuCode}"! Ready to paste.`, 'success');
                           }}
-                          className="h-6 w-6 rounded border border-gray-200 bg-white text-[#0B6B63] hover:border-[#0B6B63] flex items-center justify-center shadow-2xs transition-all cursor-pointer"
+                          className="h-6 w-6 rounded border border-gray-200 bg-white text-[#0B6B63] hover:border-[#0B6B63] flex items-center justify-center shadow-2xs cursor-pointer"
                           title="Copy this BOM & Costing"
                         >
                           <Copy className="w-3 h-3 text-[#0B6B63]" />
@@ -865,7 +865,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
               })}
 
               {filteredBuildProducts.length === 0 && (
-                <div className="p-4 text-center text-xs text-gray-400 italic">
+                <div className="p-4 text-center text-[0.875rem] text-gray-400 italic">
                   No products match search
                 </div>
               )}
@@ -873,15 +873,15 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
           </div>
 
           {/* Column 2: Active Product Recipe & Costing Builder */}
-          <div className="flex-1 min-w-[540px] border border-slate-200/90 rounded-2xl p-3 flex flex-col gap-2.5 bg-white overflow-hidden shadow-2xs">
+          <div className="flex-1 min-w-[33.75rem] border border-slate-200/90 rounded-2xl p-3 flex flex-col gap-2.5 bg-white overflow-hidden shadow-2xs">
             {activeBomProduct ? (
               <>
                 {/* Active Product Header Bar */}
                 <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2.5">
                   <div className="min-w-0 pr-2">
                     <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-gray-900 text-sm truncate" title={activeBomProduct.name}>{activeBomProduct.name}</h4>
-                      <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-mono font-bold tracking-tight shrink-0">{activeBomProduct.skuCode}</span>
+                      <h4 className="font-semibold text-gray-900 text-[0.875rem] truncate" title={activeBomProduct.name}>{activeBomProduct.name}</h4>
+                      <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-xs font-mono font-semibold tracking-tight shrink-0">{activeBomProduct.skuCode}</span>
                     </div>
                   </div>
 
@@ -1005,7 +1005,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                     <button
                       onClick={handleSaveBuildBomRecipe}
                       disabled={isSavingBuildBom}
-                      className="px-3 py-1 bg-[#064E3B] hover:bg-[#0B6B63] text-white font-semibold rounded-lg text-xs shadow-3xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      className="px-3 py-1 bg-[#064E3B] hover:bg-[#0B6B63] text-white font-semibold rounded-lg text-[0.875rem] shadow-3xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
                       {isSavingBuildBom ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                       <span>Save recipe</span>
@@ -1027,12 +1027,12 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                   }
 
                   return (
-                    <div className="flex items-center justify-between px-3 py-1.5 bg-blue-50/40 border border-blue-100/70 rounded-xl text-xs shrink-0">
+                    <div className="flex items-center justify-between px-3 py-1.5 bg-blue-50/40 border border-blue-100/70 rounded-xl text-[0.875rem] shrink-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="px-2 py-0.5 bg-blue-100/70 text-blue-800 rounded-md font-bold text-[10.5px]">
+                        <span className="px-2 py-0.5 bg-blue-100/70 text-blue-800 rounded-md font-semibold text-xs">
                           {activeRecipeItems.length} {activeRecipeItems.length === 1 ? 'ITEM' : 'ITEMS'}
                         </span>
-                        <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-600">
+                        <div className="flex items-center gap-1 text-xs font-semibold text-slate-600">
                           <span>BATCH SIZE:</span>
                           <input
                             type="number"
@@ -1055,7 +1055,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                 recipeYieldQty: numVal
                               } : s));
                             }}
-                            className="w-14 h-6 px-1 border border-blue-200 rounded-md text-xs font-bold text-blue-800 text-center bg-white shadow-3xs focus:ring-1 focus:ring-blue-400 focus:outline-none"
+                            className="w-14 h-6 px-1 border border-blue-200 rounded-md text-[0.875rem] font-semibold text-blue-800 text-center bg-white shadow-3xs focus:ring-1 focus:ring-blue-400 focus:outline-none"
                           />
                           {options.length > 1 ? (
                             <select
@@ -1074,7 +1074,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                   recipeYieldUnit: val
                                 } : s));
                               }}
-                              className="h-6 px-1.5 border border-blue-200 rounded-md text-[11px] font-bold text-blue-900 bg-white cursor-pointer shadow-3xs focus:ring-1 focus:ring-blue-400 focus:outline-none"
+                              className="h-6 px-1.5 border border-blue-200 rounded-md text-xs font-semibold text-blue-900 bg-white cursor-pointer shadow-3xs focus:ring-1 focus:ring-blue-400 focus:outline-none"
                               title="Yield Unit (UOM / AUOM)"
                             >
                               {options.map(opt => (
@@ -1084,13 +1084,13 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                               ))}
                             </select>
                           ) : (
-                            <strong className="text-blue-900 bg-white border border-blue-200 px-1.5 py-0.5 rounded-md text-[11px] font-bold font-mono shadow-3xs">
+                            <strong className="text-blue-900 bg-white border border-blue-200 px-1.5 py-0.5 rounded-md text-xs font-semibold font-mono shadow-3xs">
                               {uom}
                             </strong>
                           )}
                         </div>
                       </div>
-                      <span className="text-[10px] text-slate-400 font-normal hidden sm:inline">Quantities per batch produced</span>
+                      <span className="text-xs text-slate-400 font-normal hidden sm:inline">Quantities per batch produced</span>
                     </div>
                   );
                 })()}
@@ -1107,14 +1107,14 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                         </div>
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <h5 className="text-[11px] font-bold text-slate-800 uppercase tracking-wide">
+                            <h5 className="text-xs font-medium text-slate-800 uppercase tracking-wide">
                               MATERIALS
                             </h5>
-                            <span className="px-1.5 py-0.2 bg-blue-50 text-blue-700 font-mono font-bold text-[10px] rounded-full">
+                            <span className="px-1.5 py-0.2 bg-blue-50 text-blue-700 font-mono font-semibold text-xs rounded-full">
                               {activeRecipeItems.length}
                             </span>
                           </div>
-                          <p className="text-[10px] text-slate-400 font-medium">
+                          <p className="text-xs text-slate-400 font-medium">
                             Raw materials consumed to produce this item.
                           </p>
                         </div>
@@ -1137,7 +1137,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                             }
                           ]);
                         }}
-                        className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 font-bold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer transition-all shadow-3xs"
+                        className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 font-semibold rounded-lg text-xs flex items-center gap-1 cursor-pointer shadow-3xs"
                       >
                         <Plus className="w-3.5 h-3.5 text-blue-600" />
                         <span>Add Material</span>
@@ -1145,29 +1145,29 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                     </div>
 
                     <div className="overflow-x-auto border border-slate-100 rounded-lg custom-scrollbar">
-                      <table className="w-full text-left border-collapse text-xs">
-                        <thead className="bg-slate-50/80 text-[9.5px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 select-none">
+                      <table className="w-full text-left border-collapse text-[0.875rem]">
+                        <thead className="bg-slate-50/80 text-xs font-medium text-slate-400 uppercase tracking-wider border-b border-slate-100 select-none">
                           <tr>
                             <th className="py-1.5 px-2 w-7 text-center">#</th>
-                            <th className="py-1.5 px-2 min-w-[170px]">MATERIAL</th>
+                            <th className="py-1.5 px-2 min-w-[10.625rem]">MATERIAL</th>
                             <th className="py-1.5 px-1.5 text-center w-16">QTY</th>
-                            <th className="py-1.5 px-1.5 text-center min-w-[120px]">UOM / AUOM</th>
+                            <th className="py-1.5 px-1.5 text-center min-w-[7.5rem]">UOM / AUOM</th>
                             <th className="py-1.5 px-1.5 text-center w-16">IN STOCK</th>
                             <th className="py-1.5 px-1.5 text-center w-10"></th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 bg-white">
                           {activeRecipeItems.map((b, idx) => (
-                            <tr key={b.id} className="hover:bg-blue-50/20 transition-colors">
-                              <td className="py-1.5 px-2 text-center text-slate-400 font-bold text-[10px] select-none">
+                            <tr key={b.id} className="hover:bg-blue-50/20">
+                              <td className="py-1.5 px-2 text-center text-slate-400 font-semibold text-xs select-none">
                                 {idx + 1}
                               </td>
-                              <td className="py-1.5 px-2 min-w-[170px]">
+                              <td className="py-1.5 px-2 min-w-[10.625rem]">
                                 <SearchableMaterialDropdown
                                   value={b.name}
                                   materials={skus}
                                   compact={true}
-                                  className="w-full px-2 py-1 bg-white border border-slate-200 hover:border-blue-400 rounded-lg text-xs font-semibold text-slate-800 flex items-center justify-between shadow-3xs transition-all cursor-pointer h-7"
+                                  className="w-full px-2 py-1 bg-white border border-slate-200 hover:border-blue-400 rounded-lg text-[0.875rem] font-semibold text-slate-800 flex items-center justify-between shadow-3xs cursor-pointer h-7"
                                   placeholder="Select raw material..."
                                   onChange={(selectedName, matchedSku) => {
                                     setActiveRecipeItems(prev => prev.map(item => {
@@ -1187,7 +1187,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                 />
                                 {b.skuCode && (
                                   <div className="mt-0.5 pl-1">
-                                    <span className="text-[9.5px] text-slate-400 font-mono">{b.skuCode}</span>
+                                    <span className="text-xs text-slate-400 font-mono">{b.skuCode}</span>
                                   </div>
                                 )}
                               </td>
@@ -1200,7 +1200,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                     const val = Number(e.target.value);
                                     setActiveRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, qty: val } : item));
                                   }}
-                                  className="w-14 h-7 border border-slate-200 focus:border-blue-400 rounded-md px-1.5 py-0.5 text-xs font-bold font-mono text-center bg-white shadow-3xs focus:outline-none mx-auto block"
+                                  className="w-14 h-7 border border-slate-200 focus:border-blue-400 rounded-md px-1.5 py-0.5 text-[0.875rem] font-semibold font-mono text-center bg-white shadow-3xs focus:outline-none mx-auto block"
                                   placeholder="Qty"
                                 />
                               </td>
@@ -1241,7 +1241,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                           altUnit: isAlt ? val : (altUom || '')
                                         } : item));
                                       }}
-                                      className="h-7 px-2 border border-slate-200 focus:border-blue-400 rounded-md text-[10.5px] font-bold text-slate-800 bg-white shadow-3xs focus:outline-none cursor-pointer mx-auto block max-w-[125px] truncate"
+                                      className="h-7 px-2 border border-slate-200 focus:border-blue-400 rounded-md text-xs font-semibold text-slate-800 bg-white shadow-3xs focus:outline-none cursor-pointer mx-auto block max-w-[7.8125rem] truncate"
                                       title="Unit of Measurement (UOM / AUOM)"
                                     >
                                       {options.map(opt => (
@@ -1254,7 +1254,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                 })()}
                               </td>
                               <td className="py-1.5 px-1.5 text-center">
-                                <span className="font-mono text-[10px] font-semibold text-slate-500 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded">
+                                <span className="font-mono text-xs font-semibold text-slate-500 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded">
                                   {b.inStock ?? 0}
                                 </span>
                               </td>
@@ -1262,7 +1262,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => setActiveRecipeItems(prev => prev.filter(item => item.id !== b.id))}
-                                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all cursor-pointer"
+                                  className="icon-btn-danger"
                                   title="Remove material"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -1272,7 +1272,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           ))}
                           {activeRecipeItems.length === 0 && (
                             <tr>
-                              <td colSpan={6} className="py-3.5 text-center text-[11px] text-slate-400 italic bg-slate-50/20">
+                              <td colSpan={6} className="py-3.5 text-center text-xs text-slate-400 italic bg-slate-50/20">
                                 No materials added yet. Click "+ Add Material" above or choose from the catalog on the right.
                               </td>
                             </tr>
@@ -1291,14 +1291,14 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                         </div>
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <h5 className="text-[11px] font-bold text-slate-800 uppercase tracking-wide">
+                            <h5 className="text-xs font-medium text-slate-800 uppercase tracking-wide">
                               ADDITIONAL COSTS / OVERHEADS
                             </h5>
-                            <span className="px-1.5 py-0.2 bg-amber-50 text-amber-700 font-mono font-bold text-[10px] rounded-full">
+                            <span className="px-1.5 py-0.2 bg-amber-50 text-amber-700 font-mono font-semibold text-xs rounded-full">
                               {activeAdditionalCosts.length}
                             </span>
                           </div>
-                          <p className="text-[10px] text-slate-400 font-medium">
+                          <p className="text-xs text-slate-400 font-medium">
                             Direct labour, electricity, packaging, or machine charges.
                           </p>
                         </div>
@@ -1316,7 +1316,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                               setShowQuickCostPresetMenu(v => !v);
                               setHighlightedCostPresetIdx(0);
                             }}
-                            className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100/80 text-blue-700 font-bold rounded-lg text-[11px] flex items-center gap-1.5 cursor-pointer transition-all border border-blue-200 shadow-3xs"
+                            className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100/80 text-blue-700 font-semibold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer border border-blue-200 shadow-3xs"
                           >
                             <Sparkles className="w-3.5 h-3.5 text-blue-500" />
                             <span>Add Preset</span>
@@ -1325,15 +1325,15 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
 
                           {showQuickCostPresetMenu && (
                             <div
-                              className={`absolute right-0 ${quickCostOpenUpwards ? 'bottom-full mb-1' : 'top-full mt-1'} w-80 max-h-[80vh] bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 text-xs divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100`}
+                              className={`absolute right-0 ${quickCostOpenUpwards ? 'bottom-full mb-1' : 'top-full mt-1'} w-80 max-h-[calc(80*var(--vh,1vh))] bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 text-[0.875rem] divide-y divide-gray-100`}
                               role="menu"
                             >
-                              <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                              <div className="px-3 py-1.5 text-xs font-medium text-gray-400 uppercase tracking-wider flex items-center justify-between">
                                 <span className="flex items-center gap-1.5"><span>Predefined Overheads</span></span>
                                 <button
                                   type="button"
                                   onClick={() => { setShowQuickCostPresetMenu(false); setShowManageCostModal(true); }}
-                                  className="text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer font-bold"
+                                  className="text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer font-semibold"
                                 >
                                   <Settings className="w-3 h-3" />
                                   <span>Manage</span>
@@ -1348,13 +1348,13 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                       type="button"
                                       onClick={() => { handleAddPredefinedCost(p); setShowQuickCostPresetMenu(false); }}
                                       onMouseEnter={() => setHighlightedCostPresetIdx(pIdx)}
-                                      className={`w-full px-3 py-1.5 text-left flex items-center justify-between group transition-colors cursor-pointer ${
-                                        isSelected ? 'bg-blue-100/90 text-blue-900 font-bold ring-1 ring-inset ring-blue-400' : 'hover:bg-blue-50/70 text-gray-800'
+                                      className={`w-full px-3 py-1.5 text-left flex items-center justify-between group cursor-pointer ${
+                                        isSelected ? 'bg-blue-100/90 text-blue-900 font-semibold ring-1 ring-inset ring-blue-400' : 'hover:bg-blue-50/70 text-gray-800'
                                       }`}
                                       role="menuitem"
                                     >
                                       <span className="font-semibold truncate">{p.name}</span>
-                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ml-2 ${
+                                      <span className={`px-1.5 py-0.5 rounded text-xs font-mono font-semibold shrink-0 ml-2 ${
                                         ['Per GBL','Per Piece','Per BOM','Per Ream'].includes(p.basis)
                                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                           : 'bg-gray-100 text-gray-600'
@@ -1365,12 +1365,12 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                   );
                                 })}
                                 {costPresets.length === 0 && (
-                                  <div className="px-3 py-4 text-center text-[11px] text-gray-400">No presets saved. Click Manage to add.</div>
+                                  <div className="px-3 py-4 text-center text-xs text-gray-400">No presets saved. Click Manage to add.</div>
                                 )}
                               </div>
-                              <div className="px-3 py-1 bg-gray-50 text-[10px] text-gray-500 flex items-center justify-between">
-                                <span>Use <kbd className="font-mono bg-white border border-gray-200 px-1 rounded font-bold">↑</kbd><kbd className="font-mono bg-white border border-gray-200 px-1 rounded font-bold ml-0.5">↓</kbd></span>
-                                <span><kbd className="font-mono bg-white border border-gray-200 px-1 rounded font-bold">Enter</kbd> to add</span>
+                              <div className="px-3 py-1 bg-gray-50 text-xs text-gray-500 flex items-center justify-between">
+                                <span>Use <kbd className="font-mono bg-white border border-gray-200 px-1 rounded font-semibold">↑</kbd><kbd className="font-mono bg-white border border-gray-200 px-1 rounded font-semibold ml-0.5">↓</kbd></span>
+                                <span><kbd className="font-mono bg-white border border-gray-200 px-1 rounded font-semibold">Enter</kbd> to add</span>
                               </div>
                             </div>
                           )}
@@ -1380,7 +1380,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                         <button
                           type="button"
                           onClick={() => setShowManageCostModal(true)}
-                          className="px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-600 font-bold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer transition-all border border-gray-200 shadow-3xs"
+                          className="btn-secondary"
                         >
                           <Settings className="w-3.5 h-3.5" />
                           <span>Manage Presets</span>
@@ -1395,7 +1395,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                               { id: `cost-${Date.now()}-${prev.length}`, costType: '', calcBasis: 'Per Piece', amount: '', appliedAs: 'Per Unit (PCS)' }
                             ]);
                           }}
-                          className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 font-bold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer transition-all shadow-3xs"
+                          className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 font-semibold rounded-lg text-xs flex items-center gap-1 cursor-pointer shadow-3xs"
                         >
                           <Plus className="w-3.5 h-3.5 text-amber-600" />
                           <span>Add Cost</span>
@@ -1404,8 +1404,8 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                     </div>
 
                     <div className="overflow-x-auto border border-slate-100 rounded-lg custom-scrollbar">
-                      <table className="w-full text-left border-collapse text-xs">
-                        <thead className="bg-slate-50/80 text-[9.5px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 select-none">
+                      <table className="w-full text-left border-collapse text-[0.875rem]">
+                        <thead className="bg-slate-50/80 text-xs font-medium text-slate-400 uppercase tracking-wider border-b border-slate-100 select-none">
                           <tr>
                             <th className="py-1.5 px-2 w-7 text-center">#</th>
                             <th className="py-1.5 px-2">COST TYPE</th>
@@ -1416,8 +1416,8 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                         </thead>
                         <tbody className="divide-y divide-slate-100 bg-white">
                           {activeAdditionalCosts.map((cost, cIdx) => (
-                            <tr key={cost.id} className="hover:bg-amber-50/20 transition-colors">
-                              <td className="py-1.5 px-2 text-center text-slate-400 font-bold text-[10px] select-none">
+                            <tr key={cost.id} className="hover:bg-amber-50/20">
+                              <td className="py-1.5 px-2 text-center text-slate-400 font-semibold text-xs select-none">
                                 {cIdx + 1}
                               </td>
                               <td className="py-1.5 px-2">
@@ -1441,7 +1441,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                     }
                                   }}
                                   placeholder="e.g. Cover Printing & Lamination, Labour"
-                                  className="w-full h-7 px-2 py-0.5 bg-white border border-slate-200 rounded-md text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                                  className="w-full h-7 px-2 py-0.5 bg-white border border-slate-200 rounded-md text-[0.875rem] font-semibold text-slate-800 focus:ring-1 focus:ring-amber-500 focus:outline-none"
                                 />
                                 <datalist id="bulk-edit-cost-presets">
                                   {costPresets.map(p => (
@@ -1458,7 +1458,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                     const val = e.target.value;
                                     setActiveAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, calcBasis: val, appliedAs: val } : c));
                                   }}
-                                  className="h-7 px-1.5 py-0.5 bg-white border border-slate-200 rounded-md text-[11px] font-semibold text-slate-800 cursor-pointer focus:outline-none"
+                                  className="h-7 px-1.5 py-0.5 bg-white border border-slate-200 rounded-md text-xs font-semibold text-slate-800 cursor-pointer focus:outline-none"
                                 >
                                   <option value="Per BOM">Per BOM</option>
                                   <option value="Per Piece">Per Piece</option>
@@ -1476,14 +1476,14 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                                     setActiveAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, amount: val === '' ? '' : Number(val) } : c));
                                   }}
                                   placeholder="0.00"
-                                  className="w-20 h-7 px-1.5 py-0.5 bg-white border border-slate-200 rounded-md text-xs font-bold font-mono text-slate-800 text-right focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                                  className="w-20 h-7 px-1.5 py-0.5 bg-white border border-slate-200 rounded-md text-[0.875rem] font-semibold font-mono text-slate-800 text-right focus:ring-1 focus:ring-amber-500 focus:outline-none"
                                 />
                               </td>
                               <td className="py-1.5 px-1.5 text-center">
                                 <button
                                   type="button"
                                   onClick={() => setActiveAdditionalCosts(prev => prev.filter(c => c.id !== cost.id))}
-                                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all cursor-pointer"
+                                  className="icon-btn-danger"
                                   title="Delete overhead"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -1493,7 +1493,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           ))}
                           {activeAdditionalCosts.length === 0 && (
                             <tr>
-                              <td colSpan={6} className="py-3.5 text-center text-[11px] text-slate-400 italic bg-slate-50/20">
+                              <td colSpan={6} className="py-3.5 text-center text-xs text-slate-400 italic bg-slate-50/20">
                                 No additional costs added. Click <strong className="text-amber-700 font-semibold cursor-pointer" onClick={() => {
                                   setActiveAdditionalCosts(prev => [
                                     ...prev,
@@ -1521,10 +1521,10 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                         <Tag className="w-3.5 h-3.5 text-emerald-700" />
                       </div>
                       <div>
-                        <h5 className="text-[11px] font-bold text-slate-800 uppercase tracking-wide">
+                        <h5 className="text-xs font-medium text-slate-800 uppercase tracking-wide">
                           PROFIT & PRICING (Optional)
                         </h5>
-                        <p className="text-[10px] text-slate-500 font-medium">
+                        <p className="text-xs text-slate-500 font-medium">
                           Calculate suggested selling price based on manufacturing cost.
                         </p>
                       </div>
@@ -1532,17 +1532,17 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
 
                     <div className="bg-white border border-emerald-200/70 rounded-lg p-2.5 grid grid-cols-1 sm:grid-cols-4 gap-2.5 items-center">
                       <div>
-                        <label className="text-[9.5px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                           Pricing Method
                         </label>
-                        <div className="w-full h-7 px-2 py-0.5 bg-white border border-emerald-200 rounded-md text-xs font-bold text-emerald-800 flex items-center justify-between">
+                        <div className="w-full h-7 px-2 py-0.5 bg-white border border-emerald-200 rounded-md text-[0.875rem] font-semibold text-emerald-800 flex items-center justify-between">
                           <span>Margin %</span>
-                          <span className="text-[9px] px-1 py-0.2 bg-emerald-50 text-emerald-700 rounded font-semibold">Margin</span>
+                          <span className="text-xs px-1 py-0.2 bg-emerald-50 text-emerald-700 rounded font-semibold">Margin</span>
                         </div>
                       </div>
 
                       <div>
-                        <label className="text-[9.5px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                           Margin Percentage
                         </label>
                         <div className="relative">
@@ -1552,22 +1552,22 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                             value={activeProfitPricing.markupPercentage}
                             onChange={e => setActiveProfitPricing(prev => ({ ...prev, pricingMethod: 'Margin %', markupPercentage: e.target.value }))}
                             placeholder="0"
-                            className="w-full h-7 pl-2.5 pr-6 py-0.5 bg-white border border-gray-200 rounded-md text-xs font-bold font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            className="w-full h-7 pl-2.5 pr-6 py-0.5 bg-white border border-gray-200 rounded-md text-[0.875rem] font-semibold font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                           />
-                          <span className="absolute right-2 top-1.5 text-xs font-bold text-gray-400 select-none">%</span>
+                          <span className="absolute right-2 top-1.5 text-[0.875rem] font-semibold text-gray-400 select-none">%</span>
                         </div>
                       </div>
 
                       <div>
-                        <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider">Suggested Price / PCS</div>
-                        <div className="px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-md font-mono font-bold text-xs text-center">
+                        <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">Suggested Price / PCS</div>
+                        <div className="px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-md font-mono font-semibold text-[0.875rem] text-center">
                           ₹{formatInr(costingSummary.suggestedPricePcs)}
                         </div>
                       </div>
 
                       <div>
-                        <div className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider">Suggested Price / GBL</div>
-                        <div className="px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-md font-mono font-bold text-xs text-center">
+                        <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">Suggested Price / GBL</div>
+                        <div className="px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-md font-mono font-semibold text-[0.875rem] text-center">
                           ₹{formatInr(costingSummary.suggestedPriceGbl)}
                         </div>
                       </div>
@@ -1580,16 +1580,16 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                 <div className="flex items-center justify-between pt-2 border-t border-slate-100 shrink-0">
                   <div className="flex items-center gap-3">
                     <div className="bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
-                      <div className="text-[9.5px] text-slate-400 font-medium uppercase tracking-wider">Ingredients</div>
-                      <div className="text-xs font-bold text-slate-800">{activeRecipeItems.length} items</div>
+                      <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">Ingredients</div>
+                      <div className="text-[0.875rem] font-semibold text-slate-800">{activeRecipeItems.length} items</div>
                     </div>
                     <div className="bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
-                      <div className="text-[9.5px] text-slate-400 font-medium uppercase tracking-wider">Overheads</div>
-                      <div className="text-xs font-bold text-slate-800">{activeAdditionalCosts.length} items</div>
+                      <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">Overheads</div>
+                      <div className="text-[0.875rem] font-semibold text-slate-800">{activeAdditionalCosts.length} items</div>
                     </div>
                     <div className="bg-emerald-50/60 px-2 py-1 rounded-lg border border-emerald-100">
-                      <div className="text-[9.5px] text-emerald-600 font-medium uppercase tracking-wider">Can make</div>
-                      <div className="text-xs font-bold text-emerald-800 font-mono">
+                      <div className="text-xs text-emerald-600 font-medium uppercase tracking-wider">Can make</div>
+                      <div className="text-[0.875rem] font-semibold text-emerald-800 font-mono">
                         {(() => {
                           const validRuns = activeRecipeItems
                             .map(b => (b.qty && Number(b.qty) > 0) ? Math.floor((Number(b.inStock) || 0) / Number(b.qty)) : null)
@@ -1604,7 +1604,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                   <button
                     onClick={handleSaveBuildBomRecipe}
                     disabled={isSavingBuildBom}
-                    className="px-3.5 py-1.5 bg-[#064E3B] hover:bg-[#0B6B63] text-white font-bold rounded-lg text-xs shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    className="px-3.5 py-1.5 bg-[#064E3B] hover:bg-[#0B6B63] text-white font-semibold rounded-lg text-[0.875rem] shadow-2xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
                     {isSavingBuildBom ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                     <span>Save recipe</span>
@@ -1615,13 +1615,13 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
               <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-gray-400">
                 <ClipboardList className="w-10 h-10 text-gray-300 mb-2" />
                 <p className="font-semibold text-gray-600">Select a product from the left list</p>
-                <p className="text-xs">Choose any product to view or edit its BOM recipe ingredients & costing</p>
+                <p className="text-[0.875rem]">Choose any product to view or edit its BOM recipe ingredients & costing</p>
               </div>
             )}
           </div>
 
           {/* Column 3: Materials Catalog & Cost Summary Panel */}
-          <div className="w-[340px] xl:w-[390px] 2xl:w-[430px] shrink-0 border border-gray-200 rounded-2xl p-3 flex flex-col gap-3 bg-gray-50/40 overflow-hidden">
+          <div className="w-[21.25rem] xl:w-[24.375rem] 2xl:w-[26.875rem] shrink-0 border border-gray-200 rounded-2xl p-3 flex flex-col gap-3 bg-gray-50/40 overflow-hidden">
             <div className="relative shrink-0">
               <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
               <input
@@ -1629,14 +1629,14 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                 value={catalogSearch}
                 onChange={(e) => setCatalogSearch(e.target.value)}
                 placeholder="Filter catalog..."
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 shadow-2xs"
+                className="w-full pl-8 pr-3 py-1.5 text-[0.875rem] bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 shadow-2xs"
               />
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-4 pr-1 custom-scrollbar min-h-0">
               {/* Section 1: Raw Materials */}
               <div className="space-y-1.5">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">
+                <div className="text-xs font-medium text-gray-400 uppercase tracking-wider px-1">
                   MATERIALS ({filteredRawCatalog.length})
                 </div>
                 {filteredRawCatalog.map((mat) => {
@@ -1667,18 +1667,18 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           ]);
                         }
                       }}
-                      className={`p-2 rounded-xl text-xs font-semibold flex items-center justify-between cursor-pointer transition-all border ${isAdded
+                      className={`p-2 rounded-xl text-[0.875rem] font-semibold flex items-center justify-between cursor-pointer border ${isAdded
                         ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
                         : 'bg-white border-gray-200 hover:border-blue-300 text-gray-800 shadow-2xs'
                         }`}
                     >
                       <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-1">
-                        <span className={isAdded ? 'text-emerald-600 font-bold shrink-0' : 'text-blue-600 font-bold shrink-0'}>
+                        <span className={isAdded ? 'text-emerald-600 font-semibold shrink-0' : 'text-blue-600 font-semibold shrink-0'}>
                           {isAdded ? '✓' : '+'}
                         </span>
-                        <span className="text-[11.5px] leading-snug line-clamp-2" title={mat.name}>{mat.name}</span>
+                        <span className="text-xs leading-snug line-clamp-2" title={mat.name}>{mat.name}</span>
                       </div>
-                      <span className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
+                      <span className="text-xs font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
                         {Number((mat as any).presentStock || 0)}
                       </span>
                     </div>
@@ -1688,7 +1688,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
 
               {/* Section 2: Semi-Finished Goods */}
               <div className="space-y-1.5">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-1">
+                <div className="text-xs font-medium text-gray-400 uppercase tracking-wider px-1">
                   SUB-ASSEMBLIES ({filteredSemiCatalog.length})
                 </div>
                 {filteredSemiCatalog.map((semi) => {
@@ -1719,18 +1719,18 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                           ]);
                         }
                       }}
-                      className={`p-2 rounded-xl text-xs font-semibold flex items-center justify-between cursor-pointer transition-all border ${isAdded
+                      className={`p-2 rounded-xl text-[0.875rem] font-semibold flex items-center justify-between cursor-pointer border ${isAdded
                         ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
                         : 'bg-white border-gray-200 hover:border-blue-300 text-gray-800 shadow-2xs'
                         }`}
                     >
                       <div className="flex items-center gap-1.5 min-w-0 flex-1 pr-1">
-                        <span className={isAdded ? 'text-emerald-600 font-bold shrink-0' : 'text-blue-600 font-bold shrink-0'}>
+                        <span className={isAdded ? 'text-emerald-600 font-semibold shrink-0' : 'text-blue-600 font-semibold shrink-0'}>
                           {isAdded ? '✓' : '+'}
                         </span>
-                        <span className="text-[11.5px] leading-snug line-clamp-2" title={semi.name}>{semi.name}</span>
+                        <span className="text-xs leading-snug line-clamp-2" title={semi.name}>{semi.name}</span>
                       </div>
-                      <span className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
+                      <span className="text-xs font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded shrink-0">
                         {Number((semi as any).presentStock || 0)}
                       </span>
                     </div>
@@ -1742,48 +1742,48 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
             {/* Bottom: Cost Summary (Per Batch) Card matching user mock */}
             {activeBomProduct && (
               <div className="bg-white border border-gray-200 rounded-2xl p-3.5 shadow-2xs space-y-2.5 shrink-0">
-                <div className="flex items-center gap-2 text-xs font-bold text-gray-900 pb-1 border-b border-gray-100">
+                <div className="flex items-center gap-2 text-[0.875rem] font-semibold text-gray-900 pb-1 border-b border-gray-100">
                   <Receipt className="w-4 h-4 text-blue-600" />
                   <span>COST SUMMARY (Per Batch)</span>
                 </div>
 
-                <div className="space-y-1.5 text-xs">
+                <div className="space-y-1.5 text-[0.875rem]">
                   <div className="flex justify-between text-gray-600 font-medium">
                     <span>Material Cost (A)</span>
-                    <span className="font-mono font-bold text-gray-900">
+                    <span className="font-mono font-semibold text-gray-900">
                       ₹{formatInr(costingSummary.materialCost)}
                     </span>
                   </div>
 
                   <div className="flex justify-between text-gray-600 font-medium">
                     <span>Additional Costs (B)</span>
-                    <span className="font-mono font-bold text-gray-900">
+                    <span className="font-mono font-semibold text-gray-900">
                       ₹{formatInr(costingSummary.additionalCostsTotal)}
                     </span>
                   </div>
 
                   <div className="pt-2 border-t border-gray-100 flex justify-between items-center">
-                    <span className="font-bold text-gray-900 text-xs">Total Production Cost (A + B)</span>
-                    <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-md font-mono font-black text-xs">
+                    <span className="font-semibold text-gray-900 text-[0.875rem]">Total Production Cost (A + B)</span>
+                    <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-md font-mono font-semibold text-[0.875rem]">
                       ₹{formatInr(costingSummary.totalProductionCost)}
                     </span>
                   </div>
 
                   <div className="pt-2 border-t border-gray-100 space-y-1">
-                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">
                       COST PER UNIT
                     </div>
 
-                    <div className="flex justify-between items-center text-xs">
+                    <div className="flex justify-between items-center text-[0.875rem]">
                       <span className="text-gray-600 font-medium">Cost / PCS</span>
-                      <span className="font-mono font-bold text-blue-900">
+                      <span className="font-mono font-semibold text-blue-900">
                         ₹{formatInr(costingSummary.costPerPcs)}
                       </span>
                     </div>
 
-                    <div className="flex justify-between items-center text-xs">
+                    <div className="flex justify-between items-center text-[0.875rem]">
                       <span className="text-gray-600 font-medium">Cost / GBL ({costingSummary.conversionFactor} PCS)</span>
-                      <span className="font-mono font-bold text-gray-900">
+                      <span className="font-mono font-semibold text-gray-900">
                         ₹{formatInr(costingSummary.costPerGbl)}
                       </span>
                     </div>
@@ -1793,11 +1793,11 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
             )}
 
             {/* Bottom Manufacturing Pill */}
-            <div className="p-2.5 bg-blue-50/50 border border-blue-100 rounded-xl flex items-center gap-2 text-xs shrink-0">
+            <div className="p-2.5 bg-blue-50/50 border border-blue-100 rounded-xl flex items-center gap-2 text-[0.875rem] shrink-0">
               <Info className="w-4 h-4 text-blue-600 shrink-0" />
-              <div className="text-[11px] leading-tight">
+              <div className="text-xs leading-tight">
                 <span className="font-semibold text-gray-800 block">Manufacturing Execution Engine</span>
-                <span className="text-gray-500 text-[10px]">Ready to dispatch to factory floor</span>
+                <span className="text-gray-500 text-xs">Ready to dispatch to factory floor</span>
               </div>
             </div>
           </div>
@@ -1806,8 +1806,8 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
     </Modal>
     {showManageCostModal && typeof document !== 'undefined' && createPortal(
       <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowManageCostModal(false)} />
-        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+        <div className="absolute inset-0 bg-gray-900/40" onClick={() => setShowManageCostModal(false)} />
+        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[calc(90*var(--vh,1vh))]">
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
             <div className="flex items-center gap-2.5">
@@ -1815,8 +1815,8 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                 <Star className="w-4 h-4 text-blue-600" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-gray-900">Manage Overhead Presets</h3>
-                <p className="text-[10px] text-gray-500">Predefined overheads sync across all users via company metadata.</p>
+                <h3 className="text-[0.875rem] font-semibold text-gray-900">Manage Overhead Presets</h3>
+                <p className="text-xs text-gray-500">Predefined overheads sync across all users via company metadata.</p>
               </div>
             </div>
             <button type="button" onClick={() => setShowManageCostModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 cursor-pointer">
@@ -1827,15 +1827,15 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
           {/* Preset List */}
           <div className="flex-1 overflow-y-auto px-5 py-3 space-y-1.5">
             {costPresets.length === 0 && (
-              <div className="py-8 text-center text-[12px] text-gray-400">No predefined overheads saved. Add one below or click Reset to Defaults.</div>
+              <div className="py-8 text-center text-xs text-gray-400">No predefined overheads saved. Add one below or click Reset to Defaults.</div>
             )}
             {costPresets.map((p) => (
-              <div key={p.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-100 group hover:border-blue-200 transition-all">
+              <div key={p.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-100 group hover:border-blue-200">
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold text-gray-800 truncate">{p.name}</div>
-                  <div className="text-[10px] text-gray-400 font-mono">{p.basis} · ₹{p.defaultRate}</div>
+                  <div className="text-[0.875rem] font-semibold text-gray-800 truncate">{p.name}</div>
+                  <div className="text-xs text-gray-400 font-mono">{p.basis} · ₹{p.defaultRate}</div>
                 </div>
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ${
+                <span className={`px-1.5 py-0.5 rounded text-xs font-mono font-semibold shrink-0 ${
                   ['Per GBL','Per Piece','Per BOM','Per Ream'].includes(p.basis)
                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                     : 'bg-gray-100 text-gray-600'
@@ -1845,7 +1845,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                 <button
                   type="button"
                   onClick={() => handleDeletePreset(p.id)}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-all cursor-pointer"
+                  className="icon-btn-danger opacity-0 group-hover:opacity-100"
                   title="Delete preset"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -1856,20 +1856,20 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
 
           {/* Add New Preset */}
           <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50 space-y-2">
-            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Add New Preset</div>
+            <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">Add New Preset</div>
             <div className="flex gap-2 items-center flex-wrap">
               <input
                 type="text"
                 value={newPresetName}
                 onChange={e => setNewPresetName(e.target.value)}
                 placeholder="e.g. Freight Charges"
-                className="flex-1 min-w-0 h-8 px-2.5 bg-white border border-gray-200 rounded-lg text-xs font-medium focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                className="flex-1 min-w-0 h-8 px-2.5 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-medium focus:ring-1 focus:ring-blue-500 focus:outline-none"
                 onKeyDown={e => e.key === 'Enter' && handleSaveNewPreset()}
               />
               <select
                 value={newPresetBasis}
                 onChange={e => setNewPresetBasis(e.target.value)}
-                className="h-8 px-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold cursor-pointer focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                className="h-8 px-2 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold cursor-pointer focus:ring-1 focus:ring-blue-500 focus:outline-none"
               >
                 <option value="Per BOM">📦 Per BOM</option>
                 <option value="Per Piece">⚡ Per Piece</option>
@@ -1877,21 +1877,21 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
                 <option value="Per Ream">📋 Per Ream</option>
               </select>
               <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 h-8">
-                <span className="text-gray-400 text-xs font-bold">₹</span>
+                <span className="text-gray-400 text-[0.875rem] font-semibold">₹</span>
                 <input
                   type="number"
                   step="0.01"
                   value={newPresetRate}
                   onChange={e => setNewPresetRate(e.target.value === '' ? '' : Number(e.target.value))}
                   placeholder="Rate"
-                  className="w-20 bg-transparent text-xs font-bold font-mono focus:outline-none"
+                  className="w-20 bg-transparent text-[0.875rem] font-semibold font-mono focus:outline-none"
                   onKeyDown={e => e.key === 'Enter' && handleSaveNewPreset()}
                 />
               </div>
               <button
                 type="button"
                 onClick={handleSaveNewPreset}
-                className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg flex items-center gap-1 cursor-pointer transition-all"
+                className="btn-primary"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Save
@@ -1904,7 +1904,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
             <button
               type="button"
               onClick={handleResetPresets}
-              className="flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-red-600 font-semibold cursor-pointer transition-colors"
+              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-red-600 font-semibold cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               Reset to Defaults
@@ -1912,7 +1912,7 @@ export const BulkEditBomModal: React.FC<BulkEditBomModalProps> = ({
             <button
               type="button"
               onClick={() => setShowManageCostModal(false)}
-              className="px-4 py-1.5 bg-gray-900 hover:bg-gray-800 text-white font-bold text-xs rounded-lg cursor-pointer transition-all"
+              className="px-4 py-1.5 bg-gray-900 hover:bg-gray-800 text-white font-semibold text-[0.875rem] rounded-lg cursor-pointer"
             >
               Done
             </button>

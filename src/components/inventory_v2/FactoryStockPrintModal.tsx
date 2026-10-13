@@ -772,7 +772,7 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-3 sm:p-5 overflow-y-auto animate-fadeIn">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl max-h-[94vh] flex flex-col overflow-hidden animate-modalPop font-sans">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl max-h-[calc(94*var(--vh,1vh))] flex flex-col overflow-hidden animate-modalPop font-sans">
 
         {/* ── 1. MODAL TOP TOOLBAR (Hidden on Paper) ── */}
         <div className="px-5 py-3 border-b border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-3 shrink-0">
@@ -787,7 +787,7 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
                   {activeFactory?.name || 'All Plants'}
                 </span>
               </h2>
-              <p className="text-[11px] text-slate-500 truncate">
+              <p className="text-[0.6875rem] text-slate-500 truncate">
                 Comprehensive Factory Audit • Total Stock • Total Locations • All Stored SKUs
               </p>
             </div>
@@ -831,7 +831,7 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
             {/* Factory Selector (if multiple exist) */}
             {factories.length > 1 && onSelectFactory && (
               <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-slate-400 uppercase">Factory:</span>
+                <span className="text-[0.6875rem] font-bold text-slate-400 uppercase">Factory:</span>
                 <select
                   value={activeFactory?._id || ''}
                   onChange={(e) => onSelectFactory(e.target.value)}
@@ -846,7 +846,7 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
 
             {/* Floor Selector */}
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Floor:</span>
+              <span className="text-[0.6875rem] font-bold text-slate-400 uppercase">Floor:</span>
               <select
                 value={selectedFloorFilter}
                 onChange={(e) => setSelectedFloorFilter(e.target.value)}
@@ -866,7 +866,7 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
                   key={cat}
                   type="button"
                   onClick={() => setSelectedCategoryFilter(cat)}
-                  className={`px-2 py-1 rounded text-[11px] font-bold transition-colors cursor-pointer ${
+                  className={`px-2 py-1 rounded text-[0.6875rem] font-bold transition-colors cursor-pointer ${
                     selectedCategoryFilter === cat
                       ? 'bg-blue-600 text-white shadow-2xs'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -904,7 +904,7 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
                 <h1 className="company-title text-xl font-black uppercase tracking-wider text-slate-900">
                   {companyName}
                 </h1>
-                <p className="voucher-sub text-[10px] font-bold text-slate-500 tracking-wider">
+                <p className="voucher-sub text-[0.625rem] font-bold text-slate-500 tracking-wider">
                   FACTORY INVENTORY & LOCATION STOCK MANIFEST • OFFICIAL GODOWN AUDIT
                 </p>
               </div>
@@ -914,7 +914,7 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
                   FAC-{activeFactory?.name?.toUpperCase().replace(/\s+/g, '-') || 'PLANT'}
                 </div>
                 <div className="mt-1">
-                  <span className="status-pill inline-block text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-300">
+                  <span className="status-pill inline-block text-[0.625rem] font-extrabold uppercase px-2.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-300">
                     VERIFIED LIVE AUDIT
                   </span>
                 </div>
@@ -922,28 +922,28 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
             </div>
 
             {/* Metadata Grid */}
-            <div className="meta-grid grid grid-cols-2 gap-4 bg-slate-50 border border-slate-200 rounded-lg p-3.5 mb-4 text-[11px]">
+            <div className="meta-grid grid grid-cols-2 gap-4 bg-slate-50 border border-slate-200 rounded-lg p-3.5 mb-4 text-[0.6875rem]">
               {/* Left Column: Factory Structure */}
               <div className="meta-box space-y-1">
-                <h4 className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">
+                <h4 className="text-[0.625rem] text-slate-500 font-bold uppercase tracking-wide">
                   Factory & Plant Architecture
                 </h4>
                 <div className="primary-val font-bold text-slate-900 text-sm">
                   {activeFactory?.name || 'Main Factory'}
                 </div>
-                <div className="meta-row flex justify-between text-[11px]">
+                <div className="meta-row flex justify-between text-[0.6875rem]">
                   <span className="label text-slate-500">Plant Status:</span>
                   <span className="value font-bold text-slate-800">{activeFactory?.status || 'Active'}</span>
                 </div>
-                <div className="meta-row flex justify-between text-[11px]">
+                <div className="meta-row flex justify-between text-[0.6875rem]">
                   <span className="label text-slate-500">Total Factory Floors:</span>
                   <span className="value font-bold text-slate-800">{factoryTotals.totalFloors} Floors</span>
                 </div>
-                <div className="meta-row flex justify-between text-[11px]">
+                <div className="meta-row flex justify-between text-[0.6875rem]">
                   <span className="label text-slate-500">Total Storage Zones:</span>
                   <span className="value font-bold text-slate-800">{factoryTotals.totalZones} Zones</span>
                 </div>
-                <div className="meta-row flex justify-between text-[11px]">
+                <div className="meta-row flex justify-between text-[0.6875rem]">
                   <span className="label text-slate-500">Total Storage Locations:</span>
                   <span className="value font-black text-blue-700">
                     {factoryTotals.totalStorageLocations} Locations
@@ -953,29 +953,29 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
 
               {/* Right Column: Physical Stock Consolidated */}
               <div className="meta-box space-y-1">
-                <h4 className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">
+                <h4 className="text-[0.625rem] text-slate-500 font-bold uppercase tracking-wide">
                   Audit & Physical Stock Summary
                 </h4>
                 <div className="primary-val font-mono font-bold text-blue-900 text-sm">
                   {factoryTotals.totalNetWeightKg.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} KG
                 </div>
-                <div className="meta-row flex justify-between text-[11px]">
+                <div className="meta-row flex justify-between text-[0.6875rem]">
                   <span className="label text-slate-500">Audit Date & Time:</span>
                   <span className="value font-bold text-slate-800">
                     {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                <div className="meta-row flex justify-between text-[11px]">
+                <div className="meta-row flex justify-between text-[0.6875rem]">
                   <span className="label text-slate-500">Total Physical Units:</span>
                   <span className="value font-bold text-slate-800">
                     {factoryTotals.totalStockQty.toLocaleString('en-IN', { maximumFractionDigits: 2 })} Units
                   </span>
                 </div>
-                <div className="meta-row flex justify-between text-[11px]">
+                <div className="meta-row flex justify-between text-[0.6875rem]">
                   <span className="label text-slate-500">Total Distinct SKUs:</span>
                   <span className="value font-bold text-slate-800">{factoryTotals.totalUniqueSkus} SKUs</span>
                 </div>
-                <div className="meta-row flex justify-between text-[11px]">
+                <div className="meta-row flex justify-between text-[0.6875rem]">
                   <span className="label text-slate-500">Locations Occupied:</span>
                   <span className="value font-bold text-emerald-700">
                     {factoryTotals.occupiedLocationsCount} of {factoryTotals.totalStorageLocations} ({factoryTotals.totalStorageLocations > 0 ? Math.round((factoryTotals.occupiedLocationsCount / factoryTotals.totalStorageLocations) * 100) : 0}%)
@@ -988,54 +988,54 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
             <div className="metrics-grid grid grid-cols-4 gap-2.5 mb-4">
               {/* Card 1: Total Locations */}
               <div className="metric-card bg-slate-50 border border-slate-200 rounded-lg p-2.5">
-                <div className="metric-title text-[9px] font-bold text-slate-500 uppercase tracking-wide">
+                <div className="metric-title text-[0.5625rem] font-bold text-slate-500 uppercase tracking-wide">
                   Total Locations
                 </div>
                 <div className="metric-value text-lg font-black text-slate-900">
                   {factoryTotals.totalStorageLocations}
                 </div>
-                <div className="metric-sub text-[9.5px] text-slate-500 font-medium">
+                <div className="metric-sub text-[0.59375rem] text-slate-500 font-medium">
                   {factoryTotals.totalFloors} Flr • {factoryTotals.totalZones} Zn
                 </div>
               </div>
 
               {/* Card 2: Total Net Weight */}
               <div className="metric-card bg-blue-50/60 border border-blue-200 rounded-lg p-2.5">
-                <div className="metric-title text-[9px] font-bold text-blue-700 uppercase tracking-wide">
+                <div className="metric-title text-[0.5625rem] font-bold text-blue-700 uppercase tracking-wide">
                   Total Stock Weight
                 </div>
                 <div className="metric-value text-lg font-black text-blue-900 font-mono">
                   {factoryTotals.totalNetWeightKg.toLocaleString('en-IN', { maximumFractionDigits: 1 })}
-                  <span className="text-[10px] font-bold ml-0.5">KG</span>
+                  <span className="text-[0.625rem] font-bold ml-0.5">KG</span>
                 </div>
-                <div className="metric-sub text-[9.5px] text-blue-600 font-medium">
+                <div className="metric-sub text-[0.59375rem] text-blue-600 font-medium">
                   Net calculated mass
                 </div>
               </div>
 
               {/* Card 3: Total Stock Units */}
               <div className="metric-card bg-emerald-50/60 border border-emerald-200 rounded-lg p-2.5">
-                <div className="metric-title text-[9px] font-bold text-emerald-700 uppercase tracking-wide">
+                <div className="metric-title text-[0.5625rem] font-bold text-emerald-700 uppercase tracking-wide">
                   Total Stock Units
                 </div>
                 <div className="metric-value text-lg font-black text-emerald-900 font-mono">
                   {factoryTotals.totalStockQty.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                 </div>
-                <div className="metric-sub text-[9.5px] text-emerald-600 font-medium">
+                <div className="metric-sub text-[0.59375rem] text-emerald-600 font-medium">
                   Across {factoryTotals.totalUniqueSkus} SKU types
                 </div>
               </div>
 
               {/* Card 4: Raw Material Mass */}
               <div className="metric-card bg-amber-50/60 border border-amber-200 rounded-lg p-2.5">
-                <div className="metric-title text-[9px] font-bold text-amber-700 uppercase tracking-wide">
+                <div className="metric-title text-[0.5625rem] font-bold text-amber-700 uppercase tracking-wide">
                   Raw Material Stock
                 </div>
                 <div className="metric-value text-lg font-black text-amber-900 font-mono">
                   {factoryTotals.rawMatWeight.toLocaleString('en-IN', { maximumFractionDigits: 1 })}
-                  <span className="text-[10px] font-bold ml-0.5">KG</span>
+                  <span className="text-[0.625rem] font-bold ml-0.5">KG</span>
                 </div>
-                <div className="metric-sub text-[9.5px] text-amber-700 font-medium">
+                <div className="metric-sub text-[0.59375rem] text-amber-700 font-medium">
                   {factoryTotals.rawMatCount} raw SKU lines
                 </div>
               </div>
@@ -1045,7 +1045,7 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
             <div className="section-title text-xs font-bold text-slate-900 uppercase tracking-wider border-l-4 border-blue-600 pl-2 mb-2">
               1. Factory Structure & Zone-Wise Stock Summary
             </div>
-            <table className="data-table w-full border-collapse border border-slate-300 text-left text-[10.5px] mb-4">
+            <table className="doc-table data-table w-full border-collapse border border-slate-300 text-left text-[0.65625rem] mb-4">
               <thead>
                 <tr className="bg-slate-100 text-slate-800">
                   <th className="border border-slate-300 p-1.5 text-center w-8">#</th>
@@ -1123,12 +1123,12 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
             {/* ── SECTION 2: DETAILED MASTER INVENTORY ROSTER ── */}
             <div className="section-title text-xs font-bold text-slate-900 uppercase tracking-wider border-l-4 border-blue-600 pl-2 mb-2 flex items-center justify-between">
               <span>2. Detailed Inventory Roster — Everything Present in {activeFactory?.name || 'Factory'}</span>
-              <span className="text-[10px] text-slate-500 font-normal">
+              <span className="text-[0.625rem] text-slate-500 font-normal">
                 Showing {filteredItems.length} of {factoryItems.length} items
               </span>
             </div>
 
-            <table className="data-table w-full border-collapse border border-slate-300 text-left text-[10.5px] mb-4">
+            <table className="doc-table data-table w-full border-collapse border border-slate-300 text-left text-[0.65625rem] mb-4">
               <thead>
                 <tr className="bg-slate-100 text-slate-800">
                   <th className="border border-slate-300 p-1.5 text-center w-8">#</th>
@@ -1161,7 +1161,7 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
                           <MapPin className="w-3 h-3 text-blue-600 inline shrink-0" />
                           <span>{item.locationName}</span>
                         </div>
-                        <div className="text-[9.5px] text-slate-500 font-mono">
+                        <div className="text-[0.59375rem] text-slate-500 font-mono">
                           {item.locationPath}
                         </div>
                       </td>
@@ -1169,7 +1169,7 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
                       {/* Item Specification */}
                       <td className="border border-slate-300 p-1.5">
                         <div className="font-bold text-slate-900">{item.skuName}</div>
-                        <div className="text-[9.5px] text-slate-500 font-mono">
+                        <div className="text-[0.59375rem] text-slate-500 font-mono">
                           <span className="font-bold text-blue-700">{item.skuCode}</span>
                           {item.sku.gsm ? ` • ${item.sku.gsm} GSM` : ''}
                           {(item.sku.width || item.sku.length) ? ` • ${item.sku.width || ''}${item.sku.length ? `×${item.sku.length}` : ''}"` : ''}
@@ -1182,10 +1182,10 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
                       <td className="border border-slate-300 p-1.5 text-center">
                         <span className={
                           item.categoryType === 'Raw Material'
-                            ? 'badge-raw bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-bold text-[9px]'
+                            ? 'badge-raw bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-bold text-[0.5625rem]'
                             : item.categoryType === 'Semi Finished'
-                              ? 'badge-semi bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-bold text-[9px]'
-                              : 'badge-fg bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold text-[9px]'
+                              ? 'badge-semi bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-bold text-[0.5625rem]'
+                              : 'badge-fg bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold text-[0.5625rem]'
                         }>
                           {item.categoryType}
                         </span>
@@ -1200,12 +1200,12 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
                       <td className="border border-slate-300 p-1.5 text-right font-mono">
                         <span className="font-bold text-blue-900">{item.formattedWeight}</span>
                         {item.weightNote && item.weightKg !== null && item.weightKg > 0 && (
-                          <span className="text-[9px] text-slate-400 block font-sans">({item.weightNote})</span>
+                          <span className="text-[0.5625rem] text-slate-400 block font-sans">({item.weightNote})</span>
                         )}
                       </td>
 
                       {/* Physical Format / Reels */}
-                      <td className="border border-slate-300 p-1.5 text-center text-[10px] text-slate-600">
+                      <td className="border border-slate-300 p-1.5 text-center text-[0.625rem] text-slate-600">
                         {item.reels?.length ? (
                           <span className="font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">
                             {item.reels.length} Reel{item.reels.length > 1 ? 's' : ''}
@@ -1223,8 +1223,8 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
             {/* ── SECTION 3: SUMMARY & GRAND TOTALS BREAKDOWN ── */}
             <div className="summary-grid grid grid-cols-2 gap-4 mb-6">
               {/* Left Box: Category & Location Utilization */}
-              <div className="summary-card bg-slate-50 border border-slate-200 rounded-lg p-3 text-[11px] space-y-1.5">
-                <h4 className="text-[10px] font-bold text-slate-700 uppercase border-b border-slate-200 pb-1">
+              <div className="summary-card bg-slate-50 border border-slate-200 rounded-lg p-3 text-[0.6875rem] space-y-1.5">
+                <h4 className="text-[0.625rem] font-bold text-slate-700 uppercase border-b border-slate-200 pb-1">
                   Plant Category & Storage Utilization
                 </h4>
                 <div className="summary-row flex justify-between">
@@ -1254,8 +1254,8 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
               </div>
 
               {/* Right Box: Grand Totals */}
-              <div className="summary-card bg-slate-50 border border-slate-200 rounded-lg p-3 text-[11px] space-y-1.5">
-                <h4 className="text-[10px] font-bold text-slate-700 uppercase border-b border-slate-200 pb-1">
+              <div className="summary-card bg-slate-50 border border-slate-200 rounded-lg p-3 text-[0.6875rem] space-y-1.5">
+                <h4 className="text-[0.625rem] font-bold text-slate-700 uppercase border-b border-slate-200 pb-1">
                   Factory Consolidated Totals
                 </h4>
                 <div className="summary-row flex justify-between">
@@ -1284,29 +1284,29 @@ export const FactoryStockPrintModal: React.FC<FactoryStockPrintModalProps> = ({
             </div>
 
             {/* ── SECTION 4: OFFICIAL SIGNATURES ── */}
-            <div className="signatures-block grid grid-cols-3 gap-6 pt-8 border-t border-slate-300 text-center text-[10px] text-slate-600 mt-6">
+            <div className="signatures-block grid grid-cols-3 gap-6 pt-8 border-t border-slate-300 text-center text-[0.625rem] text-slate-600 mt-6">
               <div>
                 <div className="sig-line border-t border-slate-400 pt-1 font-bold text-slate-900">
                   Warehouse In-Charge / Storekeeper
                 </div>
-                <div className="text-[9px] text-slate-400 mt-0.5">Physical Stock Count Verification</div>
+                <div className="text-[0.5625rem] text-slate-400 mt-0.5">Physical Stock Count Verification</div>
               </div>
               <div>
                 <div className="sig-line border-t border-slate-400 pt-1 font-bold text-slate-900">
                   Inventory Auditor / Quality Control
                 </div>
-                <div className="text-[9px] text-slate-400 mt-0.5">Reconciliation & Batch Validation</div>
+                <div className="text-[0.5625rem] text-slate-400 mt-0.5">Reconciliation & Batch Validation</div>
               </div>
               <div>
                 <div className="sig-line border-t border-slate-400 pt-1 font-bold text-slate-900">
                   Factory Manager / Operations Head
                 </div>
-                <div className="text-[9px] text-slate-400 mt-0.5">Plant Authorization & Final Sign-off</div>
+                <div className="text-[0.5625rem] text-slate-400 mt-0.5">Plant Authorization & Final Sign-off</div>
               </div>
             </div>
 
             {/* Print Footer Notice */}
-            <div className="mt-6 pt-2 border-t border-slate-200 text-center text-[8.5px] text-slate-400">
+            <div className="mt-6 pt-2 border-t border-slate-200 text-center text-[0.53125rem] text-slate-400">
               Generated by SKBW ERP System • Official Plant Inventory Audit Document • Confidential & Proprietary
             </div>
 

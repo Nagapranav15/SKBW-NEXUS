@@ -236,15 +236,15 @@ const SalesQuotes: React.FC = () => {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Sales Quotes</h1>
-        <p className="text-sm text-gray-500">Create and manage sales quotations</p>
+        <h1 className="text-2xl font-semibold text-gray-900 mb-2">Sales Quotes</h1>
+        <p className="text-[0.875rem] text-gray-500">Create and manage sales quotations</p>
       </div>
 
       <div className="bg-white rounded-xl border p-4 mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
           <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input type="text" placeholder="Search quotes..." value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
@@ -262,7 +262,7 @@ const SalesQuotes: React.FC = () => {
           <div className="flex items-center space-x-2">
             {canCreate && (
               <button onClick={() => setShowForm(true)}
-                className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
+                className="btn-primary">
                 <Plus className="w-4 h-4" /> New Quote
               </button>
             )}
@@ -275,31 +275,31 @@ const SalesQuotes: React.FC = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quote Details</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                <th className="px-6 py-3 text-left text-[0.875rem] font-medium text-gray-500 uppercase">Quote Details</th>
+                <th className="px-6 py-3 text-left text-[0.875rem] font-medium text-gray-500 uppercase">Customer</th>
+                <th className="px-6 py-3 text-left text-[0.875rem] font-medium text-gray-500 uppercase">Amount</th>
+                <th className="px-6 py-3 text-left text-[0.875rem] font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-left text-[0.875rem] font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredQuotes.map((quote) => (
                 <tr key={quote._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-[13.5px] font-medium text-gray-900">{quote.quoteNumber}</div>
-                    <div className="text-[13.5px] text-gray-500">Date: {new Date(quote.date).toLocaleDateString()}</div>
-                    <div className="text-[13.5px] text-gray-500">Valid: {new Date(quote.validUntil).toLocaleDateString()}</div>
+                    <div className="text-[0.84375rem] font-medium text-gray-900">{quote.quoteNumber}</div>
+                    <div className="text-[0.84375rem] text-gray-500">Date: {new Date(quote.date).toLocaleDateString()}</div>
+                    <div className="text-[0.84375rem] text-gray-500">Valid: {new Date(quote.validUntil).toLocaleDateString()}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-[13.5px] font-medium text-gray-900">{quote.customerName}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-[0.84375rem] font-medium text-gray-900">{quote.customerName}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-[13.5px] font-medium text-gray-900">₹{quote.total?.toFixed(2)}</div>
-                    <div className="text-[13.5px] text-gray-500">{quote.items?.length} items</div>
+                    <div className="text-[0.84375rem] font-medium text-gray-900">₹{quote.total?.toFixed(2)}</div>
+                    <div className="text-[0.84375rem] text-gray-500">{quote.items?.length} items</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {canManage ? (
                       <select value={quote.status}
                         onChange={(e) => handleStatusUpdate(quote._id, e.target.value)}
-                        className={`text-xs font-semibold rounded-full px-2 py-1 border-0 ${getStatusColor(quote.status)}`}>
+                        className={`text-[0.875rem] font-semibold rounded-full px-2 py-1 border-0 ${getStatusColor(quote.status)}`}>
                         <option value="draft">Draft</option>
                         <option value="sent">Sent</option>
                         <option value="accepted">Accepted</option>
@@ -307,20 +307,20 @@ const SalesQuotes: React.FC = () => {
                         <option value="expired">Expired</option>
                       </select>
                     ) : (
-                      <span className={`text-xs font-semibold rounded-full px-2 py-1 ${getStatusColor(quote.status)}`}>
+                      <span className={`text-[0.875rem] font-semibold rounded-full px-2 py-1 ${getStatusColor(quote.status)}`}>
                         {quote.status}
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-[13.5px] font-medium">
+                  <td className="px-6 py-4 whitespace-nowrap text-[0.84375rem] font-medium">
                     <div className="flex space-x-2">
                       {canCreate && (
-                        <button onClick={() => handleEdit(quote)} className="text-blue-600 hover:text-blue-900">
+                        <button onClick={() => handleEdit(quote)} className="icon-btn">
                           <Edit className="w-4 h-4" />
                         </button>
                       )}
                       {canManage && (
-                        <button onClick={() => handleDelete(quote._id)} className="text-red-600 hover:text-red-900">
+                        <button onClick={() => handleDelete(quote._id)} className="icon-btn-danger">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       )}
@@ -338,12 +338,12 @@ const SalesQuotes: React.FC = () => {
 
       {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold mb-4">{editingQuote ? 'Edit Quote' : 'Create New Quote'}</h2>
+          <div className="bg-white p-6 w-full max-w-4xl max-h-[calc(90*var(--vh,1vh))] overflow-y-auto dlg-panel">
+            <h2 className="text-2xl font-semibold mb-4">{editingQuote ? 'Edit Quote' : 'Create New Quote'}</h2>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Customer *</label>
+                  <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">Customer *</label>
                   <select value={formData.customerId}
                     onChange={(e) => setFormData(prev => ({ ...prev, customerId: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
@@ -354,19 +354,19 @@ const SalesQuotes: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Quote Date *</label>
+                  <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">Quote Date *</label>
                   <input type="date" value={formData.date}
                     onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Valid Until *</label>
+                  <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">Valid Until *</label>
                   <input type="date" value={formData.validUntil}
                     onChange={(e) => setFormData(prev => ({ ...prev, validUntil: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Tax Rate (%)</label>
+                  <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">Tax Rate (%)</label>
                   <input type="number" step="0.01" value={formData.tax}
                     onChange={(e) => setFormData(prev => ({ ...prev, tax: parseFloat(e.target.value) || 0 }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
@@ -377,7 +377,7 @@ const SalesQuotes: React.FC = () => {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold">Items</h3>
                   <button type="button" onClick={addItem}
-                    className="flex items-center space-x-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm">
+                    className="btn-primary">
                     <Plus className="w-4 h-4" /><span>Add Item</span>
                   </button>
                 </div>
@@ -385,10 +385,10 @@ const SalesQuotes: React.FC = () => {
                   {formData.items.map((item, index) => (
                     <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-gray-50 rounded-lg">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Item</label>
+                        <label className="block text-[0.875rem] font-medium text-gray-700 mb-1">Item</label>
                         <select value={item.itemId}
                           onChange={(e) => handleItemChange(index, 'itemId', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" required>
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[0.875rem]" required>
                           <option value="">Select Item</option>
                           {itemsList.map((itm: any) => (
                             <option key={itm._id} value={itm._id}>{itm.name}</option>
@@ -396,25 +396,25 @@ const SalesQuotes: React.FC = () => {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                        <label className="block text-[0.875rem] font-medium text-gray-700 mb-1">Quantity</label>
                         <input type="number" value={item.quantity}
                           onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" required />
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[0.875rem]" required />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
+                        <label className="block text-[0.875rem] font-medium text-gray-700 mb-1">Price</label>
                         <input type="number" step="0.01" value={item.price}
                           onChange={(e) => handleItemChange(index, 'price', parseFloat(e.target.value) || 0)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" required />
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[0.875rem]" required />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Total</label>
+                        <label className="block text-[0.875rem] font-medium text-gray-700 mb-1">Total</label>
                         <input type="number" value={item.total.toFixed(2)} readOnly
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-sm" />
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-[0.875rem]" />
                       </div>
                       <div className="flex items-end">
                         <button type="button" onClick={() => removeItem(index)}
-                          className="w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm"
+                          className="btn-danger w-full"
                           disabled={formData.items.length === 1}>Remove</button>
                       </div>
                     </div>
@@ -423,13 +423,13 @@ const SalesQuotes: React.FC = () => {
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                   <div className="flex justify-end space-x-8">
                     <div className="text-right">
-                      <div className="text-sm text-gray-600">Subtotal:</div>
-                      <div className="text-sm text-gray-600">Tax ({formData.tax}%):</div>
+                      <div className="text-[0.875rem] text-gray-600">Subtotal:</div>
+                      <div className="text-[0.875rem] text-gray-600">Tax ({formData.tax}%):</div>
                       <div className="text-lg font-semibold text-gray-900">Total:</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm">₹{calculateTotals(formData.items, formData.tax).subtotal.toFixed(2)}</div>
-                      <div className="text-sm">₹{calculateTotals(formData.items, formData.tax).tax.toFixed(2)}</div>
+                      <div className="text-[0.875rem]">₹{calculateTotals(formData.items, formData.tax).subtotal.toFixed(2)}</div>
+                      <div className="text-[0.875rem]">₹{calculateTotals(formData.items, formData.tax).tax.toFixed(2)}</div>
                       <div className="text-lg font-semibold">₹{calculateTotals(formData.items, formData.tax).total.toFixed(2)}</div>
                     </div>
                   </div>
@@ -437,14 +437,14 @@ const SalesQuotes: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                <label className="block text-[0.875rem] font-medium text-gray-700 mb-2">Notes</label>
                 <textarea value={formData.notes}
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg" rows={3} />
               </div>
 
               <div className="flex space-x-4 pt-4">
-                <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg">
+                <button type="submit" className="btn-primary flex-1">
                   {editingQuote ? 'Update Quote' : 'Create Quote'}
                 </button>
                 <button type="button" onClick={resetForm}

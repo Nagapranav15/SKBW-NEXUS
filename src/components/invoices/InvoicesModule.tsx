@@ -6,6 +6,7 @@ import {
   Printer, X, ArrowUp, ArrowDown, Calendar, Edit3, Trash2, IndianRupee, Layers, Check
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { generateObjectListPdf } from '../../utils/pdfReport';
 import { useAuth } from '../../context/AuthContext';
 import { SalesInvoice, getInvoices, getLocalInvoices, deleteInvoice } from '../../api/invoiceApi';
 import { getDeliveryChallans, deleteDeliveryChallan } from '../../api/deliveryChallanApi';
@@ -549,7 +550,7 @@ export const InvoicesModule: React.FC = () => {
     (activeTab === 'history' ? paginatedInvoices.every(i => selectedIds.has(i.invoiceNumber)) : paginatedDeliveries.every(d => selectedIds.has(d.id)));
 
   // Excel Export Handler
-  const handleExportExcel = () => {
+  const handleExportExcel = (asPdf = false) => {
     try {
       let exportData: any[] = [];
       if (activeTab === 'history') {
@@ -582,6 +583,16 @@ export const InvoicesModule: React.FC = () => {
         }));
       }
 
+      if (asPdf) {
+        generateObjectListPdf({
+          companyName: selectedCompany?.name,
+          title: activeTab === 'history' ? 'Sales Invoices Report' : 'Pending Invoices Report',
+          rows: exportData,
+          fileName: `Invoices_Report_${new Date().toISOString().split('T')[0]}`,
+        });
+        showToast('PDF report downloaded successfully!', 'success');
+        return;
+      }
       const ws = XLSX.utils.json_to_sheet(exportData);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, activeTab === 'history' ? 'Sales_Invoices' : 'Pending_Invoices');
@@ -652,24 +663,21 @@ export const InvoicesModule: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+    <div className="min-h-[calc(100*var(--vh,1vh))] bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
       
       {/* ── 1. TOP HEADER & TITLE BANNER (Matching DispatchModule) ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-gray-150 shadow-2xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
         <div>
-          <div className="flex items-center gap-2 text-xs font-medium text-gray-500 mb-1">
+          <div className="flex items-center gap-2 text-[0.875rem] font-medium text-gray-500 mb-1">
             <span>Sales</span>
             <span>&gt;</span>
             <span className="text-gray-900 font-semibold">Tax Invoices</span>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200/80 flex items-center justify-center text-blue-600 shadow-2xs">
-              <FileText className="w-5 h-5 text-blue-600 stroke-[2.2]" />
-            </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight">Sales Invoices</h1>
-              <p className="text-xs text-gray-500">
+              <h1 className="text-lg font-semibold text-gray-900">Sales Invoices</h1>
+              <p className="text-[0.875rem] text-gray-500">
                 Generate official GST sales tax invoices directly from delivery challans or manual sales.
               </p>
             </div>
@@ -679,25 +687,32 @@ export const InvoicesModule: React.FC = () => {
         {/* Action Buttons Top Right */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={handleExportExcel}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 transition-colors shadow-2xs cursor-pointer"
+            onClick={() => handleExportExcel()}
+            className="px-3.5 py-2 rounded-xl text-[0.875rem] font-semibold flex items-center gap-1.5 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 shadow-2xs cursor-pointer"
           >
             <Download className="w-4 h-4 text-gray-500" />
             <span>Export Excel</span>
           </button>
+          <button
+            onClick={() => handleExportExcel(true)}
+            className="px-3.5 py-2 rounded-xl text-[0.875rem] font-semibold flex items-center gap-1.5 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 shadow-2xs cursor-pointer"
+          >
+            <Printer className="w-4 h-4 text-gray-500" />
+            <span>Print PDF</span>
+          </button>
 
           <button
             onClick={handleOpenDirectInvoice}
-            className="px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+            className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-[0.875rem] font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer"
             title="Create invoice directly without delivery challan"
           >
-            <Plus className="w-4 h-4 text-purple-600 stroke-[2.5]" />
+            <Plus className="w-4 h-4 text-blue-600 stroke-[2.5]" />
             <span>+ Direct Invoice</span>
           </button>
 
           <button
             onClick={() => handleOpenCreateInvoice()}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-blue-500/25 transition-all cursor-pointer"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[0.875rem] font-semibold flex items-center gap-1.5 shadow-sm shadow-blue-500/25 cursor-pointer"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>+ Create Invoice</span>
@@ -708,7 +723,7 @@ export const InvoicesModule: React.FC = () => {
 
 
       {/* ── 3. TOP NAVIGATION TABS & ACTION BAR (Identical to DispatchModule) ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-4 rounded-2xl shadow-2xs relative">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-1 relative">
         {/* Navigation Tabs */}
         <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full">
           {[
@@ -722,7 +737,7 @@ export const InvoicesModule: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => { setActiveTab(tab.id as any); setCurrentPage(1); }}
-                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
                   active 
                     ? 'border-blue-600 text-blue-700 bg-transparent'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
@@ -730,7 +745,7 @@ export const InvoicesModule: React.FC = () => {
               >
                 <span>{tab.label}</span>
                 {tab.count !== undefined && (
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                  <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
                     active ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-700'
                   }`}>
                     {tab.count}
@@ -751,7 +766,7 @@ export const InvoicesModule: React.FC = () => {
               value={searchQuery}
               onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
               placeholder="Search invoice, DC, customer, items..."
-              className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-36 md:w-48 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+              className="pl-8 pr-7 py-1.5 text-[0.875rem] bg-gray-50 border border-gray-200 rounded-xl w-36 md:w-48 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
             />
             {searchQuery && (
               <button 
@@ -767,14 +782,14 @@ export const InvoicesModule: React.FC = () => {
           <button
             type="button"
             onClick={toggleAllDetails}
-            className={`px-2.5 py-1.5 text-xs rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 font-bold shadow-2xs ${
+            className={`px-2.5 py-1.5 text-[0.875rem] rounded-xl border cursor-pointer flex items-center gap-1.5 font-semibold shadow-2xs ${
               isAllExpanded
                 ? 'bg-blue-50 text-blue-700 border-blue-200'
                 : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
             }`}
             title={isAllExpanded ? "Collapse All Items" : "Expand All Items"}
           >
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isAllExpanded ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-3.5 h-3.5 ${isAllExpanded ? 'rotate-180' : ''}`} />
             <span className="hidden sm:inline">{isAllExpanded ? 'Collapse All' : 'Detailed View'}</span>
           </button>
 
@@ -786,7 +801,7 @@ export const InvoicesModule: React.FC = () => {
                 setShowDateFilter(!showDateFilter);
                 setShowFilterMenu(false);
               }}
-              className={`px-2.5 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs text-xs font-bold ${
+              className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 cursor-pointer shadow-2xs text-[0.875rem] font-semibold ${
                 datePreset !== 'All' || startDate || endDate
                   ? 'bg-blue-50 border-blue-300 text-blue-700 ring-2 ring-blue-100'
                   : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-700'
@@ -802,15 +817,15 @@ export const InvoicesModule: React.FC = () => {
 
             {showDateFilter && (
               <div 
-                className="absolute right-0 mt-1.5 w-68 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-xs text-left animate-in fade-in zoom-in-95 duration-100"
+                className="absolute right-0 mt-1.5 w-68 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-[0.875rem] text-left"
                 onClick={e => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
-                  <span className="font-bold text-gray-800 text-xs">Date Range Filter</span>
+                  <span className="font-semibold text-gray-800 text-[0.875rem]">Date Range Filter</span>
                   {(datePreset !== 'All' || startDate || endDate) && (
                     <button
                       onClick={() => applyDatePreset('All')}
-                      className="text-blue-600 hover:text-blue-800 text-[11px] font-bold cursor-pointer"
+                      className="text-blue-600 hover:text-blue-800 text-xs font-semibold cursor-pointer"
                     >
                       Reset
                     </button>
@@ -822,7 +837,7 @@ export const InvoicesModule: React.FC = () => {
                     <button
                       key={preset}
                       onClick={() => applyDatePreset(preset as any)}
-                      className={`px-2.5 py-1.5 text-xs font-bold rounded-lg text-center transition-colors cursor-pointer ${
+                      className={`px-2.5 py-1.5 text-[0.875rem] font-semibold rounded-lg text-center cursor-pointer ${
                         datePreset === preset ? 'bg-blue-600 text-white' : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
                       }`}
                     >
@@ -833,21 +848,21 @@ export const InvoicesModule: React.FC = () => {
 
                 <div className="space-y-1.5 pt-2 border-t border-gray-100">
                   <div>
-                    <label className="text-[10px] font-bold text-gray-500 block mb-0.5">From Date</label>
+                    <label className="text-xs font-semibold text-gray-500 block mb-0.5">From Date</label>
                     <input
                       type="date"
                       value={startDate}
                       onChange={e => { setStartDate(e.target.value); setDatePreset('Custom'); }}
-                      className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono"
+                      className="w-full px-2 py-1 border border-gray-200 rounded-lg text-[0.875rem] font-mono"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-gray-500 block mb-0.5">To Date</label>
+                    <label className="text-xs font-semibold text-gray-500 block mb-0.5">To Date</label>
                     <input
                       type="date"
                       value={endDate}
                       onChange={e => { setEndDate(e.target.value); setDatePreset('Custom'); }}
-                      className="w-full px-2 py-1 border border-gray-200 rounded-lg text-xs font-mono"
+                      className="w-full px-2 py-1 border border-gray-200 rounded-lg text-[0.875rem] font-mono"
                     />
                   </div>
                 </div>
@@ -863,7 +878,7 @@ export const InvoicesModule: React.FC = () => {
                 setShowFilterMenu(!showFilterMenu);
                 setShowDateFilter(false);
               }}
-              className={`p-2 rounded-xl border transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+              className={`p-2 rounded-xl border flex items-center justify-center cursor-pointer shadow-2xs ${
                 (selectedCustomer !== 'ALL' || selectedRegion !== 'ALL' || selectedTransporter !== 'ALL' || selectedStatus !== 'ALL')
                   ? 'bg-blue-50 border-blue-300 text-blue-700 ring-2 ring-blue-100'
                   : 'bg-white hover:bg-blue-50/60 border-gray-200 hover:border-blue-200 text-blue-600'
@@ -875,11 +890,11 @@ export const InvoicesModule: React.FC = () => {
 
             {showFilterMenu && (
               <div 
-                className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-xs text-left animate-in fade-in zoom-in-95 duration-100"
+                className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-[0.875rem] text-left"
                 onClick={e => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
-                  <span className="font-bold text-gray-800 text-xs">Filter Attributes</span>
+                  <span className="font-semibold text-gray-800 text-[0.875rem]">Filter Attributes</span>
                   {(selectedCustomer !== 'ALL' || selectedRegion !== 'ALL' || selectedTransporter !== 'ALL' || selectedStatus !== 'ALL') && (
                     <button
                       onClick={() => {
@@ -889,7 +904,7 @@ export const InvoicesModule: React.FC = () => {
                         setSelectedStatus('ALL');
                         setCurrentPage(1);
                       }}
-                      className="text-blue-600 hover:text-blue-800 text-[11px] font-bold cursor-pointer"
+                      className="text-blue-600 hover:text-blue-800 text-xs font-semibold cursor-pointer"
                     >
                       Reset All
                     </button>
@@ -897,11 +912,11 @@ export const InvoicesModule: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-gray-500 block mb-1">Customer / Firm</label>
+                  <label className="text-xs font-semibold text-gray-500 block mb-1">Customer / Firm</label>
                   <select
                     value={selectedCustomer}
                     onChange={e => { setSelectedCustomer(e.target.value); setCurrentPage(1); }}
-                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-gray-50 font-medium"
+                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] bg-gray-50 font-medium"
                   >
                     <option value="ALL">All Customers ({customerOptions.length})</option>
                     {customerOptions.map(c => (
@@ -911,11 +926,11 @@ export const InvoicesModule: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-gray-500 block mb-1">Destination Region</label>
+                  <label className="text-xs font-semibold text-gray-500 block mb-1">Destination Region</label>
                   <select
                     value={selectedRegion}
                     onChange={e => { setSelectedRegion(e.target.value); setCurrentPage(1); }}
-                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-gray-50 font-medium"
+                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] bg-gray-50 font-medium"
                   >
                     <option value="ALL">All Regions ({regionOptions.length})</option>
                     {regionOptions.map(r => (
@@ -926,11 +941,11 @@ export const InvoicesModule: React.FC = () => {
 
                 {activeTab !== 'history' && (
                   <div>
-                    <label className="text-[10px] font-bold text-gray-500 block mb-1">Transporter</label>
+                    <label className="text-xs font-semibold text-gray-500 block mb-1">Transporter</label>
                     <select
                       value={selectedTransporter}
                       onChange={e => { setSelectedTransporter(e.target.value); setCurrentPage(1); }}
-                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-gray-50 font-medium"
+                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] bg-gray-50 font-medium"
                     >
                       <option value="ALL">All Transporters ({transporterOptions.length})</option>
                       {transporterOptions.map(t => (
@@ -947,7 +962,7 @@ export const InvoicesModule: React.FC = () => {
           <button
             type="button"
             onClick={() => { loadData(false); showToast('Invoices data refreshed', 'info'); }}
-            className="p-2 bg-white hover:bg-gray-50 text-gray-600 border border-gray-200 rounded-xl shadow-2xs transition-colors cursor-pointer"
+            className="p-2 bg-white hover:bg-gray-50 text-gray-600 border border-gray-200 rounded-xl shadow-2xs cursor-pointer"
             title="Refresh Invoices"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
@@ -956,13 +971,13 @@ export const InvoicesModule: React.FC = () => {
       </div>
 
       {/* ── 4. MAIN DATA TABLE (MATCHING DISPATCH MODULE) ── */}
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-2xs overflow-hidden">
+      <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2">
         <div className="overflow-x-auto">
           {activeTab === 'history' ? (
             /* ── INVOICES HISTORY SUB-TABLE ── */
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full text-left text-[0.875rem] border-collapse">
               <thead>
-                <tr className="bg-gray-50/80 text-gray-500 font-bold border-b border-gray-200 text-[10px] uppercase tracking-wider">
+                <tr className="bg-gray-50/80 text-gray-500 font-medium border-b border-gray-200 text-xs uppercase tracking-wider">
                   <th className="py-3 px-3 text-center w-9">
                     <input
                       type="checkbox"
@@ -985,12 +1000,12 @@ export const InvoicesModule: React.FC = () => {
                   <th className="py-3 px-3 text-center">ACTIONS</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="bg-white divide-y divide-gray-100">
                 {isLoading ? (
                   <tr>
                     <td colSpan={13} className="py-16 text-center text-gray-400">
                       <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-600" />
-                      <p className="font-semibold text-xs text-gray-600">Loading sales tax invoices...</p>
+                      <p className="font-semibold text-[0.875rem] text-gray-600">Loading sales tax invoices...</p>
                     </td>
                   </tr>
                 ) : paginatedInvoices.length > 0 ? (
@@ -1002,7 +1017,7 @@ export const InvoicesModule: React.FC = () => {
                       <React.Fragment key={inv.invoiceNumber || inv._id}>
                         <tr
                           onClick={() => toggleRowExpand(inv.invoiceNumber)}
-                          className={`hover:bg-blue-50/20 transition-colors cursor-pointer ${
+                          className={`hover:bg-blue-50/20 cursor-pointer ${
                             isSelected ? 'bg-blue-50/30' : ''
                           }`}
                         >
@@ -1017,14 +1032,14 @@ export const InvoicesModule: React.FC = () => {
 
                           <td className="py-3 px-2 text-center">
                             <ChevronRight
-                              className={`w-4 h-4 text-gray-400 transition-transform duration-200 mx-auto ${
+                              className={`w-4 h-4 text-gray-400 mx-auto ${
                                 isExpanded ? 'rotate-90 text-blue-600' : ''
                               }`}
                             />
                           </td>
 
                           {/* Invoice Number */}
-                          <td className="py-3 px-3 font-mono font-bold text-blue-700">
+                          <td className="py-3 px-3 font-mono font-semibold text-blue-700">
                             {getSafeText(inv.invoiceNumber)}
                           </td>
 
@@ -1034,48 +1049,48 @@ export const InvoicesModule: React.FC = () => {
                           </td>
 
                           {/* DC Ref */}
-                          <td className="py-3 px-3 font-mono text-gray-700 font-bold">
+                          <td className="py-3 px-3 font-mono text-gray-700 font-semibold">
                             {getSafeText(inv.dispatchNumber, 'DIRECT')}
                           </td>
 
                           {/* Customer */}
                           <td className="py-3 px-3">
-                            <div className="font-bold text-gray-900">{getSafeText(inv.customerName, 'Customer')}</div>
+                            <div className="font-semibold text-gray-900">{getSafeText(inv.customerName, 'Customer')}</div>
                             {inv.customerPhone && (
-                              <div className="text-[10px] text-gray-400 font-mono">{getSafeText(inv.customerPhone)}</div>
+                              <div className="text-xs text-gray-400 font-mono">{getSafeText(inv.customerPhone)}</div>
                             )}
                           </td>
 
                           {/* Region */}
                           <td className="py-3 px-3">
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                            <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                               {getSafeText(inv.region, 'Telangana')}
                             </span>
                           </td>
 
                           {/* Items Count */}
-                          <td className="py-3 px-3 text-center font-bold text-gray-700">
+                          <td className="py-3 px-3 text-center font-semibold text-gray-700">
                             {inv.items?.length || 0}
                           </td>
 
                           {/* Total Qty */}
-                          <td className="py-3 px-3 text-right font-mono font-bold text-gray-800">
+                          <td className="py-3 px-3 text-right font-mono font-semibold text-gray-800">
                             {inv.totalQtyGbl || 0} GBL
                           </td>
 
                           {/* Taxable */}
-                          <td className="py-3 px-3 text-right font-mono font-bold text-gray-700">
+                          <td className="py-3 px-3 text-right font-mono font-semibold text-gray-700">
                             ₹{(inv.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
 
                           {/* Grand Total */}
-                          <td className="py-3 px-3 text-right font-mono font-black text-emerald-700">
+                          <td className="py-3 px-3 text-right font-mono font-semibold text-emerald-700">
                             ₹{(inv.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
 
                           {/* Status */}
                           <td className="py-3 px-3 text-center whitespace-nowrap">
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs">
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs">
                               Billed
                             </span>
                           </td>
@@ -1086,7 +1101,7 @@ export const InvoicesModule: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => handleViewInvoice(inv)}
-                                className="px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                className="px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-[0.875rem] font-semibold flex items-center gap-1 cursor-pointer shadow-2xs"
                                 title="View & Print Tax Invoice"
                               >
                                 <Printer className="w-3.5 h-3.5" />
@@ -1096,7 +1111,7 @@ export const InvoicesModule: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => handleEditInvoice(inv)}
-                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                className="icon-btn"
                                 title="Edit Invoice"
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
@@ -1105,7 +1120,7 @@ export const InvoicesModule: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => handleDeleteInvoice(inv)}
-                                className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                className="icon-btn-danger"
                                 title="Delete Invoice"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -1119,13 +1134,13 @@ export const InvoicesModule: React.FC = () => {
                           <tr className="bg-slate-50/70 border-b border-gray-200">
                             <td colSpan={13} className="p-4 pl-12">
                               <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-2xs">
-                                <div className="px-3 py-2 bg-gray-100/70 border-b border-gray-200 flex items-center justify-between text-xs font-bold text-gray-700">
+                                <div className="px-3 py-2 bg-gray-100/70 border-b border-gray-200 flex items-center justify-between text-[0.875rem] font-semibold text-gray-700">
                                   <span>Invoice Line Items Breakdown</span>
                                   <span className="font-mono text-blue-700">{inv.items?.length || 0} Items</span>
                                 </div>
-                                <table className="w-full text-left text-xs">
+                                <table className="w-full text-left text-[0.875rem]">
                                   <thead>
-                                    <tr className="bg-gray-50 text-gray-500 font-bold border-b border-gray-100 text-[10px] uppercase">
+                                    <tr className="bg-gray-50 text-gray-500 font-semibold border-b border-gray-100 text-xs uppercase">
                                       <th className="py-2 px-3">#</th>
                                       <th className="py-2 px-3">SKU Code</th>
                                       <th className="py-2 px-3">Item Description</th>
@@ -1134,19 +1149,19 @@ export const InvoicesModule: React.FC = () => {
                                       <th className="py-2 px-3 text-right">Amount (₹)</th>
                                     </tr>
                                   </thead>
-                                  <tbody className="divide-y divide-gray-100">
+                                  <tbody className="bg-white divide-y divide-gray-100">
                                     {(inv.items || []).map((it, itemIdx) => (
                                       <tr key={itemIdx} className="hover:bg-gray-50">
-                                        <td className="py-2 px-3 text-gray-400 font-bold">{itemIdx + 1}</td>
-                                        <td className="py-2 px-3 font-mono font-bold text-blue-700">{getSafeText(it.skuCode, '—')}</td>
-                                        <td className="py-2 px-3 font-bold text-gray-900">{getSafeText(it.itemName, 'Item')}</td>
-                                        <td className="py-2 px-3 text-right font-mono font-bold text-gray-800">
+                                        <td className="py-2 px-3 text-gray-400 font-semibold">{itemIdx + 1}</td>
+                                        <td className="py-2 px-3 font-mono font-semibold text-blue-700">{getSafeText(it.skuCode, '—')}</td>
+                                        <td className="py-2 px-3 font-semibold text-gray-900">{getSafeText(it.itemName, 'Item')}</td>
+                                        <td className="py-2 px-3 text-right font-mono font-semibold text-gray-800">
                                           {it.invoiceQtyGbl || it.dispatchedGbl} GBL (= {it.invoiceQtyPcs || it.dispatchedPcs} PCS)
                                         </td>
                                         <td className="py-2 px-3 text-right font-mono text-gray-700">
                                           ₹{Number(it.rate || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
-                                        <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">
+                                        <td className="py-2 px-3 text-right font-mono font-semibold text-slate-900">
                                           ₹{Number(it.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
                                       </tr>
@@ -1164,8 +1179,8 @@ export const InvoicesModule: React.FC = () => {
                   <tr>
                     <td colSpan={13} className="py-16 text-center text-gray-400">
                       <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                      <p className="font-bold text-gray-600">No finalized tax invoices found</p>
-                      <p className="text-[11px] text-gray-400">Create an invoice from pending delivery challans or use Direct Invoice</p>
+                      <p className="font-semibold text-gray-600">No finalized tax invoices found</p>
+                      <p className="text-xs text-gray-400">Create an invoice from pending delivery challans or use Direct Invoice</p>
                     </td>
                   </tr>
                 )}
@@ -1173,9 +1188,9 @@ export const InvoicesModule: React.FC = () => {
             </table>
           ) : (
             /* ── PENDING / DISPATCH DELIVERIES TABLE (MATCHING DISPATCH MODULE) ── */
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full text-left text-[0.875rem] border-collapse">
               <thead>
-                <tr className="bg-gray-50/80 text-gray-500 font-bold border-b border-gray-200 text-[10px] uppercase tracking-wider">
+                <tr className="bg-gray-50/80 text-gray-500 font-medium border-b border-gray-200 text-xs uppercase tracking-wider">
                   <th className="py-3 px-3 text-center w-9">
                     <input
                       type="checkbox"
@@ -1198,12 +1213,12 @@ export const InvoicesModule: React.FC = () => {
                   <th className="py-3 px-3 text-center">ACTIONS</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="bg-white divide-y divide-gray-100">
                 {isLoading ? (
                   <tr>
                     <td colSpan={13} className="py-16 text-center text-gray-400">
                       <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-600" />
-                      <p className="font-semibold text-xs text-gray-600">Loading delivery challans...</p>
+                      <p className="font-semibold text-[0.875rem] text-gray-600">Loading delivery challans...</p>
                     </td>
                   </tr>
                 ) : paginatedDeliveries.length > 0 ? (
@@ -1215,13 +1230,13 @@ export const InvoicesModule: React.FC = () => {
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : row.invoiceStatus === 'Partially Invoiced'
                       ? 'bg-amber-50 text-amber-700 border-amber-200'
-                      : 'bg-purple-50 text-purple-700 border-purple-200';
+                      : 'bg-blue-50 text-blue-700 border-blue-200';
 
                     return (
                       <React.Fragment key={row.id}>
                         <tr
                           onClick={() => toggleRowExpand(row.id)}
-                          className={`hover:bg-blue-50/20 transition-colors cursor-pointer ${
+                          className={`hover:bg-blue-50/20 cursor-pointer ${
                             isSelected ? 'bg-blue-50/30' : ''
                           }`}
                         >
@@ -1236,14 +1251,14 @@ export const InvoicesModule: React.FC = () => {
 
                           <td className="py-3 px-2 text-center">
                             <ChevronRight
-                              className={`w-4 h-4 text-gray-400 transition-transform duration-200 mx-auto ${
+                              className={`w-4 h-4 text-gray-400 mx-auto ${
                                 isExpanded ? 'rotate-90 text-blue-600' : ''
                               }`}
                             />
                           </td>
 
                           {/* Dispatch No */}
-                          <td className="py-3 px-3 font-mono font-bold text-blue-700">
+                          <td className="py-3 px-3 font-mono font-semibold text-blue-700">
                             {row.dispatchNo}
                           </td>
 
@@ -1254,54 +1269,54 @@ export const InvoicesModule: React.FC = () => {
 
                           {/* Customer */}
                           <td className="py-3 px-3">
-                            <div className="font-bold text-gray-900">{row.customerName}</div>
+                            <div className="font-semibold text-gray-900">{row.customerName}</div>
                             {row.customerPhone && (
-                              <div className="text-[10px] text-gray-400 font-mono">{row.customerPhone}</div>
+                              <div className="text-xs text-gray-400 font-mono">{row.customerPhone}</div>
                             )}
                           </td>
 
                           {/* Destination */}
                           <td className="py-3 px-3">
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                            <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                               {row.region || 'Telangana'}
                             </span>
                           </td>
 
                           {/* Items Count */}
-                          <td className="py-3 px-3 text-center font-bold text-gray-700">
+                          <td className="py-3 px-3 text-center font-semibold text-gray-700">
                             {row.itemCount}
                           </td>
 
                           {/* Dispatch Qty */}
                           <td className="py-3 px-3 text-right font-mono">
-                            <div className="font-black text-gray-900">{row.totalGbl} GBL</div>
-                            <div className="text-[10px] text-gray-400">≈ {row.totalPcs.toLocaleString()} PCS</div>
+                            <div className="font-semibold text-gray-900">{row.totalGbl} GBL</div>
+                            <div className="text-xs text-gray-400">≈ {row.totalPcs.toLocaleString()} PCS</div>
                           </td>
 
                           {/* Transporter */}
                           <td className="py-3 px-3">
-                            <div className="font-medium text-gray-800 truncate max-w-[140px]">{row.transporterName}</div>
+                            <div className="font-medium text-gray-800 truncate max-w-[8.75rem]">{row.transporterName}</div>
                             {row.vehicleNumber && row.vehicleNumber !== '—' && (
-                              <div className="text-[10px] font-mono text-gray-400 uppercase">{row.vehicleNumber}</div>
+                              <div className="text-xs font-mono text-gray-400 uppercase">{row.vehicleNumber}</div>
                             )}
                           </td>
 
                           {/* Status */}
                           <td className="py-3 px-3 text-center whitespace-nowrap">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border shadow-2xs ${statusClass}`}>
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border shadow-2xs ${statusClass}`}>
                               {row.invoiceStatus === 'Not Invoiced' ? 'Ready to Invoice' : row.invoiceStatus}
                             </span>
                           </td>
 
                           {/* Age */}
-                          <td className="py-3 px-2 text-center font-mono text-gray-500 font-bold">
+                          <td className="py-3 px-2 text-center font-mono text-gray-500 font-semibold">
                             {row.days}d
                           </td>
 
                           {/* Invoice Ref */}
-                          <td className="py-3 px-3 font-mono text-xs">
+                          <td className="py-3 px-3 font-mono text-[0.875rem]">
                             {row.invoiceNumber ? (
-                              <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                              <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                                 {row.invoiceNumber}
                               </span>
                             ) : (
@@ -1315,7 +1330,7 @@ export const InvoicesModule: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => handleOpenCreateInvoice(row)}
-                                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 mx-auto cursor-pointer shadow-2xs transition-colors"
+                                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[0.875rem] font-semibold flex items-center gap-1 mx-auto cursor-pointer shadow-2xs"
                               >
                                 <Plus className="w-3.5 h-3.5" />
                                 <span>+ Invoice</span>
@@ -1328,7 +1343,7 @@ export const InvoicesModule: React.FC = () => {
                                   if (inv) handleViewInvoice(inv);
                                   else showToast('Invoice details loaded', 'info');
                                 }}
-                                className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-bold flex items-center gap-1 mx-auto cursor-pointer shadow-2xs"
+                                className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-[0.875rem] font-semibold flex items-center gap-1 mx-auto cursor-pointer shadow-2xs"
                               >
                                 <Eye className="w-3.5 h-3.5" />
                                 <span>View</span>
@@ -1342,13 +1357,13 @@ export const InvoicesModule: React.FC = () => {
                           <tr className="bg-slate-50/70 border-b border-gray-200">
                             <td colSpan={13} className="p-4 pl-12">
                               <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-2xs">
-                                <div className="px-3 py-2 bg-gray-100/70 border-b border-gray-200 flex items-center justify-between text-xs font-bold text-gray-700">
+                                <div className="px-3 py-2 bg-gray-100/70 border-b border-gray-200 flex items-center justify-between text-[0.875rem] font-semibold text-gray-700">
                                   <span>Delivery Items Breakdown ({row.dispatchNo})</span>
                                   <span className="font-mono text-blue-700">{row.items.length} Lines</span>
                                 </div>
-                                <table className="w-full text-left text-xs">
+                                <table className="w-full text-left text-[0.875rem]">
                                   <thead>
-                                    <tr className="bg-gray-50 text-gray-500 font-bold border-b border-gray-100 text-[10px] uppercase">
+                                    <tr className="bg-gray-50 text-gray-500 font-semibold border-b border-gray-100 text-xs uppercase">
                                       <th className="py-2 px-3">#</th>
                                       <th className="py-2 px-3">SKU Code</th>
                                       <th className="py-2 px-3">Item Description</th>
@@ -1357,19 +1372,19 @@ export const InvoicesModule: React.FC = () => {
                                       <th className="py-2 px-3 text-right">Total Amount (₹)</th>
                                     </tr>
                                   </thead>
-                                  <tbody className="divide-y divide-gray-100">
+                                  <tbody className="bg-white divide-y divide-gray-100">
                                     {row.items.map((it, itemIdx) => (
                                       <tr key={itemIdx} className="hover:bg-gray-50">
-                                        <td className="py-2 px-3 text-gray-400 font-bold">{itemIdx + 1}</td>
-                                        <td className="py-2 px-3 font-mono font-bold text-blue-700">{it.itemCode}</td>
-                                        <td className="py-2 px-3 font-bold text-gray-900">{it.itemName}</td>
-                                        <td className="py-2 px-3 text-right font-mono font-bold text-gray-800">
+                                        <td className="py-2 px-3 text-gray-400 font-semibold">{itemIdx + 1}</td>
+                                        <td className="py-2 px-3 font-mono font-semibold text-blue-700">{it.itemCode}</td>
+                                        <td className="py-2 px-3 font-semibold text-gray-900">{it.itemName}</td>
+                                        <td className="py-2 px-3 text-right font-mono font-semibold text-gray-800">
                                           {it.dispatchedGbl} GBL (= {it.dispatchedPcs} PCS)
                                         </td>
                                         <td className="py-2 px-3 text-right font-mono text-gray-700">
                                           ₹{Number(it.rate || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
-                                        <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">
+                                        <td className="py-2 px-3 text-right font-mono font-semibold text-slate-900">
                                           ₹{Number(it.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
                                       </tr>
@@ -1387,8 +1402,8 @@ export const InvoicesModule: React.FC = () => {
                   <tr>
                     <td colSpan={13} className="py-16 text-center text-gray-400">
                       <Truck className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                      <p className="font-bold text-gray-600">No delivery challan records found</p>
-                      <p className="text-[11px] text-gray-400">Dispatch orders from Dispatch Module to bill them here</p>
+                      <p className="font-semibold text-gray-600">No delivery challan records found</p>
+                      <p className="text-xs text-gray-400">Dispatch orders from Dispatch Module to bill them here</p>
                     </td>
                   </tr>
                 )}

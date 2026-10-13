@@ -102,7 +102,7 @@ const PendingOrders: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="p-8 flex items-center justify-center min-h-[400px]">
+      <div className="p-8 flex items-center justify-center min-h-[25rem]">
         <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -112,8 +112,8 @@ const PendingOrders: React.FC = () => {
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-5">
       {/* ── HEADER ── */}
       <div>
-        <h1 className="text-2xl font-black text-gray-900 tracking-tight">Pending Sales Orders (Production View)</h1>
-        <p className="text-xs text-gray-500 mt-0.5">
+        <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Pending Sales Orders (Production View)</h1>
+        <p className="text-[0.875rem] text-gray-500 mt-0.5">
           Tally-style Sales Orders Outstandings & Material Requirement Planning (Statements of Inventory)
         </p>
       </div>

@@ -196,14 +196,14 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'In Production':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-200">In Production</span>;
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">In Production</span>;
       case 'Completed':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Completed</span>;
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Completed</span>;
       case 'Cancelled':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">Cancelled</span>;
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">Cancelled</span>;
       case 'Planned':
       default:
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">Planned</span>;
+        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">Planned</span>;
     }
   };
 
@@ -219,15 +219,15 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h1 className="text-lg font-bold text-gray-900 tracking-tight font-mono">
+                <h1 className="text-lg font-semibold text-gray-900 tracking-tight font-mono">
                   {formatOrderNo(order.orderNumber)}
                 </h1>
                 {getStatusBadge(order.status)}
               </div>
-              <h2 className="text-xs font-bold text-gray-900 mt-0.5">
+              <h2 className="text-[0.875rem] font-semibold text-gray-900 mt-0.5">
                 {order.itemName}
               </h2>
-              <p className="text-[11px] text-gray-500 font-medium mt-0.5 flex items-center gap-1.5 flex-wrap">
+              <p className="text-xs text-gray-500 font-medium mt-0.5 flex items-center gap-1.5 flex-wrap">
                 <span>SKU: <strong className="text-gray-700 font-mono">{order.itemCode || 'FG-002'}</strong></span>
                 <span className="text-gray-300">|</span>
                 <span>Type: <strong className="text-gray-700">{order.itemType}</strong></span>
@@ -241,7 +241,7 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
           <div className="flex items-center space-x-2 shrink-0">
             <button
               onClick={() => onEdit ? onEdit(order) : onViewOverview(order, 'overview')}
-              className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer shadow-2xs"
+              className="btn-secondary"
             >
               <Edit3 className="w-3.5 h-3.5 text-gray-500" />
               <span>Edit</span>
@@ -249,7 +249,7 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
 
             <button
               onClick={() => onPrint(order)}
-              className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer shadow-2xs"
+              className="btn-secondary"
             >
               <Printer className="w-3.5 h-3.5 text-gray-500" />
               <span>Print</span>
@@ -257,7 +257,7 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
 
             <button
               onClick={() => onViewOverview(order, 'materials')}
-              className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer shadow-2xs"
+              className="btn-secondary"
             >
               <Layers className="w-3.5 h-3.5 text-gray-500" />
               <span>View BOM</span>
@@ -266,17 +266,17 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
             {order.status !== 'Completed' && (
               <button
                 onClick={() => onCompleteOrder(order._id)}
-                className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
+                className="btn-primary"
               >
                 <span>Complete Production</span>
-                <span className="font-bold">→</span>
+                <span className="font-semibold">→</span>
               </button>
             )}
 
             <button
               onClick={onBack}
               title="Close (Esc)"
-              className="w-7 h-7 rounded-lg border border-gray-200 hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors cursor-pointer ml-1"
+              className="w-7 h-7 rounded-lg border border-gray-200 hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 cursor-pointer ml-1"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -285,7 +285,7 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
       </div>
 
       {/* ── 5 TABS NAVIGATION (Identical to View Production Order) ── */}
-      <div className="bg-white border-b border-gray-200 px-5 shrink-0 flex items-center space-x-5 overflow-x-auto custom-scrollbar text-xs font-semibold">
+      <div className="bg-white border-b border-gray-200 px-5 shrink-0 flex items-center space-x-5 overflow-x-auto custom-scrollbar text-[0.875rem] font-semibold">
         {[
           { id: 'overview', label: 'Overview' },
           { id: 'materials', label: 'Materials' },
@@ -302,9 +302,9 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
                   onViewOverview(order, tab.id as any);
                 }
               }}
-              className={`py-2.5 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              className={`py-2.5 border-b-2 cursor-pointer whitespace-nowrap ${
                 active 
-                  ? 'border-blue-600 text-blue-600 font-bold'
+                  ? 'border-blue-600 text-blue-600 font-semibold'
                   : 'border-transparent text-gray-500 hover:text-gray-800'
               }`}
             >
@@ -320,35 +320,35 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
         <div className="bg-white rounded-xl border border-gray-200/80 shadow-2xs p-4 sm:p-5 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
             <div>
-              <h2 className="text-xs font-bold text-gray-900 tracking-wide uppercase">
+              <h2 className="text-[0.875rem] font-medium text-gray-900 tracking-wide uppercase">
                 1. Record Production Entry
               </h2>
-              <p className="text-[11px] text-gray-500 mt-0.5">
+              <p className="text-xs text-gray-500 mt-0.5">
                 Enter the quantity produced and update the production progress.
               </p>
             </div>
 
             <div className="flex items-center space-x-3 flex-wrap gap-y-2">
               <div className="flex items-center space-x-2">
-                <label className="text-xs font-semibold text-gray-700 whitespace-nowrap">
+                <label className="text-[0.875rem] font-semibold text-gray-700 whitespace-nowrap">
                   Production Date <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="date"
                   value={productionDate}
                   onChange={e => setProductionDate(e.target.value)}
-                  className="text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-500"
+                  className="text-[0.875rem] text-gray-900 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-500"
                 />
               </div>
 
               <div className="flex items-center space-x-2">
-                <label className="text-xs font-semibold text-gray-700 whitespace-nowrap">
+                <label className="text-[0.875rem] font-semibold text-gray-700 whitespace-nowrap">
                   Shift (Optional)
                 </label>
                 <select
                   value={shift}
                   onChange={e => setShift(e.target.value)}
-                  className="text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-500 cursor-pointer"
+                  className="text-[0.875rem] text-gray-900 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-500 cursor-pointer"
                 >
                   <option value="Day Shift">Day Shift</option>
                   <option value="Night Shift">Night Shift</option>
@@ -367,7 +367,7 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Produced Quantity */}
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                <label className="block text-[0.875rem] font-semibold text-gray-700 mb-1">
                   Produced Quantity <span className="text-rose-500">*</span>
                 </label>
                 <div className="flex space-x-2">
@@ -387,7 +387,7 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
                       setProducedQty(Number(val));
                     }}
                     placeholder={isOrderFullyCompleted ? "Order completed (0 remaining)" : "0"}
-                    className={`w-full text-xs font-bold rounded-lg px-3 py-2 transition-all focus:outline-none ${
+                    className={`w-full text-[0.875rem] font-semibold rounded-lg px-3 py-2 focus:outline-none ${
                       isOverLimit
                         ? 'border-2 border-rose-500 bg-rose-50/60 text-rose-900 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/20'
                         : isOrderFullyCompleted
@@ -399,14 +399,14 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
                     value={producedUom}
                     onChange={e => setProducedUom(e.target.value)}
                     disabled={isOrderFullyCompleted}
-                    className="w-24 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg px-2.5 py-2 font-semibold focus:outline-none focus:border-blue-500 cursor-pointer disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-24 text-[0.875rem] text-gray-700 bg-white border border-gray-200 rounded-lg px-2.5 py-2 font-semibold focus:outline-none focus:border-blue-500 cursor-pointer disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
                     <option value={order.plannedUom || 'PCS'}>{order.plannedUom || 'PCS'}</option>
                     {order.plannedUom !== 'PCS' && <option value="PCS">PCS</option>}
                   </select>
                 </div>
                 {isOverLimit && (
-                  <div className="flex items-center justify-between gap-1 text-[11px] text-rose-600 font-semibold mt-1">
+                  <div className="flex items-center justify-between gap-1 text-xs text-rose-600 font-semibold mt-1">
                     <span className="flex items-center gap-1">
                       <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                       <span>Exceeds required amount (Max: {maxRequiredQty} {producedUom})</span>
@@ -415,7 +415,7 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
                       <button
                         type="button"
                         onClick={() => setProducedQty(maxRequiredQty)}
-                        className="text-[10px] underline font-bold text-rose-700 hover:text-rose-900 cursor-pointer ml-1"
+                        className="text-xs underline font-semibold text-rose-700 hover:text-rose-900 cursor-pointer ml-1"
                       >
                         Set to max ({maxRequiredQty})
                       </button>
@@ -423,29 +423,29 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
                   </div>
                 )}
                 {isGbl && !isOverLimit && (
-                  <p className="text-[11px] text-gray-500 mt-1 font-medium">
-                    = <span className="font-bold text-gray-800">{producedPcs.toLocaleString()} PCS</span> (1 GBL = {conversion} PCS)
+                  <p className="text-xs text-gray-500 mt-1 font-medium">
+                    = <span className="font-semibold text-gray-800">{producedPcs.toLocaleString()} PCS</span> (1 GBL = {conversion} PCS)
                   </p>
                 )}
                 {!isGbl && orderIsGbl && Number(producedQty) > 0 && !isOverLimit && (
-                  <p className="text-[11px] text-blue-500 mt-1 font-medium">
-                    = <span className="font-bold text-blue-700">{(Math.round((Number(producedQty) / conversion) * 10000) / 10000).toLocaleString()} GBL</span> (÷ {conversion} PCS/GBL)
+                  <p className="text-xs text-blue-500 mt-1 font-medium">
+                    = <span className="font-semibold text-blue-700">{(Math.round((Number(producedQty) / conversion) * 10000) / 10000).toLocaleString()} GBL</span> (÷ {conversion} PCS/GBL)
                   </p>
                 )}
               </div>
 
               {/* Completed Qty (Till Date) */}
               <div className="bg-slate-50 border border-gray-200 rounded-xl p-3 flex flex-col justify-between">
-                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">Completed Qty (Till Date)</span>
-                <span className="text-sm font-bold text-gray-900 mt-1 block font-mono">
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block">Completed Qty (Till Date)</span>
+                <span className="text-[0.875rem] font-semibold text-gray-900 mt-1 block font-mono">
                   {order.producedQty || 0} {order.plannedUom} {orderIsGbl && completedPcs > 0 && <span className="text-gray-500 font-normal">({completedPcs.toLocaleString()} PCS)</span>}
                 </span>
               </div>
 
               {/* Remaining Qty */}
               <div className="bg-slate-50 border border-gray-200 rounded-xl p-3 flex flex-col justify-between">
-                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">Remaining Qty</span>
-                <span className="text-sm font-bold text-amber-600 mt-1 block font-mono">
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block">Remaining Qty</span>
+                <span className="text-[0.875rem] font-semibold text-amber-600 mt-1 block font-mono">
                   {remainingQty} {order.plannedUom} {orderIsGbl && remainingPcs > 0 && <span className="text-amber-700/80 font-normal">({remainingPcs.toLocaleString()} PCS)</span>}
                 </span>
               </div>
@@ -453,13 +453,13 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
 
             {/* Remarks */}
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Remarks (Optional)</label>
+              <label className="block text-[0.875rem] font-semibold text-gray-700 mb-1">Remarks (Optional)</label>
               <textarea
                 rows={2}
                 value={remarks}
                 onChange={e => setRemarks(e.target.value)}
                 placeholder="Add any notes about this production entry..."
-                className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+                className="w-full text-[0.875rem] text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
               />
             </div>
 
@@ -467,7 +467,7 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
               <button
                 type="button"
                 onClick={handleClear}
-                className="px-3.5 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                className="btn-secondary"
               >
                 Clear
               </button>
@@ -475,7 +475,7 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
               <button
                 type="submit"
                 disabled={isOverLimit || !producedQty || qtyNumber <= 0 || isOrderFullyCompleted}
-                className={`inline-flex items-center space-x-1.5 text-xs font-semibold px-4 py-1.5 rounded-lg transition-all ${
+                className={`inline-flex items-center space-x-1.5 text-[0.875rem] font-semibold px-4 py-1.5 rounded-lg ${
                   isOverLimit || !producedQty || qtyNumber <= 0 || isOrderFullyCompleted
                     ? 'bg-gray-200 text-gray-400 border border-gray-200 cursor-not-allowed shadow-none'
                     : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow cursor-pointer'
@@ -492,19 +492,19 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
         <div className="bg-white rounded-xl border border-gray-200/80 shadow-2xs overflow-hidden">
           <div className="p-4 border-b border-gray-200 flex items-center justify-between">
             <div>
-              <h2 className="text-xs font-bold text-gray-900 tracking-wide uppercase">
+              <h2 className="text-[0.875rem] font-medium text-gray-900 tracking-wide uppercase">
                 2. Production Entries ({processedEntries.length})
               </h2>
-              <p className="text-[11px] text-gray-500 mt-0.5">
+              <p className="text-xs text-gray-500 mt-0.5">
                 All recorded production entries for this order.
               </p>
             </div>
           </div>
 
           <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-[0.875rem]">
               <thead>
-                <tr className="bg-gray-50/70 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                <tr className="bg-gray-50/70 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <th className="py-2.5 px-3 w-8 text-center">#</th>
                   <th className="py-2.5 px-3">Entry No.</th>
                   <th className="py-2.5 px-3">Date</th>
@@ -518,28 +518,28 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
                   <th className="py-2.5 px-3">Remarks</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 text-xs">
+              <tbody className="divide-y divide-gray-100 text-[0.875rem]">
                 {processedEntries.length === 0 ? (
                   <tr>
-                    <td colSpan={orderIsGbl ? 11 : 10} className="py-8 text-center text-gray-400 text-xs">
+                    <td colSpan={orderIsGbl ? 11 : 10} className="py-8 text-center text-gray-400 text-[0.875rem]">
                       <Package className="w-6 h-6 text-gray-300 mx-auto mb-1" />
                       <p className="font-semibold text-gray-700">No production entries recorded yet.</p>
-                      <p className="text-[11px] text-gray-400 mt-0.5">Use the form above to record shift output.</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Use the form above to record shift output.</p>
                     </td>
                   </tr>
                 ) : (
                   processedEntries.map((entry, idx) => (
-                    <tr key={entry.id || idx} className="hover:bg-gray-50/60 transition-colors">
+                    <tr key={entry.id || idx} className="hover:bg-gray-50/60">
                       <td className="py-2.5 px-3 text-center font-semibold text-gray-500">{entry.entryIndex}</td>
-                      <td className="py-2.5 px-3 font-bold text-blue-600 font-mono whitespace-nowrap">
+                      <td className="py-2.5 px-3 font-semibold text-blue-600 font-mono whitespace-nowrap">
                         {entry.entryNo}
                       </td>
                       <td className="py-2.5 px-3 font-medium text-gray-800 whitespace-nowrap">{entry.date}</td>
                       <td className="py-2.5 px-3 text-gray-700 whitespace-nowrap">{entry.shift || 'Day Shift'}</td>
-                      <td className="py-2.5 px-3 font-bold text-gray-900 whitespace-nowrap font-mono">
+                      <td className="py-2.5 px-3 font-semibold text-gray-900 whitespace-nowrap font-mono">
                         {entry.producedQty} {order.plannedUom}
                         {(entry as any).enteredUom && (entry as any).enteredUom !== order.plannedUom && (
-                          <span className="block text-[10px] text-gray-400 font-normal">
+                          <span className="block text-xs text-gray-400 font-normal">
                             (entered: {(entry as any).enteredQty?.toLocaleString()} {(entry as any).enteredUom})
                           </span>
                         )}
@@ -549,8 +549,8 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
                           {(entry.producedPcs || Math.round(entry.producedQty * conversion)).toLocaleString()} PCS
                         </td>
                       )}
-                      <td className="py-2.5 px-3 font-bold text-gray-900 whitespace-nowrap font-mono">{entry.calcCumulative} {order.plannedUom}</td>
-                      <td className="py-2.5 px-3 font-bold text-gray-900 whitespace-nowrap font-mono">{entry.calcBalance} {order.plannedUom}</td>
+                      <td className="py-2.5 px-3 font-semibold text-gray-900 whitespace-nowrap font-mono">{entry.calcCumulative} {order.plannedUom}</td>
+                      <td className="py-2.5 px-3 font-semibold text-gray-900 whitespace-nowrap font-mono">{entry.calcBalance} {order.plannedUom}</td>
                       <td className="py-2.5 px-3 text-gray-700 whitespace-nowrap">{entry.outputLocation}</td>
                       <td className="py-2.5 px-3 text-gray-700 font-semibold whitespace-nowrap">{entry.loggedBy}</td>
                       <td className="py-2.5 px-3 text-gray-600">{entry.remarks || '—'}</td>
@@ -569,10 +569,10 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
               <Package className="w-4 h-4 stroke-[2.2]" />
             </div>
             <div>
-              <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+              <h4 className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">
                 Production Entry Summary
               </h4>
-              <p className="text-[11px] text-gray-500 mt-0.5">
+              <p className="text-xs text-gray-500 mt-0.5">
                 Aggregated progress of recorded shifts.
               </p>
             </div>
@@ -580,27 +580,27 @@ export const ProductionOrderEntriesView: React.FC<ProductionOrderEntriesViewProp
 
           <div className="flex items-center space-x-6 shrink-0 flex-wrap gap-y-2">
             <div>
-              <span className="text-[11px] text-gray-500 font-medium block">Total Entries</span>
-              <span className="text-base font-black text-gray-900 font-mono mt-0.5 block">{processedEntries.length}</span>
+              <span className="text-xs text-gray-500 font-medium block">Total Entries</span>
+              <span className="text-base font-semibold text-gray-900 font-mono mt-0.5 block">{processedEntries.length}</span>
             </div>
 
             <div>
-              <span className="text-[11px] text-gray-500 font-medium block">Total Produced</span>
-              <span className="text-base font-black text-gray-900 font-mono mt-0.5 block">
+              <span className="text-xs text-gray-500 font-medium block">Total Produced</span>
+              <span className="text-base font-semibold text-gray-900 font-mono mt-0.5 block">
                 {totalProducedFromEntries} {order.plannedUom}
               </span>
             </div>
 
             <div>
-              <span className="text-[11px] text-gray-500 font-medium block">Remaining</span>
-              <span className="text-base font-black text-amber-600 font-mono mt-0.5 block">
+              <span className="text-xs text-gray-500 font-medium block">Remaining</span>
+              <span className="text-base font-semibold text-amber-600 font-mono mt-0.5 block">
                 {remainingQtyFromEntries} {order.plannedUom}
               </span>
             </div>
 
             <div>
-              <span className="text-[11px] text-gray-500 font-medium block">Last Production</span>
-              <span className="text-base font-black text-gray-900 font-mono mt-0.5 block">
+              <span className="text-xs text-gray-500 font-medium block">Last Production</span>
+              <span className="text-base font-semibold text-gray-900 font-mono mt-0.5 block">
                 {lastProductionDate}
               </span>
             </div>

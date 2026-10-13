@@ -125,88 +125,95 @@ const CompanySelection: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-[calc(100*var(--vh,1vh))] bg-gray-50 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
-          <div className="text-center sm:text-left flex-1">
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Select Company</h1>
-            <p className="text-gray-600 text-sm sm:text-base">Choose a company to continue or create a new one</p>
+    <div className="min-h-[calc(100*var(--vh,1vh))] bg-white p-4 md:p-8 font-sans text-gray-800">
+      <div className="max-w-5xl mx-auto">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-lg font-semibold text-gray-900">Select Company</h1>
+            <p className="text-[0.875rem] text-gray-500">Choose a company to continue{canManage ? ' or create a new one' : ''}.</p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center space-x-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors w-full sm:w-auto justify-center"
-          >
-            <LogOut className="w-5 h-5" />
-            <span>Logout</span>
-          </button>
-        </div>
-
-        {canManage && (
-          <div className="mb-6">
+          <div className="flex items-center gap-2 shrink-0">
+            {canManage && (
+              <button
+                onClick={() => { resetForm(); setEditingCompany(null); setShowCreateForm(true); }}
+                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[0.875rem] font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>New Company</span>
+              </button>
+            )}
             <button
-              onClick={() => { resetForm(); setEditingCompany(null); setShowCreateForm(true); }}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors"
+              onClick={handleLogout}
+              className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-[0.875rem] font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer"
             >
-              <Plus className="w-5 h-5" />
-              <span>Create New Company</span>
+              <LogOut className="w-4 h-4 text-gray-500" />
+              <span>Logout</span>
             </button>
           </div>
-        )}
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Company cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {companies.map((company) => (
-            <div key={company._id} className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-3">
+            <div
+              key={company._id}
+              onClick={() => selectCompany(company)}
+              className="group bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-white rounded-xl p-5 flex flex-col gap-4 cursor-pointer transition-colors"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   {company.logo ? (
-                    <img src={company.logo} alt={company.name} className="w-12 h-12 rounded-full object-cover" />
+                    <img src={company.logo} alt={company.name} className="w-11 h-11 rounded-xl object-cover shrink-0" />
                   ) : (
-                    <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
-                      <Building2 className="w-6 h-6 text-white" />
+                    <div className="w-11 h-11 bg-blue-50 border border-blue-100 rounded-xl flex items-center justify-center shrink-0">
+                      <Building2 className="w-5 h-5 text-blue-600" />
                     </div>
                   )}
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900">{company.name}</h3>
-                    <p className="text-sm text-gray-500">GST: {company.gst}</p>
+                  <div className="min-w-0">
+                    <h3 className="text-[0.9375rem] font-semibold text-gray-900 truncate">{company.name}</h3>
+                    {company.gst && <p className="text-xs text-gray-500 truncate">GST: {company.gst}</p>}
                   </div>
                 </div>
                 {canManage && (
-                  <div className="flex space-x-2">
+                  <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => startEdit(company)}
-                      className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer"
+                      title="Edit company"
                     >
                       <Edit className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteCompany(company._id)}
-                      className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg cursor-pointer"
+                      title="Delete company"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 )}
               </div>
-              
-              <div className="space-y-2 mb-4">
-                <p className="text-sm text-gray-600">{company.address}</p>
-                <p className="text-sm text-gray-600">{company.phone}</p>
-                <p className="text-sm text-gray-600">{company.email}</p>
-              </div>
 
-              <button
-                onClick={() => selectCompany(company)}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors"
-              >
-                Select Company
-              </button>
+              {(company.address || company.phone || company.email) && (
+                <div className="space-y-1 text-[0.875rem] text-gray-500 border-t border-gray-200 pt-3">
+                  {company.address && <p className="truncate">{company.address}</p>}
+                  {company.phone && <p className="truncate">{company.phone}</p>}
+                  {company.email && <p className="truncate">{company.email}</p>}
+                </div>
+              )}
+
+              <div className="mt-auto flex items-center justify-between text-[0.875rem] font-medium text-blue-600">
+                <span>Open company</span>
+                <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+              </div>
             </div>
           ))}
         </div>
@@ -221,8 +228,8 @@ const CompanySelection: React.FC = () => {
 
         {showCreateForm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-              <h2 className="text-2xl font-bold mb-4">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[calc(90*var(--vh,1vh))] overflow-y-auto">
+              <h2 className="text-2xl font-semibold mb-4">
                 {editingCompany ? 'Edit Company' : 'Create New Company'}
               </h2>
               
@@ -322,14 +329,14 @@ const CompanySelection: React.FC = () => {
                   <LogOut className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900">Confirm Logout</h3>
-                  <p className="text-[11px] text-gray-500 mt-0.5">Are you sure you want to log out of your session?</p>
+                  <h3 className="text-sm font-semibold text-gray-900">Confirm Logout</h3>
+                  <p className="text-[0.6875rem] text-gray-500 mt-0.5">Are you sure you want to log out of your session?</p>
                 </div>
               </div>
               <div className="flex gap-2.5 mt-5">
                 <button
                   onClick={() => setShowLogoutConfirm(false)}
-                  className="flex-1 px-4 py-2 border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                  className="flex-1 px-4 py-2 border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl text-xs font-semibold transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -339,7 +346,7 @@ const CompanySelection: React.FC = () => {
                     logout();
                     navigate('/login');
                   }}
-                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-red-200 cursor-pointer"
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-red-200 cursor-pointer"
                 >
                   Logout
                 </button>

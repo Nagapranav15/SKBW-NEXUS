@@ -187,10 +187,12 @@ const Layout: React.FC = () => {
       const navRect = navEl.getBoundingClientRect();
       const itemRect = activeEl.getBoundingClientRect();
 
-      const top = itemRect.top - navRect.top + navEl.scrollTop;
-      const left = itemRect.left - navRect.left + navEl.scrollLeft;
-      const width = itemRect.width;
-      const height = itemRect.height;
+      // Rects are in screen pixels; divide by the page zoom to get layout pixels
+      const scale = navEl.offsetWidth ? navRect.width / navEl.offsetWidth : 1;
+      const top = (itemRect.top - navRect.top) / scale + navEl.scrollTop;
+      const left = (itemRect.left - navRect.left) / scale + navEl.scrollLeft;
+      const width = itemRect.width / scale;
+      const height = itemRect.height / scale;
 
       setIndicatorStyle({
         top,
@@ -219,11 +221,15 @@ const Layout: React.FC = () => {
 
     timer = setTimeout(() => {
       updateIndicator(true);
-    }, 320);
+    }, 480);
+
+    const onResize = () => updateIndicator(false);
+    window.addEventListener('resize', onResize);
 
     return () => {
       if (timer) clearTimeout(timer);
       resizeObserver.disconnect();
+      window.removeEventListener('resize', onResize);
     };
   }, [location.pathname, location.search, sidebarOpen]);
 
@@ -234,20 +240,20 @@ const Layout: React.FC = () => {
   // Grouped Navigation Items (Matching Makoro layout & section header vibe!)
   const navSections = [
     {
-      title: 'OPERATIONS',
+      title: 'Operations',
       items: [
         { label: 'Item Master', path: '/inventory-v2/skus', icon: Package, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
         { label: 'Stock & Inventory', path: '/stock-inventory', icon: Layers, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY', 'MANAGE_ITEMS', 'VIEW_ITEMS'] },
       ]
     },
     {
-      title: 'PARTNERS & DIRECTORY',
+      title: 'Partners & Directory',
       items: [
         { label: 'Business Directory', path: '/directory', icon: Users, permission: ['MANAGE_PARTIES', 'VIEW_PARTIES', 'CREATE_PARTIES'] },
       ]
     },
     {
-      title: 'FINANCE & SALES',
+      title: 'Finance & Sales',
       items: [
         { label: 'Purchase Batches', path: '/inventory-v2/purchases', icon: Receipt, permission: ['MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
         { label: 'Sale Orders', path: '/sales/orders', icon: ShoppingBag, permission: ['MANAGE_ORDERS', 'VIEW_ORDERS'] },
@@ -257,13 +263,13 @@ const Layout: React.FC = () => {
       ]
     },
     {
-      title: 'FIELD COLLECTIONS & ROUTES',
+      title: 'Field Collections & Routes',
       items: [
         { label: 'Payment Collections', path: '/collections', icon: Wallet, permission: ['MANAGE_ORDERS', 'VIEW_ORDERS', 'MANAGE_INVENTORY', 'VIEW_INVENTORY'] },
       ]
     },
     {
-      title: 'REPORTS',
+      title: 'Reports',
       items: [
         { label: 'Ledgers', path: '/ledgers', icon: BookOpen },
         { label: 'Reports', path: '/reports', icon: BarChart3 },
@@ -287,15 +293,15 @@ const Layout: React.FC = () => {
           if (item.action) item.action();
           else if (item.path) handleNavigate(item.path);
         }}
-        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs relative z-10 group cursor-pointer transition-colors duration-150 ${
+        className={`w-full flex items-center justify-between px-2.5 h-8 rounded text-[0.875rem] relative z-10 group cursor-pointer transition-colors duration-150 ${
           active
-            ? 'text-blue-600 font-semibold'
-            : 'text-gray-600 hover:text-gray-900 font-medium'
+            ? 'text-blue-700 font-medium'
+            : 'text-gray-700 hover:text-gray-900 font-medium'
         }`}
         title={!sidebarOpen ? item.label : undefined}
       >
         <div className={`flex items-center space-x-2.5 ${!sidebarOpen ? 'mx-auto' : ''}`}>
-          <item.icon className={`w-4 h-4 shrink-0 transition-colors duration-150 ${active ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+          <item.icon strokeWidth={1.6} className={`w-[1.125rem] h-[1.125rem] shrink-0 transition-colors duration-150 ${active ? 'text-blue-700' : 'text-blue-500 group-hover:text-blue-600'}`} />
           {sidebarOpen && <span className="truncate">{item.label}</span>}
         </div>
       </button>
@@ -303,7 +309,7 @@ const Layout: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-white overflow-hidden font-sans">
+    <div className="flex h-[calc(100*var(--vh,1vh))] bg-white overflow-hidden font-sans">
       {/* Sidebar Overlay for Mobile */}
       {sidebarOpen && (
         <div 
@@ -315,28 +321,30 @@ const Layout: React.FC = () => {
       {/* Sidebar (Minimalist & Clean) */}
       <div className={`
         fixed inset-y-0 left-0 z-50 md:relative md:z-0
-        ${sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64 md:translate-x-0 md:w-16'}
-        bg-white border-r border-gray-150 shadow-2xs transition-all duration-300 flex flex-col h-full overflow-hidden
+        ${sidebarOpen ? 'translate-x-0 w-[15.5rem]' : '-translate-x-full w-[15.5rem] md:translate-x-0 md:w-16'}
+        bg-white border-r border-gray-200 transition-all duration-300 flex flex-col h-full overflow-hidden
       `}>
         {/* Brand Header */}
         <div className="p-3.5 border-b border-gray-100 flex items-center justify-between shrink-0">
           <div className="flex items-center space-x-2.5 overflow-hidden">
             {/* Logo Avatar Badge */}
-            <div className="w-8 h-8 rounded-lg border border-gray-200/80 bg-slate-50 flex items-center justify-center font-bold text-gray-900 shrink-0">
+            <div className="w-8 h-8 rounded-md bg-blue-600 flex items-center justify-center shrink-0">
               {selectedCompany?.logo ? (
                 <img src={selectedCompany.logo} alt={selectedCompany.name} className="w-full h-full object-cover rounded-lg" />
               ) : (
-                <span className="text-xs font-black text-blue-600">M</span>
+                <span className="text-xs font-semibold text-white">
+                  {(selectedCompany?.name || 'SKBW CORE').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+                </span>
               )}
             </div>
             {sidebarOpen && (
               <div className="truncate">
                 <div className="flex items-center gap-1.5">
-                  <h2 className="font-bold text-gray-900 text-xs tracking-wide uppercase truncate">
+                  <h2 className="font-semibold text-gray-900 text-sm truncate">
                     {selectedCompany?.name || 'SKBW CORE'}
                   </h2>
                   <span
-                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold tracking-normal shrink-0 ${
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[0.6875rem] font-semibold tracking-normal shrink-0 ${
                       isConnected
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                         : 'bg-amber-50 text-amber-700 border border-amber-200'
@@ -347,7 +355,7 @@ const Layout: React.FC = () => {
                     {isConnected ? 'Live' : 'Syncing'}
                   </span>
                 </div>
-                <p className="text-[10px] text-gray-400 font-medium truncate">ERP Management System</p>
+                <p className="text-xs text-gray-400 font-medium truncate">ERP Management System</p>
               </div>
             )}
           </div>
@@ -366,7 +374,7 @@ const Layout: React.FC = () => {
         <nav ref={navRef} className="flex-1 p-2.5 space-y-1 overflow-y-auto custom-scrollbar relative">
           {/* Minimal Smooth Sliding active highlighted pill */}
           <div
-            className="absolute pointer-events-none rounded-lg bg-blue-50/80 border border-blue-100/50 z-0"
+            className="absolute pointer-events-none rounded bg-blue-50 z-0"
             style={{
               top: `${indicatorStyle.top}px`,
               left: `${indicatorStyle.left}px`,
@@ -374,7 +382,7 @@ const Layout: React.FC = () => {
               height: `${indicatorStyle.height}px`,
               opacity: indicatorStyle.visible ? 1 : 0,
               transition: indicatorStyle.animate
-                ? 'top 220ms cubic-bezier(0.2, 0, 0, 1), left 200ms cubic-bezier(0.2, 0, 0, 1), width 200ms cubic-bezier(0.2, 0, 0, 1), height 200ms ease, opacity 150ms ease'
+                ? 'top 450ms cubic-bezier(0.65, 0, 0.35, 1), left 450ms cubic-bezier(0.65, 0, 0.35, 1), width 450ms cubic-bezier(0.65, 0, 0.35, 1), height 450ms cubic-bezier(0.65, 0, 0.35, 1), opacity 300ms ease'
                 : 'none',
             }}
           />
@@ -392,9 +400,9 @@ const Layout: React.FC = () => {
             if (visibleItems.length === 0) return null;
 
             return (
-              <div key={idx} className="pt-1.5">
+              <div key={idx} className="pt-0.5">
                 {sidebarOpen ? (
-                  <div className="px-3 pt-2 pb-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                  <div className="px-2.5 pt-3 pb-1 text-xs font-medium text-gray-500">
                     {section.title}
                   </div>
                 ) : (
@@ -410,8 +418,8 @@ const Layout: React.FC = () => {
           {/* System Settings & Utilities */}
           <div className="pt-2">
             {sidebarOpen ? (
-              <div className="px-3 pt-2 pb-1 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                SYSTEM
+              <div className="px-3 pt-2 pb-1 text-xs font-medium text-gray-600">
+                System
               </div>
             ) : (
               <div className="my-2 border-t border-gray-100" />
@@ -445,13 +453,13 @@ const Layout: React.FC = () => {
         <div className="p-3 border-t border-gray-100 shrink-0">
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 transition-all cursor-pointer ${
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-100 transition-all cursor-pointer ${
               !sidebarOpen ? 'justify-center' : ''
             }`}
             title={!sidebarOpen ? "Logout" : undefined}
           >
             <div className="flex items-center space-x-3">
-              <LogOut className="w-4 h-4 shrink-0 text-rose-600" />
+              <LogOut className="w-5 h-5 shrink-0 text-blue-500" />
               {sidebarOpen && <span>Logout</span>}
             </div>
           </button>
@@ -469,9 +477,9 @@ const Layout: React.FC = () => {
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-1.5 truncate">
-            <span className="font-extrabold text-gray-900 text-xs tracking-wide truncate max-w-[150px]">{selectedCompany?.name || 'SKBW ERP'}</span>
+            <span className="font-semibold text-gray-900 text-xs tracking-wide truncate max-w-[9.375rem]">{selectedCompany?.name || 'SKBW ERP'}</span>
             <span
-              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[0.5625rem] font-semibold ${
                 isConnected
                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                   : 'bg-amber-50 text-amber-700 border border-amber-200'
@@ -481,7 +489,7 @@ const Layout: React.FC = () => {
               {isConnected ? 'Live' : 'Syncing'}
             </span>
           </div>
-          <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs uppercase shrink-0 border border-blue-200">
+          <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold text-xs uppercase shrink-0 border border-blue-200">
             {user?.fullName?.charAt(0) || 'A'}
           </div>
         </div>
@@ -500,14 +508,14 @@ const Layout: React.FC = () => {
                 <LogOut className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-gray-900">Confirm Logout</h3>
-                <p className="text-[11px] text-gray-500 mt-0.5">Are you sure you want to log out of your session?</p>
+                <h3 className="text-sm font-semibold text-gray-900">Confirm Logout</h3>
+                <p className="text-[0.6875rem] text-gray-500 mt-0.5">Are you sure you want to log out of your session?</p>
               </div>
             </div>
             <div className="flex gap-2.5 mt-5">
               <button
                 onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 px-4 py-2 border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                className="flex-1 px-4 py-2 border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl text-xs font-semibold transition-all cursor-pointer"
               >
                 Cancel
               </button>
@@ -517,7 +525,7 @@ const Layout: React.FC = () => {
                   logout();
                   navigate('/login');
                 }}
-                className="flex-1 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-rose-200 cursor-pointer"
+                className="btn-danger flex-1"
               >
                 Logout
               </button>

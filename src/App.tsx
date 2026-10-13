@@ -39,10 +39,10 @@ const SettingsPage = lazyWithRetry(() => import('./components/inventory_v2/Setti
 
 // Premium Micro-Loading Indicator
 const LoadingFallback = () => (
-  <div className="flex items-center justify-center min-h-[60vh] w-full">
+  <div className="flex items-center justify-center min-h-[calc(60*var(--vh,1vh))] w-full">
     <div className="flex flex-col items-center gap-3">
       <div className="w-8 h-8 border-3 border-blue-600/10 border-t-blue-600 rounded-full animate-spin" />
-      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest animate-pulse">Loading modules...</span>
+      <span className="text-[0.625rem] font-medium text-gray-400 uppercase tracking-widest animate-pulse">Loading modules...</span>
     </div>
   </div>
 );
@@ -64,7 +64,7 @@ function App() {
     <AuthProvider>
       <RealtimeProvider>
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <div className="min-h-screen bg-white">
+        <div className="min-h-[calc(100*var(--vh,1vh))] bg-white">
           <ToastContainer />
           <Analytics />
           <ErrorBoundary>

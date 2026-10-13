@@ -16,6 +16,8 @@ interface ModalProps {
   padding?: string;
 }
 
+const PAD_REM: Record<string, string> = { 'p-0': '0rem', 'p-1': '0.25rem', 'p-2': '0.5rem', 'p-3': '0.75rem', 'p-4': '1rem', 'p-5': '1.25rem', 'p-6': '1.5rem', 'p-8': '2rem' };
+
 export const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
@@ -57,29 +59,29 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   const modalContent = (
-    <div className={`fixed inset-0 ${zIndex} transition-all duration-200 animate-fadeIn`}>
+    <div className={`fixed inset-0 ${zIndex} `}>
       {/* Dedicated Full-Screen Backdrop Overlay covering 100% of viewport edge-to-edge */}
       <div 
-        className="fixed inset-0 bg-slate-950/60 backdrop-blur-md transition-opacity cursor-pointer"
+        className="fixed inset-0 bg-gray-900/40 cursor-pointer dlg-fade"
         onClick={onClose}
       />
 
       {/* Modal Dialog Content Container */}
       <div className="fixed inset-0 overflow-y-auto flex items-center justify-center p-2 sm:p-4 lg:p-6 pointer-events-none">
-        <div className={`relative bg-white rounded-2xl shadow-2xl shadow-slate-950/20 border border-slate-200 flex flex-col w-full ${modalSize} ${className.includes('max-h-') ? '' : 'max-h-[90vh]'} overflow-hidden animate-modalPop pointer-events-auto ${className}`}>
+        <div className={`relative bg-white rounded-2xl shadow-[0_24px_60px_-12px_rgba(15,23,42,0.28)] border border-gray-100 flex flex-col w-full ${modalSize} ${className.includes('max-h-') ? '' : 'max-h-[calc(90*var(--vh,1vh))]'} overflow-hidden pointer-events-auto ${className}`}>
           {title && (
-            <div className="px-6 py-4 border-b border-slate-100 bg-white flex justify-between items-center shrink-0">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <div className="px-6 py-4 border-b border-gray-100 bg-white flex justify-between items-center shrink-0">
+              <h3 className="text-[0.9375rem] font-semibold text-gray-900 flex items-center gap-2">
                 {title}
               </h3>
               {!hideCloseButton && (
-                <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1.5 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer">
-                  <X className="w-5 h-5" />
+                <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1.5 hover:bg-gray-100 rounded-full cursor-pointer">
+                  <X className="w-4 h-4" />
                 </button>
               )}
             </div>
           )}
-          <div className={`overflow-y-auto flex-1 flex flex-col ${padding}`}>
+          <div className={`dlg-modal-body overflow-y-auto flex-1 flex flex-col ${padding}`} style={{ ['--dlg-pad' as any]: PAD_REM[padding.split(' ')[0]] ?? '1.5rem' }}>
             {children}
           </div>
         </div>

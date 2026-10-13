@@ -182,7 +182,7 @@ const DEFAULT_PREDEFINED_CHARGES: PredefinedCharge[] = [
 
 // Custom WhatsApp SVG Icon
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ 
-  className = "w-3.5 h-3.5 text-emerald-500 hover:text-emerald-600 transition-all block shrink-0" 
+  className = "w-3.5 h-3.5 text-emerald-500 hover:text-emerald-600 block shrink-0" 
 }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor">
     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.458 5.705 1.459h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
@@ -1779,14 +1779,14 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       <Modal
       isOpen={isOpen}
       onClose={onClose}
-      maxWidth="max-w-[1360px]"
+      maxWidth="max-w-[85rem]"
       padding="p-0"
       hideCloseButton={true}
     >
       <form 
         onSubmit={(e) => { e.preventDefault(); handleSaveOrder(editOrder?.status === 'Draft' ? 'Confirmed' : undefined); }} 
         onKeyDown={handleFormKeyDown}
-        className="flex flex-col max-h-[92vh] overflow-hidden font-sans text-xs bg-slate-50/70"
+        className="flex flex-col max-h-[calc(92*var(--vh,1vh))] overflow-hidden font-sans text-[0.875rem] bg-slate-50/70"
       >
         
         {/* ── MODAL HEADER (1:1 with Screenshot) ── */}
@@ -1796,10 +1796,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
               <FileText className="w-6 h-6 stroke-[2.2]" />
             </div>
             <div>
-              <h2 className="text-lg font-black text-gray-900 tracking-tight">
+              <h2 className="text-lg font-semibold text-gray-900 tracking-tight">
                 {editOrder ? `Edit Sales Order (${orderNumber})` : 'Create Sales Order'}
               </h2>
-              <p className="text-xs text-gray-500 font-medium mt-0.5">
+              <p className="text-[0.875rem] text-gray-500 font-medium mt-0.5">
                 Create a new sales order for customer
               </p>
             </div>
@@ -1809,7 +1809,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-3.5 py-2 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold rounded-xl text-xs transition-all cursor-pointer shadow-3xs"
+              className="btn-secondary"
             >
               Cancel
             </button>
@@ -1817,7 +1817,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
               type="button"
               onClick={() => handleSaveOrder('Draft')}
               disabled={isSaving}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 active:scale-98 text-slate-800 font-bold rounded-xl text-xs shadow-3xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 font-semibold rounded-xl text-[0.875rem] shadow-3xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               title="Save order as Draft"
             >
               <FileText className="w-3.5 h-3.5 text-slate-600" />
@@ -1826,7 +1826,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
             <button
               type="submit"
               disabled={isSaving}
-              className={`px-4 py-2 ${editOrder?.status === 'Draft' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'} active:scale-98 text-white font-bold rounded-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50`}
+              className={`px-4 py-2 ${editOrder?.status === 'Draft' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'} text-white font-semibold rounded-xl text-[0.875rem] shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50`}
             >
               {editOrder?.status === 'Draft' ? <Check className="w-4 h-4 stroke-[2.5]" /> : <Save className="w-4 h-4 stroke-[2.5]" />}
               <span>{isSaving ? 'Saving...' : (editOrder?.status === 'Draft' ? 'Confirm Order' : 'Save Sales Order')}</span>
@@ -1841,10 +1841,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
             {/* CARD 1: Customer Details (Fixed Height) */}
-            <div className="lg:col-span-5 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[270px] min-h-[270px] max-h-[270px] flex flex-col justify-between">
+            <div className="lg:col-span-5 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[16.875rem] min-h-[16.875rem] max-h-[16.875rem] flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between pb-1.5">
-                  <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
+                  <div className="flex items-center gap-2 text-[0.875rem] font-semibold text-gray-900">
                     <User className="w-4 h-4 text-blue-600" />
                     <span>Customer Details</span>
                   </div>
@@ -1852,7 +1852,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     <button 
                       type="button"
                       onClick={() => setShowCustomerDetailsModal(true)}
-                      className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer flex items-center gap-1"
+                      className="text-[0.875rem] font-semibold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer flex items-center gap-1"
                     >
                       <span>View Customer</span>
                       <Eye className="w-3.5 h-3.5" />
@@ -1862,10 +1862,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                 <div className="relative" ref={customerRef}>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block text-[10.5px] font-bold text-gray-600">
+                    <label className="block text-xs font-semibold text-gray-600">
                       Customer <span className="text-red-500">*</span>
                     </label>
-                    <span className="text-[10px] text-gray-400 font-mono">
+                    <span className="text-xs text-gray-400 font-mono">
                       {customersList.length > 0 ? `${customersList.length.toLocaleString()} customers available` : 'Loading customers...'}
                     </span>
                   </div>
@@ -1883,7 +1883,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                       onClick={() => setShowCustomerDropdown(true)}
                       onFocus={() => setShowCustomerDropdown(true)}
                       placeholder="Search customer firm name..."
-                      className="w-full pl-8 pr-10 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
+                      className="w-full pl-8 pr-10 py-1.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
                     />
 
                     {/* DOWN ARROW REMOVED IF SOMEONE IS TYPED/SELECTED IN THIS FIELD */}
@@ -1917,7 +1917,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                       {isDataLoading && customersList.length === 0 ? (
                         <div className="p-4 text-center text-gray-500 flex items-center justify-center gap-2">
                           <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                          <span className="text-xs font-semibold">Loading customers...</span>
+                          <span className="text-[0.875rem] font-semibold">Loading customers...</span>
                         </div>
                       ) : (
                         <>
@@ -1926,28 +1926,28 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                               key={c._id || `${c.firmName}-${idx}`}
                               onClick={() => handleSelectCustomer(c)}
                               onMouseEnter={() => setHighlightedCustomerIdx(idx)}
-                              className={`p-2.5 cursor-pointer rounded-lg transition-colors flex items-center justify-between ${
-                                highlightedCustomerIdx === idx ? 'bg-blue-100/90 text-blue-900 font-bold border border-blue-200' : 'hover:bg-blue-50/70'
+                              className={`p-2.5 cursor-pointer rounded-lg flex items-center justify-between ${
+                                highlightedCustomerIdx === idx ? 'bg-blue-100/90 text-blue-900 font-semibold border border-blue-200' : 'hover:bg-blue-50/70'
                               }`}
                             >
                               <div>
-                                <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5 flex-wrap">
+                                <div className="font-semibold text-gray-900 text-[0.875rem] flex items-center gap-1.5 flex-wrap">
                                   <span>{c.firmName || c.ownerName || c.contactName}</span>
                                   {getCustomerTags(c).map((tag: string, tIdx: number) => (
-                                    <span key={tIdx} className="px-1.5 py-0.2 bg-indigo-50 text-indigo-700 border border-indigo-200/70 rounded text-[9px] font-bold">
+                                    <span key={tIdx} className="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200/70 rounded text-xs font-semibold">
                                       {tag}
                                     </span>
                                   ))}
                                 </div>
-                                <div className="text-[10px] text-gray-400">{c.city ? `${c.city}, ` : ''}{c.state || ''}</div>
+                                <div className="text-xs text-gray-400">{c.city ? `${c.city}, ` : ''}{c.state || ''}</div>
                               </div>
-                              <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
+                              <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-semibold">
                                 {c.phone || c.mobile || 'Select'}
                               </span>
                             </div>
                           ))}
                           {filteredCustomers.length > 200 && (
-                            <div className="p-2 text-center text-gray-400 text-[10px] bg-gray-50 rounded-lg">
+                            <div className="p-2 text-center text-gray-400 text-xs bg-gray-50 rounded-lg">
                               Showing first 200 of {filteredCustomers.length} customers. Type in the search box to find specific customer.
                             </div>
                           )}
@@ -1961,9 +1961,9 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                 </div>
               </div>
 
-              {/* Customer Info Box & Financials (Fixed h-[142px]) */}
+              {/* Customer Info Box & Financials (Fixed h-[8.875rem]) */}
               {selectedCustomer ? (
-                <div className="h-[142px] p-3 bg-blue-50/30 rounded-xl border border-blue-100/80 flex flex-col justify-between text-[11px] text-gray-600">
+                <div className="h-[8.875rem] p-3 bg-blue-50/30 rounded-xl border border-blue-100/80 flex flex-col justify-between text-xs text-gray-600">
                   <div className="space-y-1">
                     <div className="flex items-start justify-between gap-1.5 text-gray-800">
                       <div className="flex items-start gap-1.5 flex-1 min-w-0">
@@ -1975,7 +1975,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                       <button 
                         type="button"
                         onClick={() => setShowCustomerDetailsModal(true)}
-                        className="text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
+                        className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
                       >
                         <span>View Details</span>
                         <Eye className="w-3 h-3" />
@@ -1983,7 +1983,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
-                      <div className="flex items-center gap-1 font-bold text-gray-900 shrink-0">
+                      <div className="flex items-center gap-1 font-semibold text-gray-900 shrink-0">
                         <Phone className="w-3.5 h-3.5 text-blue-600" />
                         <span>{billingAddress.phone || selectedCustomer.phone || selectedCustomer.mobile || '—'}</span>
                       </div>
@@ -1995,17 +1995,17 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           title="Chat on WhatsApp"
                           className="shrink-0"
                         >
-                          <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-500 hover:scale-110" />
+                          <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-500" />
                         </a>
                       )}
 
                       {/* Customer Tags Badges */}
                       {getCustomerTags(selectedCustomer).length > 0 && (
-                        <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar max-w-[180px] shrink-0">
+                        <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar max-w-[11.25rem] shrink-0">
                           {getCustomerTags(selectedCustomer).map((tag: string, tIdx: number) => (
                             <span 
                               key={tIdx} 
-                              className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200/80 rounded-md font-bold text-[9px] shrink-0 whitespace-nowrap"
+                              className="px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/80 rounded-md font-semibold text-xs shrink-0 whitespace-nowrap"
                               title={`Customer Tag: ${tag}`}
                             >
                               {tag}
@@ -2014,7 +2014,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                         </div>
                       )}
 
-                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px] ml-auto shrink-0">
+                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-semibold text-xs ml-auto shrink-0">
                         {selectedCustomer.status === 'inactive' ? 'Inactive' : 'Active'}
                       </span>
                     </div>
@@ -2022,31 +2022,31 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                   <div className="pt-2 border-t border-blue-100/70 grid grid-cols-3 gap-2 text-center">
                     <div className="bg-white/90 p-1.5 rounded-lg border border-gray-100 shadow-3xs">
-                      <div className="text-[9px] text-gray-500 font-bold uppercase">Credit Limit</div>
-                      <div className="font-bold text-gray-900 text-xs mt-0.5">₹{(selectedCustomer.creditLimit || 0).toLocaleString('en-IN')}</div>
+                      <div className="text-xs text-gray-500 font-semibold uppercase">Credit Limit</div>
+                      <div className="font-semibold text-gray-900 text-[0.875rem] mt-0.5">₹{(selectedCustomer.creditLimit || 0).toLocaleString('en-IN')}</div>
                     </div>
                     <div className="bg-white/90 p-1.5 rounded-lg border border-gray-100 shadow-3xs">
-                      <div className="text-[9px] text-gray-500 font-bold uppercase">Outstanding</div>
-                      <div className="font-bold text-rose-700 text-xs mt-0.5">₹{(selectedCustomer.outstandingBalance || selectedCustomer.outstanding || 0).toLocaleString('en-IN')}</div>
+                      <div className="text-xs text-gray-500 font-semibold uppercase">Outstanding</div>
+                      <div className="font-semibold text-rose-700 text-[0.875rem] mt-0.5">₹{(selectedCustomer.outstandingBalance || selectedCustomer.outstanding || 0).toLocaleString('en-IN')}</div>
                     </div>
                     <div className="bg-white/90 p-1.5 rounded-lg border border-gray-100 shadow-3xs">
-                      <div className="text-[9px] text-gray-500 font-bold uppercase">City</div>
-                      <div className="font-bold text-blue-900 text-xs mt-0.5 truncate">{selectedCustomer.city || billingAddress.city || '—'}</div>
+                      <div className="text-xs text-gray-500 font-semibold uppercase">City</div>
+                      <div className="font-semibold text-blue-900 text-[0.875rem] mt-0.5 truncate">{selectedCustomer.city || billingAddress.city || '—'}</div>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="h-[142px] p-4 bg-gray-50/80 rounded-xl border border-dashed border-gray-200 flex flex-col items-center justify-center text-center text-gray-400">
+                <div className="h-[8.875rem] p-4 bg-gray-50/80 rounded-xl border border-dashed border-gray-200 flex flex-col items-center justify-center text-center text-gray-400">
                   <User className="w-7 h-7 text-gray-300 mb-1 stroke-[1.5]" />
-                  <p className="text-xs font-semibold text-gray-500">No Customer Selected</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">Search and select a customer above to proceed with the sales order.</p>
+                  <p className="text-[0.875rem] font-semibold text-gray-500">No Customer Selected</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Search and select a customer above to proceed with the sales order.</p>
                 </div>
               )}
             </div>
 
             {/* CARD 2: Order Information (Fixed Height) */}
-            <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[270px] min-h-[270px] max-h-[270px] flex flex-col justify-between">
-              <div className="flex items-center gap-2 text-xs font-bold text-gray-900 pb-1 border-b border-gray-100">
+            <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[16.875rem] min-h-[16.875rem] max-h-[16.875rem] flex flex-col justify-between">
+              <div className="flex items-center gap-2 text-[0.875rem] font-semibold text-gray-900 pb-1 border-b border-gray-100">
                 <Calendar className="w-4 h-4 text-blue-600" />
                 <span>Order Information</span>
               </div>
@@ -2054,7 +2054,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
               {/* Order Date & Delivery Date */}
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-[10.5px] font-bold text-gray-600 mb-1">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
                     Order Date <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -2062,32 +2062,32 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     value={orderDate || new Date().toISOString().split('T')[0]}
                     readOnly
                     disabled
-                    className="w-full px-2.5 py-1.5 bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 cursor-not-allowed select-none opacity-80"
+                    className="w-full px-2.5 py-1.5 bg-gray-100 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-600 cursor-not-allowed select-none opacity-80"
                     title="Order Date is fixed to Today's Date"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10.5px] font-bold text-gray-600 mb-1">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
                     Expected Delivery Date
                   </label>
                   <input
                     type="date"
                     value={promisedDate}
                     onChange={(e) => setPromisedDate(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
               </div>
 
               {/* Transporter */}
               <div className="flex items-center justify-between gap-2">
-                <label className="text-[11px] font-bold text-gray-600 shrink-0 w-24">
+                <label className="text-xs font-semibold text-gray-600 shrink-0 w-24">
                   Transporter
                 </label>
                 <select
                   value={transporter}
                   onChange={(e) => setTransporter(e.target.value)}
-                  className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 >
                   <option value="">Select Transporter</option>
                   {transporter && !transporterList.includes(transporter) && (
@@ -2101,14 +2101,14 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
               {/* Order Type: EXACTLY 2 VALUES AS REQUESTED (Credit and Cash) */}
               <div className="flex items-center justify-between gap-2">
-                <label className="text-[11px] font-bold text-gray-600 shrink-0 w-24">
+                <label className="text-xs font-semibold text-gray-600 shrink-0 w-24">
                   Order Type
                 </label>
                 <div className="flex-1 flex items-center gap-1.5 min-w-0">
                   <select
                     value={orderType}
                     onChange={(e) => setOrderType(e.target.value as 'Credit' | 'Cash')}
-                    className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   >
                     <option value="">Select Order Type</option>
                     <option value="Credit">Credit</option>
@@ -2121,13 +2121,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                       type="button"
                       title={drawerPaidAmount > 0 ? `Payment Recorded: ₹${drawerPaidAmount.toLocaleString('en-IN')}` : "Record Payment"}
                       onClick={() => setShowPaymentModal(true)}
-                      className={`relative p-1.5 rounded-xl border transition-all duration-150 flex items-center justify-center shrink-0 cursor-pointer shadow-xs group ${
+                      className={`relative p-1.5 rounded-xl border flex items-center justify-center shrink-0 cursor-pointer shadow-xs group ${
                         drawerPaidAmount > 0
                           ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 shadow-emerald-200'
                           : 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400'
                       }`}
                     >
-                      <Receipt className="w-4 h-4 transition-transform group-hover:scale-110" />
+                      <Receipt className="w-4 h-4" />
                       {drawerPaidAmount > 0 && (
                         <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -2140,7 +2140,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
               </div>
 
               {orderType === 'Cash' && (
-                <div className="py-1 px-2.5 rounded-lg bg-emerald-50 border border-emerald-200/80 text-[10px] text-emerald-900 flex items-center justify-between">
+                <div className="py-1 px-2.5 rounded-lg bg-emerald-50 border border-emerald-200/80 text-xs text-emerald-900 flex items-center justify-between">
                   <span className="flex items-center gap-1.5 font-medium">
                     <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                     <span>
@@ -2150,7 +2150,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     </span>
                   </span>
                   {totals.grandTotal > 0 ? (
-                    <span className="font-bold font-mono">
+                    <span className="font-semibold font-mono">
                       {drawerPaidAmount >= totals.grandTotal ? (
                         <span className="text-emerald-700 font-semibold">Fully Paid</span>
                       ) : drawerPaidAmount > 0 ? (
@@ -2166,29 +2166,29 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                       )}
                     </span>
                   ) : drawerPaidAmount > 0 ? (
-                    <span className="font-bold font-mono text-emerald-700">Advance</span>
+                    <span className="font-semibold font-mono text-emerald-700">Advance</span>
                   ) : null}
                 </div>
               )}
 
               {orderType === 'Credit' && (
-                <div className="py-1 px-2.5 rounded-lg bg-amber-50 border border-amber-200/80 text-[10px] text-amber-900 flex items-center justify-between">
+                <div className="py-1 px-2.5 rounded-lg bg-amber-50 border border-amber-200/80 text-xs text-amber-900 flex items-center justify-between">
                   <span>Credit: Unpaid balance reflects in Customer Outstanding</span>
                   {totals.grandTotal > 0 && (
-                    <span className="font-bold font-mono text-rose-700 ml-1">₹{totals.grandTotal.toLocaleString('en-IN')}</span>
+                    <span className="font-semibold font-mono text-rose-700 ml-1">₹{totals.grandTotal.toLocaleString('en-IN')}</span>
                   )}
                 </div>
               )}
 
               {/* Order Status */}
               <div className="flex items-center justify-between gap-2">
-                <label className="text-[11px] font-bold text-gray-600 shrink-0 w-24">
+                <label className="text-xs font-semibold text-gray-600 shrink-0 w-24">
                   Order Status
                 </label>
                 <select
                   value={orderStatus || 'Confirmed'}
                   onChange={(e) => setOrderStatus(e.target.value)}
-                  className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 >
                   <option value="Confirmed">Confirmed (Active Demand)</option>
                   <option value="Draft">Draft</option>
@@ -2198,24 +2198,24 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
             </div>
 
             {/* CARD 3: Addresses (Fixed Height - No Box Dynamic Change!) */}
-            <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[270px] min-h-[270px] max-h-[270px] flex flex-col justify-between">
+            <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[16.875rem] min-h-[16.875rem] max-h-[16.875rem] flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between pb-1">
-                  <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
+                  <div className="flex items-center gap-2 text-[0.875rem] font-semibold text-gray-900">
                     <MapPin className="w-4 h-4 text-blue-600" />
                     <span>Addresses</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsEditingAddress(!isEditingAddress)}
-                    className="p-1 hover:bg-gray-100 rounded-lg text-blue-600 cursor-pointer"
+                    className="icon-btn"
                     title={isEditingAddress ? 'Done Editing' : 'Edit Address Details'}
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
-                <label className="flex items-center gap-2 cursor-pointer text-[11px] font-semibold text-gray-700 py-0.5">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-700 py-0.5">
                   <input
                     type="checkbox"
                     checked={sameAddress}
@@ -2236,7 +2236,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                   <button
                     type="button"
                     onClick={() => setActiveAddressTab('bill')}
-                    className={`flex-1 py-1 px-2 text-center rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`flex-1 py-1 px-2 text-center rounded-xl text-[0.875rem] font-semibold cursor-pointer ${
                       activeAddressTab === 'bill'
                         ? 'bg-blue-50 text-blue-700 border border-blue-200/70 shadow-3xs'
                         : 'text-gray-500 hover:text-gray-900'
@@ -2247,7 +2247,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                   <button
                     type="button"
                     onClick={() => setActiveAddressTab('ship')}
-                    className={`flex-1 py-1 px-2 text-center rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`flex-1 py-1 px-2 text-center rounded-xl text-[0.875rem] font-semibold cursor-pointer ${
                       activeAddressTab === 'ship'
                         ? 'bg-blue-50 text-blue-700 border border-blue-200/70 shadow-3xs'
                         : 'text-gray-500 hover:text-gray-900'
@@ -2258,18 +2258,18 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                 </div>
               </div>
 
-              {/* Dynamic Editable Address Box (Fixed h-[142px]) */}
+              {/* Dynamic Editable Address Box (Fixed h-[8.875rem]) */}
               {activeAddressTab === 'ship' ? (
                 sameAddress ? (
-                  <div className="h-[142px] p-3 bg-gray-50/80 rounded-xl border border-gray-200/70 text-[11px] text-gray-700 flex flex-col justify-between">
+                  <div className="h-[8.875rem] p-3 bg-gray-50/80 rounded-xl border border-gray-200/70 text-xs text-gray-700 flex flex-col justify-between">
                     <div>
-                      <div className="flex items-center justify-between font-bold text-gray-900 mb-1">
+                      <div className="flex items-center justify-between font-semibold text-gray-900 mb-1">
                         <span className="truncate pr-1">{billingAddress.attention || selectedCustomer?.firmName || 'Customer Address'}</span>
-                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-bold text-[9.5px] border border-blue-200/60 shrink-0">
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-semibold text-xs border border-blue-200/60 shrink-0">
                           Synced with Customer
                         </span>
                       </div>
-                      <div className="text-gray-700 leading-snug line-clamp-3 text-[11px]">
+                      <div className="text-gray-700 leading-snug line-clamp-3 text-xs">
                         {billingAddress.addressLine ? (
                           <>
                             <span className="font-semibold text-gray-900">{billingAddress.addressLine}</span>
@@ -2289,11 +2289,11 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           <span className="text-gray-400 italic">No customer selected</span>
                         )}
                       </div>
-                      <div className="text-gray-500 font-mono mt-1 text-[10.5px]">
+                      <div className="text-gray-500 font-mono mt-1 text-xs">
                         Mobile: <span className="font-semibold text-gray-800">{billingAddress.phone || selectedCustomer?.phone || selectedCustomer?.mobile || '—'}</span>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between pt-1 border-t border-gray-200/60 text-[10px]">
+                    <div className="flex items-center justify-between pt-1 border-t border-gray-200/60 text-xs">
                       <span className="text-gray-400">Same as customer address</span>
                       <button
                         type="button"
@@ -2302,18 +2302,18 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           setActiveAddressTab('ship');
                           setShowShipToDropdown(true);
                         }}
-                        className="font-bold text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                        className="font-semibold text-blue-600 hover:text-blue-800 underline cursor-pointer"
                       >
                         Change Ship To
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="h-[142px] flex flex-col justify-between text-xs relative">
+                  <div className="h-[8.875rem] flex flex-col justify-between text-[0.875rem] relative">
                     {/* Searchable Dropdown */}
                     <div className="relative" ref={shipToRef}>
                       <div className="flex items-center justify-between pb-1">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block">
                           Search Ship To Company / Customer
                         </label>
                         {selectedShipToParty && (
@@ -2325,7 +2325,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                               setShippingAddress({ attention: '', addressLine: '', city: '', state: '', pincode: '', phone: '' });
                               setShowShipToDropdown(true);
                             }}
-                            className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold cursor-pointer"
+                            className="text-xs text-rose-500 hover:text-rose-700 font-semibold cursor-pointer"
                           >
                             Clear
                           </button>
@@ -2343,7 +2343,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                             setShipToSearch(e.target.value);
                             setShowShipToDropdown(true);
                           }}
-                          className="w-full pl-8 pr-8 py-1.5 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
+                          className="w-full pl-8 pr-8 py-1.5 bg-white border border-gray-300 rounded-xl text-[0.875rem] font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
                         />
                         <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
                           {shipToSearch && (
@@ -2367,7 +2367,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                       {/* Dropdown Floating Options Menu */}
                       {showShipToDropdown && (
-                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 max-h-48 overflow-y-auto divide-y divide-gray-100 py-1 text-xs">
+                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 max-h-48 overflow-y-auto divide-y divide-gray-100 py-1 text-[0.875rem]">
                           {filteredShipToParties.map((c) => {
                             const cId = c._id || c.id || c.firmName;
                             const isSelected = (selectedShipToParty?._id || selectedShipToParty?.id) === cId;
@@ -2389,26 +2389,26 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                     phone: c.phone || c.mobile || ''
                                   });
                                 }}
-                                className={`p-2 px-3 cursor-pointer flex items-center justify-between transition-colors ${
-                                  isSelected ? 'bg-blue-50 text-blue-900 font-bold' : 'hover:bg-gray-50'
+                                className={`p-2 px-3 cursor-pointer flex items-center justify-between ${
+                                  isSelected ? 'bg-blue-50 text-blue-900 font-semibold' : 'hover:bg-gray-50'
                                 }`}
                               >
                                 <div>
-                                  <div className="font-bold text-gray-900 text-xs">
+                                  <div className="font-semibold text-gray-900 text-[0.875rem]">
                                     {c.firmName || c.name || c.companyName}
                                   </div>
-                                  <div className="text-[10px] text-gray-500">
+                                  <div className="text-xs text-gray-500">
                                     {c.ownerName ? `${c.ownerName} • ` : ''}{[c.city, c.state].filter(Boolean).join(', ')}
                                   </div>
                                 </div>
-                                <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-bold font-mono">
+                                <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-semibold font-mono">
                                   {c.phone || c.mobile || 'Select'}
                                 </span>
                               </div>
                             );
                           })}
                           {filteredShipToParties.length === 0 && (
-                            <div className="p-3 text-center text-gray-400 italic text-[11px]">
+                            <div className="p-3 text-center text-gray-400 italic text-xs">
                               No matching company or customer found
                             </div>
                           )}
@@ -2418,19 +2418,19 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                     {/* Selected Destination Summary Card */}
                     {shippingAddress.attention || selectedShipToParty ? (
-                      <div className="p-2 bg-white rounded-xl border border-gray-200 text-[11px] space-y-0.5 shadow-3xs mt-1">
-                        <div className="flex items-center justify-between font-bold text-gray-900">
+                      <div className="p-2 bg-white rounded-xl border border-gray-200 text-xs space-y-0.5 shadow-3xs mt-1">
+                        <div className="flex items-center justify-between font-semibold text-gray-900">
                           <span className="truncate pr-1">{shippingAddress.attention || selectedShipToParty?.firmName}</span>
                           {(shippingAddress.city || selectedShipToParty?.city) && (
-                            <span className="text-[9.5px] font-semibold text-blue-700 bg-blue-50 border border-blue-200/60 px-1.5 py-0.2 rounded shrink-0">
+                            <span className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200/60 px-1.5 py-0.2 rounded shrink-0">
                               {shippingAddress.city || selectedShipToParty?.city}
                             </span>
                           )}
                         </div>
-                        <div className="text-gray-600 leading-tight truncate text-[10.5px]">
+                        <div className="text-gray-600 leading-tight truncate text-xs">
                           {[shippingAddress.addressLine, shippingAddress.city, shippingAddress.state, shippingAddress.pincode].filter(Boolean).join(', ')}
                         </div>
-                        <div className="flex items-center justify-between text-[10px] text-gray-500 font-mono pt-0.5">
+                        <div className="flex items-center justify-between text-xs text-gray-500 font-mono pt-0.5">
                           <span>Phone: <strong className="text-gray-800">{shippingAddress.phone || selectedShipToParty?.phone || '—'}</strong></span>
                           {selectedShipToParty?.ownerName && (
                             <span className="text-gray-600 font-sans">Attn: <strong>{selectedShipToParty.ownerName}</strong></span>
@@ -2438,98 +2438,98 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                         </div>
                       </div>
                     ) : (
-                      <div className="p-2.5 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-[11px] text-gray-400 text-center italic mt-1">
+                      <div className="p-2.5 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-xs text-gray-400 text-center italic mt-1">
                         Use search box above to select ship-to company/customer.
                       </div>
                     )}
                   </div>
                 )
               ) : isEditingAddress ? (
-                <div className="h-[142px] overflow-y-auto p-2.5 bg-gray-50 rounded-xl border border-gray-200 space-y-2 text-xs pr-1">
+                <div className="h-[8.875rem] overflow-y-auto p-2.5 bg-gray-50 rounded-xl border border-gray-200 space-y-2 text-[0.875rem] pr-1">
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Billing Attention / Company</label>
+                    <label className="block text-xs font-semibold text-gray-500 mb-0.5">Billing Attention / Company</label>
                     <input
                       type="text"
                       placeholder="Contact / Attention"
                       value={billingAddress.attention}
                       onChange={(e) => setBillingAddress({ ...billingAddress, attention: e.target.value })}
-                      className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Street Address</label>
+                    <label className="block text-xs font-semibold text-gray-500 mb-0.5">Street Address</label>
                     <input
                       type="text"
                       placeholder="Street / Address Line"
                       value={billingAddress.addressLine}
                       onChange={(e) => setBillingAddress({ ...billingAddress, addressLine: e.target.value })}
-                      className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-medium text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     />
                   </div>
                   <div className="grid grid-cols-3 gap-1">
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-500 mb-0.5">City</label>
+                      <label className="block text-xs font-semibold text-gray-500 mb-0.5">City</label>
                       <input
                         type="text"
                         placeholder="City"
                         value={billingAddress.city}
                         onChange={(e) => setBillingAddress({ ...billingAddress, city: e.target.value })}
-                        className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800"
+                        className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-medium text-gray-800"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-500 mb-0.5">State</label>
+                      <label className="block text-xs font-semibold text-gray-500 mb-0.5">State</label>
                       <input
                         type="text"
                         placeholder="State"
                         value={billingAddress.state}
                         onChange={(e) => setBillingAddress({ ...billingAddress, state: e.target.value })}
-                        className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800"
+                        className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-medium text-gray-800"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Pincode</label>
+                      <label className="block text-xs font-semibold text-gray-500 mb-0.5">Pincode</label>
                       <input
                         type="text"
                         placeholder="Pincode"
                         value={billingAddress.pincode}
                         onChange={(e) => setBillingAddress({ ...billingAddress, pincode: e.target.value })}
-                        className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800"
+                        className="w-full px-1.5 py-0.5 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-medium text-gray-800"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Contact Phone</label>
+                    <label className="block text-xs font-semibold text-gray-500 mb-0.5">Contact Phone</label>
                     <input
                       type="text"
                       placeholder="Phone / Mobile"
                       value={billingAddress.phone}
                       onChange={(e) => setBillingAddress({ ...billingAddress, phone: e.target.value })}
-                      className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-medium text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     />
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsEditingAddress(false)}
-                    className="w-full py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer transition-all shadow-3xs"
+                    className="w-full py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-[0.875rem] cursor-pointer shadow-3xs"
                   >
                     Done
                   </button>
                 </div>
               ) : (
-                <div className="h-[142px] p-3 bg-gray-50/80 rounded-xl border border-gray-200/70 text-[11px] text-gray-700 flex flex-col justify-between">
+                <div className="h-[8.875rem] p-3 bg-gray-50/80 rounded-xl border border-gray-200/70 text-xs text-gray-700 flex flex-col justify-between">
                   <div>
-                    <div className="flex items-center justify-between font-bold text-gray-900 mb-1">
+                    <div className="flex items-center justify-between font-semibold text-gray-900 mb-1">
                       <span className="truncate pr-1">{billingAddress.attention || selectedCustomer?.firmName || 'Customer Billing Address'}</span>
                       <button
                         type="button"
                         onClick={() => setIsEditingAddress(true)}
-                        className="text-[10px] text-blue-600 hover:text-blue-700 font-bold underline cursor-pointer shrink-0"
+                        className="text-xs text-blue-600 hover:text-blue-700 font-semibold underline cursor-pointer shrink-0"
                       >
                         Edit
                       </button>
                     </div>
-                    <div className="text-gray-700 leading-snug line-clamp-3 text-[11px]">
+                    <div className="text-gray-700 leading-snug line-clamp-3 text-xs">
                       {billingAddress.addressLine ? (
                         <>
                           <span className="font-semibold text-gray-900">{billingAddress.addressLine}</span>
@@ -2549,11 +2549,11 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                         <span className="text-gray-400 italic">No customer selected</span>
                       )}
                     </div>
-                    <div className="text-gray-500 font-mono mt-1 text-[10.5px]">
+                    <div className="text-gray-500 font-mono mt-1 text-xs">
                       Mobile: <span className="font-semibold text-gray-800">{billingAddress.phone || selectedCustomer?.phone || selectedCustomer?.mobile || '—'}</span>
                     </div>
                   </div>
-                  <div className="text-[10px] text-gray-400 italic text-right">
+                  <div className="text-xs text-gray-400 italic text-right">
                     Click Edit above to alter billing details
                   </div>
                 </div>
@@ -2565,7 +2565,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
           {/* ── MIDDLE SECTION: ORDER ITEMS TABLE (1:1 with Screenshot) ── */}
           <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs space-y-3 relative z-30">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
+              <div className="flex items-center gap-2 text-[0.875rem] font-semibold text-gray-900">
                 <Package className="w-4 h-4 text-blue-600" />
                 <span>Order Items</span>
               </div>
@@ -2573,7 +2573,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                 <button
                   type="button"
                   onClick={handleAddProduct}
-                  className="px-3 py-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all shadow-3xs"
+                  className="px-3 py-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 font-semibold rounded-xl text-[0.875rem] flex items-center gap-1 cursor-pointer shadow-3xs"
                 >
                   <Plus className="w-3.5 h-3.5 stroke-[3]" />
                   <span>Add Product</span>
@@ -2589,12 +2589,12 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
             {/* Order Items Table (Compact Spacing & Dropdown in Front) */}
             <div className="overflow-visible border border-gray-200 rounded-xl">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
+              <table className="w-full text-left border-collapse text-[0.875rem]">
+                <thead className="bg-gray-50/80 text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
                   <tr>
                     <th className="py-2.5 px-2 text-center w-8 whitespace-nowrap">#</th>
-                    <th className="py-2.5 px-3 min-w-[220px] whitespace-nowrap">ITEM / PRODUCT <span className="text-red-500">*</span></th>
-                    <th className="py-2.5 px-3 min-w-[160px] whitespace-nowrap">ITEM DESCRIPTION</th>
+                    <th className="py-2.5 px-3 min-w-[13.75rem] whitespace-nowrap">ITEM / PRODUCT <span className="text-red-500">*</span></th>
+                    <th className="py-2.5 px-3 min-w-[10rem] whitespace-nowrap">ITEM DESCRIPTION</th>
                     <th className="py-2.5 px-2 text-center whitespace-nowrap">STOCK (GBL)</th>
                     <th className="py-2.5 px-2 text-center whitespace-nowrap">GBL <span className="text-red-500">*</span></th>
                     <th className="py-2.5 px-2 text-center whitespace-nowrap">PCS / GBL</th>
@@ -2605,7 +2605,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-gray-100 bg-white text-xs">
+                <tbody className="divide-y divide-gray-100 bg-white text-[0.875rem]">
                   {items.map((row, idx) => {
                     const isDropdownActive = activeItemDropdownIdx === idx;
                     const stockVal = row.stockGbl;
@@ -2621,9 +2621,9 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                     return (
                       <React.Fragment key={idx}>
-                        <tr className={`hover:bg-blue-50/30 transition-colors relative ${isDropdownActive ? 'z-50' : ''}`}>
+                        <tr className={`hover:bg-blue-50/30 relative ${isDropdownActive ? 'z-50' : ''}`}>
                           {/* # */}
-                        <td className="py-2.5 px-2 text-center font-bold text-gray-500">
+                        <td className="py-2.5 px-2 text-center font-semibold text-gray-500">
                           {idx + 1}
                         </td>
 
@@ -2641,7 +2641,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                               }}
                               onClick={() => setActiveItemDropdownIdx(idx)}
                               placeholder="Select product..."
-                              className="w-full pl-7 pr-6 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
+                              className="w-full pl-7 pr-6 py-1.5 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
                             />
                             {/* DOWN ARROW REMOVED IF AN ITEM IS IN THAT FIELD */}
                             <div className="absolute right-2 top-2.5 flex items-center">
@@ -2687,12 +2687,12 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           {isDropdownActive && (
                             <div 
                               ref={(el) => { productDropdownRefMap.current[idx] = el; }} 
-                              className="absolute left-3 top-full mt-1 w-[560px] max-w-[92vw] bg-white border border-gray-200 rounded-xl shadow-2xl z-[99999] max-h-64 overflow-y-auto divide-y divide-gray-100 p-1"
+                              className="absolute left-3 top-full mt-1 w-[35rem] max-w-[92vw] bg-white border border-gray-200 rounded-xl shadow-2xl z-[99999] max-h-64 overflow-y-auto divide-y divide-gray-100 p-1"
                             >
                               {isDataLoading && availableSkus.length === 0 ? (
                                 <div className="p-4 text-center text-gray-500 flex items-center justify-center gap-2">
                                   <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                                  <span className="text-xs font-semibold">Loading product items...</span>
+                                  <span className="text-[0.875rem] font-semibold">Loading product items...</span>
                                 </div>
                               ) : (
                                 <>
@@ -2707,43 +2707,43 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                         key={s._id}
                                         onClick={() => handleSelectProduct(idx, s)}
                                         onMouseEnter={() => setHighlightedProductIdxMap(prev => ({ ...prev, [idx]: sIdx }))}
-                                        className={`p-2.5 cursor-pointer rounded-lg text-xs flex justify-between items-center transition-colors ${
-                                          isHighlighted ? 'bg-blue-100/90 font-bold border border-blue-200' : 'hover:bg-blue-50/80'
+                                        className={`p-2.5 cursor-pointer rounded-lg text-[0.875rem] flex justify-between items-center ${
+                                          isHighlighted ? 'bg-blue-100/90 font-semibold border border-blue-200' : 'hover:bg-blue-50/80'
                                         }`}
                                       >
                                         <div className="flex-1 min-w-0 pr-3">
-                                          <div className="font-bold text-gray-900 truncate">{s.name}</div>
+                                          <div className="font-semibold text-gray-900 truncate">{s.name}</div>
                                           <div className="flex items-center gap-2 mt-0.5">
-                                            <span className="text-[10px] text-gray-400 font-mono">{s.skuCode}</span>
-                                            <span className="text-[10px] text-gray-300">•</span>
-                                            <span className="text-[10px] text-gray-500">{s.category || 'Finished Goods'}</span>
+                                            <span className="text-xs text-gray-400 font-mono">{s.skuCode}</span>
+                                            <span className="text-xs text-gray-300">•</span>
+                                            <span className="text-xs text-gray-500">{s.category || 'Finished Goods'}</span>
                                             {definedConv > 0 && (
                                               <>
-                                                <span className="text-[10px] text-gray-300">•</span>
-                                                <span className="text-[10px] font-semibold text-indigo-600">{definedConv} Pcs/GBL</span>
+                                                <span className="text-xs text-gray-300">•</span>
+                                                <span className="text-xs font-semibold text-blue-600">{definedConv} Pcs/GBL</span>
                                               </>
                                             )}
                                           </div>
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
                                           {/* Sweet Dynamic Costing Pill */}
-                                          <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gradient-to-r from-slate-50 via-indigo-50/40 to-purple-50/40 border border-indigo-100/90 shadow-xs">
+                                          <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gradient-to-r from-slate-50 via-blue-50/40 to-blue-50/40 border border-blue-100/90 shadow-xs">
                                             <div className="flex items-center gap-1">
-                                              <span className="text-[11.5px] font-black text-slate-800 tracking-tight font-mono">{costing.formattedGbl}</span>
-                                              <span className="text-[8px] font-black uppercase px-1 py-0.5 rounded bg-indigo-100/90 text-indigo-700 tracking-wider">GBL</span>
+                                              <span className="text-xs font-semibold text-slate-800 tracking-tight font-mono">{costing.formattedGbl}</span>
+                                              <span className="text-xs font-medium uppercase px-1 py-0.5 rounded bg-blue-100/90 text-blue-700 tracking-wider">GBL</span>
                                             </div>
-                                            <span className="text-indigo-200 text-[10px]">•</span>
+                                            <span className="text-blue-200 text-xs">•</span>
                                             <div className="flex items-center gap-1">
-                                              <span className="text-[11px] font-bold text-slate-600 tracking-tight font-mono">{costing.formattedPcs}</span>
-                                              <span className="text-[8px] font-bold uppercase px-1 py-0.5 rounded bg-slate-200/80 text-slate-600 tracking-wider">Pcs</span>
+                                              <span className="text-xs font-semibold text-slate-600 tracking-tight font-mono">{costing.formattedPcs}</span>
+                                              <span className="text-xs font-medium uppercase px-1 py-0.5 rounded bg-slate-200/80 text-slate-600 tracking-wider">Pcs</span>
                                             </div>
                                           </div>
 
                                           {/* Cute Active / Inactive Badge with glowing dot */}
-                                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[9.5px] font-extrabold uppercase rounded-lg border shadow-xs transition-all ${
+                                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold uppercase rounded-lg border shadow-xs ${
                                             isInactive
                                               ? 'bg-gradient-to-r from-amber-50 to-orange-50 text-amber-800 border-amber-200/90'
-                                              : 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-800 border-emerald-200/90'
+                                              : 'bg-gradient-to-r from-emerald-50 to-blue-50 text-emerald-800 border-emerald-200/90'
                                           }`}>
                                             <span className={`w-1.5 h-1.5 rounded-full ${isInactive ? 'bg-amber-500' : 'bg-emerald-500 ring-2 ring-emerald-300/60'}`} />
                                             {s.status || 'Active'}
@@ -2766,17 +2766,17 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                               <button
                                 type="button"
                                 onClick={() => setAllocExpandedRows(prev => ({ ...prev, [idx]: !prev[idx] }))}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100/80 text-indigo-700 border border-indigo-200/80 rounded-md text-[10.5px] font-bold transition-all cursor-pointer shadow-3xs"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 hover:bg-blue-100/80 text-blue-700 border border-blue-200/80 rounded-md text-xs font-semibold cursor-pointer shadow-3xs"
                                 title="Click to view/hide sub-item breakdown"
                               >
-                                <Layers className="w-3 h-3 text-indigo-600 shrink-0" />
+                                <Layers className="w-3 h-3 text-blue-600 shrink-0" />
                                 <span>Mixed Pack: {row.components.length} Items ({row.pcsPerGbl || row.components.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0)} pcs)</span>
-                                <ChevronDown className={`w-3 h-3 transition-transform ${allocExpandedRows[idx] ? 'rotate-180' : ''}`} />
+                                <ChevronDown className={`w-3 h-3 ${allocExpandedRows[idx] ? 'rotate-180' : ''}`} />
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleOpenAllocationModal(idx)}
-                                className="px-1.5 py-0.5 text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+                                className="px-1.5 py-0.5 text-xs font-semibold text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded cursor-pointer"
                                 title="Edit mixed components"
                               >
                                 Edit Mix
@@ -2784,7 +2784,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                               <button
                                 type="button"
                                 onClick={() => handleRemoveBundle(idx)}
-                                className="px-1 py-0.5 text-[10px] text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                                className="px-1 py-0.5 text-xs text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded cursor-pointer"
                                 title="Remove breakdown and revert to standard single item"
                               >
                                 ✕
@@ -2795,10 +2795,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                               <button
                                 type="button"
                                 onClick={() => handleOpenAllocationModal(idx)}
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/60 rounded border border-dashed border-gray-300 hover:border-indigo-300 transition-colors cursor-pointer"
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-semibold text-gray-500 hover:text-blue-600 hover:bg-blue-50/60 rounded border border-dashed border-gray-300 hover:border-blue-300 cursor-pointer"
                                 title="Customize this item as a mixed pack with multiple sub-items (Tally style)"
                               >
-                                <Layers className="w-2.5 h-2.5 text-indigo-500" />
+                                <Layers className="w-2.5 h-2.5 text-blue-500" />
                                 <span>+ Mix / Allocation</span>
                               </button>
                             </div>
@@ -2812,18 +2812,18 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                             value={row.description}
                             onChange={(e) => updateRowField(idx, 'description', e.target.value)}
                             placeholder="Description"
-                            className="w-full px-2 py-1 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs text-gray-700"
+                            className="w-full px-2 py-1 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-[0.875rem] text-gray-700"
                           />
                         </td>
 
                         {/* Stock (GBL) */}
                         <td className="py-2.5 px-2 text-center">
                           {stockVal !== null ? (
-                            <span className={`font-bold font-mono text-xs ${stockVal > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            <span className={`font-semibold font-mono text-[0.875rem] ${stockVal > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                               {stockVal}
                             </span>
                           ) : (
-                            <span className="text-gray-400 font-mono text-xs">—</span>
+                            <span className="text-gray-400 font-mono text-[0.875rem]">—</span>
                           )}
                         </td>
 
@@ -2835,7 +2835,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                             placeholder="0"
                             value={row.gbl}
                             onChange={(e) => updateRowField(idx, 'gbl', e.target.value)}
-                            className="w-14 px-1.5 py-1 text-center bg-white border border-gray-200 rounded-lg font-bold font-mono text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            className="w-14 px-1.5 py-1 text-center bg-white border border-gray-200 rounded-lg font-semibold font-mono text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                           />
                         </td>
 
@@ -2847,13 +2847,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                             placeholder="e.g. 120"
                             value={row.pcsPerGbl}
                             onChange={(e) => updateRowField(idx, 'pcsPerGbl', e.target.value)}
-                            className="w-16 px-1.5 py-1 text-center bg-white border border-gray-200 rounded-lg font-bold font-mono text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            className="w-16 px-1.5 py-1 text-center bg-white border border-gray-200 rounded-lg font-semibold font-mono text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                             title="Pieces per GBL conversion rate. Auto-filled if configured on product, or type custom rate."
                           />
                         </td>
 
                         {/* TOTAL PCS */}
-                        <td className="py-2.5 px-2 text-center font-black font-mono text-gray-900">
+                        <td className="py-2.5 px-2 text-center font-semibold font-mono text-gray-900">
                           {row.totalPcs > 0 ? row.totalPcs.toLocaleString('en-IN') : 0}
                         </td>
 
@@ -2865,12 +2865,12 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                             placeholder="0.00"
                             value={row.rate}
                             onChange={(e) => updateRowField(idx, 'rate', e.target.value)}
-                            className="w-20 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-bold font-mono text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            className="w-20 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-semibold font-mono text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                           />
                         </td>
 
                         {/* FINAL TOTAL AMOUNT (₹) */}
-                        <td className="py-2.5 px-3 text-right font-black font-mono text-gray-900">
+                        <td className="py-2.5 px-3 text-right font-semibold font-mono text-gray-900">
                           {row.amount > 0 ? `₹${row.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '₹0.00'}
                         </td>
 
@@ -2880,7 +2880,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                             <button
                               type="button"
                               onClick={() => handleDuplicateRow(idx)}
-                              className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer"
+                              className="icon-btn"
                               title="Duplicate row"
                             >
                               <Copy className="w-3.5 h-3.5" />
@@ -2888,7 +2888,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                             <button
                               type="button"
                               onClick={() => handleDeleteRow(idx)}
-                              className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
+                              className="icon-btn-danger"
                               title="Delete row"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -2899,36 +2899,36 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                       {/* Accordion Sub-row: Tally-Style Mixed Breakdown Tree */}
                       {row.isMixedBundle && allocExpandedRows[idx] && row.components && row.components.length > 0 && (
-                        <tr className="bg-indigo-50/25 border-b border-indigo-100/70">
-                          <td className="py-2.5 px-2 text-center text-indigo-400 font-bold text-xs select-none">↳</td>
+                        <tr className="bg-blue-50/25 border-b border-blue-100/70">
+                          <td className="py-2.5 px-2 text-center text-blue-400 font-semibold text-[0.875rem] select-none">↳</td>
                           <td colSpan={2} className="py-2.5 px-3">
-                            <div className="text-[11px] font-extrabold text-indigo-950 mb-1.5 flex items-center gap-1.5">
-                              <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                            <div className="text-xs font-semibold text-blue-950 mb-1.5 flex items-center gap-1.5">
+                              <Layers className="w-3.5 h-3.5 text-blue-600" />
                               <span>Sub-Material Breakdown inside {row.itemName || 'Pack'}:</span>
                             </div>
-                            <div className="space-y-1 pl-3 border-l-2 border-indigo-200">
+                            <div className="space-y-1 pl-3 border-l-2 border-blue-200">
                               {row.components.map((comp, cIdx) => (
-                                <div key={comp.componentId || cIdx} className="flex items-center justify-between text-xs text-gray-800 py-0.5">
+                                <div key={comp.componentId || cIdx} className="flex items-center justify-between text-[0.875rem] text-gray-800 py-0.5">
                                   <span className="font-semibold flex items-center gap-1.5">
-                                    <span className="text-[11px] text-indigo-600 font-bold">
+                                    <span className="text-xs text-blue-600 font-semibold">
                                       {cIdx === 0 ? '①' : cIdx === 1 ? '②' : cIdx === 2 ? '③' : `${cIdx + 1}.`}
                                     </span>
                                     <span>{comp.name}</span>
                                   </span>
-                                  <span className="font-mono text-gray-500 text-[11px]">
+                                  <span className="font-mono text-gray-500 text-xs">
                                     {comp.quantity} {comp.uom || 'Pcs'} × ₹{Number(comp.rate).toFixed(2)} = <strong className="text-gray-900">₹{Number(comp.amount).toFixed(2)}</strong>
                                   </span>
                                 </div>
                               ))}
                             </div>
                           </td>
-                          <td colSpan={6} className="py-2.5 px-3 text-right align-bottom text-[11px] text-gray-500 font-mono">
+                          <td colSpan={6} className="py-2.5 px-3 text-right align-bottom text-xs text-gray-500 font-mono">
                             <div className="flex items-center justify-end gap-3 flex-wrap">
-                              <span>Sum Total: <strong className="text-gray-900 font-bold">{row.components.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0)} pcs</strong></span>
+                              <span>Sum Total: <strong className="text-gray-900 font-semibold">{row.components.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0)} pcs</strong></span>
                               <span>•</span>
-                              <span>Weighted Avg Rate: <strong className="text-indigo-700 font-bold">₹{Number(row.rate).toFixed(2)} / pc</strong></span>
+                              <span>Weighted Avg Rate: <strong className="text-blue-700 font-semibold">₹{Number(row.rate).toFixed(2)} / pc</strong></span>
                               <span>•</span>
-                              <span>Total Value: <strong className="text-emerald-700 font-black">₹{Number(row.amount).toFixed(2)}</strong></span>
+                              <span>Total Value: <strong className="text-emerald-700 font-semibold">₹{Number(row.amount).toFixed(2)}</strong></span>
                             </div>
                           </td>
                         </tr>
@@ -2942,9 +2942,9 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
             {/* Items Total Summary right corner */}
             <div className="flex justify-end pt-1">
-              <div className="flex items-center gap-3 text-xs">
+              <div className="flex items-center gap-3 text-[0.875rem]">
                 <span className="font-semibold text-gray-500">Items Total:</span>
-                <span className="text-sm font-black text-gray-900 font-mono">
+                <span className="text-[0.875rem] font-semibold text-gray-900 font-mono">
                   ₹{totals.itemsTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               </div>
@@ -2967,13 +2967,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">Order Charges <span className="text-rose-600 font-bold">*</span></span>
-                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-mono text-[10.5px] font-bold border border-blue-200 flex items-center gap-1">
+                        <span className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wide">Order Charges <span className="text-rose-600 font-semibold">*</span></span>
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-mono text-xs font-semibold border border-blue-200 flex items-center gap-1">
                           <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
                           <span>Total Order: {totalOrderGbl} GBL</span>
                         </span>
                       </div>
-                      <p className="text-[10px] text-gray-500 font-medium mt-0.5">
+                      <p className="text-xs text-gray-500 font-medium mt-0.5">
                         Charges set to <strong className="text-emerald-700">Per GBL</strong> automatically calculate QTY based on the total {totalOrderGbl} GBL ordered.
                       </p>
                     </div>
@@ -2991,7 +2991,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           setShowQuickPresetMenu(!showQuickPresetMenu);
                           setHighlightedQuickPresetIdx(0);
                         }}
-                        className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100/80 text-blue-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-blue-200 shadow-3xs"
+                        className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100/80 text-blue-700 font-semibold rounded-lg text-[0.875rem] flex items-center gap-1.5 cursor-pointer border border-blue-200 shadow-3xs"
                       >
                         <Sparkles className="w-3.5 h-3.5 text-blue-600" />
                         <span>Add Preset Charge</span>
@@ -3000,13 +3000,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                       {showQuickPresetMenu && (
                         <div 
-                          className={`absolute right-0 ${quickPresetOpenUpwards ? 'bottom-full mb-1' : 'top-full mt-1'} w-72 max-h-[80vh] bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 text-xs divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100`}
+                          className={`absolute right-0 ${quickPresetOpenUpwards ? 'bottom-full mb-1' : 'top-full mt-1'} w-72 max-h-[calc(80*var(--vh,1vh))] bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 text-[0.875rem] divide-y divide-gray-100`}
                           role="menu"
                         >
-                          <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                          <div className="px-3 py-1.5 text-xs font-medium text-gray-400 uppercase tracking-wider flex items-center justify-between">
                             <span className="flex items-center gap-1.5">
                               <span>Predefined Charges</span>
-                              <kbd className="font-mono text-[9px] bg-gray-100 text-gray-600 px-1 py-0.5 rounded border border-gray-200">Alt+P</kbd>
+                              <kbd className="font-mono text-xs bg-gray-100 text-gray-600 px-1 py-0.5 rounded border border-gray-200">Alt+P</kbd>
                             </span>
                             <button
                               type="button"
@@ -3014,7 +3014,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                 setShowQuickPresetMenu(false);
                                 setShowManageChargesModal(true);
                               }}
-                              className="text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer font-bold"
+                              className="text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer font-semibold"
                             >
                               <Settings className="w-3 h-3" />
                               <span>Manage</span>
@@ -3030,25 +3030,25 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                   id={`quick-preset-opt-${pIdx}`}
                                   onClick={() => handleAddCharge(p)}
                                   onMouseEnter={() => setHighlightedQuickPresetIdx(pIdx)}
-                                  className={`w-full px-3 py-1.5 text-left flex items-center justify-between group transition-colors cursor-pointer ${
+                                  className={`w-full px-3 py-1.5 text-left flex items-center justify-between group cursor-pointer ${
                                     isSelected
-                                      ? 'bg-blue-100/90 text-blue-900 font-bold ring-1 ring-inset ring-blue-400'
+                                      ? 'bg-blue-100/90 text-blue-900 font-semibold ring-1 ring-inset ring-blue-400'
                                       : 'hover:bg-blue-50/70 text-gray-800'
                                   }`}
                                   role="menuitem"
                                   aria-selected={isSelected}
                                 >
                                   <span className="font-semibold truncate">{p.name}</span>
-                                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ml-2 ${p.calculationType === 'per_gbl' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
+                                  <span className={`px-1.5 py-0.5 rounded text-xs font-mono font-semibold shrink-0 ml-2 ${p.calculationType === 'per_gbl' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
                                     {p.calculationType === 'per_gbl' ? `₹${p.defaultRate}/GBL` : `₹${p.defaultRate} Flat`}
                                   </span>
                                 </button>
                               );
                             })}
                           </div>
-                          <div className="px-3 py-1 bg-gray-50 text-[10px] text-gray-500 flex items-center justify-between">
-                            <span>Use <kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold">↑</kbd><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold ml-0.5">↓</kbd></span>
-                            <span><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold">Enter</kbd> to add</span>
+                          <div className="px-3 py-1 bg-gray-50 text-xs text-gray-500 flex items-center justify-between">
+                            <span>Use <kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-semibold">↑</kbd><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-semibold ml-0.5">↓</kbd></span>
+                            <span><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-semibold">Enter</kbd> to add</span>
                           </div>
                         </div>
                       )}
@@ -3057,8 +3057,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                 </div>
 
                 <div className="overflow-visible border border-gray-200 rounded-xl">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
+                  <table className="w-full text-left border-collapse text-[0.875rem]">
+                    <thead className="bg-gray-50/80 text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
                       <tr>
                         <th className="py-2 px-3 w-8 text-center">#</th>
                         <th className="py-2 px-3">CHARGE NAME</th>
@@ -3074,7 +3074,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                         const isPerGbl = ch.chargeType === 'per_gbl' || (!ch.chargeType && (ch.name.toLowerCase().includes('hamali') || ch.name.toLowerCase().includes('freight') || ch.name.toLowerCase().includes('loading') || ch.name.toLowerCase().includes('packing')));
                         return (
                           <tr key={cIdx} className="hover:bg-gray-50/60">
-                            <td className="py-2 px-3 text-center font-bold text-gray-400">
+                            <td className="py-2 px-3 text-center font-semibold text-gray-400">
                               {cIdx + 1}
                             </td>
                             
@@ -3100,18 +3100,18 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                     setActiveChargeDropdown(cIdx);
                                     setHighlightedChargePresetIdx(0);
                                   }}
-                                  className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                  className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                                 />
 
                                 {activeChargeDropdown === cIdx && (
                                   <div 
-                                    className={`absolute left-0 ${chargeDropdownOpenUpwards ? 'bottom-full mb-1' : 'top-full mt-1'} w-72 max-h-[80vh] bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1.5 text-xs divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100`}
+                                    className={`absolute left-0 ${chargeDropdownOpenUpwards ? 'bottom-full mb-1' : 'top-full mt-1'} w-72 max-h-[calc(80*var(--vh,1vh))] bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1.5 text-[0.875rem] divide-y divide-gray-100`}
                                     role="listbox"
                                   >
-                                    <div className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                                    <div className="px-3 py-1 text-xs font-medium text-gray-400 uppercase tracking-wider flex items-center justify-between">
                                       <span>Predefined Charges</span>
                                       <span 
-                                        className="text-blue-600 cursor-pointer hover:underline font-bold" 
+                                        className="text-blue-600 cursor-pointer hover:underline font-semibold" 
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           setActiveChargeDropdown(null);
@@ -3141,16 +3141,16 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                                     }
                                                   }}
                                                   onMouseEnter={() => setHighlightedChargePresetIdx(pIdx)}
-                                                  className={`w-full px-3 py-1.5 text-left flex items-center justify-between group transition-colors cursor-pointer ${
+                                                  className={`w-full px-3 py-1.5 text-left flex items-center justify-between group cursor-pointer ${
                                                     isSelected
-                                                      ? 'bg-blue-100/90 text-blue-900 font-bold ring-1 ring-inset ring-blue-400'
+                                                      ? 'bg-blue-100/90 text-blue-900 font-semibold ring-1 ring-inset ring-blue-400'
                                                       : 'hover:bg-blue-50/70 text-gray-800'
                                                   }`}
                                                   role="option"
                                                   aria-selected={isSelected}
                                                 >
                                                   <span className="font-semibold truncate">{p.name}</span>
-                                                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ml-2 ${p.calculationType === 'per_gbl' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
+                                                  <span className={`px-1.5 py-0.5 rounded text-xs font-mono font-semibold shrink-0 ml-2 ${p.calculationType === 'per_gbl' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600'}`}>
                                                     {p.calculationType === 'per_gbl' ? `₹${p.defaultRate}/GBL` : `₹${p.defaultRate} Flat`}
                                                   </span>
                                                 </button>
@@ -3181,10 +3181,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                                   setActiveChargeDropdown(null);
                                                   showToast(`Saved "${ch.name.trim()}" to Predefined Charges`, 'success');
                                                 }}
-                                                className={`w-full px-3 py-2 text-left flex items-center gap-1.5 text-xs border-t border-blue-100 cursor-pointer ${
+                                                className={`w-full px-3 py-2 text-left flex items-center gap-1.5 text-[0.875rem] border-t border-blue-100 cursor-pointer ${
                                                   highlightedChargePresetIdx === filteredPresets.length
-                                                    ? 'bg-blue-100 text-blue-900 font-bold ring-1 ring-inset ring-blue-400'
-                                                    : 'bg-blue-50/70 hover:bg-blue-100/90 text-blue-700 font-bold'
+                                                    ? 'bg-blue-100 text-blue-900 font-semibold ring-1 ring-inset ring-blue-400'
+                                                    : 'bg-blue-50/70 hover:bg-blue-100/90 text-blue-700 font-semibold'
                                                 }`}
                                               >
                                                 <Plus className="w-3.5 h-3.5 text-blue-600" />
@@ -3195,9 +3195,9 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                         );
                                       })()}
                                     </div>
-                                    <div className="px-3 py-1 bg-gray-50 text-[10px] text-gray-500 flex items-center justify-between">
-                                      <span>Use <kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold">↑</kbd><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold ml-0.5">↓</kbd></span>
-                                      <span><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold">Enter</kbd> to select</span>
+                                    <div className="px-3 py-1 bg-gray-50 text-xs text-gray-500 flex items-center justify-between">
+                                      <span>Use <kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-semibold">↑</kbd><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-semibold ml-0.5">↓</kbd></span>
+                                      <span><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-semibold">Enter</kbd> to select</span>
                                     </div>
                                   </div>
                                 )}
@@ -3210,7 +3210,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                 type="button"
                                 onClick={() => handleToggleChargeType(cIdx, isPerGbl ? 'fixed' : 'per_gbl')}
                                 title={isPerGbl ? 'Synced with total GBL. Click to switch to Flat / Fixed' : 'Fixed fee. Click to switch to Per GBL'}
-                                className={`px-2 py-0.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all border ${
+                                className={`px-2 py-0.5 rounded-lg text-xs font-semibold cursor-pointer border ${
                                   isPerGbl
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
                                     : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
@@ -3228,12 +3228,12 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                   min="0"
                                   value={ch.quantity}
                                   onChange={(e) => updateCharge(cIdx, 'quantity', e.target.value)}
-                                  className={`w-18 px-1.5 py-1 text-center bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-xs font-bold ${
+                                  className={`w-18 px-1.5 py-1 text-center bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-[0.875rem] font-semibold ${
                                     isPerGbl ? 'bg-emerald-50/30 border-emerald-200 text-emerald-800' : ''
                                   }`}
                                 />
                                 {isPerGbl && (
-                                  <span className="ml-1 text-[9.5px] font-bold text-emerald-600 font-mono">GBL</span>
+                                  <span className="ml-1 text-xs font-semibold text-emerald-600 font-mono">GBL</span>
                                 )}
                               </div>
                             </td>
@@ -3246,12 +3246,12 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                 min="0"
                                 value={ch.rate}
                                 onChange={(e) => updateCharge(cIdx, 'rate', e.target.value)}
-                                className="w-20 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-xs font-bold"
+                                className="w-20 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-[0.875rem] font-semibold"
                               />
                             </td>
 
                             {/* Amount */}
-                            <td className="py-2 px-3 text-right font-black font-mono text-gray-900">
+                            <td className="py-2 px-3 text-right font-semibold font-mono text-gray-900">
                               ₹{ch.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
 
@@ -3260,7 +3260,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                               <button
                                 type="button"
                                 onClick={() => handleDeleteCharge(cIdx)}
-                                className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                                className="icon-btn-danger"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -3271,7 +3271,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                       {otherCharges.length === 0 && (
                         <tr>
-                          <td colSpan={7} className="py-5 text-center text-xs text-rose-500 font-medium italic bg-rose-50/20">
+                          <td colSpan={7} className="py-5 text-center text-[0.875rem] text-rose-500 font-medium italic bg-rose-50/20">
                             No order charges added yet. Click <strong className="text-blue-600 font-semibold cursor-pointer" onClick={() => setShowQuickPresetMenu(true)}>"Add Preset Charge"</strong> above to select a charge.
                           </td>
                         </tr>
@@ -3283,7 +3283,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
               {/* Notes / Instructions (Optional) */}
               <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs space-y-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
+                <div className="flex items-center gap-2 text-[0.875rem] font-semibold text-gray-900">
                   <FileText className="w-4 h-4 text-blue-600" />
                   <span>Notes / Instructions (Optional)</span>
                 </div>
@@ -3294,9 +3294,9 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     maxLength={500}
                     onChange={(e) => setInternalNotes(e.target.value)}
                     placeholder="Enter any special dispatch, packing, or delivery instructions for customer..."
-                    className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-medium text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
-                  <div className="text-[10px] text-gray-400 text-right mt-0.5">
+                  <div className="text-xs text-gray-400 text-right mt-0.5">
                     {internalNotes.length}/500
                   </div>
                 </div>
@@ -3307,29 +3307,29 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
             {/* Right 4 Columns: Order Summary Card */}
             <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200/80 p-5 shadow-3xs flex flex-col justify-between space-y-4">
               <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-gray-900 pb-1">
+                <div className="flex items-center gap-2 text-[0.875rem] font-semibold text-gray-900 pb-1">
                   <Receipt className="w-4 h-4 text-blue-600" />
                   <span>Order Summary</span>
                 </div>
 
-                <div className="space-y-2 text-xs">
+                <div className="space-y-2 text-[0.875rem]">
                   <div className="flex justify-between text-gray-600 font-medium">
                     <span>Items Total</span>
-                    <span className="font-mono font-bold text-gray-900">
+                    <span className="font-mono font-semibold text-gray-900">
                       ₹{totals.itemsTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
 
                   <div className="flex justify-between text-gray-600 font-medium">
                     <span>Other Charges</span>
-                    <span className="font-mono font-bold text-gray-900">
+                    <span className="font-mono font-semibold text-gray-900">
                       ₹{totals.otherChargesTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
 
                   <div className="border-t border-gray-100 my-2" />
 
-                  <div className="flex justify-between text-gray-700 font-bold">
+                  <div className="flex justify-between text-gray-700 font-semibold">
                     <span>Subtotal</span>
                     <span className="font-mono text-gray-900">
                       ₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -3349,11 +3349,11 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           placeholder="0.00"
                           value={overallDiscount}
                           onChange={(e) => setOverallDiscount(e.target.value)}
-                          className="w-20 pr-5 pl-2 py-0.5 text-right bg-white border border-gray-200 rounded-lg text-xs font-mono font-bold text-gray-900 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                          className="w-20 pr-5 pl-2 py-0.5 text-right bg-white border border-gray-200 rounded-lg text-[0.875rem] font-mono font-semibold text-gray-900 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                         />
-                        <span className="absolute right-1.5 text-[10px] text-gray-400 font-bold select-none pointer-events-none">%</span>
+                        <span className="absolute right-1.5 text-xs text-gray-400 font-semibold select-none pointer-events-none">%</span>
                       </div>
-                      <span className="font-mono text-xs font-semibold text-gray-600 min-w-[50px] text-right">
+                      <span className="font-mono text-[0.875rem] font-semibold text-gray-600 min-w-[3.125rem] text-right">
                         {totals.discountAmount.toFixed(2)}
                       </span>
                     </div>
@@ -3364,8 +3364,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
               {/* Grand Total */}
               <div className="pt-4 border-t border-gray-100">
                 <div className="flex items-baseline justify-between">
-                  <span className="text-sm font-bold text-gray-700">Grand Total</span>
-                  <span className="text-2xl font-black text-blue-600 font-mono tracking-tight">
+                  <span className="text-[0.875rem] font-semibold text-gray-700">Grand Total</span>
+                  <span className="text-2xl font-semibold text-blue-600 font-mono tracking-tight">
                     ₹{totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
@@ -3397,10 +3397,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base sm:text-lg font-black text-gray-900 tracking-tight">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 tracking-tight">
                       {selectedCustomer.firmName || selectedCustomer.name || selectedCustomer.contactName}
                     </h3>
-                    <span className={`px-2.5 py-0.5 text-[10px] font-extrabold uppercase rounded-full border ${
+                    <span className={`px-2.5 py-0.5 text-xs font-semibold uppercase rounded-full border ${
                       selectedCustomer.status === 'active' || !selectedCustomer.status
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                         : 'bg-rose-50 text-rose-700 border-rose-200'
@@ -3409,19 +3409,19 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     </span>
                   </div>
                   {(selectedCustomer.contactName || selectedCustomer.ownerName) && (
-                    <div className="text-xs text-gray-600 font-medium mt-0.5 flex items-center gap-1">
+                    <div className="text-[0.875rem] text-gray-600 font-medium mt-0.5 flex items-center gap-1">
                       <span className="text-gray-400 font-normal">Contact Person:</span>
-                      <span className="text-blue-700 font-bold">{selectedCustomer.contactName || selectedCustomer.ownerName}</span>
+                      <span className="text-blue-700 font-semibold">{selectedCustomer.contactName || selectedCustomer.ownerName}</span>
                     </div>
                   )}
-                  <p className="text-[11px] text-gray-400 font-mono mt-0.5">
-                    CUSTOMER CODE: <span className="font-extrabold text-blue-600">{selectedCustomer.code || selectedCustomer._id?.slice(-6).toUpperCase() || 'CUST-001'}</span>
+                  <p className="text-xs text-gray-400 font-mono mt-0.5">
+                    CUSTOMER CODE: <span className="font-semibold text-blue-600">{selectedCustomer.code || selectedCustomer._id?.slice(-6).toUpperCase() || 'CUST-001'}</span>
                   </p>
                   {getCustomerTags(selectedCustomer).length > 0 && (
                     <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tags:</span>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Tags:</span>
                       {getCustomerTags(selectedCustomer).map((tag: string, tIdx: number) => (
-                        <span key={tIdx} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full font-bold text-[10px]">
+                        <span key={tIdx} className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full font-semibold text-xs">
                           {tag}
                         </span>
                       ))}
@@ -3432,7 +3432,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
               <button
                 type="button"
                 onClick={() => setShowCustomerDetailsModal(false)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3441,27 +3441,27 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
             {/* Quick Metrics Bar */}
             <div className="grid grid-cols-3 gap-2.5">
               <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider">ASSIGNED REGION</span>
-                <span className="block text-xs font-extrabold text-blue-950 mt-0.5 truncate">
+                <span className="block text-xs text-blue-700 font-medium uppercase tracking-wider">ASSIGNED REGION</span>
+                <span className="block text-[0.875rem] font-semibold text-blue-950 mt-0.5 truncate">
                   {selectedCustomer.route || selectedCustomer.assignedRegion || selectedCustomer.state || 'Unassigned'}
                 </span>
               </div>
               <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider">ASSIGNED CITY</span>
-                <span className="block text-xs font-extrabold text-blue-950 mt-0.5 truncate">
+                <span className="block text-xs text-blue-700 font-medium uppercase tracking-wider">ASSIGNED CITY</span>
+                <span className="block text-[0.875rem] font-semibold text-blue-950 mt-0.5 truncate">
                   {selectedCustomer.city || selectedCustomer.assignedMarket || 'Unassigned'}
                 </span>
               </div>
               <div className="bg-rose-50/60 border border-rose-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                <span className="block text-[9px] text-rose-700 font-extrabold uppercase tracking-wider">OUTSTANDING BALANCE</span>
-                <span className="block text-xs font-mono font-black text-rose-950 mt-0.5">
+                <span className="block text-xs text-rose-700 font-medium uppercase tracking-wider">OUTSTANDING BALANCE</span>
+                <span className="block text-[0.875rem] font-mono font-semibold text-rose-950 mt-0.5">
                   ₹{Number(selectedCustomer.outstandingBalance || selectedCustomer.outstanding || 0).toLocaleString('en-IN')}
                 </span>
               </div>
             </div>
 
             {/* Main Details Grid */}
-            <div className="max-h-[55vh] overflow-y-auto pr-1 space-y-3 text-xs">
+            <div className="max-h-[calc(55*var(--vh,1vh))] overflow-y-auto pr-1 space-y-3 text-[0.875rem]">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* BASIC INFO */}
                 <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
@@ -3469,18 +3469,18 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                       <User className="w-3.5 h-3.5" />
                     </div>
-                    <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">BASIC INFORMATION</h4>
+                    <h4 className="font-medium text-gray-900 text-[0.875rem] tracking-wider uppercase">BASIC INFORMATION</h4>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-y-2 gap-x-3 text-xs">
+                  <div className="grid grid-cols-2 gap-y-2 gap-x-3 text-[0.875rem]">
                     <div>
-                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Contact Person</span>
-                      <span className="font-bold text-gray-900 text-xs block truncate">{selectedCustomer.contactName || selectedCustomer.ownerName || '—'}</span>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Contact Person</span>
+                      <span className="font-semibold text-gray-900 text-[0.875rem] block truncate">{selectedCustomer.contactName || selectedCustomer.ownerName || '—'}</span>
                     </div>
                     <div>
-                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Mobile Number</span>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Mobile Number</span>
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-mono font-bold text-blue-600 text-xs">{selectedCustomer.phone || selectedCustomer.mobile || '—'}</span>
+                        <span className="font-mono font-semibold text-blue-600 text-[0.875rem]">{selectedCustomer.phone || selectedCustomer.mobile || '—'}</span>
                         {(selectedCustomer.phone || selectedCustomer.mobile) && (
                           <a href={`https://wa.me/91${(selectedCustomer.phone || selectedCustomer.mobile).replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
                             <WhatsAppIcon />
@@ -3489,12 +3489,12 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                       </div>
                     </div>
                     <div>
-                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">GST Number</span>
-                      <span className="font-mono font-bold text-blue-600 text-xs">{selectedCustomer.gstNumber || selectedCustomer.gstin || '—'}</span>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">GST Number</span>
+                      <span className="font-mono font-semibold text-blue-600 text-[0.875rem]">{selectedCustomer.gstNumber || selectedCustomer.gstin || '—'}</span>
                     </div>
                     <div>
-                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Email</span>
-                      <span className="font-semibold text-gray-800 text-xs truncate block">{selectedCustomer.email || '—'}</span>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Email</span>
+                      <span className="font-semibold text-gray-800 text-[0.875rem] truncate block">{selectedCustomer.email || '—'}</span>
                     </div>
                   </div>
                 </div>
@@ -3505,27 +3505,27 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                       <Building2 className="w-3.5 h-3.5" />
                     </div>
-                    <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">BUSINESS & CREDIT</h4>
+                    <h4 className="font-medium text-gray-900 text-[0.875rem] tracking-wider uppercase">BUSINESS & CREDIT</h4>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-y-2 gap-x-3 text-xs">
+                  <div className="grid grid-cols-2 gap-y-2 gap-x-3 text-[0.875rem]">
                     <div>
-                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Credit Limit</span>
-                      <span className="font-mono font-bold text-blue-700 text-xs">
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Credit Limit</span>
+                      <span className="font-mono font-semibold text-blue-700 text-[0.875rem]">
                         ₹{Number(selectedCustomer.creditLimit || 0).toLocaleString('en-IN')}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Credit Days</span>
-                      <span className="font-mono font-bold text-gray-900 text-xs">{selectedCustomer.creditDays || 30} Days</span>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Credit Days</span>
+                      <span className="font-mono font-semibold text-gray-900 text-[0.875rem]">{selectedCustomer.creditDays || 30} Days</span>
                     </div>
                     <div>
-                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Transporter</span>
-                      <span className="font-bold text-gray-900 text-xs truncate block">{selectedCustomer.preferredTransport || selectedCustomer.transporter || '—'}</span>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Transporter</span>
+                      <span className="font-semibold text-gray-900 text-[0.875rem] truncate block">{selectedCustomer.preferredTransport || selectedCustomer.transporter || '—'}</span>
                     </div>
                     <div>
-                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Assigned Agent</span>
-                      <span className="font-bold text-indigo-700 text-xs">{selectedCustomer.agentAssigned || selectedCustomer.assignedAgent || 'Direct'}</span>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Assigned Agent</span>
+                      <span className="font-semibold text-blue-700 text-[0.875rem]">{selectedCustomer.agentAssigned || selectedCustomer.assignedAgent || 'Direct'}</span>
                     </div>
                   </div>
                 </div>
@@ -3536,23 +3536,23 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
                       <MapPin className="w-3.5 h-3.5" />
                     </div>
-                    <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">ADDRESS INFORMATION</h4>
+                    <h4 className="font-medium text-gray-900 text-[0.875rem] tracking-wider uppercase">ADDRESS INFORMATION</h4>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-[0.875rem]">
                     <div className="col-span-2">
-                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Full Address</span>
-                      <span className="font-bold text-gray-900 text-xs leading-relaxed">
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Full Address</span>
+                      <span className="font-semibold text-gray-900 text-[0.875rem] leading-relaxed">
                         {formatCustomerFullAddress(selectedCustomer, billingAddress.addressLine)}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">City</span>
-                      <span className="font-bold text-gray-900 text-xs">{cleanAddressVal(selectedCustomer.city) || cleanAddressVal(billingAddress.city) || '—'}</span>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">City</span>
+                      <span className="font-semibold text-gray-900 text-[0.875rem]">{cleanAddressVal(selectedCustomer.city) || cleanAddressVal(billingAddress.city) || '—'}</span>
                     </div>
                     <div>
-                      <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">State & Pincode</span>
-                      <span className="font-bold text-gray-900 text-xs">
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">State & Pincode</span>
+                      <span className="font-semibold text-gray-900 text-[0.875rem]">
                         {cleanAddressVal(selectedCustomer.state) || cleanAddressVal(billingAddress.state) || ''} {(cleanAddressVal(selectedCustomer.pincode) || cleanAddressVal(billingAddress.pincode)) ? `- ${cleanAddressVal(selectedCustomer.pincode) || cleanAddressVal(billingAddress.pincode)}` : ''}
                       </span>
                     </div>
@@ -3562,11 +3562,11 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
             </div>
 
             {/* Modal Footer */}
-            <div className="flex justify-end pt-2 border-t border-gray-100">
+            <div className="flex justify-end pt-2 border-t border-gray-100 dlg-footer">
               <button
                 type="button"
                 onClick={() => setShowCustomerDetailsModal(false)}
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition-all cursor-pointer shadow-2xs"
+                className="btn-primary"
               >
                 Close
               </button>
@@ -3587,14 +3587,14 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
           maxWidth="max-w-2xl"
           title={
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-200/70 flex items-center justify-center text-indigo-600 shadow-2xs shrink-0">
+              <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200/70 flex items-center justify-center text-blue-600 shadow-2xs shrink-0">
                 <Layers className="w-3.5 h-3.5" />
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-black text-gray-900 leading-none">
+                <span className="text-[0.875rem] font-semibold text-gray-900 leading-none">
                   Tally Allocation
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60 font-mono">
+                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 font-mono">
                   {items[allocModalRowIdx].itemName || 'Mixed Pack'}
                 </span>
               </div>
@@ -3603,22 +3603,22 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
         >
           <div className="space-y-3">
             {/* Cute Compact Info Banner */}
-            <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-violet-50/70 via-indigo-50/50 to-blue-50/60 rounded-xl border border-indigo-100/70 text-xs">
+            <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-blue-50/70 via-blue-50/50 to-blue-50/60 rounded-xl border border-blue-100/70 text-[0.875rem]">
               <div className="flex items-center gap-2">
-                <span className="text-xs">✨</span>
-                <span className="text-[11px] font-medium text-slate-600">
+                <span className="text-[0.875rem]">✨</span>
+                <span className="text-xs font-medium text-slate-600">
                   Custom sub-item breakdown &amp; blended pricing for this pack
                 </span>
               </div>
-              <div className="text-[10px] font-bold text-indigo-600 font-mono bg-white/90 px-2 py-0.5 rounded-md border border-indigo-100 shadow-2xs shrink-0">
+              <div className="text-xs font-semibold text-blue-600 font-mono bg-white/90 px-2 py-0.5 rounded-md border border-blue-100 shadow-2xs shrink-0">
                 {items[allocModalRowIdx].itemName || 'Parent Item'}
               </div>
             </div>
 
             {/* Components Table */}
             <div className="border border-slate-200/80 rounded-xl shadow-2xs bg-white overflow-visible">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-bold uppercase text-[9.5px] tracking-wider">
+              <table className="w-full text-left text-[0.875rem] border-collapse">
+                <thead className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-medium uppercase text-xs tracking-wider">
                   <tr>
                     <th className="py-2 px-2 text-center w-8">#</th>
                     <th className="py-2 px-2.5">Sub-Product / Material Name</th>
@@ -3640,10 +3640,10 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     );
 
                     return (
-                      <tr key={comp.componentId || cIdx} className="hover:bg-slate-50/50 transition-colors">
+                      <tr key={comp.componentId || cIdx} className="hover:bg-slate-50/50">
                         {/* Circled Index */}
                         <td className="py-2 px-1 text-center">
-                          <span className="w-5 h-5 mx-auto rounded-full bg-indigo-50 border border-indigo-200/60 text-indigo-600 font-bold text-[10px] flex items-center justify-center">
+                          <span className="w-5 h-5 mx-auto rounded-full bg-blue-50 border border-blue-200/60 text-blue-600 font-semibold text-xs flex items-center justify-center">
                             {cIdx + 1}
                           </span>
                         </td>
@@ -3663,7 +3663,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                 setActiveAllocDropdownIdx(cIdx);
                               }}
                               onFocus={() => setActiveAllocDropdownIdx(cIdx)}
-                              className="w-full pl-7 pr-6 py-1.5 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 placeholder-slate-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 focus:outline-none transition-all"
+                              className="w-full pl-7 pr-6 py-1.5 bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg text-[0.875rem] font-semibold text-slate-800 placeholder-slate-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:outline-none"
                             />
                             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
                               {(comp.name || allocSearchTerms[cIdx]) ? (
@@ -3680,7 +3680,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                 </button>
                               ) : (
                                 <ChevronDown
-                                  className={`w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600 transition-transform ${isDropdownOpen ? 'rotate-180 text-indigo-600' : ''}`}
+                                  className={`w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600 ${isDropdownOpen ? 'rotate-180 text-blue-600' : ''}`}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setActiveAllocDropdownIdx(isDropdownOpen ? null : cIdx);
@@ -3692,13 +3692,13 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                           {/* Searchable Dropdown Popup Menu */}
                           {isDropdownOpen && (
-                            <div className="absolute left-2 top-full mt-1 w-[460px] max-w-[90vw] bg-white border border-slate-200 rounded-xl shadow-xl z-[99999] max-h-48 overflow-y-auto divide-y divide-slate-100 p-1 animate-in fade-in zoom-in-95 duration-100">
-                              <div className="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-400 flex justify-between items-center bg-slate-50 rounded mb-0.5">
+                            <div className="absolute left-2 top-full mt-1 w-[28.75rem] max-w-[90vw] bg-white border border-slate-200 rounded-xl shadow-xl z-[99999] max-h-48 overflow-y-auto divide-y divide-slate-100 p-1">
+                              <div className="px-2 py-0.5 text-xs font-medium uppercase tracking-wider text-slate-400 flex justify-between items-center bg-slate-50 rounded mb-0.5">
                                 <span>ITEM MASTER</span>
                                 <span>{filteredSkus.length} Items</span>
                               </div>
                               {filteredSkus.length === 0 ? (
-                                <div className="p-2 text-center text-[11px] text-slate-500">
+                                <div className="p-2 text-center text-xs text-slate-500">
                                   Use "{allocSearchTerms[cIdx] || comp.name}" as custom item
                                 </div>
                               ) : (
@@ -3731,41 +3731,41 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                         }));
                                         setActiveAllocDropdownIdx(null);
                                       }}
-                                      className="p-1.5 cursor-pointer rounded-lg text-xs flex justify-between items-center transition-colors hover:bg-indigo-50/70 group"
+                                      className="p-1.5 cursor-pointer rounded-lg text-[0.875rem] flex justify-between items-center hover:bg-blue-50/70 group"
                                     >
                                       <div className="flex-1 min-w-0 pr-1.5">
-                                        <div className="font-bold text-slate-800 group-hover:text-indigo-950 truncate text-[11px]">{s.name}</div>
-                                        <div className="flex items-center gap-1 text-[9.5px]">
+                                        <div className="font-semibold text-slate-800 group-hover:text-blue-950 truncate text-xs">{s.name}</div>
+                                        <div className="flex items-center gap-1 text-xs">
                                           <span className="text-slate-400 font-mono">{s.skuCode}</span>
                                           <span className="text-slate-300">•</span>
                                           <span className="text-slate-500">{s.category || 'Goods'}</span>
                                           {pcsPerGblVal > 0 && (
                                             <>
                                               <span className="text-slate-300">•</span>
-                                              <span className="text-indigo-600 font-semibold">{pcsPerGblVal} /GBL</span>
+                                              <span className="text-blue-600 font-semibold">{pcsPerGblVal} /GBL</span>
                                             </>
                                           )}
                                         </div>
                                       </div>
                                       <div className="flex items-center gap-1.5 shrink-0">
                                         {/* Sweet Dynamic Costing Pill */}
-                                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gradient-to-r from-slate-50 via-indigo-50/40 to-purple-50/40 border border-indigo-100/90 shadow-xs">
+                                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gradient-to-r from-slate-50 via-blue-50/40 to-blue-50/40 border border-blue-100/90 shadow-xs">
                                           <div className="flex items-center gap-0.5">
-                                            <span className="text-[10px] font-black text-slate-800 tracking-tight font-mono">{costing.formattedGbl}</span>
-                                            <span className="text-[7.5px] font-black uppercase px-0.8 py-0.2 rounded bg-indigo-100/90 text-indigo-700 tracking-wide">GBL</span>
+                                            <span className="text-xs font-semibold text-slate-800 tracking-tight font-mono">{costing.formattedGbl}</span>
+                                            <span className="text-[0.46875rem] font-medium uppercase px-0.8 py-0.2 rounded bg-blue-100/90 text-blue-700 tracking-wide">GBL</span>
                                           </div>
-                                          <span className="text-indigo-200 text-[8px]">•</span>
+                                          <span className="text-blue-200 text-xs">•</span>
                                           <div className="flex items-center gap-0.5">
-                                            <span className="text-[9.5px] font-bold text-slate-600 tracking-tight font-mono">{costing.formattedPcs}</span>
-                                            <span className="text-[7.5px] font-bold uppercase px-0.8 py-0.2 rounded bg-slate-200/80 text-slate-600 tracking-wide">Pcs</span>
+                                            <span className="text-xs font-semibold text-slate-600 tracking-tight font-mono">{costing.formattedPcs}</span>
+                                            <span className="text-[0.46875rem] font-medium uppercase px-0.8 py-0.2 rounded bg-slate-200/80 text-slate-600 tracking-wide">Pcs</span>
                                           </div>
                                         </div>
 
                                         {/* Cute Active / Inactive Badge with glowing dot */}
-                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8.5px] font-extrabold uppercase shrink-0 border shadow-xs ${
+                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold uppercase shrink-0 border shadow-xs ${
                                           isInactive 
                                             ? 'bg-gradient-to-r from-amber-50 to-orange-50 text-amber-800 border-amber-200/90' 
-                                            : 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-800 border-emerald-200/90'
+                                            : 'bg-gradient-to-r from-emerald-50 to-blue-50 text-emerald-800 border-emerald-200/90'
                                         }`}>
                                           <span className={`w-1.5 h-1.5 rounded-full ${isInactive ? 'bg-amber-500' : 'bg-emerald-500 ring-2 ring-emerald-300/60'}`} />
                                           {s.status || 'Active'}
@@ -3796,7 +3796,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                 return item;
                               }));
                             }}
-                            className="w-full px-2 py-1.5 text-center bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg font-bold font-mono text-slate-800 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none transition-all"
+                            className="w-full px-2 py-1.5 text-center bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg font-semibold font-mono text-slate-800 text-[0.875rem] focus:ring-1 focus:ring-blue-500 focus:outline-none"
                           />
                         </td>
 
@@ -3817,12 +3817,12 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                 return item;
                               }));
                             }}
-                            className="w-full px-2 py-1.5 text-right bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg font-bold font-mono text-slate-800 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none transition-all"
+                            className="w-full px-2 py-1.5 text-right bg-slate-50/50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg font-semibold font-mono text-slate-800 text-[0.875rem] focus:ring-1 focus:ring-blue-500 focus:outline-none"
                           />
                         </td>
 
                         {/* Amount */}
-                        <td className="py-2 px-2.5 text-right font-black font-mono text-slate-800 text-xs">
+                        <td className="py-2 px-2.5 text-right font-semibold font-mono text-slate-800 text-[0.875rem]">
                           ₹{(comp.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
 
@@ -3838,7 +3838,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                                 setAllocSearchTerms({});
                               }
                             }}
-                            className="p-1 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
+                            className="icon-btn-danger"
                             title={allocComponents.length > 1 ? "Remove item" : "Clear item"}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -3868,7 +3868,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     }
                   ]);
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100/80 text-indigo-600 font-bold rounded-lg text-xs transition-colors cursor-pointer border border-indigo-200/50 shadow-2xs"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100/80 text-blue-600 font-semibold rounded-lg text-[0.875rem] cursor-pointer border border-blue-200/50 shadow-2xs"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>+ Add Sub-Item</span>
@@ -3884,41 +3884,41 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
               return (
                 <div className="grid grid-cols-4 gap-2 p-2.5 bg-slate-50/80 rounded-xl border border-slate-200/70">
                   <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs text-center">
-                    <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">Pack Pieces</span>
-                    <span className="text-xs sm:text-sm font-black font-mono text-slate-800 mt-0.5 block">{totalAllocPcs.toLocaleString('en-IN')} pcs</span>
+                    <span className="text-xs uppercase font-medium text-slate-400 tracking-wider block">Pack Pieces</span>
+                    <span className="text-[0.875rem] sm:text-[0.875rem] font-semibold font-mono text-slate-800 mt-0.5 block">{totalAllocPcs.toLocaleString('en-IN')} pcs</span>
                   </div>
                   <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs text-center">
-                    <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">Pack Amount</span>
-                    <span className="text-xs sm:text-sm font-black font-mono text-indigo-600 mt-0.5 block">₹{totalAllocAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-xs uppercase font-medium text-slate-400 tracking-wider block">Pack Amount</span>
+                    <span className="text-[0.875rem] sm:text-[0.875rem] font-semibold font-mono text-blue-600 mt-0.5 block">₹{totalAllocAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                   <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs text-center">
-                    <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">Avg Rate</span>
-                    <span className="text-xs sm:text-sm font-black font-mono text-emerald-600 mt-0.5 block">₹{avgRate}<span className="text-[9.5px] font-normal text-slate-400">/pc</span></span>
+                    <span className="text-xs uppercase font-medium text-slate-400 tracking-wider block">Avg Rate</span>
+                    <span className="text-[0.875rem] sm:text-[0.875rem] font-semibold font-mono text-emerald-600 mt-0.5 block">₹{avgRate}<span className="text-xs font-normal text-slate-400">/pc</span></span>
                   </div>
                   <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs text-center">
-                    <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">Pcs / GBL</span>
-                    <span className="text-xs sm:text-sm font-black font-mono text-amber-600 mt-0.5 block">{totalAllocPcs} pcs/GBL</span>
+                    <span className="text-xs uppercase font-medium text-slate-400 tracking-wider block">Pcs / GBL</span>
+                    <span className="text-[0.875rem] sm:text-[0.875rem] font-semibold font-mono text-amber-600 mt-0.5 block">{totalAllocPcs} pcs/GBL</span>
                   </div>
                 </div>
               );
             })()}
 
             {/* Modal Actions */}
-            <div className="flex justify-end items-center gap-2 pt-2 border-t border-slate-100 text-xs">
+            <div className="flex justify-end items-center gap-2 pt-2 border-t border-slate-100 text-[0.875rem] dlg-footer">
               <button
                 type="button"
                 onClick={() => {
                   setAllocModalRowIdx(null);
                   setActiveAllocDropdownIdx(null);
                 }}
-                className="px-3.5 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold rounded-lg transition-colors cursor-pointer text-xs"
+                className="px-3.5 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold rounded-lg cursor-pointer text-[0.875rem]"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleApplyAllocation}
-                className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-xs transition-all cursor-pointer flex items-center gap-1.5 text-xs"
+                className="btn-primary"
               >
                 <Check className="w-3.5 h-3.5" />
                 <span>Apply to Item</span>
@@ -3937,17 +3937,17 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
           maxWidth="max-w-lg"
         >
           <div className="space-y-4">
-            <p className="text-xs text-gray-500">
+            <p className="text-[0.875rem] text-gray-500">
               Predefined charges appear in the charge selector dropdown. Any charge set to <strong>Per GBL</strong> automatically computes quantity based on the total GBL ordered.
             </p>
 
             {/* List */}
             <div className="max-h-60 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-100">
               {predefinedCharges.map(p => (
-                <div key={p.id} className="p-2.5 flex items-center justify-between text-xs hover:bg-gray-50/80">
+                <div key={p.id} className="p-2.5 flex items-center justify-between text-[0.875rem] hover:bg-gray-50/80">
                   <div>
-                    <span className="font-bold text-gray-800 block">{p.name}</span>
-                    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold mt-0.5 ${p.calculationType === 'per_gbl' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
+                    <span className="font-semibold text-gray-800 block">{p.name}</span>
+                    <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-mono font-semibold mt-0.5 ${p.calculationType === 'per_gbl' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
                       {p.calculationType === 'per_gbl' ? `Per GBL (₹${p.defaultRate}/GBL)` : `Fixed (₹${p.defaultRate})`}
                     </span>
                   </div>
@@ -3958,7 +3958,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                       setPredefinedCharges(updated);
                       try { localStorage.setItem('skbw_predefined_charges_v2', JSON.stringify(updated)); } catch (e) {}
                     }}
-                    className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer"
+                    className="icon-btn-danger"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -3977,19 +3977,19 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
               }}
               className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2"
             >
-              <span className="text-[11px] font-bold text-blue-900 block uppercase tracking-wide">+ Add New Charge Master (Press Enter to Add)</span>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+              <span className="text-xs font-medium text-blue-900 block uppercase tracking-wide">+ Add New Charge Master (Press Enter to Add)</span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[0.875rem]">
                 <input
                   type="text"
                   placeholder="Charge Name (e.g. Loading)"
                   value={newPresetForm.name}
                   onChange={(e) => setNewPresetForm({ ...newPresetForm, name: e.target.value })}
-                  className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500"
+                  className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold focus:ring-1 focus:ring-blue-500"
                 />
                 <select
                   value={newPresetForm.calculationType}
                   onChange={(e) => setNewPresetForm({ ...newPresetForm, calculationType: e.target.value as any })}
-                  className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500"
+                  className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="per_gbl">⚡ Per GBL</option>
                   <option value="fixed">Fixed / Flat</option>
@@ -4001,11 +4001,11 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     placeholder="Rate (₹)"
                     value={newPresetForm.defaultRate}
                     onChange={(e) => setNewPresetForm({ ...newPresetForm, defaultRate: e.target.value })}
-                    className="w-20 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-blue-500"
+                    className="w-20 px-2 py-1 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-mono focus:ring-1 focus:ring-blue-500"
                   />
                   <button
                     type="submit"
-                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer flex-1"
+                    className="btn-primary flex-1"
                   >
                     Add
                   </button>
@@ -4014,11 +4014,11 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
             </form>
 
             {/* Modal Footer */}
-            <div className="flex justify-end items-center pt-2 border-t border-gray-100 text-xs">
+            <div className="flex justify-end items-center pt-2 border-t border-gray-100 text-[0.875rem] dlg-footer">
               <button
                 type="button"
                 onClick={() => setShowManageChargesModal(false)}
-                className="px-4 py-1.5 bg-gray-900 text-white font-bold rounded-xl text-xs cursor-pointer"
+                className="px-4 py-1.5 bg-gray-900 text-white font-semibold rounded-xl text-[0.875rem] cursor-pointer"
               >
                 Done
               </button>

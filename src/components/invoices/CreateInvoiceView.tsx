@@ -476,10 +476,10 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
       {/* Top Header & Breadcrumbs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-gray-150 shadow-2xs">
         <div>
-          <div className="flex items-center gap-2 text-xs font-medium text-gray-500 mb-1">
+          <div className="flex items-center gap-2 text-[0.875rem] font-medium text-gray-500 mb-1">
             <button
               onClick={onBack}
-              className="hover:text-blue-600 transition-colors flex items-center gap-1 cursor-pointer"
+              className="hover:text-blue-600 flex items-center gap-1 cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to Invoices</span>
@@ -496,21 +496,21 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl font-bold text-gray-900 tracking-tight">
+                <h1 className="text-xl font-semibold text-gray-900 tracking-tight">
                   {existingInvoice ? `Edit Invoice` : `Generate Sales Invoice`}
                 </h1>
                 {invoiceNo && (
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  <span className="px-2.5 py-0.5 rounded-full text-[0.875rem] font-mono font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                     {invoiceNo}
                   </span>
                 )}
                 {dispatchNo && (
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                  <span className="px-2.5 py-0.5 rounded-full text-[0.875rem] font-mono font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                     Challan: {dispatchNo}
                   </span>
                 )}
               </div>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-[0.875rem] text-gray-500 mt-0.5">
                 Review line items, pricing, transport details, and billing information before finalizing.
               </p>
             </div>
@@ -522,7 +522,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
           <button
             type="button"
             onClick={onBack}
-            className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+            className="btn-secondary"
           >
             Cancel
           </button>
@@ -530,7 +530,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
           <button
             type="button"
             onClick={handleTriggerPreview}
-            className="px-3.5 py-2 bg-white hover:bg-gray-50 text-blue-600 border border-blue-200 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+            className="px-3.5 py-2 bg-white hover:bg-gray-50 text-blue-600 border border-blue-200 rounded-xl text-[0.875rem] font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer"
           >
             <Eye className="w-4 h-4" />
             Preview
@@ -539,7 +539,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
           <button
             type="button"
             onClick={() => handleSaveInvoice(true)}
-            className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+            className="btn-secondary"
           >
             <Save className="w-4 h-4 text-gray-500" />
             Save as Draft
@@ -548,7 +548,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
           <button
             type="button"
             onClick={() => handleSaveInvoice(false)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+            className="btn-primary"
           >
             <Printer className="w-4 h-4" />
             Generate &amp; Print
@@ -561,22 +561,22 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2">
             <Truck className="w-4 h-4 text-blue-600" />
-            <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+            <span className="text-[0.875rem] font-medium text-slate-800 uppercase tracking-wider">
               Link Delivery Challan:
             </span>
-            <span className="text-xs text-slate-500 hidden sm:inline">
+            <span className="text-[0.875rem] text-slate-500 hidden sm:inline">
               Choose an approved delivery challan to auto-fill items and customer details
             </span>
           </div>
 
-          <div className="min-w-[300px]">
+          <div className="min-w-[18.75rem]">
             <select
               value={selectedDispatch?.dispatchNo || ''}
               onChange={e => {
                 const found = allDeliveries.find(d => d.dispatchNo === e.target.value);
                 if (found) handleSelectDispatchRecord(found);
               }}
-              className="w-full h-8.5 px-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
+              className="w-full h-8.5 px-3 bg-white border border-slate-200 rounded-xl text-[0.875rem] font-semibold text-slate-800 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
             >
               <option value="">— Select Delivery Challan (Optional) —</option>
               {allDeliveries.map(d => (
@@ -595,14 +595,14 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
         <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-2xs space-y-3.5">
           <div className="flex items-center gap-2 pb-2.5 border-b border-gray-100">
             <Truck className="w-4 h-4 text-blue-600" />
-            <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+            <h2 className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">
               Dispatch &amp; Delivery Details
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[0.875rem]">
             <div>
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                 Dispatch No.
               </label>
               <input
@@ -610,12 +610,12 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
                 placeholder="e.g. DO-001"
                 value={dispatchNo}
                 onChange={e => setDispatchNo(e.target.value)}
-                className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl font-mono font-bold text-gray-900 focus:outline-blue-500"
+                className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl font-mono font-semibold text-gray-900 focus:outline-blue-500"
               />
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                 Dispatch Date
               </label>
               <input
@@ -628,7 +628,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                 Sales Order No.
               </label>
               <input
@@ -641,7 +641,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                 Customer Name <span className="text-rose-500">*</span>
               </label>
               <input
@@ -649,12 +649,12 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
                 placeholder="Customer / Consignee"
                 value={customerName}
                 onChange={e => setCustomerName(e.target.value)}
-                className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl font-bold text-gray-900 focus:outline-blue-500"
+                className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl font-semibold text-gray-900 focus:outline-blue-500"
               />
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                 Transporter Name
               </label>
               <input
@@ -667,7 +667,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                 LR / Bilty No.
               </label>
               <input
@@ -686,23 +686,23 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
           <div className="flex items-center justify-between pb-2.5 border-b border-gray-100">
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-blue-600" />
-              <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+              <h2 className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">
                 Invoice Setup &amp; Terms
               </h2>
             </div>
             <button
               type="button"
               onClick={handleRegenerateSequence}
-              className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+              className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
             >
               <RefreshCw className="w-3 h-3" />
               Refresh Next Seq
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[0.875rem]">
             <div>
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                 Invoice Number <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
@@ -711,13 +711,13 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
                   value={invoiceNo}
                   onChange={e => setInvoiceNo(e.target.value)}
                   placeholder="e.g. INV-260001"
-                  className="w-full px-3 py-1.5 border border-blue-300 bg-blue-50/20 rounded-xl font-mono font-bold text-blue-900 focus:outline-blue-500"
+                  className="w-full px-3 py-1.5 border border-blue-300 bg-blue-50/20 rounded-xl font-mono font-semibold text-blue-900 focus:outline-blue-500"
                 />
               </div>
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                 Invoice Date
               </label>
               <input
@@ -730,7 +730,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                 Payment Terms
               </label>
               <select
@@ -748,7 +748,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                 Due Date
               </label>
               <input
@@ -761,7 +761,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                 Number of Packages
               </label>
               <input
@@ -774,7 +774,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                 Region / State
               </label>
               <input
@@ -794,11 +794,11 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
         <div className="flex items-center justify-between pb-2.5 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <MapPin className="w-4 h-4 text-blue-600" />
-            <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+            <h2 className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">
               Billing &amp; Delivery Addresses
             </h2>
           </div>
-          <label className="flex items-center gap-2 text-xs font-medium text-gray-600 cursor-pointer">
+          <label className="flex items-center gap-2 text-[0.875rem] font-medium text-gray-600 cursor-pointer">
             <input
               type="checkbox"
               checked={sameAsBillTo}
@@ -812,43 +812,43 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
           </label>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[0.875rem]">
           {/* Bill To */}
           <div className="p-3.5 rounded-xl border border-gray-150 bg-gray-50/60 relative group">
             <div className="flex items-center justify-between mb-2">
-              <span className="font-bold text-gray-700 uppercase text-[10px] tracking-wider">
+              <span className="font-medium text-gray-700 uppercase text-xs tracking-wider">
                 Bill To (Customer)
               </span>
               <button
                 type="button"
                 onClick={() => setIsEditingAddress('billTo')}
-                className="text-blue-600 hover:text-blue-800 text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                className="text-blue-600 hover:text-blue-800 text-xs font-semibold flex items-center gap-1 cursor-pointer"
               >
                 <Edit3 className="w-3 h-3" />
                 Edit
               </button>
             </div>
-            <p className="font-bold text-gray-900">{billToAddress?.name || customerName || 'Customer'}</p>
+            <p className="font-semibold text-gray-900">{billToAddress?.name || customerName || 'Customer'}</p>
             <p className="text-gray-600 mt-0.5">{billToAddress?.address || 'Street / Location'}</p>
             <p className="text-gray-600">
               {billToAddress?.city || city}{billToAddress?.state ? `, ${billToAddress.state}` : ''}{billToAddress?.pincode ? ` - ${billToAddress.pincode}` : ''}
             </p>
             {billToAddress?.phone && (
-              <p className="text-gray-500 font-mono text-[11px] mt-1">Ph: {billToAddress.phone}</p>
+              <p className="text-gray-500 font-mono text-xs mt-1">Ph: {billToAddress.phone}</p>
             )}
           </div>
 
           {/* Ship To */}
           <div className="p-3.5 rounded-xl border border-gray-150 bg-gray-50/60 relative group">
             <div className="flex items-center justify-between mb-2">
-              <span className="font-bold text-gray-700 uppercase text-[10px] tracking-wider">
+              <span className="font-medium text-gray-700 uppercase text-xs tracking-wider">
                 Ship To (Delivery Site)
               </span>
               {!sameAsBillTo && (
                 <button
                   type="button"
                   onClick={() => setIsEditingAddress('shipTo')}
-                  className="text-blue-600 hover:text-blue-800 text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                  className="text-blue-600 hover:text-blue-800 text-xs font-semibold flex items-center gap-1 cursor-pointer"
                 >
                   <Edit3 className="w-3 h-3" />
                   Edit
@@ -859,13 +859,13 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
               <div className="text-gray-500 italic py-2">Same as billing address</div>
             ) : (
               <>
-                <p className="font-bold text-gray-900">{shipToAddress?.name || customerName || 'Customer'}</p>
+                <p className="font-semibold text-gray-900">{shipToAddress?.name || customerName || 'Customer'}</p>
                 <p className="text-gray-600 mt-0.5">{shipToAddress?.address || 'Street / Location'}</p>
                 <p className="text-gray-600">
                   {shipToAddress?.city || city}{shipToAddress?.state ? `, ${shipToAddress.state}` : ''}{shipToAddress?.pincode ? ` - ${shipToAddress.pincode}` : ''}
                 </p>
                 {shipToAddress?.phone && (
-                  <p className="text-gray-500 font-mono text-[11px] mt-1">Ph: {shipToAddress.phone}</p>
+                  <p className="text-gray-500 font-mono text-xs mt-1">Ph: {shipToAddress.phone}</p>
                 )}
               </>
             )}
@@ -878,14 +878,14 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
         <div className="p-4 sm:p-5 pb-3 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Package className="w-4 h-4 text-blue-600" />
-            <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+            <h2 className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">
               Dispatched Line Items ({items.length})
             </h2>
           </div>
           <button
             type="button"
             onClick={handleAddItem}
-            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-colors cursor-pointer inline-flex items-center gap-1 border border-blue-200"
+            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[0.875rem] font-semibold cursor-pointer inline-flex items-center gap-1 border border-blue-200"
           >
             <Plus className="w-3.5 h-3.5" />
             Add Item
@@ -893,9 +893,9 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-left text-[0.875rem] border-collapse">
             <thead>
-              <tr className="bg-gray-50 text-gray-500 font-bold border-b border-gray-200 text-[10px] uppercase tracking-wider">
+              <tr className="bg-gray-50 text-gray-500 font-medium border-b border-gray-200 text-xs uppercase tracking-wider">
                 <th className="py-2.5 px-3 text-center w-8">
                   <input
                     type="checkbox"
@@ -918,16 +918,16 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
                 <th className="py-2.5 px-2 text-center w-8"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 text-xs">
+            <tbody className="divide-y divide-gray-100 text-[0.875rem]">
               {items.length === 0 ? (
                 <tr>
                   <td colSpan={13} className="py-12 text-center text-gray-400">
                     <Package className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                    <p className="text-xs font-semibold text-gray-600">No line items in this invoice yet.</p>
+                    <p className="text-[0.875rem] font-semibold text-gray-600">No line items in this invoice yet.</p>
                     <button
                       type="button"
                       onClick={handleAddItem}
-                      className="mt-2 text-xs font-bold text-blue-600 hover:text-blue-800"
+                      className="mt-2 text-[0.875rem] font-semibold text-blue-600 hover:text-blue-800"
                     >
                       + Add Item Manually
                     </button>
@@ -939,7 +939,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
                   return (
                     <tr
                       key={row.itemId || idx}
-                      className={`hover:bg-blue-50/20 transition-colors ${
+                      className={`hover:bg-blue-50/20 ${
                         !isChecked ? 'opacity-40 bg-gray-50/40' : ''
                       }`}
                     >
@@ -961,7 +961,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
                           type="text"
                           value={row.itemCode}
                           onChange={e => handleItemFieldChange(idx, 'itemCode', e.target.value)}
-                          className="w-20 px-1.5 py-1 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded text-xs font-mono font-bold"
+                          className="w-20 px-1.5 py-1 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded text-[0.875rem] font-mono font-semibold"
                         />
                       </td>
 
@@ -970,7 +970,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
                           type="text"
                           value={row.itemName}
                           onChange={e => handleItemFieldChange(idx, 'itemName', e.target.value)}
-                          className="w-full px-1.5 py-1 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded text-xs font-semibold text-gray-900"
+                          className="w-full px-1.5 py-1 border border-transparent hover:border-gray-300 focus:border-blue-500 rounded text-[0.875rem] font-semibold text-gray-900"
                         />
                       </td>
 
@@ -993,7 +993,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
                           min="0"
                           value={row.invoiceQtyGbl}
                           onChange={e => handleItemFieldChange(idx, 'invoiceQtyGbl', e.target.value)}
-                          className="w-20 px-2 py-1 text-right border border-gray-200 rounded-lg font-mono font-bold text-gray-900 focus:outline-blue-500 bg-white"
+                          className="w-20 px-2 py-1 text-right border border-gray-200 rounded-lg font-mono font-semibold text-gray-900 focus:outline-blue-500 bg-white"
                         />
                       </td>
 
@@ -1001,7 +1001,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
                         {row.invoiceQtyPcs?.toLocaleString('en-IN')}
                       </td>
 
-                      <td className="py-2.5 px-3 text-gray-600 text-[11px] truncate max-w-[150px]">
+                      <td className="py-2.5 px-3 text-gray-600 text-xs truncate max-w-[9.375rem]">
                         {row.locationName || 'Main Storage'}
                       </td>
 
@@ -1016,7 +1016,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
                         />
                       </td>
 
-                      <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-900">
+                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-gray-900">
                         ₹{row.amount?.toLocaleString('en-IN')}
                       </td>
 
@@ -1024,7 +1024,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
                         <button
                           type="button"
                           onClick={() => handleRemoveItem(idx)}
-                          className="p-1 text-gray-400 hover:text-rose-600 transition-colors cursor-pointer"
+                          className="icon-btn-danger"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -1043,15 +1043,15 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
         {/* Additional Charges Card (Card 5) */}
         <div className="lg:col-span-4 bg-white border border-gray-150 rounded-2xl p-5 shadow-2xs space-y-3">
           <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-            <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+            <h2 className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">
               Additional Charges
             </h2>
-            <span className="text-[10px] text-gray-400">Freight, Packing, etc.</span>
+            <span className="text-xs text-gray-400">Freight, Packing, etc.</span>
           </div>
 
           <div className="space-y-2">
             {additionalCharges.map((ch, idx) => (
-              <div key={idx} className="flex items-center gap-2 text-xs">
+              <div key={idx} className="flex items-center gap-2 text-[0.875rem]">
                 <input
                   type="text"
                   value={ch.description}
@@ -1076,7 +1076,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
                 <button
                   type="button"
                   onClick={() => handleRemoveCharge(idx)}
-                  className="p-1 text-gray-400 hover:text-rose-600 cursor-pointer"
+                  className="icon-btn-danger"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -1087,7 +1087,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
           <button
             type="button"
             onClick={handleAddCharge}
-            className="text-blue-600 hover:text-blue-800 text-xs font-bold flex items-center gap-1 cursor-pointer"
+            className="text-blue-600 hover:text-blue-800 text-[0.875rem] font-semibold flex items-center gap-1 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             Add Charge
@@ -1097,7 +1097,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
         {/* Remarks Card (Card 6) */}
         <div className="lg:col-span-4 bg-white border border-gray-150 rounded-2xl p-5 shadow-2xs flex flex-col">
           <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
-            <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+            <h2 className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">
               Remarks (Optional)
             </h2>
           </div>
@@ -1106,7 +1106,7 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
             value={remarks}
             onChange={e => setRemarks(e.target.value)}
             placeholder="Enter invoice remarks or notes..."
-            className="w-full flex-1 p-3 border border-gray-200 rounded-xl text-xs text-gray-800 focus:outline-blue-500 resize-none"
+            className="w-full flex-1 p-3 border border-gray-200 rounded-xl text-[0.875rem] text-gray-800 focus:outline-blue-500 resize-none"
           />
         </div>
 
@@ -1115,32 +1115,32 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
           <div>
             <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
               <FileText className="w-4 h-4 text-emerald-600" />
-              <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Invoice Summary</h2>
+              <h2 className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">Invoice Summary</h2>
             </div>
 
-            <div className="space-y-2.5 text-xs">
+            <div className="space-y-2.5 text-[0.875rem]">
               <div className="flex justify-between text-gray-600">
                 <span>Total Quantity (GBL)</span>
-                <span className="font-bold text-gray-900">{totalInvoiceGbl}</span>
+                <span className="font-semibold text-gray-900">{totalInvoiceGbl}</span>
               </div>
               <div className="flex justify-between text-gray-600">
                 <span>Total Quantity (PCS)</span>
-                <span className="font-bold text-gray-900">{totalInvoicePcs.toLocaleString('en-IN')}</span>
+                <span className="font-semibold text-gray-900">{totalInvoicePcs.toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between text-gray-600">
                 <span>Total Amount</span>
-                <span className="font-mono font-bold text-gray-900">₹{subtotalAmount.toLocaleString('en-IN')}</span>
+                <span className="font-mono font-semibold text-gray-900">₹{subtotalAmount.toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between text-gray-600">
                 <span>Additional Charges</span>
-                <span className="font-mono font-bold text-gray-900">₹{totalChargesAmount.toLocaleString('en-IN')}</span>
+                <span className="font-mono font-semibold text-gray-900">₹{totalChargesAmount.toLocaleString('en-IN')}</span>
               </div>
             </div>
           </div>
 
           <div className="pt-3 border-t-2 border-gray-150 mt-4 flex items-baseline justify-between">
-            <span className="text-sm font-bold text-gray-900">Grand Total</span>
-            <span className="text-xl font-black text-emerald-600 font-mono">
+            <span className="text-[0.875rem] font-semibold text-gray-900">Grand Total</span>
+            <span className="text-xl font-semibold text-emerald-600 font-mono">
               ₹{grandTotal.toLocaleString('en-IN')}
             </span>
           </div>
@@ -1149,12 +1149,12 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
 
       {/* Address Edit Dialog */}
       {isEditingAddress && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-5 w-full max-w-md space-y-3">
-            <h3 className="text-sm font-bold text-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40">
+          <div className="bg-white p-5 w-full max-w-md space-y-3 dlg-panel">
+            <h3 className="text-[0.875rem] font-semibold text-gray-900">
               Edit {isEditingAddress === 'billTo' ? 'Billing' : 'Shipping'} Address
             </h3>
-            <div className="space-y-2 text-xs">
+            <div className="space-y-2 text-[0.875rem]">
               <div>
                 <label className="text-gray-500 block mb-0.5">Firm / Customer Name</label>
                 <input
@@ -1236,11 +1236,11 @@ export const CreateInvoiceView: React.FC<CreateInvoiceViewProps> = ({
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-2 dlg-footer">
               <button
                 type="button"
                 onClick={() => setIsEditingAddress(null)}
-                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer"
+                className="btn-primary"
               >
                 Done
               </button>

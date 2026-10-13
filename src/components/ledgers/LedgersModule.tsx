@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  FileText, Search, Download, Plus, ChevronLeft, ChevronRight,
+  FileText, Search, Filter, Download, Plus, ChevronLeft, ChevronRight,
   Printer, ChevronDown, MessageCircle, User, Info, X, ExternalLink,
   CheckCircle2, Clock, AlertCircle, ShoppingBag, Truck, IndianRupee, Layers
 } from 'lucide-react';
@@ -65,6 +65,7 @@ export const LedgersModule: React.FC = () => {
 
   // Active Tab State
   const [activeTab, setActiveTab] = useState<LedgerTabType>('transaction');
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
 
   // Filter States
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('ALL');
@@ -570,181 +571,26 @@ export const LedgersModule: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-slate-800">
+    <div className="min-h-[calc(100*var(--vh,1vh))] bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
       
-      {/* ── 1. BREADCRUMB & HEADER BANNER ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-150 shadow-2xs">
+      {/* ── 1. HEADER ── */}
+      <div className="flex items-baseline justify-between gap-4 px-1">
         <div>
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-500 mb-1">
-            <span>Reports</span>
-            <span>&gt;</span>
-            <span className="text-slate-900 font-semibold">Ledgers</span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200/80 flex items-center justify-center text-blue-600 shadow-2xs">
-              <FileText className="w-5 h-5 text-blue-600 stroke-[2.2]" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight">Ledgers</h1>
-              <p className="text-xs text-slate-500">
-                View customer ledger, outstanding, payments and transaction history.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Top Right Header Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {activeCustomer && (
-            <button
-              onClick={() => setIsCustomerDetailsModalOpen(true)}
-              className="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors shadow-2xs cursor-pointer"
-            >
-              <User className="w-4 h-4 text-blue-600" />
-              <span>Customer Info</span>
-            </button>
-          )}
-
-          <button
-            onClick={handleExportExcel}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors shadow-2xs cursor-pointer"
-          >
-            <Download className="w-4 h-4 text-slate-500" />
-            <span>Export Excel</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setPaymentModalDefaultCustId(activeCustomer?.id);
-              setPaymentModalDefaultAmount(undefined);
-              setIsRecordPaymentOpen(true);
-            }}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-blue-500/25 transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>+ Record Payment</span>
-          </button>
+          <h1 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <span>Ledgers</span>
+            <span className="text-xs font-medium text-gray-500">{filteredLedgerRows.length} total</span>
+          </h1>
+          <p className="text-[0.875rem] text-gray-500">
+            Customer ledger, outstanding, payments &amp; transaction history.
+          </p>
         </div>
       </div>
 
-
-      {/* ── 2. FILTER BAR ── */}
-      <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200/80 flex flex-wrap items-end gap-3 shadow-2xs">
-        
-        {/* Customer Select Dropdown */}
-        <div className="flex-1 min-w-[240px]">
-          <div className="flex items-center justify-between mb-1">
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              Customer
-            </label>
-            {activeCustomer && (
-              <button
-                onClick={() => setIsCustomerDetailsModalOpen(true)}
-                className="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <span>View Details</span>
-                <Info className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-          <div className="relative">
-            <select
-              value={selectedCustomerId}
-              onChange={(e) => setSelectedCustomerId(e.target.value)}
-              className="w-full pl-3 pr-8 py-2 bg-white border border-slate-250 rounded-xl text-xs font-bold text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 outline-none transition-all appearance-none shadow-2xs cursor-pointer"
-            >
-              <option value="ALL">All Customers</option>
-              {customers.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.name} {c.code ? `(${c.code})` : ''}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
-          </div>
-        </div>
-
-        {/* Date From */}
-        <div className="w-36">
-          <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-            Date From
-          </label>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="w-full px-3 py-2 bg-white border border-slate-250 rounded-xl text-xs font-semibold text-slate-800 focus:border-blue-600 outline-none shadow-2xs"
-          />
-        </div>
-
-        {/* Date To */}
-        <div className="w-36">
-          <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-            Date To
-          </label>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="w-full px-3 py-2 bg-white border border-slate-250 rounded-xl text-xs font-semibold text-slate-800 focus:border-blue-600 outline-none shadow-2xs"
-          />
-        </div>
-
-        {/* Region */}
-        <div className="w-36">
-          <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-            Region
-          </label>
-          <select
-            value={selectedRegion}
-            onChange={(e) => setSelectedRegion(e.target.value)}
-            className="w-full px-3 py-2 bg-white border border-slate-250 rounded-xl text-xs font-semibold text-slate-800 focus:border-blue-600 outline-none shadow-2xs"
-          >
-            <option value="ALL">All Regions</option>
-            {regionOptions.map(r => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Status */}
-        <div className="w-32">
-          <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-            Status
-          </label>
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="w-full px-3 py-2 bg-white border border-slate-250 rounded-xl text-xs font-semibold text-slate-800 focus:border-blue-600 outline-none shadow-2xs"
-          >
-            <option value="ALL">All</option>
-            <option value="Invoice">Invoices</option>
-            <option value="Payment">Payments</option>
-            <option value="Dispatch">Dispatches</option>
-          </select>
-        </div>
-
-        {/* Apply & Reset Buttons */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCurrentPage(1)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-colors cursor-pointer"
-          >
-            Apply
-          </button>
-          <button
-            onClick={handleResetFilters}
-            className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-250 rounded-xl text-xs font-bold transition-colors shadow-2xs cursor-pointer"
-          >
-            Reset
-          </button>
-        </div>
-      </div>
-
-
-      {/* ── 3. TABS NAVIGATION BAR (Matching InvoicesModule) ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 bg-white px-4 rounded-2xl shadow-2xs relative">
+      {/* ── 2. TABS & ACTION TOOLBAR (same as Item Master / Business Directory) ── */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between border-b border-gray-200 bg-white px-1 relative">
+        {showFilterPanel && (
+          <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowFilterPanel(false)} />
+        )}
         <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full">
           {[
             { id: 'transaction', label: 'Transaction Ledger', count: filteredLedgerRows.length },
@@ -759,15 +605,15 @@ export const LedgersModule: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => { setActiveTab(tab.id as any); setCurrentPage(1); }}
-                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
                   active 
-                    ? 'border-blue-600 text-blue-700 bg-transparent'
+                    ? 'border-blue-700 text-blue-700 bg-transparent'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
                 }`}
               >
                 <span>{tab.label}</span>
                 {tab.count !== undefined && (
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                  <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
                     active ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-700'
                   }`}>
                     {tab.count}
@@ -778,60 +624,233 @@ export const LedgersModule: React.FC = () => {
           })}
         </div>
 
-        {/* Action on Right of Tab Bar */}
-        <div className="py-2 flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => setIsPrintModalOpen(true)}
-            className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+
+        {/* Toolbar */}
+        <div className="py-2 flex items-center gap-2 shrink-0 flex-wrap">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              placeholder={`Search ${activeTab.replace('_', ' ')}...`}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 pr-3 py-1.5 text-[0.875rem] bg-gray-50 border border-gray-200 rounded-xl w-40 md:w-52 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs"
+            />
+          </div>
+
+          {/* Filters */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowFilterPanel(v => !v)}
+              className="p-2 rounded-xl border bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200 flex items-center justify-center cursor-pointer shadow-2xs"
+              title="Filters"
+              aria-label="Filters"
+            >
+              <Filter className="w-4 h-4" />
+            </button>
+            {showFilterPanel && (
+              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl border border-gray-200 shadow-2xl p-4 z-50 text-left space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                  <h4 className="text-[0.875rem] font-semibold text-gray-900">Filters</h4>
+                  <button onClick={() => setShowFilterPanel(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 cursor-pointer">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+        
+        {/* Customer Select Dropdown */}
+        <div className="w-full">
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-medium text-slate-600 uppercase tracking-wider">
+              Customer
+            </label>
+            {activeCustomer && (
+              <button
+                onClick={() => setIsCustomerDetailsModalOpen(true)}
+                className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <span>View Details</span>
+                <Info className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+          <div className="relative">
+            <select
+              value={selectedCustomerId}
+              onChange={(e) => setSelectedCustomerId(e.target.value)}
+              className="w-full pl-3 pr-8 py-2 bg-white border border-slate-250 rounded-xl text-[0.875rem] font-semibold text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 outline-none appearance-none shadow-2xs cursor-pointer"
+            >
+              <option value="ALL">All Customers</option>
+              {customers.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.name} {c.code ? `(${c.code})` : ''}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
+          </div>
+        </div>
+
+        {/* Date From */}
+        <div className="w-full">
+          <label className="block text-xs font-medium text-slate-600 uppercase tracking-wider mb-1">
+            Date From
+          </label>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="w-full px-3 py-2 bg-white border border-slate-250 rounded-xl text-[0.875rem] font-semibold text-slate-800 focus:border-blue-600 outline-none shadow-2xs"
+          />
+        </div>
+
+        {/* Date To */}
+        <div className="w-full">
+          <label className="block text-xs font-medium text-slate-600 uppercase tracking-wider mb-1">
+            Date To
+          </label>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="w-full px-3 py-2 bg-white border border-slate-250 rounded-xl text-[0.875rem] font-semibold text-slate-800 focus:border-blue-600 outline-none shadow-2xs"
+          />
+        </div>
+
+        {/* Region */}
+        <div className="w-full">
+          <label className="block text-xs font-medium text-slate-600 uppercase tracking-wider mb-1">
+            Region
+          </label>
+          <select
+            value={selectedRegion}
+            onChange={(e) => setSelectedRegion(e.target.value)}
+            className="w-full px-3 py-2 bg-white border border-slate-250 rounded-xl text-[0.875rem] font-semibold text-slate-800 focus:border-blue-600 outline-none shadow-2xs"
           >
-            <Printer className="w-3.5 h-3.5 text-slate-500" />
-            <span>Print Ledger</span>
+            <option value="ALL">All Regions</option>
+            {regionOptions.map(r => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Status */}
+        <div className="w-full">
+          <label className="block text-xs font-medium text-slate-600 uppercase tracking-wider mb-1">
+            Status
+          </label>
+          <select
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            className="w-full px-3 py-2 bg-white border border-slate-250 rounded-xl text-[0.875rem] font-semibold text-slate-800 focus:border-blue-600 outline-none shadow-2xs"
+          >
+            <option value="ALL">All</option>
+            <option value="Invoice">Invoices</option>
+            <option value="Payment">Payments</option>
+            <option value="Dispatch">Dispatches</option>
+          </select>
+        </div>
+
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={() => { setCurrentPage(1); setShowFilterPanel(false); }}
+                    className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[0.875rem] font-semibold shadow-2xs cursor-pointer"
+                  >
+                    Apply
+                  </button>
+                  <button
+                    onClick={handleResetFilters}
+                    className="flex-1 px-4 py-2 bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-xl text-[0.875rem] font-semibold shadow-2xs cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {activeCustomer && (
+            <button
+              type="button"
+              onClick={() => setIsCustomerDetailsModalOpen(true)}
+              className="p-2 rounded-xl border bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200 flex items-center justify-center cursor-pointer shadow-2xs"
+              title="Customer Info"
+            >
+              <User className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsPrintModalOpen(true)}
+            className="p-2 rounded-xl border bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200 flex items-center justify-center cursor-pointer shadow-2xs"
+            title="Print Ledger"
+          >
+            <Printer className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            className="p-2 rounded-xl border bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200 flex items-center justify-center cursor-pointer shadow-2xs"
+            title="Export Excel"
+          >
+            <Download className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => { setIsCreateInvoiceModalOpen(true); }}
+            className="p-2 rounded-xl border bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200 flex items-center justify-center cursor-pointer shadow-2xs"
+            title="Create New Invoice"
+          >
+            <FileText className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleSendWhatsAppStatement}
+            className="p-2 rounded-xl border bg-white hover:bg-blue-50/60 text-emerald-600 border-gray-200 hover:border-emerald-200 flex items-center justify-center cursor-pointer shadow-2xs"
+            title="Send Statement (WhatsApp)"
+          >
+            <MessageCircle className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPaymentModalDefaultCustId(activeCustomer?.id);
+              setPaymentModalDefaultAmount(undefined);
+              setIsRecordPaymentOpen(true);
+            }}
+            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[0.875rem] font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Record Payment</span>
           </button>
         </div>
       </div>
 
-
       {/* ── 4. MAIN DYNAMIC TABS VIEW & SIDEBAR ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      <div>
         
         {/* LEFT MAIN AREA (3 COLS) */}
-        <div className="lg:col-span-3 space-y-3">
+        <div className="space-y-3">
           
-          {/* Search & Actions Bar */}
-          <div className="flex items-center justify-between gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                placeholder={`Search in ${activeTab.replace('_', ' ')}...`}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-250 rounded-lg text-xs font-medium text-slate-800 outline-none focus:border-blue-600 shadow-2xs"
-              />
-            </div>
-            <span className="text-xs text-slate-500 font-medium">
-              Showing active view results
-            </span>
-          </div>
-
           {/* DYNAMIC TAB 1: TRANSACTION LEDGER */}
           {activeTab === 'transaction' && (
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
+            <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2">
               {isLoading ? (
-                <div className="p-12 text-center text-slate-400 text-xs font-bold">
+                <div className="p-12 text-center text-slate-400 text-[0.875rem] font-semibold">
                   Loading ledger entries...
                 </div>
               ) : filteredLedgerRows.length === 0 ? (
                 <div className="p-12 text-center space-y-2">
                   <FileText className="w-8 h-8 text-slate-300 mx-auto" />
-                  <p className="text-sm font-bold text-slate-700">No transaction entries found</p>
-                  <p className="text-xs text-slate-500">Try clearing filters or select a different customer</p>
+                  <p className="text-[0.875rem] font-semibold text-slate-700">No transaction entries found</p>
+                  <p className="text-[0.875rem] text-slate-500">Try clearing filters or select a different customer</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
+                  <table className="w-full text-left text-[0.875rem] text-gray-700">
                     <thead>
-                      <tr className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      <tr className="text-xs uppercase font-semibold text-gray-600 border-b border-gray-200">
                         <th className="py-3 px-3 w-10 text-center">#</th>
                         <th className="py-3 px-3">DATE</th>
                         <th className="py-3 px-3">TYPE</th>
@@ -842,7 +861,7 @@ export const LedgersModule: React.FC = () => {
                         <th className="py-3 px-3 text-right">BALANCE (₹)</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-150">
+                    <tbody className="divide-y divide-gray-100 text-gray-700">
                       {filteredLedgerRows.map((row, idx) => {
                         const isExpanded = expandedRowIds.has(row.id);
                         let typeBadgeStyle = 'bg-slate-100 text-slate-700 border-slate-200';
@@ -850,29 +869,29 @@ export const LedgersModule: React.FC = () => {
                         if (row.type === 'Payment') typeBadgeStyle = 'bg-emerald-50 text-emerald-700 border-emerald-200';
                         if (row.type === 'Discount') typeBadgeStyle = 'bg-red-50 text-red-700 border-red-200';
                         if (row.type === 'Dispatch') typeBadgeStyle = 'bg-amber-50 text-amber-700 border-amber-200';
-                        if (row.type === 'Adjustment') typeBadgeStyle = 'bg-purple-50 text-purple-700 border-purple-200';
-                        if (row.type === 'Opening') typeBadgeStyle = 'bg-sky-50 text-sky-700 border-sky-200';
+                        if (row.type === 'Adjustment') typeBadgeStyle = 'bg-blue-50 text-blue-700 border-blue-200';
+                        if (row.type === 'Opening') typeBadgeStyle = 'bg-blue-50 text-blue-700 border-blue-200';
 
                         return (
                           <React.Fragment key={row.id}>
                             <tr
                               onClick={() => toggleRowExpand(row.id)}
-                              className={`cursor-pointer transition-colors duration-150 ${
+                              className={`cursor-pointer ${
                                 idx % 2 === 0 ? 'bg-white hover:bg-slate-50/80' : 'bg-slate-50/40 hover:bg-slate-100/60'
                               }`}
                             >
-                              <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px]">
+                              <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-xs">
                                 {idx + 1}
                               </td>
                               <td className="py-2.5 px-3 font-medium text-slate-700 whitespace-nowrap">
                                 {row.date || '—'}
                               </td>
                               <td className="py-2.5 px-3">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${typeBadgeStyle}`}>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${typeBadgeStyle}`}>
                                   {row.type}
                                 </span>
                               </td>
-                              <td className="py-2.5 px-3 font-mono font-bold text-blue-600 hover:underline">
+                              <td className="py-2.5 px-3 font-mono font-semibold text-blue-600 hover:underline">
                                 {row.refNo}
                               </td>
                               <td className="py-2.5 px-3 font-medium text-slate-800">
@@ -884,17 +903,17 @@ export const LedgersModule: React.FC = () => {
                               <td className="py-2.5 px-3 text-right font-semibold text-emerald-700">
                                 {row.credit > 0 ? row.credit.toLocaleString('en-IN') : '—'}
                               </td>
-                              <td className="py-2.5 px-3 text-right font-bold text-slate-900 whitespace-nowrap">
+                              <td className="py-2.5 px-3 text-right font-semibold text-slate-900 whitespace-nowrap">
                                 {row.balance.toLocaleString('en-IN')}{' '}
-                                <span className="text-[10px] text-slate-500 font-bold">{row.balanceType}</span>
+                                <span className="text-xs text-slate-500 font-semibold">{row.balanceType}</span>
                               </td>
                             </tr>
                             {isExpanded && (
                               <tr className="bg-slate-50 border-y border-slate-200">
                                 <td colSpan={8} className="p-4">
-                                  <div className="bg-white p-3.5 rounded-xl border border-slate-200 text-xs space-y-2">
+                                  <div className="bg-white p-3.5 rounded-xl border border-slate-200 text-[0.875rem] space-y-2">
                                     <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                                      <span className="font-bold text-slate-800">Entry Details — {row.refNo}</span>
+                                      <span className="font-semibold text-slate-800">Entry Details — {row.refNo}</span>
                                       <span className="text-slate-500">{row.date || '—'}</span>
                                     </div>
                                     <p className="text-slate-600">Particulars: <span className="font-medium text-slate-800">{row.particulars}</span></p>
@@ -915,14 +934,14 @@ export const LedgersModule: React.FC = () => {
 
           {/* DYNAMIC TAB 2: INVOICE WISE */}
           {activeTab === 'invoice_wise' && (
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
+            <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2">
               {filteredInvoiceWiseData.length === 0 ? (
-                <div className="p-12 text-center text-slate-400 text-xs font-bold">No sales invoices found</div>
+                <div className="p-12 text-center text-slate-400 text-[0.875rem] font-semibold">No sales invoices found</div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
+                  <table className="w-full text-left text-[0.875rem] text-gray-700">
                     <thead>
-                      <tr className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      <tr className="text-xs uppercase font-semibold text-gray-600 border-b border-gray-200">
                         <th className="py-3 px-3 w-10 text-center">#</th>
                         <th className="py-3 px-3">INVOICE NO</th>
                         <th className="py-3 px-3">DATE</th>
@@ -932,17 +951,17 @@ export const LedgersModule: React.FC = () => {
                         <th className="py-3 px-3 text-center">STATUS</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-150">
+                    <tbody className="divide-y divide-gray-100 text-gray-700">
                       {filteredInvoiceWiseData.map((inv, idx) => (
                         <tr key={inv._id || idx} className="hover:bg-slate-50">
-                          <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px]">{idx + 1}</td>
-                          <td className="py-2.5 px-3 font-mono font-bold text-blue-600">{inv.invoiceNumber}</td>
+                          <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
+                          <td className="py-2.5 px-3 font-mono font-semibold text-blue-600">{inv.invoiceNumber}</td>
                           <td className="py-2.5 px-3 font-medium text-slate-700">{inv.invoiceDate}</td>
                           <td className="py-2.5 px-3 font-semibold text-slate-900">{inv.customerName}</td>
                           <td className="py-2.5 px-3 text-right font-medium text-slate-700">₹{(inv.subtotal || 0).toLocaleString('en-IN')}</td>
-                          <td className="py-2.5 px-3 text-right font-bold text-slate-900">₹{(inv.grandTotal || inv.subtotal || 0).toLocaleString('en-IN')}</td>
+                          <td className="py-2.5 px-3 text-right font-semibold text-slate-900">₹{(inv.grandTotal || inv.subtotal || 0).toLocaleString('en-IN')}</td>
                           <td className="py-2.5 px-3 text-center">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                               {inv.status || 'Created'}
                             </span>
                           </td>
@@ -957,14 +976,14 @@ export const LedgersModule: React.FC = () => {
 
           {/* DYNAMIC TAB 3: PAYMENT WISE */}
           {activeTab === 'payment_wise' && (
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
+            <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2">
               {filteredPaymentWiseData.length === 0 ? (
-                <div className="p-12 text-center text-slate-400 text-xs font-bold">No payments or receipts recorded</div>
+                <div className="p-12 text-center text-slate-400 text-[0.875rem] font-semibold">No payments or receipts recorded</div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
+                  <table className="w-full text-left text-[0.875rem] text-gray-700">
                     <thead>
-                      <tr className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      <tr className="text-xs uppercase font-semibold text-gray-600 border-b border-gray-200">
                         <th className="py-3 px-3 w-10 text-center">#</th>
                         <th className="py-3 px-3">RECEIPT / REF NO</th>
                         <th className="py-3 px-3">DATE</th>
@@ -974,16 +993,16 @@ export const LedgersModule: React.FC = () => {
                         <th className="py-3 px-3 text-right">AMOUNT (₹)</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-150">
+                    <tbody className="divide-y divide-gray-100 text-gray-700">
                       {filteredPaymentWiseData.map((tx, idx) => (
                         <tr key={tx._id || idx} className="hover:bg-slate-50">
-                          <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px]">{idx + 1}</td>
-                          <td className="py-2.5 px-3 font-mono font-bold text-emerald-700">{tx.referenceId || '—'}</td>
+                          <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
+                          <td className="py-2.5 px-3 font-mono font-semibold text-emerald-700">{tx.referenceId || '—'}</td>
                           <td className="py-2.5 px-3 font-medium text-slate-700">{tx.date?.split('T')[0] || '—'}</td>
                           <td className="py-2.5 px-3 font-semibold text-slate-900">{tx.partyName || tx.ledgerAccount}</td>
-                          <td className="py-2.5 px-3 font-bold text-slate-600">{tx.paymentMethod || 'UPI'}</td>
+                          <td className="py-2.5 px-3 font-semibold text-slate-600">{tx.paymentMethod || 'UPI'}</td>
                           <td className="py-2.5 px-3 text-slate-600">{tx.description || 'Customer Payment'}</td>
-                          <td className="py-2.5 px-3 text-right font-bold text-emerald-700">₹{(tx.amount || 0).toLocaleString('en-IN')}</td>
+                          <td className="py-2.5 px-3 text-right font-semibold text-emerald-700">₹{(tx.amount || 0).toLocaleString('en-IN')}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -995,17 +1014,17 @@ export const LedgersModule: React.FC = () => {
 
           {/* DYNAMIC TAB 4: OUTSTANDING INVOICES */}
           {activeTab === 'outstanding' && (
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
+            <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2">
               {filteredOutstandingData.length === 0 ? (
-                <div className="p-12 text-center text-emerald-600 text-xs font-bold space-y-1">
+                <div className="p-12 text-center text-emerald-600 text-[0.875rem] font-semibold space-y-1">
                   <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
                   <p>All invoices paid! No pending outstanding bills.</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
+                  <table className="w-full text-left text-[0.875rem] text-gray-700">
                     <thead>
-                      <tr className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      <tr className="text-xs uppercase font-semibold text-gray-600 border-b border-gray-200">
                         <th className="py-3 px-3 w-10 text-center">#</th>
                         <th className="py-3 px-3">INVOICE NO</th>
                         <th className="py-3 px-3">DATE</th>
@@ -1017,18 +1036,18 @@ export const LedgersModule: React.FC = () => {
                         <th className="py-3 px-3 text-center">ACTION</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-150">
+                    <tbody className="divide-y divide-gray-100 text-gray-700">
                       {filteredOutstandingData.map((inv, idx) => (
                         <tr key={inv._id || idx} className="hover:bg-slate-50">
-                          <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px]">{idx + 1}</td>
-                          <td className="py-2.5 px-3 font-mono font-bold text-blue-600">{inv.invoiceNumber}</td>
+                          <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
+                          <td className="py-2.5 px-3 font-mono font-semibold text-blue-600">{inv.invoiceNumber}</td>
                           <td className="py-2.5 px-3 font-medium text-slate-700">{inv.invoiceDate}</td>
                           <td className="py-2.5 px-3 font-semibold text-slate-900">{inv.customerName}</td>
                           <td className="py-2.5 px-3 text-right font-medium text-slate-700">₹{inv.grandTotal.toLocaleString('en-IN')}</td>
                           <td className="py-2.5 px-3 text-right font-medium text-emerald-700">₹{inv.paid.toLocaleString('en-IN')}</td>
-                          <td className="py-2.5 px-3 text-right font-bold text-red-600">₹{inv.pending.toLocaleString('en-IN')}</td>
+                          <td className="py-2.5 px-3 text-right font-semibold text-red-600">₹{inv.pending.toLocaleString('en-IN')}</td>
                           <td className="py-2.5 px-3 text-center">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                               inv.daysOverdue > 30 ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-700'
                             }`}>
                               {inv.daysOverdue} days
@@ -1037,7 +1056,7 @@ export const LedgersModule: React.FC = () => {
                           <td className="py-2.5 px-3 text-center">
                             <button
                               onClick={() => handleTriggerPaymentForInvoice(inv)}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold shadow-2xs transition-colors cursor-pointer"
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-2xs cursor-pointer"
                             >
                               Pay Bill
                             </button>
@@ -1053,14 +1072,14 @@ export const LedgersModule: React.FC = () => {
 
           {/* DYNAMIC TAB 5: DISPATCH WISE */}
           {activeTab === 'dispatch_wise' && (
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
+            <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2">
               {filteredDispatchWiseData.length === 0 ? (
-                <div className="p-12 text-center text-slate-400 text-xs font-bold">No delivery dispatches found</div>
+                <div className="p-12 text-center text-slate-400 text-[0.875rem] font-semibold">No delivery dispatches found</div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
+                  <table className="w-full text-left text-[0.875rem] text-gray-700">
                     <thead>
-                      <tr className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      <tr className="text-xs uppercase font-semibold text-gray-600 border-b border-gray-200">
                         <th className="py-3 px-3 w-10 text-center">#</th>
                         <th className="py-3 px-3">DISPATCH NO</th>
                         <th className="py-3 px-3">DATE</th>
@@ -1071,19 +1090,19 @@ export const LedgersModule: React.FC = () => {
                         <th className="py-3 px-3 text-center">ACTION</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-150">
+                    <tbody className="divide-y divide-gray-100 text-gray-700">
                       {filteredDispatchWiseData.map((dc, idx) => {
                         const val = Number(dc.invoiceAmount || dc.totalValue || 0);
                         return (
                           <tr key={dc._id || idx} className="hover:bg-slate-50">
-                            <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px]">{idx + 1}</td>
-                            <td className="py-2.5 px-3 font-mono font-bold text-amber-700">{dc.dispatchNo || dc.dcNumber || '—'}</td>
+                            <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
+                            <td className="py-2.5 px-3 font-mono font-semibold text-amber-700">{dc.dispatchNo || dc.dcNumber || '—'}</td>
                             <td className="py-2.5 px-3 font-medium text-slate-700">{dc.dispatchDate || dc.date || '—'}</td>
                             <td className="py-2.5 px-3 font-semibold text-slate-900">{getSafeText(dc.customerName || dc.customer, '—')}</td>
-                            <td className="py-2.5 px-3 text-center font-bold text-slate-700">{dc.items?.length || dc.itemCount || 0}</td>
-                            <td className="py-2.5 px-3 text-right font-bold text-slate-900">₹{val.toLocaleString('en-IN')}</td>
+                            <td className="py-2.5 px-3 text-center font-semibold text-slate-700">{dc.items?.length || dc.itemCount || 0}</td>
+                            <td className="py-2.5 px-3 text-right font-semibold text-slate-900">₹{val.toLocaleString('en-IN')}</td>
                             <td className="py-2.5 px-3 text-center">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${
                                 dc.invoiceStatus === 'Invoiced' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
                               }`}>
                                 {dc.invoiceStatus || 'Not Invoiced'}
@@ -1093,7 +1112,7 @@ export const LedgersModule: React.FC = () => {
                               {dc.invoiceStatus !== 'Invoiced' && (
                                 <button
                                   onClick={() => setIsCreateInvoiceModalOpen(true)}
-                                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-bold shadow-2xs transition-colors cursor-pointer"
+                                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-2xs cursor-pointer"
                                 >
                                   Invoice DC
                                 </button>
@@ -1114,35 +1133,71 @@ export const LedgersModule: React.FC = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Sales Invoices</p>
-                  <p className="text-2xl font-black text-slate-900">₹{outstandingMetrics.totalSalesInvoices.toLocaleString('en-IN')}</p>
+                  <p className="text-[0.875rem] font-medium text-slate-500 uppercase tracking-wider mb-1">Total Sales Invoices</p>
+                  <p className="text-2xl font-semibold text-slate-900">₹{outstandingMetrics.totalSalesInvoices.toLocaleString('en-IN')}</p>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Payments Received</p>
-                  <p className="text-2xl font-black text-emerald-600">₹{outstandingMetrics.totalPaymentsReceived.toLocaleString('en-IN')}</p>
+                  <p className="text-[0.875rem] font-medium text-slate-500 uppercase tracking-wider mb-1">Total Payments Received</p>
+                  <p className="text-2xl font-semibold text-emerald-600">₹{outstandingMetrics.totalPaymentsReceived.toLocaleString('en-IN')}</p>
                 </div>
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Current Balance</p>
-                  <p className="text-2xl font-black text-blue-600">₹{outstandingMetrics.currentBalance.toLocaleString('en-IN')} {outstandingMetrics.currentBalanceType}</p>
+                  <p className="text-[0.875rem] font-medium text-slate-500 uppercase tracking-wider mb-1">Current Balance</p>
+                  <p className="text-2xl font-semibold text-blue-600">₹{outstandingMetrics.currentBalance.toLocaleString('en-IN')} {outstandingMetrics.currentBalanceType}</p>
                 </div>
               </div>
 
+          {/* 1. Outstanding Summary Card */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">
+                <div className="flex items-center gap-2 border-b border-slate-150 pb-2.5">
+                  <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-semibold text-xs">
+                    ₹
+                  </div>
+                  <h3 className="font-semibold text-slate-900 text-[0.875rem]">Outstanding Summary</h3>
+                </div>
+
+                <div className="space-y-2 text-[0.875rem]">
+                  <div className="bg-red-50/80 border border-red-150 p-2.5 rounded-xl flex justify-between items-center">
+                    <span className="font-semibold text-red-900">Total Outstanding</span>
+                    <span className="font-semibold text-[0.875rem] text-red-600">
+                      ₹ {outstandingMetrics.currentBalance.toLocaleString('en-IN')} {outstandingMetrics.currentBalanceType}
+                    </span>
+                  </div>
+
+                  <div className="bg-orange-50/60 border border-orange-150 p-2 rounded-xl flex justify-between items-center text-slate-700">
+                    <span>Overdue (&gt; 30 days)</span>
+                    <span className="font-semibold text-red-600">₹ {outstandingMetrics.overdueVal.toLocaleString('en-IN')} Dr</span>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 p-2 rounded-xl flex justify-between items-center text-slate-700">
+                    <span>Not Yet Invoiced</span>
+                    <span className="font-semibold text-slate-900">₹ {outstandingMetrics.pendingDispatchesVal.toLocaleString('en-IN')}</span>
+                  </div>
+
+                  <div className="bg-blue-50/60 border border-blue-150 p-2 rounded-xl flex justify-between items-center font-semibold text-blue-900">
+                    <span>Total Pending</span>
+                    <span className="font-semibold text-blue-700">₹ {outstandingMetrics.totalPendingVal.toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+              </div>
+
+
+
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs space-y-3">
-                <h3 className="font-bold text-slate-900 text-sm">Account Summary Statement</h3>
-                <p className="text-xs text-slate-500">
+                <h3 className="font-semibold text-slate-900 text-[0.875rem]">Account Summary Statement</h3>
+                <p className="text-[0.875rem] text-slate-500">
                   Comprehensive audit statement for {activeCustomer ? activeCustomer.name : 'All Customers'}.
                 </p>
                 <div className="pt-2 flex gap-3">
                   <button
                     onClick={() => setIsPrintModalOpen(true)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-xl text-[0.875rem] font-semibold shadow-2xs flex items-center gap-1.5 cursor-pointer"
                   >
                     <Printer className="w-4 h-4" />
                     <span>Print Statement</span>
                   </button>
                   <button
                     onClick={handleExportExcel}
-                    className="px-4 py-2 bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2 bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-[0.875rem] font-semibold shadow-2xs flex items-center gap-1.5 cursor-pointer"
                   >
                     <Download className="w-4 h-4" />
                     <span>Download Excel</span>
@@ -1155,98 +1210,21 @@ export const LedgersModule: React.FC = () => {
         </div>
 
 
-        {/* RIGHT SIDEBAR PANEL (OUTSTANDING SUMMARY & QUICK ACTIONS) */}
-        <div className="space-y-4">
-          
-          {/* 1. Outstanding Summary Card */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">
-            <div className="flex items-center gap-2 border-b border-slate-150 pb-2.5">
-              <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px]">
-                ₹
-              </div>
-              <h3 className="font-bold text-slate-900 text-xs">Outstanding Summary</h3>
-            </div>
-
-            <div className="space-y-2 text-xs">
-              <div className="bg-red-50/80 border border-red-150 p-2.5 rounded-xl flex justify-between items-center">
-                <span className="font-bold text-red-900">Total Outstanding</span>
-                <span className="font-black text-sm text-red-600">
-                  ₹ {outstandingMetrics.currentBalance.toLocaleString('en-IN')} {outstandingMetrics.currentBalanceType}
-                </span>
-              </div>
-
-              <div className="bg-orange-50/60 border border-orange-150 p-2 rounded-xl flex justify-between items-center text-slate-700">
-                <span>Overdue (&gt; 30 days)</span>
-                <span className="font-bold text-red-600">₹ {outstandingMetrics.overdueVal.toLocaleString('en-IN')} Dr</span>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200 p-2 rounded-xl flex justify-between items-center text-slate-700">
-                <span>Not Yet Invoiced</span>
-                <span className="font-bold text-slate-900">₹ {outstandingMetrics.pendingDispatchesVal.toLocaleString('en-IN')}</span>
-              </div>
-
-              <div className="bg-blue-50/60 border border-blue-150 p-2 rounded-xl flex justify-between items-center font-bold text-blue-900">
-                <span>Total Pending</span>
-                <span className="font-black text-blue-700">₹ {outstandingMetrics.totalPendingVal.toLocaleString('en-IN')}</span>
-              </div>
-            </div>
-          </div>
-
-
-          {/* 2. Quick Actions Card */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">
-            <h3 className="font-bold text-slate-900 text-xs border-b border-slate-150 pb-2">
-              Quick Actions
-            </h3>
-
-            <div className="space-y-2">
-              <button
-                onClick={() => {
-                  setPaymentModalDefaultCustId(activeCustomer?.id);
-                  setPaymentModalDefaultAmount(undefined);
-                  setIsRecordPaymentOpen(true);
-                }}
-                className="w-full py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Create Payment</span>
-              </button>
-
-              <button
-                onClick={() => setIsCreateInvoiceModalOpen(true)}
-                className="w-full py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <FileText className="w-4 h-4" />
-                <span>Create New Invoice</span>
-              </button>
-
-              <button
-                onClick={handleSendWhatsAppStatement}
-                className="w-full py-2 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <MessageCircle className="w-4 h-4 text-emerald-600" />
-                <span>Send Statement (WhatsApp)</span>
-              </button>
-            </div>
-          </div>
-
-        </div>
-
       </div>
 
 
       {/* ── 5. CUSTOMER DETAILS MODAL DIALOG POPUP ── */}
       {isCustomerDetailsModalOpen && activeCustomer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs font-sans">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 font-sans">
+          <div className="bg-white w-full max-w-md overflow-hidden dlg-panel">
             <div className="px-6 py-4 border-b border-slate-150 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
+                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-semibold text-[0.875rem]">
                   {activeCustomer.name[0]}
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">{activeCustomer.name}</h3>
-                  {activeCustomer.code && <p className="text-xs text-slate-400 font-mono">Code: {activeCustomer.code}</p>}
+                  <h3 className="text-base font-semibold text-slate-900">{activeCustomer.name}</h3>
+                  {activeCustomer.code && <p className="text-[0.875rem] text-slate-400 font-mono">Code: {activeCustomer.code}</p>}
                 </div>
               </div>
               <button
@@ -1257,9 +1235,9 @@ export const LedgersModule: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-6 space-y-4 text-xs">
+            <div className="p-6 space-y-4 text-[0.875rem]">
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1.5">
-                <p className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Contact Information</p>
+                <p className="font-medium text-slate-700 uppercase tracking-wider text-xs">Contact Information</p>
                 <p className="text-slate-800"><span className="text-slate-400">Address:</span> {activeCustomer.address || '—'}</p>
                 <p className="text-slate-800"><span className="text-slate-400">Region/City:</span> {activeCustomer.region || '—'} {activeCustomer.city ? `, ${activeCustomer.city}` : ''}</p>
                 <p className="text-slate-800"><span className="text-slate-400">Phone:</span> {activeCustomer.phone || '—'}</p>
@@ -1267,27 +1245,27 @@ export const LedgersModule: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Credit Limit</p>
-                  <p className="text-sm font-black text-slate-900">₹{(activeCustomer.creditLimit || 0).toLocaleString('en-IN')}</p>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Credit Limit</p>
+                  <p className="text-[0.875rem] font-semibold text-slate-900">₹{(activeCustomer.creditLimit || 0).toLocaleString('en-IN')}</p>
                 </div>
 
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Credit Days</p>
-                  <p className="text-sm font-black text-slate-900">{activeCustomer.creditDays || 0} days</p>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Credit Days</p>
+                  <p className="text-[0.875rem] font-semibold text-slate-900">{activeCustomer.creditDays || 0} days</p>
                 </div>
               </div>
 
               <div className="bg-red-50/80 p-3 rounded-xl border border-red-150 flex justify-between items-center">
-                <span className="font-bold text-red-900">Current Outstanding</span>
-                <span className="font-black text-sm text-red-600">
+                <span className="font-semibold text-red-900">Current Outstanding</span>
+                <span className="font-semibold text-[0.875rem] text-red-600">
                   ₹{outstandingMetrics.currentBalance.toLocaleString('en-IN')} {outstandingMetrics.currentBalanceType}
                 </span>
               </div>
 
-              <div className="pt-2 flex justify-end gap-2 border-t border-slate-150">
+              <div className="pt-2 flex justify-end gap-2 border-t border-slate-150 dlg-footer">
                 <button
                   onClick={() => setIsCustomerDetailsModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl cursor-pointer"
                 >
                   Close
                 </button>
@@ -1296,7 +1274,7 @@ export const LedgersModule: React.FC = () => {
                     setIsCustomerDetailsModalOpen(false);
                     navigate('/directory?tab=customers');
                   }}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-2xs flex items-center gap-1 cursor-pointer"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-2xs flex items-center gap-1 cursor-pointer"
                 >
                   <span>View in Directory</span>
                   <ExternalLink className="w-3.5 h-3.5" />

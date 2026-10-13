@@ -38,14 +38,14 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center p-4">
+    <div className="min-h-[calc(100*var(--vh,1vh))] bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
               <Building2 className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">SKBW ERP</h1>
+            <h1 className="text-3xl font-semibold text-gray-900 mb-2">SKBW ERP</h1>
             <p className="text-gray-600">Manufacturing Management System</p>
           </div>
 

@@ -1298,11 +1298,11 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-gray-900/40"
       onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full flex flex-col overflow-hidden max-w-6xl max-h-[94vh] border border-slate-200"
+        className="bg-white w-full flex flex-col overflow-hidden max-w-6xl max-h-[calc(94*var(--vh,1vh))] dlg-panel"
         onMouseDown={e => e.stopPropagation()}
       >
         {/* ── HEADER ── */}
@@ -1310,34 +1310,34 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
           <div className="flex items-center gap-3.5">
             <div className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-sm text-white ${
               dispatchMode === 'direct'
-                ? 'bg-gradient-to-tr from-purple-600 to-indigo-600 shadow-purple-500/20'
-                : 'bg-gradient-to-tr from-blue-600 to-cyan-600 shadow-blue-500/20'
+                ? 'bg-gradient-to-tr from-blue-600 to-blue-600 shadow-blue-500/20'
+                : 'bg-gradient-to-tr from-blue-600 to-blue-600 shadow-blue-500/20'
             }`}>
               <Truck className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base font-black text-slate-900 tracking-tight">
+                <h2 className="text-base font-semibold text-slate-900 tracking-tight">
                   {isEditing
                     ? `Edit Delivery Challan (${dcNumber})`
                     : dispatchMode === 'direct'
                     ? 'Create Direct Dispatch'
                     : 'Create Dispatch from Sales Order'}
                 </h2>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono bg-blue-50 text-blue-700 border border-blue-200">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold font-mono bg-blue-50 text-blue-700 border border-blue-200">
                   {dcNumber}
                 </span>
                 {dispatchMode === 'direct' ? (
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                     Standalone Direct Batch
                   </span>
                 ) : (
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                     SO Linked
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-[0.875rem] text-slate-500 mt-0.5">
                 {isEditing
                   ? 'Update dispatch quantities, vehicle, transporter, and delivery addresses.'
                   : dispatchMode === 'direct'
@@ -1348,7 +1348,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl cursor-pointer"
             title="Close dialog"
           >
             <X className="w-5 h-5" />
@@ -1356,20 +1356,20 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
         </div>
 
         {/* ── SCROLLABLE BODY ── */}
-        <div onKeyDown={handleModalFormKeyDown} className="flex-1 overflow-y-auto p-6 space-y-5 bg-slate-50/60 text-xs">
+        <div onKeyDown={handleModalFormKeyDown} className="flex-1 overflow-y-auto p-6 space-y-5 bg-slate-50/60 text-[0.875rem]">
 
           {/* DISPATCH MODE TOGGLE (If not editing) */}
           {!isEditing && (
             <div className="flex items-center justify-between bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs gap-4 flex-wrap">
               <div className="flex items-center gap-2 pl-2">
-                <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Dispatch Source:</span>
-                <span className="text-xs text-slate-400 hidden sm:inline">Choose whether to link to an approved Sales Order or dispatch standalone</span>
+                <span className="text-[0.875rem] font-medium text-slate-700 uppercase tracking-wider">Dispatch Source:</span>
+                <span className="text-[0.875rem] text-slate-400 hidden sm:inline">Choose whether to link to an approved Sales Order or dispatch standalone</span>
               </div>
               <div className="flex items-center gap-2 bg-slate-100/80 p-1 rounded-xl border border-slate-200">
                 <button
                   type="button"
                   onClick={() => setDispatchMode('order')}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                  className={`px-3.5 py-1.5 rounded-lg text-[0.875rem] font-semibold cursor-pointer flex items-center gap-2 ${
                     dispatchMode === 'order'
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
@@ -1384,9 +1384,9 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                     setDispatchMode('direct');
                     if (itemRows.length === 0) handleAddNewDirectItem();
                   }}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                  className={`px-3.5 py-1.5 rounded-lg text-[0.875rem] font-semibold cursor-pointer flex items-center gap-2 ${
                     dispatchMode === 'direct'
-                      ? 'bg-purple-600 text-white shadow-sm'
+                      ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
                   }`}
                 >
@@ -1410,7 +1410,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                 <div className="lg:col-span-2">
                   <div className="flex items-center justify-between mb-1">
                     <FieldLabel>Select Sales Order <Required /></FieldLabel>
-                    <span className="text-[10px] text-gray-400 font-mono">
+                    <span className="text-xs text-gray-400 font-mono">
                       {allOrders.length > 0 ? `${allOrders.length.toLocaleString()} approved orders available` : (order ? '1 order available' : '')}
                     </span>
                   </div>
@@ -1429,7 +1429,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                       onFocus={() => setShowOrderDropdown(true)}
                       onKeyDown={handleOrderKeyDown}
                       placeholder="Search order number, customer firm name, phone..."
-                      className="w-full pl-8 pr-10 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
+                      className="w-full pl-8 pr-10 py-1.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
                     />
 
                     <div className="absolute right-2 top-2 flex items-center gap-1 text-gray-400 z-10">
@@ -1461,7 +1461,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                         className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-64 overflow-y-auto divide-y divide-gray-50 p-1"
                       >
                         {filteredOrders.length === 0 ? (
-                          <div className="p-3 text-center text-gray-400 italic text-xs">No matching orders found</div>
+                          <div className="p-3 text-center text-gray-400 italic text-[0.875rem]">No matching orders found</div>
                         ) : (
                           filteredOrders.slice(0, 100).map((o, idx) => {
                             const isHighlighted = highlightedOrderIdx === idx;
@@ -1485,27 +1485,27 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                                   if (onOrderChange) onOrderChange(o);
                                 }}
                                 onMouseEnter={() => setHighlightedOrderIdx(idx)}
-                                className={`p-2.5 cursor-pointer rounded-lg transition-colors flex items-center justify-between ${
+                                className={`p-2.5 cursor-pointer rounded-lg flex items-center justify-between ${
                                   isHighlighted || isSelected
-                                    ? 'bg-blue-100/90 text-blue-900 font-bold border border-blue-200'
+                                    ? 'bg-blue-100/90 text-blue-900 font-semibold border border-blue-200'
                                     : 'hover:bg-blue-50/70'
                                 }`}
                               >
                                 <div>
-                                  <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-mono text-blue-700 font-black">{o.orderNumber}</span>
+                                  <div className="font-semibold text-gray-900 text-[0.875rem] flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-mono text-blue-700 font-semibold">{o.orderNumber}</span>
                                     <span className="text-gray-400">•</span>
                                     <span>{o.customerName}</span>
-                                    <span className="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200/70 rounded text-[9px] font-bold">
+                                    <span className="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200/70 rounded text-xs font-semibold">
                                       {itemCount} Items
                                     </span>
                                     {totalGbl > 0 && (
-                                      <span className="px-1.5 py-0.2 bg-indigo-50 text-indigo-700 border border-indigo-200/70 rounded text-[9px] font-bold">
+                                      <span className="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200/70 rounded text-xs font-semibold">
                                         {totalGbl} GBL
                                       </span>
                                     )}
                                   </div>
-                                  <div className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-2">
+                                  <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
                                     <span>{oLoc || '—'}</span>
                                     {oTransporter && (
                                       <>
@@ -1515,7 +1515,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                                     )}
                                   </div>
                                 </div>
-                                <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold font-mono">
+                                <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-semibold font-mono">
                                   {oPhone || 'Select'}
                                 </span>
                               </div>
@@ -1554,7 +1554,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                 <div className="lg:col-span-2">
                   <div className="flex items-center justify-between mb-1">
                     <FieldLabel>Customer <Required /></FieldLabel>
-                    <span className="text-[10px] text-gray-400 font-mono">
+                    <span className="text-xs text-gray-400 font-mono">
                       {partyOptions.length > 0 ? `${partyOptions.length.toLocaleString()} customers available` : 'Loading customers...'}
                     </span>
                   </div>
@@ -1576,7 +1576,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                       onFocus={() => setShowCustomerDropdown(true)}
                       onKeyDown={handleCustomerKeyDown}
                       placeholder="Search customer firm name..."
-                      className="w-full pl-8 pr-10 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
+                      className="w-full pl-8 pr-10 py-1.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
                     />
 
                     <div className="absolute right-2 top-2 flex items-center gap-1 text-gray-400 z-10">
@@ -1620,31 +1620,31 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                               key={cId || `${cName}-${idx}`}
                               onClick={() => handleSelectParty(cId)}
                               onMouseEnter={() => setHighlightedCustomerIdx(idx)}
-                              className={`p-2.5 cursor-pointer rounded-lg transition-colors flex items-center justify-between ${
+                              className={`p-2.5 cursor-pointer rounded-lg flex items-center justify-between ${
                                 isHighlighted || isSelected
-                                  ? 'bg-blue-100/90 text-blue-900 font-bold border border-blue-200'
+                                  ? 'bg-blue-100/90 text-blue-900 font-semibold border border-blue-200'
                                   : 'hover:bg-blue-50/70'
                               }`}
                             >
                               <div>
-                                <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5 flex-wrap">
+                                <div className="font-semibold text-gray-900 text-[0.875rem] flex items-center gap-1.5 flex-wrap">
                                   <span>{cName}</span>
                                   {tags.map((tag: string, tIdx: number) => (
-                                    <span key={tIdx} className="px-1.5 py-0.2 bg-indigo-50 text-indigo-700 border border-indigo-200/70 rounded text-[9px] font-bold">
+                                    <span key={tIdx} className="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200/70 rounded text-xs font-semibold">
                                       {tag}
                                     </span>
                                   ))}
                                 </div>
-                                <div className="text-[10px] text-gray-400 mt-0.5">{cLocation || '—'}</div>
+                                <div className="text-xs text-gray-400 mt-0.5">{cLocation || '—'}</div>
                               </div>
-                              <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold font-mono">
+                              <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-semibold font-mono">
                                 {cPhone || 'Select'}
                               </span>
                             </div>
                           );
                         })}
                         {filteredParties.length > 200 && (
-                          <div className="p-2 text-center text-slate-400 text-[10px] bg-slate-50 rounded-lg">
+                          <div className="p-2 text-center text-slate-400 text-xs bg-slate-50 rounded-lg">
                             Showing first 200 of {filteredParties.length} customers. Type in the search box to find specific customer.
                           </div>
                         )}
@@ -1666,7 +1666,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                 <div>
                   <FieldLabel>Customer / Consignee Name</FieldLabel>
                   {selectedParty ? (
-                    <StatDisplay icon={<Building className="w-3.5 h-3.5 text-purple-600" />}>
+                    <StatDisplay icon={<Building className="w-3.5 h-3.5 text-blue-600" />}>
                       {selectedParty.firmName || selectedParty.name || selectedParty.companyName || directCustomerName || '—'}
                     </StatDisplay>
                   ) : (
@@ -1675,7 +1675,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                       placeholder="e.g. Abbu Stationery / SRS Books"
                       value={directCustomerName}
                       onChange={e => setDirectCustomerName(e.target.value)}
-                      className="w-full h-9 px-3 text-xs border border-slate-200 rounded-xl font-bold text-slate-900 bg-white focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 shadow-2xs"
+                      className="w-full h-9 px-3 text-[0.875rem] border border-slate-200 rounded-xl font-semibold text-slate-900 bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 shadow-2xs"
                     />
                   )}
                 </div>
@@ -1683,7 +1683,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                 <div>
                   <FieldLabel>Contact Phone</FieldLabel>
                   {selectedParty ? (
-                    <StatDisplay icon={<Phone className="w-3.5 h-3.5 text-purple-600" />}>
+                    <StatDisplay icon={<Phone className="w-3.5 h-3.5 text-blue-600" />}>
                       {selectedParty.mobile || selectedParty.phone || directCustomerPhone || '—'}
                     </StatDisplay>
                   ) : (
@@ -1694,7 +1694,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                         placeholder="e.g. 9848012345"
                         value={directCustomerPhone}
                         onChange={e => setDirectCustomerPhone(e.target.value)}
-                        className="w-full h-9 pl-9 pr-3 text-xs border border-slate-200 rounded-xl font-mono text-slate-800 bg-white focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 shadow-2xs"
+                        className="w-full h-9 pl-9 pr-3 text-[0.875rem] border border-slate-200 rounded-xl font-mono text-slate-800 bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 shadow-2xs"
                       />
                     </div>
                   )}
@@ -1732,9 +1732,9 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
             badge={`${itemRows.length} Line Item${itemRows.length === 1 ? '' : 's'}`}
           >
             <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs">
-              <table className="w-full text-xs border-collapse">
+              <table className="w-full text-[0.875rem] border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                  <tr className="bg-slate-50 border-b border-slate-200 text-xs font-medium text-slate-500 uppercase tracking-wider">
                     {dispatchMode === 'order' && dispatchType === 'partial' && (
                       <th className="py-2.5 px-3 w-10 text-center">
                         <input
@@ -1747,23 +1747,23 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                       </th>
                     )}
                     <th className="py-2.5 px-3 w-10 text-center">#</th>
-                    <th className="py-2.5 px-4 text-left min-w-[260px]">Item Name & SKU</th>
-                    <th className="py-2.5 px-3 text-left min-w-[190px]">Dispatch Location</th>
-                    <th className="py-2.5 px-3 text-center min-w-[130px]">Available Stock</th>
+                    <th className="py-2.5 px-4 text-left min-w-[16.25rem]">Item Name & SKU</th>
+                    <th className="py-2.5 px-3 text-left min-w-[11.875rem]">Dispatch Location</th>
+                    <th className="py-2.5 px-3 text-center min-w-[8.125rem]">Available Stock</th>
                     {dispatchMode === 'order' ? (
                       <>
-                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[90px]">Pending (GBL)</th>
-                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[90px]">Pending (PCS)</th>
-                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[120px]">Dispatch Qty (GBL)</th>
-                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[100px]">Rate (₹)</th>
-                        <th className="py-2.5 px-4 text-right whitespace-nowrap min-w-[110px]">Total (₹)</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[5.625rem]">Pending (GBL)</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[5.625rem]">Pending (PCS)</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[7.5rem]">Dispatch Qty (GBL)</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[6.25rem]">Rate (₹)</th>
+                        <th className="py-2.5 px-4 text-right whitespace-nowrap min-w-[6.875rem]">Total (₹)</th>
                       </>
                     ) : (
                       <>
-                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[120px]">Dispatch Qty (GBL)</th>
-                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[100px]">Total Qty (PCS)</th>
-                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[100px]">Rate (₹)</th>
-                        <th className="py-2.5 px-4 text-right whitespace-nowrap min-w-[110px]">Total (₹)</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[7.5rem]">Dispatch Qty (GBL)</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[6.25rem]">Total Qty (PCS)</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap min-w-[6.25rem]">Rate (₹)</th>
+                        <th className="py-2.5 px-4 text-right whitespace-nowrap min-w-[6.875rem]">Total (₹)</th>
                         <th className="py-2.5 px-2 text-center w-12">Action</th>
                       </>
                     )}
@@ -1774,12 +1774,12 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                     <tr>
                       <td colSpan={10} className="py-12 text-center text-slate-400">
                         <Package className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                        <p className="text-xs font-semibold text-slate-500">No items in dispatch batch.</p>
+                        <p className="text-[0.875rem] font-semibold text-slate-500">No items in dispatch batch.</p>
                         {dispatchMode === 'direct' && (
                           <button
                             type="button"
                             onClick={handleAddNewDirectItem}
-                            className="mt-3 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 cursor-pointer inline-flex items-center gap-1.5"
+                            className="mt-3 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[0.875rem] font-semibold hover:bg-blue-100 cursor-pointer inline-flex items-center gap-1.5"
                           >
                             <Plus className="w-3.5 h-3.5" />
                             Add First Item
@@ -1824,15 +1824,15 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                               />
                             ) : (
                               <div>
-                                <p className="font-bold text-slate-900 leading-snug">{row.itemName}</p>
+                                <p className="font-semibold text-slate-900 leading-snug">{row.itemName}</p>
                                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                   {row.skuCode && (
-                                    <span className="font-mono text-[10px] font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                    <span className="font-mono text-xs font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
                                       {row.skuCode}
                                     </span>
                                   )}
                                   {row.category && (
-                                    <span className="text-[10px] text-slate-400">
+                                    <span className="text-xs text-slate-400">
                                       {row.category}
                                     </span>
                                   )}
@@ -1846,18 +1846,18 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                             <button
                               type="button"
                               onClick={() => setActiveLocModalRowKey(row.key)}
-                              className="w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-blue-50/50 hover:border-blue-400 transition-all text-left shadow-2xs group cursor-pointer"
+                              className="w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-blue-50/50 hover:border-blue-400 text-left shadow-2xs group cursor-pointer"
                               title="Click to select warehouse storage location"
                             >
                               <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:bg-blue-600 group-hover:text-white">
                                   <MapPin className="w-3.5 h-3.5" />
                                 </div>
-                                <span className="text-xs font-bold text-slate-800 truncate">
+                                <span className="text-[0.875rem] font-semibold text-slate-800 truncate">
                                   {row.locationName || 'Select Location'}
                                 </span>
                               </div>
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 group-hover:bg-blue-100 group-hover:text-blue-700 shrink-0">
+                              <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 group-hover:bg-blue-100 group-hover:text-blue-700 shrink-0">
                                 {row.locationName ? 'Change' : 'Choose'}
                               </span>
                             </button>
@@ -1866,20 +1866,20 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                           {/* ── Live Available Stock Column ── */}
                           <td className="py-3 px-3 text-center whitespace-nowrap">
                             {row.stockOnHandGbl !== undefined && row.stockOnHandGbl > 0 ? (
-                              <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                              <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
                                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                                 <span>{row.stockOnHandGbl} GBL</span>
                               </div>
                             ) : row.totalWarehouseStockGbl !== undefined && row.totalWarehouseStockGbl > 0 ? (
                               <div
-                                className="inline-flex flex-col items-center px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200"
+                                className="inline-flex flex-col items-center px-2 py-0.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200"
                                 title={`0 at selected location, but ${row.totalWarehouseStockGbl} GBL available across warehouse`}
                               >
                                 <span>0 at loc</span>
-                                <span className="text-[9px] text-amber-600 font-medium">({row.totalWarehouseStockGbl} GBL total)</span>
+                                <span className="text-xs text-amber-600 font-medium">({row.totalWarehouseStockGbl} GBL total)</span>
                               </div>
                             ) : (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
                                 0 in Stock
                               </span>
                             )}
@@ -1888,7 +1888,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                           {/* ── Order Mode: Pending Columns ── */}
                           {dispatchMode === 'order' && (
                             <>
-                              <td className="py-3 px-3 text-right font-bold font-mono text-slate-800">
+                              <td className="py-3 px-3 text-right font-semibold font-mono text-slate-800">
                                 {row.pendingQty}
                               </td>
                               <td className="py-3 px-3 text-right font-mono text-slate-500">
@@ -1900,7 +1900,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                           {/* ── Dispatch Qty (GBL) Input Column ── */}
                           <td className="py-3 px-3 text-right">
                             {dispatchMode === 'order' && dispatchType === 'full' ? (
-                              <span className="inline-block px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 font-bold font-mono text-xs">
+                              <span className="inline-block px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 font-semibold font-mono text-[0.875rem]">
                                 {row.dispatchGbl} GBL
                               </span>
                             ) : (
@@ -1913,9 +1913,9 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                                   value={row.dispatchGbl || ''}
                                   placeholder="0"
                                   onChange={e => handleDispatchQtyChange(row.key, Number(e.target.value))}
-                                  className="w-18 h-8 px-2 border border-slate-200 rounded-lg text-right font-mono font-bold text-slate-900 bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 text-xs shadow-2xs"
+                                  className="w-18 h-8 px-2 border border-slate-200 rounded-lg text-right font-mono font-semibold text-slate-900 bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 text-[0.875rem] shadow-2xs"
                                 />
-                                <span className="text-[10px] font-bold text-slate-400">GBL</span>
+                                <span className="text-xs font-semibold text-slate-400">GBL</span>
                               </div>
                             )}
                           </td>
@@ -1930,7 +1930,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                           {/* ── Unit Rate Column ── */}
                           <td className="py-3 px-3 text-right font-mono">
                             <div className="inline-flex items-center gap-1 justify-end">
-                              <span className="text-[10px] font-bold text-slate-400">₹</span>
+                              <span className="text-xs font-semibold text-slate-400">₹</span>
                               <input
                                 type="number"
                                 min={0}
@@ -1942,13 +1942,13 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                                   const p = val === '' ? 0 : Number(val);
                                   setItemRows(prev => prev.map(r => r.key === row.key ? { ...r, unitPrice: p } : r));
                                 }}
-                                className="w-24 h-8 px-2 border border-slate-300 rounded-lg text-right font-mono font-bold text-slate-800 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 text-xs shadow-2xs transition-all"
+                                className="w-24 h-8 px-2 border border-slate-300 rounded-lg text-right font-mono font-semibold text-slate-800 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 text-[0.875rem] shadow-2xs"
                               />
                             </div>
                           </td>
 
                           {/* ── Total Amount Column ── */}
-                          <td className="py-3 px-4 text-right font-mono font-black text-slate-900 text-xs">
+                          <td className="py-3 px-4 text-right font-mono font-semibold text-slate-900 text-[0.875rem]">
                             ₹{(row.dispatchGbl * (row.unitPrice || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
 
@@ -1958,7 +1958,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                               <button
                                 type="button"
                                 onClick={() => handleRemoveDirectItem(row.key)}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                className="icon-btn-danger"
                                 title="Remove item"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -1972,35 +1972,35 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
 
                   {/* ── TOTALS FOOTER ROW ── */}
                   {itemRows.length > 0 && (
-                    <tr className="bg-slate-50/90 border-t-2 border-slate-200 text-xs font-black">
+                    <tr className="bg-slate-50/90 border-t-2 border-slate-200 text-[0.875rem] font-semibold">
                       {dispatchMode === 'order' && dispatchType === 'partial' && <td />}
                       <td />
-                      <td colSpan={2} className="py-3 px-4 text-slate-500 uppercase text-[10px] tracking-wider font-bold">
+                      <td colSpan={2} className="py-3 px-4 text-slate-500 uppercase text-xs tracking-wider font-medium">
                         Batch Total ({totals.activeCount} active items)
                       </td>
-                      <td className="text-center font-mono text-slate-500 text-[10px]">
+                      <td className="text-center font-mono text-slate-500 text-xs">
                         —
                       </td>
                       {dispatchMode === 'order' && (
                         <>
-                          <td className="py-3 px-3 text-right font-black font-mono text-slate-800">
+                          <td className="py-3 px-3 text-right font-semibold font-mono text-slate-800">
                             {totals.totalPendingGbl}
                           </td>
-                          <td className="py-3 px-3 text-right font-mono font-bold text-slate-600">
+                          <td className="py-3 px-3 text-right font-mono font-semibold text-slate-600">
                             {totals.totalPendingPcs.toLocaleString()}
                           </td>
                         </>
                       )}
-                      <td className="py-3 px-3 text-right font-black font-mono text-blue-700">
+                      <td className="py-3 px-3 text-right font-semibold font-mono text-blue-700">
                         {totals.totalDispatchGbl} GBL
                       </td>
-                      <td className="py-3 px-3 text-right font-mono font-bold text-slate-700">
+                      <td className="py-3 px-3 text-right font-mono font-semibold text-slate-700">
                         {totals.totalDispatchPcs.toLocaleString()} PCS
                       </td>
                       <td className="py-3 px-3 text-right font-mono text-slate-400 font-normal">
                         —
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-black text-blue-700 text-sm">
+                      <td className="py-3 px-4 text-right font-mono font-semibold text-blue-700 text-[0.875rem]">
                         ₹{totals.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       {dispatchMode === 'direct' && <td />}
@@ -2016,7 +2016,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                 <button
                   type="button"
                   onClick={handleAddNewDirectItem}
-                  className="px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-2 border border-purple-200 shadow-2xs hover:shadow-sm"
+                  className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-[0.875rem] font-semibold cursor-pointer inline-flex items-center gap-2 border border-blue-200 shadow-2xs hover:shadow-sm"
                 >
                   <Plus className="w-4 h-4" />
                   <span>+ Add Another Item</span>
@@ -2039,7 +2039,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                         type="date"
                         value={dispatchDate}
                         onChange={e => setDispatchDate(e.target.value)}
-                        className="w-full h-9 pl-9 pr-3 text-xs border border-slate-200 rounded-xl font-mono text-slate-800 bg-white focus:outline-none focus:border-blue-500 shadow-2xs"
+                        className="w-full h-9 pl-9 pr-3 text-[0.875rem] border border-slate-200 rounded-xl font-mono text-slate-800 bg-white focus:outline-none focus:border-blue-500 shadow-2xs"
                       />
                     </div>
                   </div>
@@ -2053,7 +2053,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                         placeholder="e.g. Chennupati Cargo / Self Delivery"
                         value={transporter}
                         onChange={e => setTransporter(e.target.value)}
-                        className="w-full h-9 pl-9 pr-3 text-xs border border-slate-200 rounded-xl text-slate-800 bg-white focus:outline-none focus:border-blue-500 shadow-2xs"
+                        className="w-full h-9 pl-9 pr-3 text-[0.875rem] border border-slate-200 rounded-xl text-slate-800 bg-white focus:outline-none focus:border-blue-500 shadow-2xs"
                       />
                     </div>
                   </div>
@@ -2065,7 +2065,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                       placeholder="e.g. TS 09 UA 1234"
                       value={vehicleNumber}
                       onChange={e => setVehicleNumber(e.target.value.toUpperCase())}
-                      className="w-full h-9 px-3 text-xs border border-slate-200 rounded-xl font-mono font-bold text-slate-900 bg-white focus:outline-none focus:border-blue-500 shadow-2xs uppercase"
+                      className="w-full h-9 px-3 text-[0.875rem] border border-slate-200 rounded-xl font-mono font-semibold text-slate-900 bg-white focus:outline-none focus:border-blue-500 shadow-2xs uppercase"
                     />
                   </div>
 
@@ -2076,7 +2076,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                       placeholder="e.g. LR-987654"
                       value={lrNumber}
                       onChange={e => setLrNumber(e.target.value)}
-                      className="w-full h-9 px-3 text-xs border border-slate-200 rounded-xl font-mono text-slate-800 bg-white focus:outline-none focus:border-blue-500 shadow-2xs"
+                      className="w-full h-9 px-3 text-[0.875rem] border border-slate-200 rounded-xl font-mono text-slate-800 bg-white focus:outline-none focus:border-blue-500 shadow-2xs"
                     />
                   </div>
 
@@ -2086,7 +2086,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                       type="date"
                       value={lrDate}
                       onChange={e => setLrDate(e.target.value)}
-                      className="w-full h-9 px-3 text-xs border border-slate-200 rounded-xl font-mono text-slate-800 bg-white focus:outline-none focus:border-blue-500 shadow-2xs"
+                      className="w-full h-9 px-3 text-[0.875rem] border border-slate-200 rounded-xl font-mono text-slate-800 bg-white focus:outline-none focus:border-blue-500 shadow-2xs"
                     />
                   </div>
 
@@ -2097,7 +2097,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                       value={remarks}
                       onChange={e => setRemarks(e.target.value)}
                       placeholder="Special instructions or notes..."
-                      className="w-full h-9 px-3 text-xs border border-slate-200 rounded-xl text-slate-800 bg-white focus:outline-none focus:border-blue-500 shadow-2xs"
+                      className="w-full h-9 px-3 text-[0.875rem] border border-slate-200 rounded-xl text-slate-800 bg-white focus:outline-none focus:border-blue-500 shadow-2xs"
                     />
                   </div>
                 </div>
@@ -2111,11 +2111,11 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                   {/* Bill To */}
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase">Bill To (Customer Address)</span>
+                      <span className="text-xs font-semibold text-slate-500 uppercase">Bill To (Customer Address)</span>
                       <button
                         type="button"
                         onClick={() => setEditBillTo(p => !p)}
-                        className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                        className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
                       >
                         <Edit3 className="w-3 h-3" />
                         {editBillTo ? 'Save' : 'Edit'}
@@ -2127,10 +2127,10 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                         value={billToAddress}
                         onChange={e => setBillToAddress(e.target.value)}
                         placeholder="Enter billing address..."
-                        className="w-full text-xs border border-blue-300 rounded-xl p-2.5 focus:outline-none focus:border-blue-500 font-medium text-slate-800 resize-none bg-white"
+                        className="w-full text-[0.875rem] border border-blue-300 rounded-xl p-2.5 focus:outline-none focus:border-blue-500 font-medium text-slate-800 resize-none bg-white"
                       />
                     ) : (
-                      <div className="text-xs text-slate-700 leading-relaxed bg-slate-50/80 rounded-xl p-2.5 border border-slate-200 whitespace-pre-line min-h-[56px]">
+                      <div className="text-[0.875rem] text-slate-700 leading-relaxed bg-slate-50/80 rounded-xl p-2.5 border border-slate-200 whitespace-pre-line min-h-[3.5rem]">
                         {billToAddress || (
                           <span className="text-slate-400 italic">No billing address specified yet.</span>
                         )}
@@ -2149,18 +2149,18 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                       }}
                       className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
                     />
-                    <span className="text-xs font-semibold text-slate-700">Shipping address same as Bill To</span>
+                    <span className="text-[0.875rem] font-semibold text-slate-700">Shipping address same as Bill To</span>
                   </label>
 
                   {/* Ship To */}
                   {!sameAsBillTo && (
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">Ship To (Delivery Site)</span>
+                        <span className="text-xs font-semibold text-slate-500 uppercase">Ship To (Delivery Site)</span>
                         <button
                           type="button"
                           onClick={() => setEditShipTo(p => !p)}
-                          className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                          className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
                         >
                           <Edit3 className="w-3 h-3" />
                           {editShipTo ? 'Save' : 'Edit'}
@@ -2172,10 +2172,10 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
                           value={shipToAddress}
                           onChange={e => setShipToAddress(e.target.value)}
                           placeholder="Enter destination delivery address..."
-                          className="w-full text-xs border border-blue-300 rounded-xl p-2.5 focus:outline-none focus:border-blue-500 font-medium text-slate-800 resize-none bg-white"
+                          className="w-full text-[0.875rem] border border-blue-300 rounded-xl p-2.5 focus:outline-none focus:border-blue-500 font-medium text-slate-800 resize-none bg-white"
                         />
                       ) : (
-                        <div className="text-xs text-slate-700 leading-relaxed bg-slate-50/80 rounded-xl p-2.5 border border-slate-200 whitespace-pre-line min-h-[56px]">
+                        <div className="text-[0.875rem] text-slate-700 leading-relaxed bg-slate-50/80 rounded-xl p-2.5 border border-slate-200 whitespace-pre-line min-h-[3.5rem]">
                           {shipToAddress || (
                             <span className="text-slate-400 italic">No shipping address specified yet.</span>
                           )}
@@ -2192,14 +2192,14 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Dispatching</p>
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Dispatching</p>
                 <div className="flex items-baseline gap-1.5 mt-1">
-                  <span className="text-2xl font-black text-blue-700 font-mono leading-none">
+                  <span className="text-2xl font-semibold text-blue-700 font-mono leading-none">
                     {totals.totalDispatchGbl}
                   </span>
-                  <span className="text-xs font-bold text-blue-600">GBL</span>
+                  <span className="text-[0.875rem] font-semibold text-blue-600">GBL</span>
                 </div>
-                <p className="text-[11px] font-mono text-slate-500 mt-1">
+                <p className="text-xs font-mono text-slate-500 mt-1">
                   ({totals.totalDispatchPcs.toLocaleString()} PCS)
                 </p>
               </div>
@@ -2210,28 +2210,28 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
 
             <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estimated Valuation</p>
-                <p className="text-2xl font-black text-emerald-700 font-mono leading-none mt-1">
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Estimated Valuation</p>
+                <p className="text-2xl font-semibold text-emerald-700 font-mono leading-none mt-1">
                   ₹{totals.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
-                <p className="text-[11px] text-slate-500 mt-1">Total Delivery Challan Value</p>
+                <p className="text-xs text-slate-500 mt-1">Total Delivery Challan Value</p>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black text-lg">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-semibold text-lg">
                 ₹
               </div>
             </div>
 
             <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fulfillment Status</p>
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Fulfillment Status</p>
                 <div className="mt-2">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[0.875rem] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                     <span>Ready for Dispatch</span>
                   </span>
                 </div>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
                 <Truck className="w-5 h-5" />
               </div>
             </div>
@@ -2239,11 +2239,11 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
         </div>
 
         {/* ── STICKY FOOTER ── */}
-        <div className="px-6 py-4 border-t border-slate-200 bg-white flex items-center justify-between shrink-0">
+        <div className="px-6 py-4 border-t border-slate-200 bg-white flex items-center justify-between shrink-0 dlg-footer">
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 text-xs font-bold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+            className="px-5 py-2.5 text-[0.875rem] font-semibold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer"
           >
             Cancel
           </button>
@@ -2252,7 +2252,7 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
               type="button"
               disabled={isSubmitting || totals.totalDispatchGbl <= 0}
               onClick={() => buildAndSubmit(true)}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold border flex items-center gap-2 transition-all ${
+              className={`px-4 py-2.5 rounded-xl text-[0.875rem] font-semibold border flex items-center gap-2 ${
                 totals.totalDispatchGbl > 0 && !isSubmitting
                   ? 'text-slate-700 bg-white border-slate-300 hover:bg-slate-50 cursor-pointer shadow-2xs'
                   : 'text-slate-400 bg-slate-100 border-slate-200 cursor-not-allowed'
@@ -2266,9 +2266,9 @@ export const CreateDispatchModal: React.FC<CreateDispatchModalProps> = ({
               type="button"
               disabled={isSubmitting || totals.totalDispatchGbl <= 0}
               onClick={() => buildAndSubmit(false)}
-              className={`px-6 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-md ${
+              className={`px-6 py-2.5 rounded-xl text-[0.875rem] font-semibold flex items-center gap-2 shadow-md ${
                 totals.totalDispatchGbl > 0 && !isSubmitting
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-blue-500/25 cursor-pointer'
+                  ? 'bg-gradient-to-r from-blue-600 to-blue-600 hover:from-blue-700 hover:to-blue-700 text-white shadow-blue-500/25 cursor-pointer'
                   : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
               }`}
             >
@@ -2361,14 +2361,14 @@ const SearchableSkuSelector: React.FC<SearchableSkuSelectorProps> = ({
     return (
       <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl border border-slate-200 bg-slate-50/80 group">
         <div className="min-w-0">
-          <p className="font-bold text-slate-900 text-xs truncate">{row.itemName}</p>
+          <p className="font-semibold text-slate-900 text-[0.875rem] truncate">{row.itemName}</p>
           <div className="flex items-center gap-1.5 mt-0.5">
             {row.skuCode && (
-              <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-purple-100/70 text-purple-700">
+              <span className="font-mono text-xs font-semibold px-1.5 py-0.2 rounded bg-blue-100/70 text-blue-700">
                 {row.skuCode}
               </span>
             )}
-            <span className="text-[10px] text-slate-500 font-medium">
+            <span className="text-xs text-slate-500 font-medium">
               {row.pcsPerGbl} pcs/GBL
             </span>
           </div>
@@ -2379,7 +2379,7 @@ const SearchableSkuSelector: React.FC<SearchableSkuSelectorProps> = ({
             setQuery('');
             setIsOpen(true);
           }}
-          className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-purple-700 hover:border-purple-300 transition-colors shrink-0 cursor-pointer shadow-2xs"
+          className="text-xs font-semibold px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-blue-700 hover:border-blue-300 shrink-0 cursor-pointer shadow-2xs"
         >
           Change
         </button>
@@ -2401,7 +2401,7 @@ const SearchableSkuSelector: React.FC<SearchableSkuSelectorProps> = ({
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
-          className="w-full h-8 pl-8 pr-7 text-xs border border-slate-200 rounded-xl font-medium text-slate-900 bg-white focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/10 shadow-2xs"
+          className="w-full h-8 pl-8 pr-7 text-[0.875rem] border border-slate-200 rounded-xl font-medium text-slate-900 bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 shadow-2xs"
         />
         {(query || row.itemName) && (
           <button
@@ -2419,8 +2419,8 @@ const SearchableSkuSelector: React.FC<SearchableSkuSelectorProps> = ({
 
       {/* Dropdown Results */}
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1.5 w-80 max-h-60 overflow-y-auto bg-white rounded-xl shadow-xl border border-slate-200 z-50 divide-y divide-slate-100 animate-in fade-in zoom-in-95 duration-100">
-          <div className="p-2 bg-slate-50 border-b border-slate-100 text-[10px] font-black uppercase text-slate-500 flex justify-between">
+        <div className="absolute left-0 top-full mt-1.5 w-80 max-h-60 overflow-y-auto bg-white rounded-xl shadow-xl border border-slate-200 z-50 divide-y divide-slate-100">
+          <div className="p-2 bg-slate-50 border-b border-slate-100 text-xs font-semibold uppercase text-slate-500 flex justify-between">
             <span>Matching SKUs</span>
             <span>{availableSkus.length} in Master</span>
           </div>
@@ -2433,26 +2433,26 @@ const SearchableSkuSelector: React.FC<SearchableSkuSelectorProps> = ({
                 setIsOpen(false);
                 setQuery('');
               }}
-              className="p-2.5 hover:bg-purple-50/60 cursor-pointer transition-colors flex items-center justify-between gap-2"
+              className="p-2.5 hover:bg-blue-50/60 cursor-pointer flex items-center justify-between gap-2"
             >
               <div className="min-w-0">
-                <p className="font-bold text-slate-900 text-xs truncate">{sku.name}</p>
+                <p className="font-semibold text-slate-900 text-[0.875rem] truncate">{sku.name}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700">
+                  <span className="font-mono text-xs font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700">
                     {sku.skuCode}
                   </span>
                   {sku.category && (
-                    <span className="text-[10px] text-slate-400 truncate">
+                    <span className="text-xs text-slate-400 truncate">
                       {sku.category}
                     </span>
                   )}
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <p className="font-mono font-bold text-xs text-purple-700">
+                <p className="font-mono font-semibold text-[0.875rem] text-blue-700">
                   ₹{Number(sku.sellingPrice || sku.rate || 0).toLocaleString()}
                 </p>
-                <p className="text-[10px] text-slate-500">
+                <p className="text-xs text-slate-500">
                   Stock: {sku.presentStock || 0}
                 </p>
               </div>
@@ -2466,7 +2466,7 @@ const SearchableSkuSelector: React.FC<SearchableSkuSelectorProps> = ({
                 setIsEditingCustom(true);
                 setIsOpen(false);
               }}
-              className="p-2.5 bg-slate-50 hover:bg-slate-100 cursor-pointer text-xs font-bold text-purple-700 flex items-center gap-1.5"
+              className="p-2.5 bg-slate-50 hover:bg-slate-100 cursor-pointer text-[0.875rem] font-semibold text-blue-700 flex items-center gap-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Use custom item: "{query}"</span>
@@ -2502,13 +2502,13 @@ function SectionCard({
     >
       <div className="bg-slate-50/80 px-5 py-3 border-b border-slate-100 flex items-center justify-between rounded-t-2xl">
         <div className="flex items-center gap-2.5">
-          <div className="w-5 h-5 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-black shrink-0 shadow-2xs">
+          <div className="w-5 h-5 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs font-semibold shrink-0 shadow-2xs">
             {num}
           </div>
-          <span className="text-xs font-black text-slate-800 uppercase tracking-wider">{label}</span>
+          <span className="text-[0.875rem] font-medium text-slate-800 uppercase tracking-wider">{label}</span>
         </div>
         {badge && (
-          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-200/60 text-slate-700 border border-slate-200">
+          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-200/60 text-slate-700 border border-slate-200">
             {badge}
           </span>
         )}
@@ -2520,19 +2520,19 @@ function SectionCard({
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+    <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1.5">
       {children}
     </label>
   );
 }
 
 function Required() {
-  return <span className="text-rose-500 ml-0.5 font-bold">*</span>;
+  return <span className="text-rose-500 ml-0.5 font-semibold">*</span>;
 }
 
 function StatDisplay({ children, icon }: { children: React.ReactNode; icon?: React.ReactNode }) {
   return (
-    <div className="h-9 bg-slate-50/80 border border-slate-200 rounded-xl px-3 text-xs font-semibold text-slate-700 flex items-center gap-2 truncate shadow-2xs">
+    <div className="h-9 bg-slate-50/80 border border-slate-200 rounded-xl px-3 text-[0.875rem] font-semibold text-slate-700 flex items-center gap-2 truncate shadow-2xs">
       {icon}
       <span className="truncate">{children}</span>
     </div>
@@ -2555,7 +2555,7 @@ function DispatchTypeCard({
   return (
     <label
       htmlFor={`dispatch-type-${id}`}
-      className={`flex items-start gap-3.5 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+      className={`flex items-start gap-3.5 p-4 rounded-xl border-2 cursor-pointer ${
         active
           ? 'border-blue-500 bg-blue-50/40 shadow-xs'
           : 'border-slate-200 hover:border-slate-300 bg-white'
@@ -2571,8 +2571,8 @@ function DispatchTypeCard({
         className="mt-0.5 accent-blue-600 shrink-0 cursor-pointer w-4 h-4"
       />
       <div>
-        <p className="text-xs font-black text-slate-900">{title}</p>
-        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{desc}</p>
+        <p className="text-[0.875rem] font-semibold text-slate-900">{title}</p>
+        <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{desc}</p>
       </div>
     </label>
   );

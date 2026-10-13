@@ -90,8 +90,8 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
   const grandTotalWords = numberToWordsINR(invoice.grandTotal || 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl border border-gray-150 w-full max-w-6xl max-h-[95vh] flex flex-col overflow-hidden my-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-gray-900/40 overflow-y-auto">
+      <div className="bg-white w-full max-w-6xl max-h-[calc(95*var(--vh,1vh))] flex flex-col overflow-hidden my-auto dlg-panel">
         {/* Modal Top Header */}
         <div className="px-6 py-4 border-b border-gray-150 flex items-center justify-between bg-white shrink-0">
           <div className="flex items-center gap-3">
@@ -99,15 +99,15 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
               <CheckCircle2 className="w-5 h-5 text-emerald-600" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-gray-900">Invoice Generated Successfully!</h2>
-              <p className="text-xs text-gray-500">
+              <h2 className="text-base font-semibold text-gray-900">Invoice Generated Successfully!</h2>
+              <p className="text-[0.875rem] text-gray-500">
                 Invoice <span className="font-semibold text-gray-700">{invoice.invoiceNumber}</span> has been created and is ready.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -121,12 +121,12 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
             <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs">
               <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
                 <FileText className="w-4 h-4 text-blue-600" />
-                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Invoice Details</h3>
+                <h3 className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">Invoice Details</h3>
               </div>
-              <div className="space-y-2 text-xs">
+              <div className="space-y-2 text-[0.875rem]">
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">Invoice No.</span>
-                  <span className="font-bold text-blue-600 font-mono">{invoice.invoiceNumber}</span>
+                  <span className="font-semibold text-blue-600 font-mono">{invoice.invoiceNumber}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">Dispatch No.</span>
@@ -138,7 +138,7 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">Customer</span>
-                  <span className="font-semibold text-gray-800 text-right truncate max-w-[180px]">{invoice.customerName}</span>
+                  <span className="font-semibold text-gray-800 text-right truncate max-w-[11.25rem]">{invoice.customerName}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">Total Quantity</span>
@@ -148,7 +148,7 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">Total Amount</span>
-                  <span className="font-bold text-gray-900">₹ {(invoice.subtotal || invoice.grandTotal || 32500).toLocaleString('en-IN')}</span>
+                  <span className="font-semibold text-gray-900">₹ {(invoice.subtotal || invoice.grandTotal || 32500).toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">Payment Terms</span>
@@ -160,7 +160,7 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
                 </div>
                 <div className="flex items-center justify-between pt-1 border-t border-gray-100">
                   <span className="text-gray-500">Status</span>
-                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                     Created
                   </span>
                 </div>
@@ -171,9 +171,9 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
             <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs">
               <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
                 <Printer className="w-4 h-4 text-blue-600" />
-                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Print Options</h3>
+                <h3 className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">Print Options</h3>
               </div>
-              <div className="space-y-2 text-xs">
+              <div className="space-y-2 text-[0.875rem]">
                 <label className="flex items-center gap-2.5 cursor-pointer text-gray-700 hover:text-gray-900">
                   <input
                     type="checkbox"
@@ -235,9 +235,9 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
             <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs">
               <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
                 <Send className="w-4 h-4 text-emerald-600" />
-                <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Send Options</h3>
+                <h3 className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">Send Options</h3>
               </div>
-              <div className="space-y-2 text-xs">
+              <div className="space-y-2 text-[0.875rem]">
                 <label className="flex items-center gap-2.5 cursor-pointer text-gray-700 hover:text-gray-900">
                   <input
                     type="checkbox"
@@ -263,7 +263,7 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
             <div className="space-y-2 pt-2">
               <button
                 onClick={handlePrint}
-                className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+                className="btn-primary w-full justify-center"
               >
                 <Printer className="w-4 h-4" />
                 Print Invoice (PDF)
@@ -271,7 +271,7 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
 
               <button
                 onClick={handleSendWhatsApp}
-                className="w-full py-2 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                className="w-full py-2 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[0.875rem] font-semibold flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5 text-emerald-600" />
                 Send via WhatsApp
@@ -279,7 +279,7 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
 
               <button
                 onClick={handleSendEmail}
-                className="w-full py-2 px-4 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                className="w-full py-2 px-4 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-xl text-[0.875rem] font-semibold flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Mail className="w-3.5 h-3.5 text-gray-500" />
                 Send via Email
@@ -287,7 +287,7 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
 
               <button
                 onClick={onClose}
-                className="w-full py-2 text-center text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors cursor-pointer"
+                className="w-full py-2 text-center text-[0.875rem] font-medium text-gray-500 hover:text-gray-800 cursor-pointer"
               >
                 Close
               </button>
@@ -297,7 +297,7 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
           {/* Right Column: PDF / Invoice Preview Document (approx 8 cols) */}
           <div className="lg:col-span-8 flex flex-col h-full bg-slate-100 overflow-hidden">
             {/* Toolbar at top of preview */}
-            <div className="px-4 py-2 bg-white border-b border-gray-200 flex items-center justify-between text-xs text-gray-600 shrink-0">
+            <div className="px-4 py-2 bg-white border-b border-gray-200 flex items-center justify-between text-[0.875rem] text-gray-600 shrink-0">
               <div className="flex items-center gap-2">
                 <button
                   disabled={currentPage <= 1}
@@ -306,7 +306,7 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                <span className="font-mono text-[11px] font-semibold">{currentPage} / 1</span>
+                <span className="font-mono text-xs font-semibold">{currentPage} / 1</span>
                 <button
                   disabled={currentPage >= 1}
                   onClick={() => setCurrentPage(p => p + 1)}
@@ -324,7 +324,7 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
                 >
                   <ZoomOut className="w-4 h-4" />
                 </button>
-                <span className="font-mono text-[11px] font-semibold">{zoomLevel}%</span>
+                <span className="font-mono text-xs font-semibold">{zoomLevel}%</span>
                 <button
                   onClick={() => setZoomLevel(z => Math.min(150, z + 10))}
                   className="p-1 hover:bg-gray-100 rounded"
@@ -337,14 +337,14 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   onClick={handlePrint}
-                  className="p-1.5 hover:bg-gray-100 rounded text-gray-600 hover:text-gray-900"
+                  className="icon-btn"
                   title="Print"
                 >
                   <Printer className="w-4 h-4" />
                 </button>
                 <button
                   onClick={handlePrint}
-                  className="p-1.5 hover:bg-gray-100 rounded text-gray-600 hover:text-gray-900"
+                  className="icon-btn"
                   title="Download PDF"
                 >
                   <Download className="w-4 h-4" />
@@ -357,27 +357,27 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
               <div
                 ref={printAreaRef}
                 style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
-                className="bg-white text-gray-900 shadow-md border border-gray-300 w-full max-w-[760px] p-6 text-[11px] font-sans transition-transform duration-150 print:m-0 print:border-none print:shadow-none print:w-full"
+                className="bg-white text-gray-900 shadow-md border border-gray-300 w-full max-w-[47.5rem] p-6 text-xs font-sans print:m-0 print:border-none print:shadow-none print:w-full"
               >
                 {/* Header (Company Logo & Title + TAX INVOICE Box) */}
                 {printOptions.companyHeader && (
                   <div className="flex items-start justify-between border-b-2 border-gray-900 pb-3 mb-3">
                     <div>
                       <div className="flex items-baseline gap-2">
-                        <span className="text-2xl font-black text-rose-600 tracking-tight font-serif">SKBW</span>
-                        <span className="text-xs font-extrabold text-gray-900 uppercase tracking-wide">
+                        <span className="text-2xl font-semibold text-rose-600 tracking-tight font-serif">SKBW</span>
+                        <span className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wide">
                           SRI KRISHNA BINDING WORKS
                         </span>
                       </div>
-                      <p className="text-[10px] text-gray-600 font-medium">Vijayawada, Andhra Pradesh, India</p>
-                      <p className="text-[10px] text-rose-600 italic font-medium">Every Notebook A New Beginning.</p>
+                      <p className="text-xs text-gray-600 font-medium">Vijayawada, Andhra Pradesh, India</p>
+                      <p className="text-xs text-rose-600 italic font-medium">Every Notebook A New Beginning.</p>
                     </div>
 
                     <div className="border-2 border-gray-900 px-4 py-1.5 text-center bg-gray-50 rounded">
-                      <span className="text-[10px] font-extrabold text-gray-700 uppercase tracking-widest block">
+                      <span className="text-xs font-medium text-gray-700 uppercase tracking-widest block">
                         TAX INVOICE
                       </span>
-                      <span className="text-base font-black text-gray-900 font-mono block">
+                      <span className="text-base font-semibold text-gray-900 font-mono block">
                         {invoice.invoiceNumber}
                       </span>
                     </div>
@@ -385,13 +385,13 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
                 )}
 
                 {/* Details Section (Bill To + Dispatch Details) */}
-                <div className="grid grid-cols-2 gap-4 pb-3 border-b border-gray-300 mb-3 text-[10.5px]">
+                <div className="grid grid-cols-2 gap-4 pb-3 border-b border-gray-300 mb-3 text-xs">
                   {/* Left: Bill To */}
                   <div className="bg-slate-50/60 p-2.5 rounded border border-gray-200">
-                    <span className="text-[9.5px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                       Bill To
                     </span>
-                    <p className="font-bold text-gray-900 text-xs mb-0.5">{invoice.customerName}</p>
+                    <p className="font-semibold text-gray-900 text-[0.875rem] mb-0.5">{invoice.customerName}</p>
                     <p className="text-gray-700">{invoice.billTo?.address || 'Main Road, Nellore - 524001'}</p>
                     <p className="text-gray-700">{invoice.billTo?.state || invoice.region || 'Andhra Pradesh'}, India</p>
                     <p className="text-gray-700 font-mono mt-0.5">Phone: {invoice.customerPhone || '9988776655'}</p>
@@ -400,13 +400,13 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
                   {/* Right: Dispatch Details */}
                   {printOptions.transporterDetails && (
                     <div className="bg-slate-50/60 p-2.5 rounded border border-gray-200">
-                      <span className="text-[9.5px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                         Dispatch Details
                       </span>
                       <div className="space-y-0.5 text-gray-700">
                         <div className="flex justify-between">
                           <span className="text-gray-500">Dispatch No</span>
-                          <span className="font-bold text-gray-900 font-mono">: {invoice.dispatchNumber || 'DSP-0003'}</span>
+                          <span className="font-semibold text-gray-900 font-mono">: {invoice.dispatchNumber || 'DSP-0003'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-500">Dispatch Date</span>
@@ -436,9 +436,9 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
                 {/* Items Table */}
                 {printOptions.itemWiseDetails && (
                   <div className="mb-3 border border-gray-300 rounded overflow-hidden">
-                    <table className="w-full text-left text-[10px] border-collapse">
+                    <table className="doc-table w-full text-left text-xs border-collapse">
                       <thead>
-                        <tr className="bg-gray-100 text-gray-800 border-b border-gray-300 font-bold uppercase text-[9px]">
+                        <tr className="bg-gray-100 text-gray-800 border-b border-gray-300 font-semibold uppercase text-xs">
                           <th className="py-1.5 px-2 text-center w-8">#</th>
                           <th className="py-1.5 px-2">Item Code</th>
                           <th className="py-1.5 px-2">Item Name</th>
@@ -457,7 +457,7 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
                               <td className="py-1.5 px-2 font-mono font-medium text-gray-900">{it.itemCode}</td>
                               <td className="py-1.5 px-2 font-medium text-gray-900">{it.itemName}</td>
                               {printOptions.locationDetails && (
-                                <td className="py-1.5 px-2 text-gray-600 font-mono text-[9px]">
+                                <td className="py-1.5 px-2 text-gray-600 font-mono text-xs">
                                   {it.locationName || 'Factory-1 / A1'}
                                 </td>
                               )}
@@ -470,7 +470,7 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
                               <td className="py-1.5 px-2 text-right font-mono text-gray-900">
                                 {(it.rate || 0).toLocaleString('en-IN')}
                               </td>
-                              <td className="py-1.5 px-2 text-right font-mono font-bold text-gray-900">
+                              <td className="py-1.5 px-2 text-right font-mono font-semibold text-gray-900">
                                 {(it.amount || 0).toLocaleString('en-IN')}
                               </td>
                             </tr>
@@ -486,7 +486,7 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
                 )}
 
                 {/* Summary & Totals Block (2 columns) */}
-                <div className="grid grid-cols-2 gap-4 pb-3 border-b border-gray-300 mb-3 text-[10px]">
+                <div className="grid grid-cols-2 gap-4 pb-3 border-b border-gray-300 mb-3 text-xs">
                   {/* Left Column: Shipment metadata */}
                   <div className="space-y-1 text-gray-600">
                     <div className="flex">
@@ -515,37 +515,37 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
                   <div className="space-y-1.5 bg-gray-50 p-2 rounded border border-gray-200">
                     <div className="flex justify-between text-gray-600">
                       <span>Total Quantity (GBL)</span>
-                      <span className="font-bold text-gray-900">{invoice.totalQtyGbl || 5}</span>
+                      <span className="font-semibold text-gray-900">{invoice.totalQtyGbl || 5}</span>
                     </div>
                     <div className="flex justify-between text-gray-600">
                       <span>Total Quantity (PCS)</span>
-                      <span className="font-bold text-gray-900">{(invoice.totalQtyPcs || 1230).toLocaleString('en-IN')}</span>
+                      <span className="font-semibold text-gray-900">{(invoice.totalQtyPcs || 1230).toLocaleString('en-IN')}</span>
                     </div>
                     <div className="flex justify-between text-gray-600">
                       <span>Total Amount</span>
-                      <span className="font-mono font-bold text-gray-900">₹ {(invoice.subtotal || 32500).toLocaleString('en-IN')}</span>
+                      <span className="font-mono font-semibold text-gray-900">₹ {(invoice.subtotal || 32500).toLocaleString('en-IN')}</span>
                     </div>
                     {(invoice.totalAdditionalCharges > 0 || (invoice.additionalCharges && invoice.additionalCharges.length > 0)) && (
                       <div className="flex justify-between text-gray-600">
                         <span>Additional Charges</span>
-                        <span className="font-mono font-bold text-gray-900">
+                        <span className="font-mono font-semibold text-gray-900">
                           ₹ {(invoice.totalAdditionalCharges || 500).toLocaleString('en-IN')}
                         </span>
                       </div>
                     )}
-                    <div className="flex justify-between items-baseline pt-1.5 border-t-2 border-gray-900 text-xs font-black text-gray-900">
+                    <div className="flex justify-between items-baseline pt-1.5 border-t-2 border-gray-900 text-[0.875rem] font-semibold text-gray-900">
                       <span>Grand Total (₹)</span>
-                      <span className="font-mono text-sm">₹ {(invoice.grandTotal || 33000).toLocaleString('en-IN')}</span>
+                      <span className="font-mono text-[0.875rem]">₹ {(invoice.grandTotal || 33000).toLocaleString('en-IN')}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Amount In Words */}
                 <div className="mb-3 pb-2 border-b border-gray-300">
-                  <span className="text-[9px] font-bold uppercase text-gray-500 tracking-wider block">
+                  <span className="text-xs font-medium uppercase text-gray-500 tracking-wider block">
                     Amount in Words:
                   </span>
-                  <span className="font-bold text-gray-900 text-[10.5px]">
+                  <span className="font-semibold text-gray-900 text-xs">
                     {grandTotalWords}
                   </span>
                 </div>
@@ -553,8 +553,8 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
                 {/* Footer (Terms & Conditions + Signatory) */}
                 <div className="grid grid-cols-2 gap-4 pt-1">
                   {printOptions.termsConditions ? (
-                    <div className="text-[8.5px] text-gray-600 space-y-0.5">
-                      <span className="font-bold text-gray-800 block text-[9px]">Terms & Conditions:</span>
+                    <div className="text-xs text-gray-600 space-y-0.5">
+                      <span className="font-semibold text-gray-800 block text-xs">Terms & Conditions:</span>
                       <p>1. Goods once sold cannot be returned.</p>
                       <p>2. Payment to be made as per agreed terms.</p>
                       <p>3. Subject to Vijayawada jurisdiction.</p>
@@ -562,17 +562,17 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
                   ) : <div />}
 
                   <div className="text-right flex flex-col justify-between h-16">
-                    <p className="font-serif italic font-bold text-gray-800 text-[10px]">
+                    <p className="font-serif italic font-semibold text-gray-800 text-xs">
                       For Sri Krishna Binding Works
                     </p>
-                    <p className="text-[8.5px] font-semibold text-gray-500 uppercase tracking-wider">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Authorized Signatory
                     </p>
                   </div>
                 </div>
 
                 {printOptions.pageNumbers && (
-                  <div className="mt-4 pt-2 border-t border-gray-200 text-center text-[8px] text-gray-400">
+                  <div className="mt-4 pt-2 border-t border-gray-200 text-center text-xs text-gray-400">
                     Page 1 of 1
                   </div>
                 )}

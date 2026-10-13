@@ -582,8 +582,8 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl border border-gray-150 w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden my-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-gray-900/40 overflow-y-auto">
+      <div className="bg-white w-full max-w-6xl max-h-[calc(92*var(--vh,1vh))] flex flex-col overflow-hidden my-auto dlg-panel">
         
         {/* ── 1. MODAL HEADER ── */}
         <div className="px-5 py-3.5 border-b border-gray-150 flex items-center justify-between bg-white shrink-0">
@@ -593,14 +593,14 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-gray-900 tracking-tight">
+                <h2 className="text-base font-semibold text-gray-900 tracking-tight">
                   {isEditing ? `Edit Invoice (${editingInvoice?.invoiceNumber})` : 'Create Tax Invoice'}
                 </h2>
-                <span className="font-mono text-xs font-black bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md border border-blue-200">
+                <span className="font-mono text-[0.875rem] font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md border border-blue-200">
                   {invoiceNumber}
                 </span>
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-[0.875rem] text-gray-500">
                 Generate official GST Sales Tax Invoice with itemized billing, taxes & transport records.
               </p>
             </div>
@@ -609,11 +609,11 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
           <div className="flex items-center gap-2">
             {/* Mode Switcher */}
             {!isEditing && (
-              <div className="flex items-center bg-gray-100 p-0.5 rounded-xl text-xs font-bold border border-gray-200">
+              <div className="flex items-center bg-gray-100 p-0.5 rounded-xl text-[0.875rem] font-semibold border border-gray-200">
                 <button
                   type="button"
                   onClick={() => setInvoiceMode('challan')}
-                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  className={`px-3 py-1 rounded-lg cursor-pointer ${
                     invoiceMode === 'challan'
                       ? 'bg-white text-blue-700 shadow-2xs'
                       : 'text-gray-600 hover:text-gray-900'
@@ -624,9 +624,9 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setInvoiceMode('direct')}
-                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  className={`px-3 py-1 rounded-lg cursor-pointer ${
                     invoiceMode === 'direct'
-                      ? 'bg-white text-purple-700 shadow-2xs'
+                      ? 'bg-white text-blue-700 shadow-2xs'
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
@@ -637,7 +637,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
 
             <button
               onClick={onClose}
-              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -651,13 +651,13 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-2xs">
             {invoiceMode === 'challan' ? (
               <div>
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                   Select Delivery Challan
                 </label>
                 <select
                   value={selectedDcNo}
                   onChange={e => setSelectedDcNo(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-800 focus:outline-blue-500 cursor-pointer"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-800 focus:outline-blue-500 cursor-pointer"
                 >
                   {allDeliveries.map(d => (
                     <option key={d.id || d.dispatchNo} value={d.dispatchNo}>
@@ -668,13 +668,13 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
               </div>
             ) : (
               <div>
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                   Select Party / Customer
                 </label>
                 <select
                   value={selectedPartyId}
                   onChange={e => handleSelectParty(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-800 focus:outline-blue-500 cursor-pointer"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-800 focus:outline-blue-500 cursor-pointer"
                 >
                   <option value="">-- Choose Party or Enter Manually --</option>
                   {partyOptions.map(p => (
@@ -687,7 +687,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
             )}
 
             <div>
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                 Customer / Firm Name
               </label>
               <input
@@ -695,31 +695,31 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                 value={customerName}
                 onChange={e => setCustomerName(e.target.value)}
                 placeholder="Enter customer name..."
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-gray-900 bg-white focus:outline-blue-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-900 bg-white focus:outline-blue-500"
               />
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                 Invoice Date
               </label>
               <input
                 type="date"
                 value={invoiceDate}
                 onChange={e => setInvoiceDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono text-gray-900 bg-white focus:outline-blue-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[0.875rem] font-mono text-gray-900 bg-white focus:outline-blue-500"
               />
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                 Payment Terms & Due Date
               </label>
               <div className="grid grid-cols-2 gap-1.5">
                 <select
                   value={paymentTerms}
                   onChange={e => setPaymentTerms(e.target.value)}
-                  className="px-2 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-800 bg-white focus:outline-blue-500"
+                  className="px-2 py-2 border border-gray-200 rounded-lg text-[0.875rem] font-medium text-gray-800 bg-white focus:outline-blue-500"
                 >
                   <option value="Immediate">Immediate</option>
                   <option value="15 Days">15 Days</option>
@@ -731,7 +731,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                   type="date"
                   value={dueDate}
                   onChange={e => setDueDate(e.target.value)}
-                  className="px-2 py-2 border border-gray-200 rounded-lg text-xs font-mono text-gray-900 bg-white focus:outline-blue-500"
+                  className="px-2 py-2 border border-gray-200 rounded-lg text-[0.875rem] font-mono text-gray-900 bg-white focus:outline-blue-500"
                   placeholder="Due Date"
                 />
               </div>
@@ -742,69 +742,69 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Transport Details Card */}
             <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-3">
-              <div className="flex items-center gap-2 pb-2 border-b border-gray-100 font-bold text-xs text-gray-800">
+              <div className="flex items-center gap-2 pb-2 border-b border-gray-100 font-semibold text-[0.875rem] text-gray-800">
                 <Truck className="w-4 h-4 text-blue-600" />
                 <span>Transport & Reference Details</span>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="grid grid-cols-2 gap-2 text-[0.875rem]">
                 <div>
-                  <label className="text-[10px] font-bold text-gray-400 block mb-0.5">Linked DC No.</label>
+                  <label className="text-xs font-semibold text-gray-400 block mb-0.5">Linked DC No.</label>
                   <input
                     type="text"
                     value={dispatchNo}
                     onChange={e => setDispatchNo(e.target.value)}
                     placeholder="DO-001..."
-                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono font-bold"
+                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] font-mono font-semibold"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-gray-400 block mb-0.5">Sales Order No.</label>
+                  <label className="text-xs font-semibold text-gray-400 block mb-0.5">Sales Order No.</label>
                   <input
                     type="text"
                     value={salesOrderNo}
                     onChange={e => setSalesOrderNo(e.target.value)}
                     placeholder="SO-0001..."
-                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono font-bold"
+                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] font-mono font-semibold"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-gray-400 block mb-0.5">Transporter Name</label>
+                  <label className="text-xs font-semibold text-gray-400 block mb-0.5">Transporter Name</label>
                   <input
                     type="text"
                     value={transporter}
                     onChange={e => setTransporter(e.target.value)}
                     placeholder="e.g. Navata Road Transport"
-                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs"
+                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem]"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-gray-400 block mb-0.5">Vehicle Number</label>
+                  <label className="text-xs font-semibold text-gray-400 block mb-0.5">Vehicle Number</label>
                   <input
                     type="text"
                     value={vehicleNumber}
                     onChange={e => setVehicleNumber(e.target.value)}
                     placeholder="TS08 EA 1234"
-                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono font-bold uppercase"
+                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] font-mono font-semibold uppercase"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-gray-400 block mb-0.5">LR / Waybill No.</label>
+                  <label className="text-xs font-semibold text-gray-400 block mb-0.5">LR / Waybill No.</label>
                   <input
                     type="text"
                     value={lrNumber}
                     onChange={e => setLrNumber(e.target.value)}
                     placeholder="LR-98765"
-                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono"
+                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-gray-400 block mb-0.5">Buyer GSTIN</label>
+                  <label className="text-xs font-semibold text-gray-400 block mb-0.5">Buyer GSTIN</label>
                   <input
                     type="text"
                     value={customerGstin}
                     onChange={e => setCustomerGstin(e.target.value.toUpperCase())}
                     placeholder="36AAAAA0000A1Z5"
-                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-mono font-bold uppercase"
+                    className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] font-mono font-semibold uppercase"
                   />
                 </div>
               </div>
@@ -812,12 +812,12 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
 
             {/* Billing & Shipping Address Card */}
             <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-gray-100 font-bold text-xs text-gray-800">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-100 font-semibold text-[0.875rem] text-gray-800">
                 <div className="flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-emerald-600" />
                   <span>Billing & Shipping Address</span>
                 </div>
-                <label className="flex items-center gap-1.5 text-[11px] font-normal text-gray-600 cursor-pointer">
+                <label className="flex items-center gap-1.5 text-xs font-normal text-gray-600 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={sameAsBillTo}
@@ -828,25 +828,25 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                 </label>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[0.875rem]">
                 <div>
-                  <label className="text-[10px] font-bold text-gray-400 block mb-0.5">Bill To Address</label>
+                  <label className="text-xs font-semibold text-gray-400 block mb-0.5">Bill To Address</label>
                   <textarea
                     rows={3}
                     value={billToAddress}
                     onChange={e => setBillToAddress(e.target.value)}
-                    className="w-full p-2 border border-gray-200 rounded-lg text-xs text-gray-800 bg-white font-medium"
+                    className="w-full p-2 border border-gray-200 rounded-lg text-[0.875rem] text-gray-800 bg-white font-medium"
                     placeholder="Enter billing address..."
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-gray-400 block mb-0.5">Ship To Address</label>
+                  <label className="text-xs font-semibold text-gray-400 block mb-0.5">Ship To Address</label>
                   <textarea
                     rows={3}
                     value={sameAsBillTo ? billToAddress : shipToAddress}
                     onChange={e => setShipToAddress(e.target.value)}
                     disabled={sameAsBillTo}
-                    className={`w-full p-2 border border-gray-200 rounded-lg text-xs text-gray-800 ${sameAsBillTo ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : 'bg-white'}`}
+                    className={`w-full p-2 border border-gray-200 rounded-lg text-[0.875rem] text-gray-800 ${sameAsBillTo ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : 'bg-white'}`}
                     placeholder="Enter shipping address..."
                   />
                 </div>
@@ -859,8 +859,8 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Package className="w-4 h-4 text-blue-600" />
-                <span className="font-bold text-xs text-gray-800">Invoice Items & GST Rates</span>
-                <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                <span className="font-semibold text-[0.875rem] text-gray-800">Invoice Items & GST Rates</span>
+                <span className="text-xs font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
                   {itemRows.length} items
                 </span>
               </div>
@@ -868,7 +868,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                 <button
                   type="button"
                   onClick={handleAddNewDirectItem}
-                  className="px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                  className="px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-[0.875rem] font-semibold flex items-center gap-1 cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add Line Item</span>
@@ -877,9 +877,9 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-[0.875rem]">
                 <thead>
-                  <tr className="bg-gray-100/70 text-gray-600 font-bold border-b border-gray-200 text-[10px] uppercase tracking-wider">
+                  <tr className="bg-gray-100/70 text-gray-600 font-medium border-b border-gray-200 text-xs uppercase tracking-wider">
                     <th className="py-2.5 px-3 text-center w-8">#</th>
                     <th className="py-2.5 px-3">Item Description</th>
                     <th className="py-2.5 px-3 text-right">Invoice Qty</th>
@@ -893,8 +893,8 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {itemRows.map((row, idx) => (
-                    <tr key={row.key} className="hover:bg-blue-50/20 transition-colors">
-                      <td className="py-2.5 px-3 text-center font-bold text-gray-400">
+                    <tr key={row.key} className="hover:bg-blue-50/20">
+                      <td className="py-2.5 px-3 text-center font-semibold text-gray-400">
                         {idx + 1}
                       </td>
                       <td className="py-2.5 px-3">
@@ -906,7 +906,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                                 const matched = availableSkus.find(s => String(s._id) === e.target.value);
                                 handleSelectSkuForDirectRow(row.key, matched);
                               }}
-                              className="w-full p-1.5 border border-gray-200 rounded-lg text-xs font-bold text-gray-900 bg-white"
+                              className="w-full p-1.5 border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-900 bg-white"
                             >
                               <option value="">-- Choose Master SKU --</option>
                               {availableSkus.map(s => (
@@ -923,14 +923,14 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                                 setItemRows(prev => prev.map(r => r.key === row.key ? { ...r, itemName: val } : r));
                               }}
                               placeholder="Item description"
-                              className="w-full px-2 py-1 border border-gray-200 rounded-md text-xs"
+                              className="w-full px-2 py-1 border border-gray-200 rounded-md text-[0.875rem]"
                             />
                           </div>
                         ) : (
                           <div>
-                            <span className="font-mono font-bold text-blue-700 mr-2">{row.skuCode}</span>
-                            <span className="font-bold text-gray-900">{row.itemName}</span>
-                            <div className="text-[10px] text-gray-400 font-mono mt-0.5">
+                            <span className="font-mono font-semibold text-blue-700 mr-2">{row.skuCode}</span>
+                            <span className="font-semibold text-gray-900">{row.itemName}</span>
+                            <div className="text-xs text-gray-400 font-mono mt-0.5">
                               Dispatched: {row.dispatchedGbl} GBL (= {row.dispatchedPcs} PCS)
                             </div>
                           </div>
@@ -946,16 +946,16 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                             step="any"
                             value={row.invoiceQtyGbl || ''}
                             onChange={e => updateRowField(row.key, 'invoiceQtyGbl', Number(e.target.value))}
-                            className="w-18 h-8 px-2 border border-slate-300 rounded-lg text-right font-mono font-bold text-slate-800 bg-white text-xs focus:outline-blue-600"
+                            className="w-18 h-8 px-2 border border-slate-300 rounded-lg text-right font-mono font-semibold text-slate-800 bg-white text-[0.875rem] focus:outline-blue-600"
                           />
-                          <span className="text-[10px] font-bold text-slate-400">GBL</span>
+                          <span className="text-xs font-semibold text-slate-400">GBL</span>
                         </div>
                       </td>
 
                       {/* Unit Rate */}
                       <td className="py-2.5 px-3 text-right font-mono">
                         <div className="inline-flex items-center gap-1 justify-end">
-                          <span className="text-[10px] font-bold text-slate-400">₹</span>
+                          <span className="text-xs font-semibold text-slate-400">₹</span>
                           <input
                             type="number"
                             min={0}
@@ -963,7 +963,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                             value={row.rate || ''}
                             placeholder="0.00"
                             onChange={e => updateRowField(row.key, 'rate', Number(e.target.value))}
-                            className="w-24 h-8 px-2 border border-slate-300 rounded-lg text-right font-mono font-bold text-slate-800 bg-white text-xs focus:outline-blue-600"
+                            className="w-24 h-8 px-2 border border-slate-300 rounded-lg text-right font-mono font-semibold text-slate-800 bg-white text-[0.875rem] focus:outline-blue-600"
                           />
                         </div>
                       </td>
@@ -977,12 +977,12 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                           value={row.discountPct || ''}
                           placeholder="0"
                           onChange={e => updateRowField(row.key, 'discountPct', Number(e.target.value))}
-                          className="w-14 h-8 px-1.5 border border-slate-200 rounded-lg text-right font-mono text-xs focus:outline-blue-600"
+                          className="w-14 h-8 px-1.5 border border-slate-200 rounded-lg text-right font-mono text-[0.875rem] focus:outline-blue-600"
                         />
                       </td>
 
                       {/* Taxable Amount */}
-                      <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-800">
+                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-gray-800">
                         ₹{(row.taxableAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
 
@@ -991,7 +991,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                         <select
                           value={row.gstRate}
                           onChange={e => updateRowField(row.key, 'gstRate', Number(e.target.value))}
-                          className="px-2 py-1 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 bg-white focus:outline-blue-600 cursor-pointer"
+                          className="px-2 py-1 border border-slate-200 rounded-lg text-[0.875rem] font-semibold text-slate-700 bg-white focus:outline-blue-600 cursor-pointer"
                         >
                           <option value={0}>0%</option>
                           <option value={5}>5%</option>
@@ -1002,7 +1002,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                       </td>
 
                       {/* Total Amount */}
-                      <td className="py-2.5 px-3 text-right font-mono font-black text-slate-900">
+                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-900">
                         ₹{(row.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
 
@@ -1011,7 +1011,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                           <button
                             type="button"
                             onClick={() => handleRemoveDirectItem(row.key)}
-                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded cursor-pointer"
+                            className="icon-btn-danger"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -1027,7 +1027,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
           {/* ── 4. SUMMARY TOTALS & TAX BREAKDOWN ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-2">
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block">
                 Invoice Remarks / Terms
               </label>
               <textarea
@@ -1035,31 +1035,31 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                 value={remarks}
                 onChange={e => setRemarks(e.target.value)}
                 placeholder="Remarks, transport instructions, bank details note..."
-                className="w-full p-2.5 border border-gray-200 rounded-lg text-xs text-gray-800 bg-white focus:outline-blue-500"
+                className="w-full p-2.5 border border-gray-200 rounded-lg text-[0.875rem] text-gray-800 bg-white focus:outline-blue-500"
               />
             </div>
 
             {/* Calculation Card */}
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-2 text-xs">
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-2 text-[0.875rem]">
               <div className="flex justify-between text-gray-600 font-medium">
                 <span>Taxable Amount ({calculations.totalGbl} GBL):</span>
-                <span className="font-mono font-bold">₹{calculations.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className="font-mono font-semibold">₹{calculations.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
 
               {calculations.isInterState ? (
-                <div className="flex justify-between text-indigo-700 font-medium">
+                <div className="flex justify-between text-blue-700 font-medium">
                   <span>IGST (Integrated Tax):</span>
-                  <span className="font-mono font-bold">₹{calculations.igst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span className="font-mono font-semibold">₹{calculations.igst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               ) : (
                 <>
                   <div className="flex justify-between text-slate-600">
                     <span>CGST (Central Tax):</span>
-                    <span className="font-mono font-bold">₹{calculations.cgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="font-mono font-semibold">₹{calculations.cgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between text-slate-600">
                     <span>SGST (State Tax):</span>
-                    <span className="font-mono font-bold">₹{calculations.sgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="font-mono font-semibold">₹{calculations.sgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 </>
               )}
@@ -1067,11 +1067,11 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
               {calculations.chargesTotal > 0 && (
                 <div className="flex justify-between text-gray-600">
                   <span>Additional Charges:</span>
-                  <span className="font-mono font-bold">₹{calculations.chargesTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span className="font-mono font-semibold">₹{calculations.chargesTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               )}
 
-              <div className="pt-2 border-t border-gray-200 flex justify-between items-center text-sm font-black text-gray-900">
+              <div className="pt-2 border-t border-gray-200 flex justify-between items-center text-[0.875rem] font-semibold text-gray-900 dlg-footer">
                 <span>Grand Total (Payable):</span>
                 <span className="font-mono text-base text-emerald-700">
                   ₹{calculations.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1083,16 +1083,16 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
         </div>
 
         {/* ── 5. MODAL FOOTER ── */}
-        <div className="px-5 py-3.5 border-t border-gray-150 flex items-center justify-between bg-white shrink-0">
-          <div className="text-xs font-semibold text-gray-500">
-            Total Qty: <span className="text-gray-900 font-bold font-mono">{calculations.totalGbl} GBL</span> ({calculations.totalPcs.toLocaleString()} PCS)
+        <div className="px-5 py-3.5 border-t border-gray-150 flex items-center justify-between bg-white shrink-0 dlg-footer">
+          <div className="text-[0.875rem] font-semibold text-gray-500">
+            Total Qty: <span className="text-gray-900 font-semibold font-mono">{calculations.totalGbl} GBL</span> ({calculations.totalPcs.toLocaleString()} PCS)
           </div>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[0.875rem] font-semibold cursor-pointer"
             >
               Cancel
             </button>
@@ -1101,7 +1101,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
               type="button"
               onClick={handleSubmitInvoice}
               disabled={isSubmitting}
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm shadow-blue-500/25 transition-all cursor-pointer disabled:opacity-50"
+              className="btn-primary disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
               <span>{isSubmitting ? 'Generating Invoice...' : isEditing ? 'Update Invoice' : 'Generate Tax Invoice'}</span>

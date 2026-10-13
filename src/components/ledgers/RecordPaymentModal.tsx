@@ -113,23 +113,23 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs font-sans">
-      <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 font-sans">
+      <div className="bg-white w-full max-w-lg overflow-hidden dlg-panel">
         
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-150 flex items-center justify-between bg-slate-50">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+            <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-semibold">
               <DollarSign className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900">Record Payment / Receipt</h3>
-              <p className="text-xs text-slate-500">Post transaction entry directly to customer ledger</p>
+              <h3 className="text-base font-semibold text-slate-900">Record Payment / Receipt</h3>
+              <p className="text-[0.875rem] text-slate-500">Post transaction entry directly to customer ledger</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
+            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 rounded-lg cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -140,7 +140,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           
           {/* Party Select */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+            <label className="block text-[0.875rem] font-medium text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
               <User className="w-3.5 h-3.5 text-slate-400" />
               <span>Customer / Party</span>
             </label>
@@ -148,7 +148,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               value={partyId}
               onChange={(e) => setPartyId(e.target.value)}
               required
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none transition-all"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[0.875rem] font-medium text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none"
             >
               <option value="">Select Customer...</option>
               {customers.map((c) => (
@@ -162,14 +162,14 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           {/* Entry Type & Category */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              <label className="block text-[0.875rem] font-medium text-slate-700 uppercase tracking-wider mb-1.5">
                 Entry Nature
               </label>
               <div className="flex rounded-xl p-1 bg-slate-100 border border-slate-200">
                 <button
                   type="button"
                   onClick={() => setType('credit')}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  className={`flex-1 py-1.5 rounded-lg text-[0.875rem] font-semibold ${
                     type === 'credit'
                       ? 'bg-emerald-600 text-white shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
@@ -180,7 +180,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setType('debit')}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  className={`flex-1 py-1.5 rounded-lg text-[0.875rem] font-semibold ${
                     type === 'debit'
                       ? 'bg-blue-600 text-white shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
@@ -192,13 +192,13 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              <label className="block text-[0.875rem] font-medium text-slate-700 uppercase tracking-wider mb-1.5">
                 Voucher Type
               </label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as any)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 outline-none"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[0.875rem] font-medium text-slate-800 focus:bg-white focus:border-blue-600 outline-none"
               >
                 <option value="Payment">Payment / Receipt</option>
                 <option value="Discount">Discount Allowed</option>
@@ -211,11 +211,11 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           {/* Amount & Date */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              <label className="block text-[0.875rem] font-medium text-slate-700 uppercase tracking-wider mb-1.5">
                 Amount (₹)
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-2.5 text-sm font-bold text-slate-400">₹</span>
+                <span className="absolute left-3 top-2.5 text-[0.875rem] font-semibold text-slate-400">₹</span>
                 <input
                   type="number"
                   step="any"
@@ -224,13 +224,13 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   required
-                  className="w-full pl-7 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:border-blue-600 outline-none"
+                  className="w-full pl-7 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[0.875rem] font-semibold text-slate-900 focus:bg-white focus:border-blue-600 outline-none"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+              <label className="block text-[0.875rem] font-medium text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
                 <span>Payment Date</span>
               </label>
@@ -239,7 +239,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 required
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 outline-none"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[0.875rem] font-medium text-slate-800 focus:bg-white focus:border-blue-600 outline-none"
               />
             </div>
           </div>
@@ -247,14 +247,14 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           {/* Payment Method & Ref No */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+              <label className="block text-[0.875rem] font-medium text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                 <CreditCard className="w-3.5 h-3.5 text-slate-400" />
                 <span>Mode of Payment</span>
               </label>
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 outline-none"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[0.875rem] font-medium text-slate-800 focus:bg-white focus:border-blue-600 outline-none"
               >
                 <option value="UPI">UPI / GPay / PhonePe</option>
                 <option value="Bank Transfer">Bank Transfer (NEFT/RTGS)</option>
@@ -266,7 +266,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+              <label className="block text-[0.875rem] font-medium text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                 <Hash className="w-3.5 h-3.5 text-slate-400" />
                 <span>Ref / Cheque No</span>
               </label>
@@ -275,14 +275,14 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 placeholder="e.g. UTR-984021"
                 value={referenceId}
                 onChange={(e) => setReferenceId(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 outline-none"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[0.875rem] font-medium text-slate-800 focus:bg-white focus:border-blue-600 outline-none"
               />
             </div>
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+            <label className="block text-[0.875rem] font-medium text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
               <FileText className="w-3.5 h-3.5 text-slate-400" />
               <span>Particulars / Narration</span>
             </label>
@@ -291,23 +291,23 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               placeholder="e.g. Payment received against Invoice #INV-260845"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:bg-white focus:border-blue-600 outline-none"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[0.875rem] font-medium text-slate-800 focus:bg-white focus:border-blue-600 outline-none"
             />
           </div>
 
           {/* Buttons */}
-          <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-150">
+          <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-150 dlg-footer">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              className="px-4 py-2 text-[0.875rem] font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm shadow-emerald-600/20 flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              className="btn-success disabled:opacity-50"
             >
               <Check className="w-4 h-4 stroke-[2.5]" />
               <span>{isSubmitting ? 'Posting...' : 'Save & Post Entry'}</span>

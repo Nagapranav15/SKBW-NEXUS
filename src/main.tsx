@@ -40,6 +40,9 @@ if (typeof window !== 'undefined') {
   });
 }
 
+// UI sizes are fixed (16px root, like Makoro): larger monitors show more content instead of scaling the text.
+document.documentElement.style.removeProperty('font-size');
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

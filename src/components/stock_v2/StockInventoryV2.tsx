@@ -43,6 +43,7 @@ import {
   ClipboardList
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { generateObjectListPdf } from '../../utils/pdfReport';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
@@ -1347,7 +1348,7 @@ export const StockInventoryV2: React.FC = () => {
   };
 
   // Export to Excel / CSV
-  const handleExportExcel = () => {
+  const handleExportExcel = (asPdf = false) => {
     const exportData = filteredSkus.map(s => {
       const itemGroup = getSkuCategoryGroup(s);
       const itemTypeLabel = itemGroup === 'products' ? 'Finished Goods' : itemGroup === 'semi' ? 'Semi Finished' : 'Raw Material';
@@ -1372,6 +1373,16 @@ export const StockInventoryV2: React.FC = () => {
       };
     });
 
+    if (asPdf) {
+      generateObjectListPdf({
+        companyName: selectedCompany?.name,
+        title: 'Stock Inventory Report',
+        rows: exportData,
+        fileName: `Stock_Inventory_${new Date().toISOString().split('T')[0]}`,
+      });
+      showToast('Stock inventory PDF downloaded', 'success');
+      return;
+    }
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Stock Inventory');
@@ -1436,24 +1447,21 @@ export const StockInventoryV2: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+    <div className="min-h-[calc(100*var(--vh,1vh))] bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
       {/* ── 1. Header Banner with Spacious Integrated KPI Metric Cards ── */}
-      <div className="bg-white p-4 md:p-5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-3.5 relative">
+      <div className="space-y-3.5 relative px-1">
         
         {/* Top Row: Heading & Subtitle on Left | Action Controls on Right (Exact match to Item Master / Business Directory) */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3.5">
-            <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs shrink-0">
-              <Boxes className="w-6 h-6 stroke-[2.2]" />
-            </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+              <h1 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <span>Stock &amp; Inventory</span>
-                <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold transition-all">
-                  {kpiStats.totalItemsCount} Total Items
+                <span className="text-xs font-medium text-gray-500">
+                  {kpiStats.totalItemsCount} total items
                 </span>
               </h1>
-              <p className="text-xs text-gray-500 font-medium">
+              <p className="text-[0.875rem] text-gray-500 font-medium">
                 Multi-warehouse tracking &amp; live batch costing
               </p>
             </div>
@@ -1466,7 +1474,7 @@ export const StockInventoryV2: React.FC = () => {
               onClick={() => {
                 loadAuxiliaryData(true);
               }}
-              className="p-2.5 border border-gray-200 text-gray-600 hover:bg-gray-100 rounded-xl transition-all cursor-pointer shadow-2xs"
+              className="p-2.5 border border-gray-200 text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer shadow-2xs"
               title="Refresh inventory balances"
             >
               <RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-600' : ''}`} />
@@ -1474,11 +1482,20 @@ export const StockInventoryV2: React.FC = () => {
 
             <button
               type="button"
-              onClick={handleExportExcel}
-              className="px-3.5 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+              onClick={() => handleExportExcel()}
+              className="px-3.5 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[0.875rem] font-semibold rounded-xl flex items-center gap-1.5 shadow-2xs cursor-pointer"
             >
               <Download className="w-3.5 h-3.5 text-gray-500" /> 
               <span>Export Excel</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleExportExcel(true)}
+              className="px-3.5 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[0.875rem] font-semibold rounded-xl flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5 text-gray-500" /> 
+              <span>Print PDF</span>
             </button>
 
             {/* + Add New Dropdown */}
@@ -1486,7 +1503,7 @@ export const StockInventoryV2: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowAddMenu(prev => !prev)}
-                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-[0.875rem] font-semibold rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add New</span>
@@ -1494,7 +1511,7 @@ export const StockInventoryV2: React.FC = () => {
               </button>
 
               {showAddMenu && (
-                <div className="absolute right-0 mt-1.5 w-56 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 py-1.5 divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100">
+                <div className="absolute right-0 mt-1.5 w-56 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 py-1.5 divide-y divide-gray-100">
                   <div className="p-1">
                     <button
                       type="button"
@@ -1504,7 +1521,7 @@ export const StockInventoryV2: React.FC = () => {
                         setTransferInitialLocId(undefined);
                         setShowTransferModal(true);
                       }}
-                      className="w-full px-3 py-2 text-left text-xs font-bold text-gray-800 hover:bg-blue-50 hover:text-blue-900 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
+                      className="w-full px-3 py-2 text-left text-[0.875rem] font-semibold text-gray-800 hover:bg-blue-50 hover:text-blue-900 rounded-xl flex items-center gap-2.5 cursor-pointer"
                     >
                       <ArrowRightLeft className="w-4 h-4 text-blue-600" />
                       <span>New Stock Transfer</span>
@@ -1517,7 +1534,7 @@ export const StockInventoryV2: React.FC = () => {
                         setAdjustmentInitialLocId(undefined);
                         setShowAdjustmentModal(true);
                       }}
-                      className="w-full px-3 py-2 text-left text-xs font-bold text-gray-800 hover:bg-amber-50 hover:text-amber-900 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
+                      className="w-full px-3 py-2 text-left text-[0.875rem] font-semibold text-gray-800 hover:bg-amber-50 hover:text-amber-900 rounded-xl flex items-center gap-2.5 cursor-pointer"
                     >
                       <SlidersHorizontal className="w-4 h-4 text-amber-600" />
                       <span>Stock Adjustment</span>
@@ -1531,7 +1548,7 @@ export const StockInventoryV2: React.FC = () => {
                         setShowAddMenu(false);
                         handleOpenBatchModal();
                       }}
-                      className="w-full px-3 py-2 text-left text-xs font-bold text-gray-800 hover:bg-blue-50 hover:text-blue-900 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
+                      className="w-full px-3 py-2 text-left text-[0.875rem] font-semibold text-gray-800 hover:bg-blue-50 hover:text-blue-900 rounded-xl flex items-center gap-2.5 cursor-pointer"
                     >
                       <Layers className="w-4 h-4 text-blue-600" />
                       <span>Add Purchase Batch</span>
@@ -1543,9 +1560,9 @@ export const StockInventoryV2: React.FC = () => {
                         setEditingSku(null);
                         setIsAddSkuOpen(true);
                       }}
-                      className="w-full px-3 py-2 text-left text-xs font-bold text-gray-800 hover:bg-purple-50 hover:text-purple-900 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer"
+                      className="w-full px-3 py-2 text-left text-[0.875rem] font-semibold text-gray-800 hover:bg-blue-50 hover:text-blue-900 rounded-xl flex items-center gap-2.5 cursor-pointer"
                     >
-                      <Package className="w-4 h-4 text-purple-600" />
+                      <Package className="w-4 h-4 text-blue-600" />
                       <span>Add New Item (SKU)</span>
                     </button>
                   </div>
@@ -1557,10 +1574,10 @@ export const StockInventoryV2: React.FC = () => {
       </div>
 
       {/* ── MAIN TABS & ACTION BAR ── */}
-        <div className="bg-white rounded-2xl border border-gray-200/80 p-3 shadow-2xs space-y-3">
+        <div className="space-y-3">
           
           {/* Main Navigation Tabs */}
-          <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+          <div className="flex items-center justify-between border-b border-gray-200">
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
               {[
                 { id: 'overview', label: 'Stock Overview', icon: Boxes },
@@ -1581,17 +1598,17 @@ export const StockInventoryV2: React.FC = () => {
                       setActiveTab(tab.id as StockTabType);
                       setPage(1);
                     }}
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`flex items-center gap-1.5 px-4 py-3 text-[0.875rem] font-semibold border-b-2 -mb-[0.0625rem] cursor-pointer whitespace-nowrap ${
                       isActive
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900'
+                        ? 'border-blue-600 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-900'
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5" />
                     <span>{tab.label}</span>
                     {tab.count !== undefined && (
-                      <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
-                        isActive ? 'bg-blue-900/40 text-blue-100' : 'bg-gray-200 text-gray-700'
+                      <span className={`px-1.5 py-0.2 rounded-full text-xs font-semibold ${
+                        isActive ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
                       }`}>
                         {tab.count}
                       </span>
@@ -1601,7 +1618,7 @@ export const StockInventoryV2: React.FC = () => {
               })}
             </div>
 
-            <div className="text-xs text-gray-400 font-semibold shrink-0">
+            <div className="text-[0.875rem] text-gray-400 font-semibold shrink-0">
               Showing <strong>{filteredSkus.length}</strong> items
             </div>
           </div>
@@ -1610,14 +1627,14 @@ export const StockInventoryV2: React.FC = () => {
           {activeTab !== 'warehouse' && (
             <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
               {/* Search Bar */}
-              <div className="relative min-w-[200px] max-w-xs flex-1">
+              <div className="relative min-w-[12.5rem] max-w-xs flex-1">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder="Search SKU code, name, brand..."
-                  className="w-full pl-8 pr-7 py-1.5 text-xs bg-gray-50/80 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 transition-all shadow-2xs"
+                  className="w-full pl-8 pr-7 py-1.5 text-[0.875rem] bg-gray-50/80 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 shadow-2xs"
                 />
                 {search && (
                   <button
@@ -1642,7 +1659,7 @@ export const StockInventoryV2: React.FC = () => {
                       setShowColumnPicker(false);
                       setShowExportMenu(false);
                     }}
-                    className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+                    className={`p-2 rounded-xl border text-[0.875rem] font-semibold flex items-center justify-center cursor-pointer shadow-2xs ${
                       categoryFilter !== 'ALL' || ruleTypeFilter !== 'ALL' || statusFilter !== 'ALL'
                         ? 'bg-blue-600 text-white border-blue-600 shadow-blue-100'
                         : 'bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200'
@@ -1652,20 +1669,15 @@ export const StockInventoryV2: React.FC = () => {
                   >
                     <Filter className="w-4 h-4" />
                   </button>
-                  {!showFilterPanel && (
-                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                      Filters
-                    </div>
-                  )}
 
                   {/* Filter Popover */}
                   {showFilterPanel && (
-                    <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-200 shadow-2xl p-4 z-50 animate-in fade-in zoom-in-95 duration-150 text-left">
+                    <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white/95 rounded-2xl border border-gray-200 shadow-2xl p-4 z-50 text-left">
                       <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-3">
                         <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-bold text-gray-900">Inventory Filters</h4>
+                          <h4 className="text-[0.875rem] font-semibold text-gray-900">Inventory Filters</h4>
                           {(categoryFilter !== 'ALL' || ruleTypeFilter !== 'ALL' || statusFilter !== 'ALL') && (
-                            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                            <span className="text-[0.875rem] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
                               Active
                             </span>
                           )}
@@ -1675,7 +1687,7 @@ export const StockInventoryV2: React.FC = () => {
                             <button
                               type="button"
                               onClick={handleResetFilters}
-                              className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                              className="text-[0.875rem] font-semibold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
                             >
                               Clear All
                             </button>
@@ -1692,7 +1704,7 @@ export const StockInventoryV2: React.FC = () => {
 
                       {/* Quick Status Filter Pills */}
                       <div className="mb-3">
-                        <label className="text-[10px] font-bold text-gray-400 tracking-wider uppercase block mb-1.5">Stock Status</label>
+                        <label className="text-xs font-medium text-gray-400 tracking-wider uppercase block mb-1.5">Stock Status</label>
                         <div className="flex flex-wrap gap-1.5">
                           {[
                             { id: 'ALL', label: 'All Items' },
@@ -1705,7 +1717,7 @@ export const StockInventoryV2: React.FC = () => {
                               key={pill.id}
                               type="button"
                               onClick={() => setStatusFilter(pill.id)}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                              className={`px-2.5 py-1 rounded-lg text-[0.875rem] font-semibold cursor-pointer ${
                                 statusFilter === pill.id
                                   ? 'bg-blue-600 text-white shadow-2xs'
                                   : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
@@ -1720,11 +1732,11 @@ export const StockInventoryV2: React.FC = () => {
                       {/* Category & Ruling Type selects */}
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="text-[10px] font-bold text-gray-400 tracking-wider uppercase block mb-1">Category</label>
+                          <label className="text-xs font-medium text-gray-400 tracking-wider uppercase block mb-1">Category</label>
                           <select
                             value={categoryFilter}
                             onChange={e => setCategoryFilter(e.target.value)}
-                            className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:outline-none focus:border-blue-500 cursor-pointer"
+                            className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:outline-none focus:border-blue-500 cursor-pointer"
                           >
                             <option value="ALL">All Categories</option>
                             {availableCategories.map(cat => (
@@ -1733,11 +1745,11 @@ export const StockInventoryV2: React.FC = () => {
                           </select>
                         </div>
                         <div>
-                          <label className="text-[10px] font-bold text-gray-400 tracking-wider uppercase block mb-1">Ruling Type</label>
+                          <label className="text-xs font-medium text-gray-400 tracking-wider uppercase block mb-1">Ruling Type</label>
                           <select
                             value={ruleTypeFilter}
                             onChange={e => setRuleTypeFilter(e.target.value)}
-                            className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:outline-none focus:border-blue-500 cursor-pointer"
+                            className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:outline-none focus:border-blue-500 cursor-pointer"
                           >
                             <option value="ALL">All Ruling Types</option>
                             {availableRuleTypes.map(rt => (
@@ -1760,20 +1772,15 @@ export const StockInventoryV2: React.FC = () => {
                       setShowExportMenu(false);
                       setShowFilterPanel(false);
                     }}
-                    className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                    className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
                     title="Sort Records"
                     aria-label="Sort Records"
                   >
                     <ArrowUpDown className="w-4 h-4" />
                   </button>
-                  {!showSortMenu && (
-                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                      Sort Options
-                    </div>
-                  )}
                   {showSortMenu && (
-                    <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs text-left">
-                      <div className="px-2 py-1 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Sort Options</div>
+                    <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-[0.875rem] text-left">
+                      <div className="px-2 py-1 text-xs font-medium text-gray-400 uppercase tracking-wider">Sort Options</div>
                       {[
                         { label: 'Item Name (A to Z)', field: 'name', order: 'asc' as const },
                         { label: 'Item Name (Z to A)', field: 'name', order: 'desc' as const },
@@ -1793,7 +1800,7 @@ export const StockInventoryV2: React.FC = () => {
                               setShowSortMenu(false);
                             }}
                             className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${
-                              active ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'
+                              active ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'
                             }`}
                           >
                             <span>{s.label}</span>
@@ -1814,25 +1821,20 @@ export const StockInventoryV2: React.FC = () => {
                       setShowExportMenu(false);
                       setShowFilterPanel(false);
                     }}
-                    className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                    className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
                     title="Toggle Columns"
                     aria-label="Toggle Columns"
                   >
                     <Columns className="w-4 h-4" />
                   </button>
-                  {!showColumnPicker && (
-                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                      Column Visibility
-                    </div>
-                  )}
                   {showColumnPicker && (
-                    <div className="absolute right-0 mt-1.5 w-60 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-2 text-xs text-left">
+                    <div className="absolute right-0 mt-1.5 w-60 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-2 text-[0.875rem] text-left">
                       <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                        <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Visible Columns</span>
+                        <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Visible Columns</span>
                         <button
                           type="button"
                           onClick={() => setColumnsConfig(DEFAULT_STOCK_COLUMNS)}
-                          className="text-[10.5px] text-blue-600 font-bold hover:underline cursor-pointer"
+                          className="text-xs text-blue-600 font-semibold hover:underline cursor-pointer"
                         >
                           Reset
                         </button>
@@ -1841,7 +1843,7 @@ export const StockInventoryV2: React.FC = () => {
                         {columnsConfig.map((col) => (
                           <label
                             key={col.id}
-                            className="flex items-center justify-between p-1.5 rounded-lg border border-gray-200/80 bg-gray-50/80 hover:bg-blue-50/40 hover:border-blue-300 text-xs font-semibold cursor-pointer transition-all select-none text-gray-800"
+                            className="flex items-center justify-between p-1.5 rounded-lg border border-gray-200/80 bg-gray-50/80 hover:bg-blue-50/40 hover:border-blue-300 text-[0.875rem] font-semibold cursor-pointer select-none text-gray-800"
                           >
                             <div className="flex items-center gap-2">
                               <input
@@ -1872,19 +1874,14 @@ export const StockInventoryV2: React.FC = () => {
                       setShowColumnPicker(false);
                       setShowFilterPanel(false);
                     }}
-                    className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                    className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
                     title="Export Data"
                     aria-label="Export Data"
                   >
                     <Download className="w-4 h-4" />
                   </button>
-                  {!showExportMenu && (
-                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                      Export Data
-                    </div>
-                  )}
                   {showExportMenu && (
-                    <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs text-left">
+                    <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-[0.875rem] text-left">
                       <button
                         type="button"
                         onClick={() => { handleExportCSV(); setShowExportMenu(false); }}
@@ -1910,22 +1907,19 @@ export const StockInventoryV2: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleDownloadSampleCSV}
-                    className="p-2 rounded-xl bg-white hover:bg-blue-50/60 text-blue-600 border border-gray-200 hover:border-blue-200 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                    className="p-2 rounded-xl bg-white hover:bg-blue-50/60 text-blue-600 border border-gray-200 hover:border-blue-200 flex items-center justify-center cursor-pointer shadow-2xs"
                     title="Download Sample Intake Template"
                     aria-label="Download Sample Intake Template"
                   >
                     <FileSpreadsheet className="w-4 h-4 text-blue-600" />
                   </button>
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    Sample Template
-                  </div>
                 </div>
 
                 {/* 6. Import CSV Icon Button */}
                 <div className="relative group">
                   <label
-                    className={`p-2 rounded-xl border text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
-                      isImporting ? 'bg-blue-100 border-blue-300 animate-pulse' : 'bg-white hover:bg-blue-50/60 border-gray-200 hover:border-blue-200'
+                    className={`p-2 rounded-xl border text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs ${
+                      isImporting ? 'bg-blue-100 border-blue-300' : 'bg-white hover:bg-blue-50/60 border-gray-200 hover:border-blue-200'
                     }`}
                     title="Import Excel/CSV File"
                     aria-label="Import Excel/CSV File"
@@ -1939,9 +1933,6 @@ export const StockInventoryV2: React.FC = () => {
                       className="hidden"
                     />
                   </label>
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    Import Excel/CSV
-                  </div>
                 </div>
 
                 {/* 7. Refresh / Sync Live Stock */}
@@ -1950,7 +1941,7 @@ export const StockInventoryV2: React.FC = () => {
                     type="button"
                     onClick={handleSyncLiveInventory}
                     disabled={isSyncing}
-                    className={`p-2 rounded-xl border text-amber-700 transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+                    className={`p-2 rounded-xl border text-amber-700 flex items-center justify-center cursor-pointer shadow-2xs ${
                       isSyncing ? 'bg-amber-100 border-amber-300' : 'bg-white hover:bg-amber-50/60 border-gray-200 hover:border-amber-200'
                     }`}
                     title="Sync & Refresh Live Stock Balances"
@@ -1958,9 +1949,6 @@ export const StockInventoryV2: React.FC = () => {
                   >
                     <RefreshCw className={`w-4 h-4 text-amber-600 ${isSyncing ? 'animate-spin' : ''}`} />
                   </button>
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    Sync Live Stock
-                  </div>
                 </div>
 
                 {/* 8. Movements Ledger / History */}
@@ -1968,15 +1956,12 @@ export const StockInventoryV2: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setActiveTab('transfers')}
-                    className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                    className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
                     title="View Stock Movement Ledger"
                     aria-label="View Stock Movement Ledger"
                   >
                     <History className="w-4 h-4 text-blue-600" />
                   </button>
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    Stock Transfers Ledger
-                  </div>
                 </div>
 
                 {/* 9. Stock Alerts Toggle / Filter */}
@@ -1984,7 +1969,7 @@ export const StockInventoryV2: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setStatusFilter(prev => prev === 'ALERTS' ? 'ALL' : 'ALERTS')}
-                    className={`p-2 rounded-xl border transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+                    className={`p-2 rounded-xl border flex items-center justify-center cursor-pointer shadow-2xs ${
                       statusFilter === 'ALERTS'
                         ? 'bg-rose-600 text-white border-rose-600 shadow-rose-100'
                         : 'bg-rose-50 hover:bg-rose-100/80 border-rose-200 text-rose-700'
@@ -1994,9 +1979,6 @@ export const StockInventoryV2: React.FC = () => {
                   >
                     <Trash2 className="w-4 h-4 text-rose-600" />
                   </button>
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    {statusFilter === 'ALERTS' ? 'Show All Items' : 'Show Stock Alerts'}
-                  </div>
                 </div>
 
                 {/* 10. Find Duplicates */}
@@ -2005,15 +1987,12 @@ export const StockInventoryV2: React.FC = () => {
                     type="button"
                     onClick={handleFindDuplicates}
                     disabled={isScanningDuplicates}
-                    className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100/80 border border-amber-200 text-amber-700 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                    className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100/80 border border-amber-200 text-amber-700 flex items-center justify-center cursor-pointer shadow-2xs"
                     title="Scan for Duplicate SKU codes / Item names"
                     aria-label="Scan for Duplicate Items"
                   >
                     <Copy className={`w-4 h-4 text-amber-600 ${isScanningDuplicates ? 'animate-spin' : ''}`} />
                   </button>
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    Find Duplicates
-                  </div>
                 </div>
 
                 {/* 11. Stock Adjustment / Quick Audit */}
@@ -2025,15 +2004,12 @@ export const StockInventoryV2: React.FC = () => {
                       setAdjustmentInitialLocId(undefined);
                       setShowAdjustmentModal(true);
                     }}
-                    className="p-2 text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/90 rounded-xl border border-emerald-200/80 transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                    className="p-2 text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/90 rounded-xl border border-emerald-200/80 cursor-pointer shadow-2xs flex items-center justify-center"
                     title="Stock Adjustment / Physical Count Reconciliation"
                     aria-label="Stock Adjustment / Physical Count"
                   >
                     <ClipboardList className="w-4 h-4 text-emerald-700 stroke-[2.2]" />
                   </button>
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    Stock Adjustment
-                  </div>
                 </div>
 
                 {/* 12. Add New SKU Item Circular Button */}
@@ -2044,15 +2020,12 @@ export const StockInventoryV2: React.FC = () => {
                       setEditingSku(null);
                       setIsAddSkuOpen(true);
                     }}
-                    className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold shrink-0"
+                    className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs cursor-pointer font-semibold shrink-0"
                     title="Add New SKU Item"
                     aria-label="Add New SKU Item"
                   >
                     <Plus className="w-4 h-4 text-blue-600 stroke-[2.5]" />
                   </button>
-                  <div className="absolute top-full mt-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    Add New SKU
-                  </div>
                 </div>
               </div>
             </div>
@@ -2068,11 +2041,11 @@ export const StockInventoryV2: React.FC = () => {
 
         {/* 2. Stock Transfers Tab */}
         {activeTab === 'transfers' && (
-          <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden">
+          <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2">
             <div className="p-4 border-b border-gray-100 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-gray-900">Stock Transfers Log</h3>
-                <p className="text-xs text-gray-500">Chronological history of all inter-location movements.</p>
+                <h3 className="text-[0.875rem] font-semibold text-gray-900">Stock Transfers Log</h3>
+                <p className="text-[0.875rem] text-gray-500">Chronological history of all inter-location movements.</p>
               </div>
               <button
                 type="button"
@@ -2081,22 +2054,22 @@ export const StockInventoryV2: React.FC = () => {
                   setTransferInitialLocId(undefined);
                   setShowTransferModal(true);
                 }}
-                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[0.875rem] font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" /> New Transfer
               </button>
             </div>
 
             {transferEntries.length === 0 ? (
-              <div className="text-center py-16 text-gray-400 text-xs space-y-2">
+              <div className="text-center py-16 text-gray-400 text-[0.875rem] space-y-2">
                 <ArrowRightLeft className="w-8 h-8 mx-auto text-gray-300" />
                 <p className="font-semibold text-gray-600">No stock transfers recorded yet</p>
-                <p className="text-[11px]">Click "New Transfer" to move items between warehouse bins.</p>
+                <p className="text-xs">Click "New Transfer" to move items between warehouse bins.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-gray-700">
-                  <thead className="bg-gray-50/80 text-[10.5px] uppercase font-bold text-gray-500 border-b border-gray-200/80">
+                <table className="w-full text-left text-[0.875rem] text-gray-700">
+                  <thead className="text-xs uppercase font-semibold text-gray-600 border-b border-gray-200">
                     <tr>
                       <th className="px-4 py-3">Date</th>
                       <th className="px-4 py-3">Reference #</th>
@@ -2108,20 +2081,16 @@ export const StockInventoryV2: React.FC = () => {
                       <th className="px-4 py-3 text-right">Action</th>
                     </tr>
                   </thead>
-                  <tbody key={`transfers-${animationKey}`} className="divide-y divide-gray-100 text-xs text-gray-700">
+                  <tbody key={`transfers-${animationKey}`} className="divide-y divide-gray-100 text-[0.875rem] text-gray-700">
                     {transferEntries.map((entry, idx) => (
                       <tr 
                         key={entry._id || idx}
-                        style={{
-                          animation: 'slideDownFade 0.35s ease-out forwards',
-                          animationDelay: `${idx * 35}ms`
-                        }}
-                        className="hover:bg-gray-50/80 transition-all opacity-0 whitespace-nowrap"
+                        className="hover:bg-gray-50/80  whitespace-nowrap"
                       >
                         <td className="px-4 py-3 whitespace-nowrap text-gray-500">
                           {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-IN') : 'Recent'}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap font-mono font-bold text-gray-900">
+                        <td className="px-4 py-3 whitespace-nowrap font-mono font-semibold text-gray-900">
                           {entry.referenceNumber || `TRF-${idx + 100}`}
                         </td>
                         <td className="px-4 py-3 font-semibold text-gray-900">
@@ -2133,17 +2102,17 @@ export const StockInventoryV2: React.FC = () => {
                         <td className="px-4 py-3 text-gray-600">
                           {entry.toLocationName || entry.locationName || 'Destination'}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono font-bold text-blue-700">
+                        <td className="px-4 py-3 text-right font-mono font-semibold text-blue-700">
                           {Number(entry.quantity || 0).toLocaleString('en-IN')} {entry.unit || 'Units'}
                         </td>
-                        <td className="px-4 py-3 text-gray-500 text-[11px] italic">
+                        <td className="px-4 py-3 text-gray-500 text-xs italic">
                           {entry.remarks || '—'}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <button
                             type="button"
                             onClick={() => setSelectedTransferForPrint(entry)}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 text-xs font-semibold"
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer inline-flex items-center gap-1 text-[0.875rem] font-semibold"
                             title="Print Transfer Slip"
                           >
                             <Printer className="w-3.5 h-3.5" />
@@ -2161,11 +2130,11 @@ export const StockInventoryV2: React.FC = () => {
 
         {/* 3. Adjustments Tab */}
         {activeTab === 'adjustments' && (
-          <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden">
+          <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2">
             <div className="p-4 border-b border-gray-100 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-gray-900">Stock Adjustments Log</h3>
-                <p className="text-xs text-gray-500">Audit trail of quantity reconciliations and damage write-offs.</p>
+                <h3 className="text-[0.875rem] font-semibold text-gray-900">Stock Adjustments Log</h3>
+                <p className="text-[0.875rem] text-gray-500">Audit trail of quantity reconciliations and damage write-offs.</p>
               </div>
               <button
                 type="button"
@@ -2174,22 +2143,22 @@ export const StockInventoryV2: React.FC = () => {
                   setAdjustmentInitialLocId(undefined);
                   setShowAdjustmentModal(true);
                 }}
-                className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[0.875rem] font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" /> New Adjustment
               </button>
             </div>
 
             {adjustmentEntries.length === 0 ? (
-              <div className="text-center py-16 text-gray-400 text-xs space-y-2">
+              <div className="text-center py-16 text-gray-400 text-[0.875rem] space-y-2">
                 <SlidersHorizontal className="w-8 h-8 mx-auto text-gray-300" />
                 <p className="font-semibold text-gray-600">No stock adjustments recorded yet</p>
-                <p className="text-[11px]">Click "New Adjustment" to record physical audit counts or wastage.</p>
+                <p className="text-xs">Click "New Adjustment" to record physical audit counts or wastage.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-gray-700">
-                  <thead className="bg-gray-50/80 text-[10.5px] uppercase font-bold text-gray-500 border-b border-gray-200/80">
+                <table className="w-full text-left text-[0.875rem] text-gray-700">
+                  <thead className="text-xs uppercase font-semibold text-gray-600 border-b border-gray-200">
                     <tr>
                       <th className="px-4 py-3">Date</th>
                       <th className="px-4 py-3">Reference #</th>
@@ -2200,22 +2169,18 @@ export const StockInventoryV2: React.FC = () => {
                       <th className="px-4 py-3">Reason / Remarks</th>
                     </tr>
                   </thead>
-                  <tbody key={`adjustments-${animationKey}`} className="divide-y divide-gray-100 text-xs text-gray-700">
+                  <tbody key={`adjustments-${animationKey}`} className="divide-y divide-gray-100 text-[0.875rem] text-gray-700">
                     {adjustmentEntries.map((entry, idx) => {
                       const isInc = entry.direction === 'IN' || (entry.quantity || 0) > 0;
                       return (
                         <tr 
                           key={entry._id || idx}
-                          style={{
-                            animation: 'slideDownFade 0.35s ease-out forwards',
-                            animationDelay: `${idx * 35}ms`
-                          }}
-                          className="hover:bg-gray-50/80 transition-all opacity-0 whitespace-nowrap"
+                          className="hover:bg-gray-50/80  whitespace-nowrap"
                         >
                           <td className="px-4 py-3 whitespace-nowrap text-gray-500">
                             {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-IN') : 'Recent'}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap font-mono font-bold text-gray-900">
+                          <td className="px-4 py-3 whitespace-nowrap font-mono font-semibold text-gray-900">
                             {entry.referenceNumber || `ADJ-${idx + 100}`}
                           </td>
                           <td className="px-4 py-3 font-semibold text-gray-900">
@@ -2225,18 +2190,18 @@ export const StockInventoryV2: React.FC = () => {
                             {entry.locationName || 'Warehouse Storage'}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                               isInc ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                             }`}>
                               {isInc ? 'Increase (+)' : 'Deduct (-)'}
                             </span>
                           </td>
-                          <td className={`px-4 py-3 text-right font-mono font-bold ${
+                          <td className={`px-4 py-3 text-right font-mono font-semibold ${
                             isInc ? 'text-emerald-700' : 'text-rose-600'
                           }`}>
                             {isInc ? '+' : '-'}{Math.abs(Number(entry.quantity || 0)).toLocaleString('en-IN')} {entry.unit || 'Units'}
                           </td>
-                          <td className="px-4 py-3 text-gray-500 text-[11px] italic">
+                          <td className="px-4 py-3 text-gray-500 text-xs italic">
                             {entry.remarks || '—'}
                           </td>
                         </tr>
@@ -2251,26 +2216,26 @@ export const StockInventoryV2: React.FC = () => {
 
         {/* 4. Stock Overview & Category Tabs (Products, Materials, Semi) */}
         {(activeTab === 'overview' || activeTab === 'products' || activeTab === 'materials' || activeTab === 'semi') && (
-          <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden">
+          <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2">
             {filteredSkus.length === 0 ? (
-              <div className="text-center py-16 text-gray-400 text-xs space-y-2">
+              <div className="text-center py-16 text-gray-400 text-[0.875rem] space-y-2">
                 <Package className="w-8 h-8 mx-auto text-gray-300" />
                 <p className="font-semibold text-gray-600">No matching items found</p>
-                <p className="text-[11px]">Try adjusting your search query or reset dropdown filters.</p>
+                <p className="text-xs">Try adjusting your search query or reset dropdown filters.</p>
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="mt-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold cursor-pointer"
+                  className="mt-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-[0.875rem] font-semibold cursor-pointer"
                 >
                   Reset All Filters
                 </button>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-gray-700">
-                  <thead className="bg-gray-50/80 text-[10.5px] uppercase font-bold text-gray-500 border-b border-gray-200/80">
+                <table className="w-full text-left text-[0.875rem] text-gray-700">
+                  <thead className="text-xs uppercase font-semibold text-gray-600 border-b border-gray-200">
                     <tr>
-                      <th className="px-4 py-3 w-10">
+                      <th className="px-2 py-2.5 w-10">
                         <input
                           type="checkbox"
                           checked={selectedIds.length === filteredSkus.length && filteredSkus.length > 0}
@@ -2284,20 +2249,20 @@ export const StockInventoryV2: React.FC = () => {
                           className="rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer"
                         />
                       </th>
-                      {columnsConfig.find(c => c.id === 'skuCode')?.visible !== false && <th className="px-4 py-3">SKU Code</th>}
-                      {columnsConfig.find(c => c.id === 'name')?.visible !== false && <th className="px-4 py-3">Item Name</th>}
-                      {columnsConfig.find(c => c.id === 'itemType')?.visible !== false && <th className="px-4 py-3">Item Type</th>}
-                      {columnsConfig.find(c => c.id === 'category')?.visible !== false && <th className="px-4 py-3">Category</th>}
-                      {columnsConfig.find(c => c.id === 'location')?.visible !== false && <th className="px-4 py-3">Location</th>}
-                      {columnsConfig.find(c => c.id === 'presentStock')?.visible !== false && <th className="px-4 py-3 text-right">Available Stock</th>}
-                      {columnsConfig.find(c => c.id === 'unit')?.visible !== false && <th className="px-4 py-3 text-center">UOM</th>}
-                      {columnsConfig.find(c => c.id === 'altUnit')?.visible !== false && <th className="px-4 py-3 text-center">AUOM</th>}
-                      {columnsConfig.find(c => c.id === 'status')?.visible !== false && <th className="px-4 py-3 text-center">Status</th>}
-                      {columnsConfig.find(c => c.id === 'stockValue')?.visible !== false && <th className="px-4 py-3 text-right">Stock Value</th>}
-                      {columnsConfig.find(c => c.id === 'actions')?.visible !== false && <th className="px-4 py-3 text-right">Actions</th>}
+                      {columnsConfig.find(c => c.id === 'skuCode')?.visible !== false && <th className="px-2 py-2.5">SKU Code</th>}
+                      {columnsConfig.find(c => c.id === 'name')?.visible !== false && <th className="px-2 py-2.5 min-w-[11rem]">Item Name</th>}
+                      {columnsConfig.find(c => c.id === 'itemType')?.visible !== false && <th className="px-2 py-2.5">Item Type</th>}
+                      {columnsConfig.find(c => c.id === 'category')?.visible !== false && <th className="px-2 py-2.5">Category</th>}
+                      {columnsConfig.find(c => c.id === 'location')?.visible !== false && <th className="px-2 py-2.5">Location</th>}
+                      {columnsConfig.find(c => c.id === 'presentStock')?.visible !== false && <th className="px-2 py-2.5 text-center">Available Stock</th>}
+                      {columnsConfig.find(c => c.id === 'unit')?.visible !== false && <th className="px-2 py-2.5 text-center">UOM</th>}
+                      {columnsConfig.find(c => c.id === 'altUnit')?.visible !== false && <th className="px-2 py-2.5 text-center">AUOM</th>}
+                      {columnsConfig.find(c => c.id === 'status')?.visible !== false && <th className="px-2 py-2.5 text-left">Status</th>}
+                      {columnsConfig.find(c => c.id === 'stockValue')?.visible !== false && <th className="px-2 py-2.5 text-right">Stock Value</th>}
+                      {columnsConfig.find(c => c.id === 'actions')?.visible !== false && <th className="px-2 py-2.5 text-right">Actions</th>}
                     </tr>
                   </thead>
-                  <tbody key={`overview-${animationKey}`} className="divide-y divide-gray-100 text-xs text-gray-700">
+                  <tbody key={`overview-${animationKey}`} className="divide-y divide-gray-100 text-[0.875rem] text-gray-700">
                     {loading ? (
                       <tr>
                         <td colSpan={columnsConfig.filter(c => c.visible !== false).length + 1} className="py-12 text-center text-gray-400 whitespace-nowrap">
@@ -2313,7 +2278,7 @@ export const StockInventoryV2: React.FC = () => {
                           <div className="flex flex-col items-center gap-2">
                             <Boxes className="w-8 h-8 text-gray-300" />
                             <p className="font-semibold text-gray-600">No inventory items found</p>
-                            <p className="text-[11px]">Click below to create your first item or add a purchase batch</p>
+                            <p className="text-xs">Click below to create your first item or add a purchase batch</p>
                           </div>
                         </td>
                       </tr>
@@ -2349,15 +2314,11 @@ export const StockInventoryV2: React.FC = () => {
                               setSelectedDrawerTab('overview');
                               setSelectedDrawerSku(sku);
                             }}
-                            style={{
-                              animation: 'slideDownFade 0.35s ease-out forwards',
-                              animationDelay: `${index * 35}ms`
-                            }}
-                            className={`hover:bg-blue-50/20 transition-all cursor-pointer opacity-0 whitespace-nowrap ${
-                              isSelected ? 'bg-blue-50/30' : ''
+                            className={`cursor-pointer ${
+                              isSelected ? 'bg-blue-50' : 'bg-white hover:bg-blue-50/40'
                             }`}
                           >
-                            <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                            <td className="px-2 py-2.5" onClick={e => e.stopPropagation()}>
                               <input
                                 type="checkbox"
                                 checked={isSelected}
@@ -2373,30 +2334,31 @@ export const StockInventoryV2: React.FC = () => {
                             </td>
                             {/* 1. SKU Code */}
                             {columnsConfig.find(c => c.id === 'skuCode')?.visible !== false && (
-                              <td className="px-4 py-3 font-mono font-bold text-gray-900 whitespace-nowrap">
+                              <td className="px-2 py-2.5 font-mono font-semibold text-gray-900 whitespace-nowrap">
                                 {sku.skuCode}
                               </td>
                             )}
                             {/* 2. Item Name */}
                             {columnsConfig.find(c => c.id === 'name')?.visible !== false && (
-                              <td className="px-4 py-3">
-                                <div className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors">
+                              <td className="px-2 py-2.5">
+                                <div className="font-semibold text-gray-900 group-hover:text-blue-700">
                                   {sku.name}
                                 </div>
                               </td>
                             )}
                             {/* 3. Item Type */}
                             {columnsConfig.find(c => c.id === 'itemType')?.visible !== false && (
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${itemTypeBadgeClass}`}>
+                              <td className="px-2 py-2.5 whitespace-nowrap">
+                                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${itemGroup === 'products' ? 'bg-blue-500' : itemGroup === 'semi' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
                                   {itemTypeLabel}
                                 </span>
                               </td>
                             )}
                             {/* 4. Category */}
                             {columnsConfig.find(c => c.id === 'category')?.visible !== false && (
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-gray-100 text-gray-700">
+                              <td className="px-2 py-2.5 whitespace-nowrap">
+                                <span className="text-xs font-medium text-gray-500">
                                   {sku.category || 'General'}
                                 </span>
                               </td>
@@ -2404,7 +2366,7 @@ export const StockInventoryV2: React.FC = () => {
                             {/* 5. Location */}
                             {columnsConfig.find(c => c.id === 'location')?.visible !== false && (
                               <td 
-                                className="px-4 py-2.5 whitespace-nowrap"
+                                className="px-2 py-2.5 whitespace-nowrap"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setSelectedDrawerTab('locations');
@@ -2422,21 +2384,19 @@ export const StockInventoryV2: React.FC = () => {
                                         title={breakdown.map(b => `${b.leafName} (${b.hierarchyPath || 'Storage'}): ${b.onHand} ${sku.unit}`).join('\n')}
                                       >
                                         <div className="flex items-center gap-1.5 flex-wrap">
-                                          <div className="flex items-center gap-1 text-xs font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
-                                            <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0 group-hover:scale-110 transition-transform" />
-                                            <span className="truncate max-w-[120px]">{locInfo.leafName}</span>
+                                          <div className="flex items-center gap-1 text-[0.875rem] font-semibold text-slate-800 group-hover:text-blue-600">
+                                            <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                            <span className="truncate max-w-[7.5rem]">{locInfo.leafName}</span>
                                           </div>
-                                          <span className="text-[9.5px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.2 rounded-full shrink-0 shadow-2xs group-hover:bg-blue-100 transition-colors">
+                                          <span className="text-xs font-semibold text-blue-700 shrink-0">
                                             +{breakdown.length - 1} more
                                           </span>
                                         </div>
-                                        {breakdown.some(b => (Number(b.onHand) || 0) < 0) && (
-                                          <span className="text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-300 px-1.5 py-0.2 rounded-md shrink-0 shadow-2xs mt-0.5 inline-block" title={`Negative stock in: ${breakdown.filter(b => (Number(b.onHand) || 0) < 0).map(nl => `${nl.leafName}: ${nl.onHand} ${sku.unit}`).join(', ')}`}>
-                                            ⚠️ {breakdown.find(b => (Number(b.onHand) || 0) < 0)?.onHand} {sku.unit} in {breakdown.find(b => (Number(b.onHand) || 0) < 0)?.leafName}
-                                          </span>
-                                        )}
-                                        <span className="text-[10px] text-gray-400 font-medium pl-5 truncate max-w-[150px]">
-                                          Across {breakdown.length} storage spots
+                                        <span className="text-xs text-gray-400 font-medium pl-5 truncate max-w-[9.375rem]">
+                                          Across {breakdown.length} spots
+                                          {breakdown.some(b => (Number(b.onHand) || 0) < 0) && (
+                                            <span className="ml-1 text-rose-600 font-semibold" title={`Negative stock in: ${breakdown.filter(b => (Number(b.onHand) || 0) < 0).map(nl => `${nl.leafName}: ${Number(nl.onHand).toLocaleString('en-IN', { maximumFractionDigits: 3 })} ${sku.unit}`).join(', ')}`}>· negative</span>
+                                          )}
                                         </span>
                                       </div>
                                     );
@@ -2447,16 +2407,16 @@ export const StockInventoryV2: React.FC = () => {
                                       className="group cursor-pointer flex flex-col text-left py-0.5"
                                       title={locInfo.fullPath || locInfo.leafName}
                                     >
-                                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
-                                        <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0 group-hover:scale-110 transition-transform" />
-                                        <span className="truncate max-w-[140px]">{locInfo.leafName}</span>
+                                      <div className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-slate-800 group-hover:text-blue-600">
+                                        <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                        <span className="truncate max-w-[8.75rem]">{locInfo.leafName}</span>
                                       </div>
                                       {locInfo.hierarchyPath ? (
-                                        <span className="text-[10px] text-gray-400 font-medium pl-5 truncate max-w-[140px]">
+                                        <span className="text-xs text-gray-400 font-medium pl-5 truncate max-w-[8.75rem]">
                                           {locInfo.hierarchyPath}
                                         </span>
                                       ) : (
-                                        <span className="text-[10px] text-gray-400 font-medium pl-5">
+                                        <span className="text-xs text-gray-400 font-medium pl-5">
                                           Storage Location
                                         </span>
                                       )}
@@ -2467,7 +2427,7 @@ export const StockInventoryV2: React.FC = () => {
                             )}
                             {/* 6. Available Stock */}
                             {columnsConfig.find(c => c.id === 'presentStock')?.visible !== false && (
-                              <td className="px-4 py-3 text-right whitespace-nowrap">
+                              <td className="px-2 py-2.5 text-center align-middle whitespace-nowrap">
                                 {(() => {
                                   const availStock = Number((sku as any).availableStock ?? onHand ?? 0);
                                   const isNegative = availStock < 0;
@@ -2483,94 +2443,75 @@ export const StockInventoryV2: React.FC = () => {
                                     altQty = eff.altUnit && eff.conversionFactor > 0 ? convertUom(availStock, eff.unit, eff.altUnit, sku) : 0;
                                   }
 
+                                  const fmt = (n: number, d: number) => n.toLocaleString('en-IN', { maximumFractionDigits: d });
+                                  const showAlt = eff.altUnit && eff.conversionFactor > 0 && altQty !== primaryQty;
+                                  const prod = Number((sku as any).inProduction || 0);
+                                  const resv = Number((sku as any).reserved || 0);
+
                                   return (
-                                    <>
-                                      <div className={`font-mono font-black text-sm ${isNegative ? 'text-rose-600 bg-rose-50 border border-rose-300 px-2 py-0.5 rounded-md inline-block shadow-2xs' : 'text-gray-900'}`}>
-                                        {isNegative ? `-${Math.abs(primaryQty).toLocaleString('en-IN')}` : primaryQty.toLocaleString('en-IN')}
+                                    <div className="flex flex-col items-center justify-center leading-tight min-w-[6rem]">
+                                      <div className={`font-mono tabular-nums ${isNegative ? 'text-rose-600' : 'text-gray-900'}`}>
+                                        <span className="text-base font-bold">{fmt(primaryQty, 3)}</span>
+                                        <span className="ml-1 text-xs font-semibold opacity-70">{eff.unit}</span>
                                       </div>
-                                      {eff.altUnit && eff.conversionFactor > 0 && altQty !== primaryQty && (
-                                        <div className={`text-[10px] font-mono mt-0.5 ${isNegative ? 'text-rose-500 font-semibold' : 'text-gray-400'}`}>
-                                          ≈ {altQty < 0 ? `-${Math.abs(altQty).toLocaleString('en-IN')}` : altQty.toLocaleString('en-IN')} {eff.altUnit}
+                                      {showAlt && (
+                                        <div className="text-xs font-mono tabular-nums text-gray-500 mt-1 px-2 py-0.5 rounded-full bg-gray-100">
+                                          {fmt(altQty, 1)} {eff.altUnit}
                                         </div>
                                       )}
-                                    </>
+                                      {(prod > 0 || resv > 0) && (
+                                        <div className="text-[0.6875rem] text-gray-400 mt-1 whitespace-nowrap">
+                                          {prod > 0 && <span className="text-blue-600" title="In Production">+{fmt(prod, 3)} in prod</span>}
+                                          {prod > 0 && resv > 0 && ' · '}
+                                          {resv > 0 && <span className="text-amber-600" title="Reserved for Production or Orders">{fmt(resv, 3)} reserved</span>}
+                                        </div>
+                                      )}
+                                    </div>
                                   );
                                 })()}
-                                <div className="flex items-center justify-end gap-1 mt-0.5">
-                                  {Number((sku as any).inProduction || 0) > 0 && (
-                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200" title="In Production (Reserved Place)">
-                                      +{Number((sku as any).inProduction).toLocaleString('en-IN')} in prod
-                                    </span>
-                                  )}
-                                  {Number((sku as any).reserved || 0) > 0 && (
-                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200" title="Reserved for Production or Orders">
-                                      {Number((sku as any).reserved).toLocaleString('en-IN')} reserved
-                                    </span>
-                                  )}
-                                  {Number((sku as any).preparedStock || 0) > 0 && Number((sku as any).preparedStock) !== Number((sku as any).availableStock ?? onHand) && (
-                                    <span className="text-[10px] text-gray-400 font-mono" title="Prepared On-Hand Stock">
-                                      ({Number((sku as any).preparedStock).toLocaleString('en-IN')} on-hand)
-                                    </span>
-                                  )}
-                                </div>
                               </td>
                             )}
                             {/* 7. UOM */}
                             {columnsConfig.find(c => c.id === 'unit')?.visible !== false && (
-                              <td className="px-4 py-3 text-center whitespace-nowrap">
-                                <span className="font-bold text-gray-800 text-xs px-2 py-0.5 bg-slate-100 rounded">
+                              <td className="px-2 py-2.5 text-center whitespace-nowrap">
+                                <span className="font-medium text-gray-700 text-[0.875rem]">
                                   {getSkuEffectiveUnits(sku).unit}
                                 </span>
                               </td>
                             )}
                             {/* 8. AUOM */}
                             {columnsConfig.find(c => c.id === 'altUnit')?.visible !== false && (
-                              <td className="px-4 py-3 text-center whitespace-nowrap">
+                              <td className="px-2 py-2.5 text-center whitespace-nowrap">
                                 {(() => {
                                   const eff = getSkuEffectiveUnits(sku);
                                   return eff.altUnit ? (
-                                    <span className="font-mono text-[11px] text-indigo-700 font-bold bg-indigo-50/70 px-2 py-0.5 rounded border border-indigo-100">
+                                    <span className="font-mono text-xs text-gray-500">
                                       {eff.altUnit} {eff.conversionFactor ? `(1:${eff.conversionFactor})` : ''}
                                     </span>
                                   ) : (
-                                    <span className="text-gray-400 text-xs">—</span>
+                                    <span className="text-gray-400 text-[0.875rem]">—</span>
                                   );
                                 })()}
                               </td>
                             )}
                             {/* 9. Status */}
                             {columnsConfig.find(c => c.id === 'status')?.visible !== false && (
-                              <td className="px-4 py-3 text-center whitespace-nowrap">
+                              <td className="px-2 py-2.5 text-left whitespace-nowrap">
                                 {onHand < 0 ? (
-                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
-                                    Negative Stock
-                                  </span>
+                                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-700"><span className="w-1.5 h-1.5 rounded-full bg-rose-500" />Negative</span>
                                 ) : isOutOfStock ? (
-                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                                    Out of Stock
-                                  </span>
+                                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600"><span className="w-1.5 h-1.5 rounded-full bg-rose-400" />Out of Stock</span>
                                 ) : isLowStock ? (
-                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                                    Low Stock
-                                  </span>
+                                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" />Low Stock</span>
                                 ) : (
-                                  <div className="flex flex-col items-center gap-0.5">
-                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                      In Stock
-                                    </span>
-                                    {((sku as any).locationBreakdown || []).some((b: any) => (Number(b.onHand) || 0) < 0) && (
-                                      <span className="px-1.5 py-0.2 rounded text-[8.5px] font-bold bg-rose-50 text-rose-700 border border-rose-300" title="Contains storage spot with negative balance">
-                                        Neg. Spot
-                                      </span>
-                                    )}
-                                  </div>
+                                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />In Stock</span>
                                 )}
                               </td>
                             )}
                             {/* 10. Stock Value */}
                             {columnsConfig.find(c => c.id === 'stockValue')?.visible !== false && (
-                              <td className="px-4 py-3 text-right whitespace-nowrap">
-                                <div className="font-mono font-bold text-blue-700 text-xs">
+                              <td className="px-2 py-2.5 text-right whitespace-nowrap">
+                                <div className="font-mono font-semibold text-blue-700 text-[0.875rem]">
                                   {formatCurrency(totalVal)}
                                 </div>
                                 {(() => {
@@ -2594,7 +2535,7 @@ export const StockInventoryV2: React.FC = () => {
 
                                   return (
                                     <div 
-                                      className="text-[10px] font-mono text-gray-500 mt-0.5 flex flex-col items-end"
+                                      className="text-xs font-mono text-gray-500 mt-0.5 flex flex-col items-end"
                                       title={(sku as any).costSource === 'slitting'
                                         ? `Dynamic unit costing from Reel Slitting: ₹${rateInPrim.toFixed(4)}/${primRateUnit}`
                                         : (sku as any).costSource === 'production' 
@@ -2604,14 +2545,9 @@ export const StockInventoryV2: React.FC = () => {
                                         : `Master item unit cost: ₹${rateInPrim.toFixed(4)}/${primRateUnit}`}
                                     >
                                       <span>
-                                        <span className="text-gray-400 font-sans">{costLabel}</span>
+                                        <span className="text-gray-400 font-sans">{costLabel.trim()} </span>
                                         ₹{rateInPrim < 1 && rateInPrim > 0 ? rateInPrim.toFixed(4) : rateInPrim.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{primRateUnit}
                                       </span>
-                                      {rateInAlt > 0 && rateInAlt !== rateInPrim && (
-                                        <span className="text-indigo-600 font-semibold text-[9.5px]">
-                                          (₹{rateInAlt < 1 ? rateInAlt.toFixed(4) : rateInAlt.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{altRateUnit})
-                                        </span>
-                                      )}
                                     </div>
                                   );
                                 })()}
@@ -2619,15 +2555,15 @@ export const StockInventoryV2: React.FC = () => {
                             )}
                             {/* 11. Actions */}
                             {columnsConfig.find(c => c.id === 'actions')?.visible !== false && (
-                              <td className="px-4 py-3 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                                <div className="flex items-center justify-end gap-1">
+                              <td className="px-2 py-2.5 text-right" onClick={e => e.stopPropagation()}>
+                                <div className="flex items-center justify-end gap-0.5 ml-auto">
                                   <button
                                     type="button"
                                     onClick={() => {
                                       setSelectedDrawerTab('overview');
                                       setSelectedDrawerSku(sku);
                                     }}
-                                    className="p-1.5 text-gray-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                    className="icon-btn"
                                     title="Inspect Stock Details"
                                   >
                                     <Eye className="w-3.5 h-3.5" />
@@ -2638,7 +2574,7 @@ export const StockInventoryV2: React.FC = () => {
                                       setTransferInitialSku(sku);
                                       setShowTransferModal(true);
                                     }}
-                                    className="p-1.5 text-gray-500 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                    className="p-1.5 text-gray-500 hover:text-blue-800 hover:bg-blue-50 rounded-lg cursor-pointer"
                                     title="Transfer Item"
                                   >
                                     <ArrowRightLeft className="w-3.5 h-3.5" />
@@ -2649,7 +2585,7 @@ export const StockInventoryV2: React.FC = () => {
                                       setAdjustmentInitialSku(sku);
                                       setShowAdjustmentModal(true);
                                     }}
-                                    className="p-1.5 text-gray-500 hover:text-amber-800 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                                    className="p-1.5 text-gray-500 hover:text-amber-800 hover:bg-amber-50 rounded-lg cursor-pointer"
                                     title="Adjust Stock"
                                   >
                                     <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -2772,13 +2708,13 @@ export const StockInventoryV2: React.FC = () => {
       {selectedTransferForPrint && (() => {
         const trf = selectedTransferForPrint;
         const trfColumns = [
-          { header: '#', align: 'center' as const, width: 'w-8', render: (_: any, idx: number) => <span className="font-bold text-slate-500">{idx + 1}</span> },
+          { header: '#', align: 'center' as const, width: 'w-8', render: (_: any, idx: number) => <span className="font-semibold text-slate-500">{idx + 1}</span> },
           {
             header: 'Transferred Item / SKU Details',
             render: (item: any) => (
               <div>
-                <div className="font-bold text-slate-900">{item.skuName || item.skuCode || 'SKU Item'}</div>
-                <div className="text-[10px] text-slate-500 font-mono">
+                <div className="font-semibold text-slate-900">{item.skuName || item.skuCode || 'SKU Item'}</div>
+                <div className="text-xs text-slate-500 font-mono">
                   {item.skuCode ? `Code: ${item.skuCode}` : ''}
                 </div>
               </div>
@@ -2798,7 +2734,7 @@ export const StockInventoryV2: React.FC = () => {
             header: 'Transfer Quantity',
             align: 'right' as const,
             render: (item: any) => (
-              <span className="font-mono font-bold text-blue-900">
+              <span className="font-mono font-semibold text-blue-900">
                 {Number(item.quantity || 0).toLocaleString('en-IN')} {item.unit || 'Units'}
               </span>
             )
@@ -2807,7 +2743,7 @@ export const StockInventoryV2: React.FC = () => {
             header: 'Transfer Reference',
             align: 'center' as const,
             render: (item: any) => (
-              <span className="font-mono text-slate-700 font-semibold text-[10px]">
+              <span className="font-mono text-slate-700 font-semibold text-xs">
                 {item.referenceNumber || 'TRF-TRANSFER'}
               </span>
             )
@@ -2938,23 +2874,23 @@ export const StockInventoryV2: React.FC = () => {
                 setIsSavingBatch(false);
               }
             }}
-            className="space-y-4 text-xs text-gray-800"
+            className="space-y-4 text-[0.875rem] text-gray-800"
           >
             {/* Header info */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50/80 p-3.5 rounded-2xl border border-slate-200">
               <div>
-                <label className="block font-bold text-gray-700 mb-1">BATCH / INVOICE #</label>
+                <label className="block font-semibold text-gray-700 mb-1">BATCH / INVOICE #</label>
                 <input
                   type="text"
                   value={batchForm.batchNumber}
                   onChange={e => setBatchForm(prev => ({ ...prev, batchNumber: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono font-bold bg-white text-gray-900 focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono font-semibold bg-white text-gray-900 focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g. PB-2026-001"
                   required
                 />
               </div>
               <div>
-                <label className="block font-bold text-gray-700 mb-1">PURCHASE DATE</label>
+                <label className="block font-semibold text-gray-700 mb-1">PURCHASE DATE</label>
                 <input
                   type="date"
                   value={batchForm.purchaseDate}
@@ -2964,7 +2900,7 @@ export const StockInventoryV2: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block font-bold text-gray-700 mb-1">SUPPLIER / VENDOR</label>
+                <label className="block font-semibold text-gray-700 mb-1">SUPPLIER / VENDOR</label>
                 <select
                   value={batchForm.supplierId}
                   onChange={e => {
@@ -2989,18 +2925,18 @@ export const StockInventoryV2: React.FC = () => {
             {/* Items Header & Add Button */}
             <div className="flex items-center justify-between pt-1">
               <div>
-                <h4 className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
+                <h4 className="font-semibold text-gray-900 text-[0.875rem] flex items-center gap-1.5">
                   <Layers className="w-4 h-4 text-blue-600" />
                   <span>Batch Items & Unit Pricing</span>
                 </h4>
-                <p className="text-[11px] text-gray-500">
+                <p className="text-xs text-gray-500">
                   Add multiple items to this batch. Stock and valuation will be calculated dynamically based on these rates.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={handleAddLotRow}
-                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl border border-blue-200 transition-colors flex items-center gap-1.5 text-xs cursor-pointer shadow-2xs"
+                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold rounded-xl border border-blue-200 flex items-center gap-1.5 text-[0.875rem] cursor-pointer shadow-2xs"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Item to Batch</span>
@@ -3008,20 +2944,20 @@ export const StockInventoryV2: React.FC = () => {
             </div>
 
             {/* Multi-Item Table / Card List */}
-            <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
+            <div className="space-y-2.5 max-h-[22.5rem] overflow-y-auto pr-1">
               {lots.map((lot, idx) => {
                 const rowQty = Number(lot.totalKg) || 0;
                 const rowRate = Number(lot.ratePerKg) || 0;
                 const rowAmount = rowQty * rowRate;
 
                 return (
-                  <div key={lot.id} className="p-3 bg-white border border-gray-200 rounded-2xl shadow-2xs space-y-2.5 hover:border-gray-300 transition-all">
+                  <div key={lot.id} className="p-3 bg-white border border-gray-200 rounded-2xl shadow-2xs space-y-2.5 hover:border-gray-300">
                     <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
                       <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 font-mono font-bold text-[10px] flex items-center justify-center">
+                        <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 font-mono font-semibold text-xs flex items-center justify-center">
                           {idx + 1}
                         </span>
-                        <span className="font-mono text-[11px] font-bold text-gray-500">
+                        <span className="font-mono text-xs font-semibold text-gray-500">
                           Lot: {batchForm.batchNumber}-L{String(idx + 1).padStart(2, '0')}
                         </span>
                       </div>
@@ -3029,7 +2965,7 @@ export const StockInventoryV2: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleRemoveLotRow(lot.id)}
-                          className="text-gray-400 hover:text-red-600 transition-colors p-1 cursor-pointer"
+                          className="icon-btn-danger"
                           title="Remove item from batch"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -3040,7 +2976,7 @@ export const StockInventoryV2: React.FC = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
                       {/* SKU Select */}
                       <div className="sm:col-span-4">
-                        <label className="text-[10px] font-bold text-gray-500 block mb-0.5">ITEM / SKU</label>
+                        <label className="text-xs font-semibold text-gray-500 block mb-0.5">ITEM / SKU</label>
                         <select
                           value={lot.skuId}
                           onChange={e => {
@@ -3054,7 +2990,7 @@ export const StockInventoryV2: React.FC = () => {
                               category: sku?.category || sku?.group || ''
                             } : l));
                           }}
-                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-xl bg-white text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-xl bg-white text-[0.875rem] font-medium text-gray-800 focus:ring-2 focus:ring-blue-500"
                           required
                         >
                           <option value="">Select Item / SKU</option>
@@ -3068,7 +3004,7 @@ export const StockInventoryV2: React.FC = () => {
 
                       {/* Location Select */}
                       <div className="sm:col-span-3">
-                        <label className="text-[10px] font-bold text-gray-500 block mb-0.5">STORAGE LOCATION</label>
+                        <label className="text-xs font-semibold text-gray-500 block mb-0.5">STORAGE LOCATION</label>
                         <select
                           value={lot.locationId}
                           onChange={e => {
@@ -3079,7 +3015,7 @@ export const StockInventoryV2: React.FC = () => {
                               locationName: loc?.name || ''
                             } : l));
                           }}
-                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-xl bg-white text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-xl bg-white text-[0.875rem] font-medium text-gray-800 focus:ring-2 focus:ring-blue-500"
                         >
                           <option value="">Select Location</option>
                           {allLocations.map(loc => (
@@ -3090,7 +3026,7 @@ export const StockInventoryV2: React.FC = () => {
 
                       {/* Quantity */}
                       <div className="sm:col-span-2">
-                        <label className="text-[10px] font-bold text-gray-500 block mb-0.5">
+                        <label className="text-xs font-semibold text-gray-500 block mb-0.5">
                           QTY ({lot.unit || 'Kg'})
                         </label>
                         <input
@@ -3100,14 +3036,14 @@ export const StockInventoryV2: React.FC = () => {
                           placeholder="0"
                           value={lot.totalKg || ''}
                           onChange={e => setLots(prev => prev.map(l => l.id === lot.id ? { ...l, totalKg: Number(e.target.value) } : l))}
-                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-xl bg-white font-mono font-bold text-xs text-gray-900 focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-xl bg-white font-mono font-semibold text-[0.875rem] text-gray-900 focus:ring-2 focus:ring-blue-500"
                           required
                         />
                       </div>
 
                       {/* Rate Per Unit */}
                       <div className="sm:col-span-2">
-                        <label className="text-[10px] font-bold text-gray-500 block mb-0.5">
+                        <label className="text-xs font-semibold text-gray-500 block mb-0.5">
                           RATE / {lot.unit || 'UNIT'} (₹)
                         </label>
                         <input
@@ -3117,15 +3053,15 @@ export const StockInventoryV2: React.FC = () => {
                           placeholder="0.00"
                           value={lot.ratePerKg || ''}
                           onChange={e => setLots(prev => prev.map(l => l.id === lot.id ? { ...l, ratePerKg: Number(e.target.value) } : l))}
-                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-xl bg-white font-mono font-bold text-xs text-gray-900 focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-xl bg-white font-mono font-semibold text-[0.875rem] text-gray-900 focus:ring-2 focus:ring-blue-500"
                           required
                         />
                       </div>
 
                       {/* Subtotal */}
                       <div className="sm:col-span-1 text-right">
-                        <label className="text-[9px] font-bold text-gray-400 block mb-0.5">AMOUNT</label>
-                        <span className="font-mono font-bold text-gray-900 text-xs block py-1.5">
+                        <label className="text-xs font-semibold text-gray-400 block mb-0.5">AMOUNT</label>
+                        <span className="font-mono font-semibold text-gray-900 text-[0.875rem] block py-1.5">
                           ₹{rowAmount.toLocaleString('en-IN')}
                         </span>
                       </div>
@@ -3136,24 +3072,24 @@ export const StockInventoryV2: React.FC = () => {
             </div>
 
             {/* Total Batch Calculation Summary */}
-            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-3 text-[0.875rem]">
               <div className="flex items-center gap-4">
                 <div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">TOTAL ITEMS</span>
-                  <span className="font-mono font-bold text-gray-800">{lots.length} SKU(s)</span>
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block">TOTAL ITEMS</span>
+                  <span className="font-mono font-semibold text-gray-800">{lots.length} SKU(s)</span>
                 </div>
                 <div className="h-6 w-px bg-gray-200" />
                 <div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">TOTAL QUANTITY</span>
-                  <span className="font-mono font-bold text-gray-800">
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block">TOTAL QUANTITY</span>
+                  <span className="font-mono font-semibold text-gray-800">
                     {lots.reduce((acc, l) => acc + (Number(l.totalKg) || 0), 0).toLocaleString('en-IN')}
                   </span>
                 </div>
               </div>
 
               <div className="text-right">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">TOTAL BATCH ESTIMATED VALUE</span>
-                <span className="font-mono font-extrabold text-blue-700 text-base">
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block">TOTAL BATCH ESTIMATED VALUE</span>
+                <span className="font-mono font-semibold text-blue-700 text-base">
                   ₹{lots.reduce((acc, l) => acc + (Number(l.totalKg) || 0) * (Number(l.ratePerKg) || 0), 0).toLocaleString('en-IN')}
                 </span>
               </div>
@@ -3161,29 +3097,29 @@ export const StockInventoryV2: React.FC = () => {
 
             {/* Remarks */}
             <div>
-              <label className="block font-bold text-gray-700 mb-1">REMARKS / NOTES</label>
+              <label className="block font-semibold text-gray-700 mb-1">REMARKS / NOTES</label>
               <input
                 type="text"
                 placeholder="Optional supplier invoice notes, gate pass ref, etc."
                 value={batchForm.remarks}
                 onChange={e => setBatchForm(prev => ({ ...prev, remarks: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white text-xs"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white text-[0.875rem]"
               />
             </div>
 
             {/* Footer Buttons */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 dlg-footer">
               <button
                 type="button"
                 onClick={() => setShowBatchModal(false)}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl cursor-pointer"
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSavingBatch}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
               >
                 {isSavingBatch ? 'Recording Batch...' : 'Save Purchase Batch'}
               </button>
@@ -3200,30 +3136,30 @@ export const StockInventoryV2: React.FC = () => {
           title="Duplicate Items Scanner"
           size="max-w-3xl"
         >
-          <div className="space-y-4 text-left text-xs">
+          <div className="space-y-4 text-left text-[0.875rem]">
             {duplicateGroups.length === 0 ? (
               <div className="py-12 text-center bg-slate-50 border border-dashed border-gray-200 rounded-2xl">
                 <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3">
                   <CheckCircle2 className="w-6 h-6 stroke-[2.5]" />
                 </div>
-                <h3 className="font-bold text-sm text-gray-900">No Duplicates Detected!</h3>
-                <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                <h3 className="font-semibold text-[0.875rem] text-gray-900">No Duplicates Detected!</h3>
+                <p className="text-[0.875rem] text-gray-500 mt-1 max-w-md mx-auto">
                   All active items in your stock inventory have unique SKU codes and names.
                 </p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-                <p className="text-xs text-gray-500 font-medium">
+              <div className="space-y-3 max-h-[calc(60*var(--vh,1vh))] overflow-y-auto pr-1">
+                <p className="text-[0.875rem] text-gray-500 font-medium">
                   The following duplicate groups were identified. Review their details and clean up or merge if needed:
                 </p>
                 {duplicateGroups.map((group, gIdx) => (
                   <div key={gIdx} className="border border-amber-200 bg-amber-50/20 rounded-xl p-3 space-y-2">
                     <div className="flex items-center justify-between border-b border-amber-100 pb-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-lg border border-amber-200">
+                        <span className="text-[0.875rem] font-semibold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-lg border border-amber-200">
                           Duplicate by {group.field}: {group.value}
                         </span>
-                        <span className="text-xs text-gray-500 font-mono">({group.items.length} records)</span>
+                        <span className="text-[0.875rem] text-gray-500 font-mono">({group.items.length} records)</span>
                       </div>
                       <button
                         type="button"
@@ -3235,15 +3171,15 @@ export const StockInventoryV2: React.FC = () => {
                     </div>
                     <div className="space-y-1.5">
                       {group.items.map(item => (
-                        <div key={item._id} className="flex items-center justify-between bg-white p-2.5 rounded-lg border border-gray-200 text-xs">
+                        <div key={item._id} className="flex items-center justify-between bg-white p-2.5 rounded-lg border border-gray-200 text-[0.875rem]">
                           <div>
-                            <div className="font-bold text-gray-900">{item.name}</div>
-                            <div className="text-gray-400 font-mono text-[11px]">{item.skuCode} • {item.category || 'General'}</div>
+                            <div className="font-semibold text-gray-900">{item.name}</div>
+                            <div className="text-gray-400 font-mono text-xs">{item.skuCode} • {item.category || 'General'}</div>
                           </div>
                           <div className="flex items-center gap-3">
                             <div className="text-right">
-                              <div className="font-bold font-mono text-gray-900">{Number(item.presentStock || 0)} {item.unit || 'Pcs'}</div>
-                              <div className="text-gray-400 text-[10px]">On Hand</div>
+                              <div className="font-semibold font-mono text-gray-900">{Number(item.presentStock || 0)} {item.unit || 'Pcs'}</div>
+                              <div className="text-gray-400 text-xs">On Hand</div>
                             </div>
                             <button
                               type="button"
@@ -3252,7 +3188,7 @@ export const StockInventoryV2: React.FC = () => {
                                 setSelectedDrawerTab('overview');
                                 setSelectedDrawerSku(item);
                               }}
-                              className="px-2.5 py-1 bg-blue-50 text-blue-700 font-bold rounded-lg hover:bg-blue-100 cursor-pointer text-xs"
+                              className="px-2.5 py-1 bg-blue-50 text-blue-700 font-semibold rounded-lg hover:bg-blue-100 cursor-pointer text-[0.875rem]"
                             >
                               Inspect
                             </button>
@@ -3264,11 +3200,11 @@ export const StockInventoryV2: React.FC = () => {
                 ))}
               </div>
             )}
-            <div className="flex justify-end pt-2 border-t border-gray-100">
+            <div className="flex justify-end pt-2 border-t border-gray-100 dlg-footer">
               <button
                 type="button"
                 onClick={() => setShowDuplicatesModal(false)}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl cursor-pointer"
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl cursor-pointer"
               >
                 Close
               </button>
@@ -3276,20 +3212,6 @@ export const StockInventoryV2: React.FC = () => {
           </div>
         </Modal>
       )}
-
-      {/* Row & Card Entrance Keyframe Animation */}
-      <style>{`
-        @keyframes slideDownFade {
-          from {
-            opacity: 0;
-            transform: translateY(-12px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
     </div>
   );
 };

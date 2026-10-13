@@ -79,7 +79,7 @@ export const PrintLedgerModal: React.FC<PrintLedgerModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs font-sans print:p-0 print:bg-white print:static print:inset-auto">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[90vh] overflow-y-auto print:max-h-none print:shadow-none print:border-none print:w-full">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[calc(90*var(--vh,1vh))] overflow-y-auto print:max-h-none print:shadow-none print:border-none print:w-full">
         
         {/* Top Action Bar (Hidden when printing) */}
         <div className="sticky top-0 bg-slate-900 text-white px-6 py-3 flex items-center justify-between z-10 print:hidden">
@@ -134,7 +134,7 @@ export const PrintLedgerModal: React.FC<PrintLedgerModalProps> = ({
           {/* Party Meta */}
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 grid grid-cols-2 gap-4 text-xs">
             <div>
-              <h3 className="font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1">Account Holder / Customer</h3>
+              <h3 className="font-bold text-slate-700 uppercase tracking-wider text-[0.6875rem] mb-1">Account Holder / Customer</h3>
               <p className="text-sm font-bold text-slate-900">{customer?.name || 'General Ledger'}</p>
               {customer?.code && <p className="text-slate-500 font-medium">Code: {customer.code}</p>}
               {customer?.address && <p className="text-slate-600 mt-1">{customer.address}</p>}
@@ -143,7 +143,7 @@ export const PrintLedgerModal: React.FC<PrintLedgerModalProps> = ({
 
             <div className="text-right flex flex-col justify-between">
               <div>
-                <h3 className="font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1">Account Summary</h3>
+                <h3 className="font-bold text-slate-700 uppercase tracking-wider text-[0.6875rem] mb-1">Account Summary</h3>
                 <p className="text-slate-600">Opening Balance: <span className="font-bold text-slate-900">₹{openingBalance.toLocaleString('en-IN')} {openingType}</span></p>
                 <p className="text-slate-600">Total Debits: <span className="font-bold text-slate-900">₹{totalDebit.toLocaleString('en-IN')}</span></p>
                 <p className="text-slate-600">Total Credits: <span className="font-bold text-slate-900">₹{totalCredit.toLocaleString('en-IN')}</span></p>
@@ -157,9 +157,9 @@ export const PrintLedgerModal: React.FC<PrintLedgerModalProps> = ({
 
           {/* Statement Table */}
           <div className="border border-slate-200 rounded-xl overflow-hidden">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="doc-table w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-100 border-b border-slate-200 font-bold text-slate-700 uppercase tracking-wider text-[10px]">
+                <tr className="bg-slate-100 border-b border-slate-200 font-bold text-slate-700 uppercase tracking-wider text-[0.625rem]">
                   <th className="py-2.5 px-3 w-10">#</th>
                   <th className="py-2.5 px-3">Date</th>
                   <th className="py-2.5 px-3">Type</th>
@@ -197,14 +197,14 @@ export const PrintLedgerModal: React.FC<PrintLedgerModalProps> = ({
                       {t.credit > 0 ? t.credit.toLocaleString('en-IN') : '—'}
                     </td>
                     <td className="py-2.5 px-3 text-right font-bold text-slate-900">
-                      {t.balance.toLocaleString('en-IN')} <span className="text-[10px] text-slate-500 font-semibold">{t.balanceType}</span>
+                      {t.balance.toLocaleString('en-IN')} <span className="text-[0.625rem] text-slate-500 font-semibold">{t.balanceType}</span>
                     </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="bg-slate-100 font-bold border-t-2 border-slate-300 text-slate-900">
-                  <td colSpan={5} className="py-3 px-3 text-right uppercase tracking-wider text-[10px]">Grand Total</td>
+                  <td colSpan={5} className="py-3 px-3 text-right uppercase tracking-wider text-[0.625rem]">Grand Total</td>
                   <td className="py-3 px-3 text-right text-blue-800 font-black">₹{totalDebit.toLocaleString('en-IN')}</td>
                   <td className="py-3 px-3 text-right text-emerald-800 font-black">₹{totalCredit.toLocaleString('en-IN')}</td>
                   <td className="py-3 px-3 text-right font-black text-slate-900">
@@ -219,11 +219,11 @@ export const PrintLedgerModal: React.FC<PrintLedgerModalProps> = ({
           <div className="pt-12 flex justify-between items-end text-xs text-slate-500">
             <div>
               <p className="font-semibold">Prepared By: System Admin</p>
-              <p className="text-[10px] mt-0.5">Computer generated statement. No signature required.</p>
+              <p className="text-[0.625rem] mt-0.5">Computer generated statement. No signature required.</p>
             </div>
             <div className="text-center border-t border-slate-300 pt-2 px-8">
               <p className="font-bold text-slate-700">Authorized Signatory</p>
-              <p className="text-[10px] text-slate-400">{companyName}</p>
+              <p className="text-[0.625rem] text-slate-400">{companyName}</p>
             </div>
           </div>
 

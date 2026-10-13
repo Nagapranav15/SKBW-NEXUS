@@ -74,52 +74,44 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
     <div className="space-y-4">
       {/* Metric Cards Banner */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center shrink-0">
-            <Scissors className="w-5 h-5" />
-          </div>
+        <div className="bg-white px-4 py-3 rounded-xl border border-gray-200 flex items-center justify-between gap-3">
           <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Cutting Slips</span>
-            <span className="font-mono font-black text-lg text-slate-900">{slips.length}</span>
+            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider block">Total Cutting Slips</span>
+            <span className="font-mono font-semibold text-lg text-gray-900">{slips.length}</span>
           </div>
+          <span className="w-2 h-2 rounded-full self-start mt-1 bg-blue-500" />
         </div>
 
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 flex items-center justify-center shrink-0">
-            <Scale className="w-5 h-5" />
-          </div>
+        <div className="bg-white px-4 py-3 rounded-xl border border-gray-200 flex items-center justify-between gap-3">
           <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Reels Consumed</span>
-            <span className="font-mono font-black text-lg text-slate-900">{totalReelsWeight.toLocaleString()} <span className="text-xs font-normal text-slate-500">kg</span></span>
+            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider block">Reels Consumed</span>
+            <span className="font-mono font-semibold text-lg text-gray-900">{totalReelsWeight.toLocaleString()} <span className="text-[0.875rem] font-normal text-slate-500">kg</span></span>
           </div>
+          <span className="w-2 h-2 rounded-full self-start mt-1 bg-rose-500" />
         </div>
 
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center shrink-0">
-            <Layers className="w-5 h-5" />
-          </div>
+        <div className="bg-white px-4 py-3 rounded-xl border border-gray-200 flex items-center justify-between gap-3">
           <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Sheets Produced</span>
-            <span className="font-mono font-black text-lg text-emerald-800">
-              {totalSheetsCut.toLocaleString()} <span className="text-xs font-normal text-slate-500">({totalReamsCut.toFixed(1)} Reams)</span>
+            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider block">Sheets Produced</span>
+            <span className="font-mono font-semibold text-lg text-emerald-800">
+              {totalSheetsCut.toLocaleString()} <span className="text-[0.875rem] font-normal text-slate-500">({totalReamsCut.toFixed(1)} Reams)</span>
             </span>
           </div>
+          <span className="w-2 h-2 rounded-full self-start mt-1 bg-emerald-500" />
         </div>
 
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
+        <div className="bg-white px-4 py-3 rounded-xl border border-gray-200 flex items-center justify-between gap-3">
           <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Avg Slitting Yield</span>
-            <span className="font-mono font-black text-lg text-blue-900">{avgYield}%</span>
+            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider block">Avg Slitting Yield</span>
+            <span className="font-mono font-semibold text-lg text-blue-900">{avgYield}%</span>
           </div>
+          <span className="w-2 h-2 rounded-full self-start mt-1 bg-blue-500" />
         </div>
       </div>
 
       {/* Action Toolbar */}
-      <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[240px] max-w-md">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[15rem] max-w-md">
           <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
           <input
             type="text"
@@ -127,7 +119,7 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
             onChange={e => setSearch(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') fetchSlips(); }}
             placeholder="Search by Slip #, Batch, Operator..."
-            className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
 
@@ -135,28 +127,20 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
           <button
             type="button"
             onClick={fetchSlips}
-            className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+            className="icon-btn"
             title="Refresh List"
           >
             <RotateCcw className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={onOpenNewSlip}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-1.5 transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4 text-white" />
-            <span>New Cutting Slip (Alt + C)</span>
           </button>
         </div>
       </div>
 
       {/* Slips Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+      <div className="bg-gray-50 rounded-xl overflow-hidden p-2 panel-table">
         <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
+          <table className="w-full text-[0.875rem] text-left">
             <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-mono text-[10px]">
+              <tr className="border-b border-gray-200 text-gray-600 uppercase tracking-wider font-medium text-xs">
                 <th className="py-3 px-4">Slip #</th>
                 <th className="py-3 px-3">Date</th>
                 <th className="py-3 px-3">Source Reel SKU & Lot</th>
@@ -181,13 +165,13 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
                   <td colSpan={10} className="py-12 text-center text-slate-400">
                     <Scissors className="w-8 h-8 text-slate-300 mx-auto mb-2 stroke-1" />
                     <p className="font-semibold text-slate-700">No Cutting Slips Recorded Yet</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
+                    <p className="text-xs text-slate-400 mt-0.5">
                       Convert paper reels into sheets before launching live notebook production.
                     </p>
                     <button
                       type="button"
                       onClick={onOpenNewSlip}
-                      className="mt-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-md shadow-blue-500/20"
+                      className="btn-primary mt-3"
                     >
                       <Plus className="w-3.5 h-3.5 text-white" />
                       <span>Create First Cutting Slip</span>
@@ -200,35 +184,35 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
                   return (
                     <tr 
                       key={slip._id}
-                      className={`hover:bg-slate-50/80 transition-colors ${isCancelled ? 'opacity-50 line-through bg-slate-50/40' : ''}`}
+                      className={`hover:bg-slate-50/80 ${isCancelled ? 'opacity-50 line-through bg-slate-50/40' : ''}`}
                     >
-                      <td className="py-3 px-4 font-mono font-bold text-slate-900">
+                      <td className="py-3 px-4 font-mono font-semibold text-slate-900">
                         {slip.slipNumber}
                       </td>
-                      <td className="py-3 px-3 text-slate-600 font-mono text-[11px]">
+                      <td className="py-3 px-3 text-slate-600 font-mono text-xs">
                         {slip.date ? new Date(slip.date).toLocaleDateString('en-GB') : '—'}
                       </td>
                       <td className="py-3 px-3">
-                        <div className="font-bold text-slate-900 truncate max-w-[180px]">
+                        <div className="font-semibold text-slate-900 truncate max-w-[11.25rem]">
                           {slip.sourceSku?.name || 'Paper Reel'}
                         </div>
-                        <div className="text-[10px] text-slate-400 font-mono">
+                        <div className="text-xs text-slate-400 font-mono">
                           {slip.purchaseBatch || slip.sourceSku?.skuCode || 'Batch N/A'}
                         </div>
                       </td>
                       <td className="py-3 px-3 text-right">
-                        <span className="font-mono font-black text-rose-700">
+                        <span className="font-mono font-semibold text-rose-700">
                           {slip.totalInputWeight} kg
                         </span>
-                        <span className="text-[10px] text-slate-400 block">
+                        <span className="text-xs text-slate-400 block">
                           {slip.selectedReels?.length || 1} reels
                         </span>
                       </td>
                       <td className="py-3 px-3">
-                        <div className="font-bold text-slate-900 truncate max-w-[200px]">
+                        <div className="font-semibold text-slate-900 truncate max-w-[12.5rem]">
                           {slip.targetSku?.name || 'Converted Sheets'}
                         </div>
-                        <div className="text-[10px] text-slate-400">
+                        <div className="text-xs text-slate-400">
                           {slip.sheetWidth}x{slip.sheetLength} cm • {slip.sheetGsm} GSM
                         </div>
                       </td>
@@ -242,14 +226,14 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
 
                           return (
                             <>
-                              <span className="font-black text-emerald-800 text-xs block">
+                              <span className="font-semibold text-emerald-800 text-[0.875rem] block">
                                 {convertedQty !== null ? `${convertedQty.toFixed(4)} ${tUnit}` : `${slip.actualSheets?.toLocaleString()} Sheets`}
                               </span>
-                              <span className="text-[10px] text-slate-500 block">
+                              <span className="text-xs text-slate-500 block">
                                 {slip.actualSheets?.toLocaleString()} Sheets ({slip.actualReams?.toFixed(2)} Reams)
                               </span>
                               {slip.cutsCount ? (
-                                <span className="text-[9.5px] text-indigo-600 font-bold block">
+                                <span className="text-xs text-blue-600 font-semibold block">
                                   {slip.cutsCount.toLocaleString()} cuts @ {slip.reelsOnStand || 1}R
                                 </span>
                               ) : null}
@@ -258,7 +242,7 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
                         })()}
                       </td>
                       <td className="py-3 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold inline-flex items-center gap-1 ${
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-semibold inline-flex items-center gap-1 ${
                           (slip.wastePercentage || 0) > 0
                             ? 'bg-rose-50 text-rose-700 border border-rose-200'
                             : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
@@ -276,7 +260,7 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
                           )}
                         </span>
                       </td>
-                      <td className="py-3 px-3 text-right font-mono text-[11px]">
+                      <td className="py-3 px-3 text-right font-mono text-xs">
                         {(() => {
                           const targetDoc = slip.targetSku as any;
                           const tUnit = (targetDoc?.unit || '').trim().toUpperCase();
@@ -286,10 +270,10 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
 
                           return (
                             <>
-                              <div className="font-bold text-slate-900">
+                              <div className="font-semibold text-slate-900">
                                 {costPerTargetUnit !== null ? `₹${costPerTargetUnit.toFixed(2)}/${tUnit}` : `₹${slip.effectiveCostPerSheet?.toFixed(2)}/sh`}
                               </div>
-                              <div className="text-[9.5px] text-slate-400">
+                              <div className="text-xs text-slate-400">
                                 ₹{slip.effectiveCostPerSheet?.toFixed(2)}/sh • ₹{slip.effectiveCostPerReam?.toFixed(1)}/rm
                               </div>
                             </>
@@ -297,10 +281,10 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
                         })()}
                       </td>
                       <td className="py-3 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                           isCancelled
                             ? 'bg-slate-100 text-slate-500'
-                            : 'bg-teal-50 text-teal-800 border border-teal-200'
+                            : 'bg-blue-50 text-blue-800 border border-blue-200'
                         }`}>
                           {slip.status || 'Posted'}
                         </span>
@@ -310,7 +294,7 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
                           <button
                             type="button"
                             onClick={() => setSelectedSlipForPrint(slip)}
-                            className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                            className="icon-btn"
                             title="Print Cutting Slip"
                           >
                             <Printer className="w-3.5 h-3.5" />
@@ -319,7 +303,7 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
                             <button
                               type="button"
                               onClick={() => handleCancelSlip(slip._id!, slip.slipNumber)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              className="icon-btn"
                               title="Cancel Slip & Reverse Stock"
                             >
                               <RotateCcw className="w-3.5 h-3.5" />
@@ -340,13 +324,13 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
       {selectedSlipForPrint && (() => {
         const slip = selectedSlipForPrint;
         const columns = [
-          { header: '#', align: 'center' as const, width: 'w-8', render: (_: any, idx: number) => <span className="font-bold text-slate-500">{idx + 1}</span> },
+          { header: '#', align: 'center' as const, width: 'w-8', render: (_: any, idx: number) => <span className="font-semibold text-slate-500">{idx + 1}</span> },
           {
             header: 'Item / Reel Identification',
             render: (row: any) => (
               <div>
-                <div className="font-bold text-slate-900">{row.name}</div>
-                <div className="text-[10px] text-slate-500 font-mono">{row.code}</div>
+                <div className="font-semibold text-slate-900">{row.name}</div>
+                <div className="text-xs text-slate-500 font-mono">{row.code}</div>
               </div>
             )
           },
@@ -355,7 +339,7 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
           {
             header: 'Quantity',
             align: 'right' as const,
-            render: (row: any) => <span className="font-mono font-bold text-slate-900">{row.qty}</span>
+            render: (row: any) => <span className="font-mono font-semibold text-slate-900">{row.qty}</span>
           },
           {
             header: 'Weight (KG)',
@@ -366,7 +350,7 @@ export const CuttingSlipListTab: React.FC<CuttingSlipListTabProps> = ({
           {
             header: 'Total Cost',
             align: 'right' as const,
-            render: (row: any) => <span className="font-mono font-bold text-slate-900">{row.total}</span>
+            render: (row: any) => <span className="font-mono font-semibold text-slate-900">{row.total}</span>
           },
         ];
 

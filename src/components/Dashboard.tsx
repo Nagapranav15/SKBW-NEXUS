@@ -336,7 +336,7 @@ const Dashboard: React.FC = () => {
 
   if (loading && !dashData && skus.length === 0) {
     return (
-      <div className="p-12 flex flex-col items-center justify-center min-h-[450px] gap-3">
+      <div className="p-12 flex flex-col items-center justify-center min-h-[28.125rem] gap-3">
         <div className="w-8 h-8 border-3 border-slate-900 border-t-transparent rounded-full animate-spin"></div>
         <span className="text-xs text-slate-500 font-semibold">Loading real-time operational dashboard...</span>
       </div>
@@ -344,7 +344,7 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-[1600px] mx-auto space-y-5 text-left bg-slate-50/50 min-h-screen">
+    <div className="p-4 sm:p-6 max-w-[100rem] mx-auto space-y-5 text-left bg-slate-50/50 min-h-[calc(100*var(--vh,1vh))]">
       <style>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(6px); }
@@ -359,25 +359,25 @@ const Dashboard: React.FC = () => {
       >
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <h1 className="text-lg font-semibold text-slate-900 tracking-tight flex items-center gap-2">
               <span>Dashboard</span>
             </h1>
-            <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-extrabold uppercase">
+            <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[0.625rem] font-semibold uppercase">
               {selectedCompany?.name || 'SKBW CORE'}
             </span>
           </div>
           <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Welcome back, <span className="font-bold text-slate-800">{user?.fullName || 'Operator'}</span>. Live factory production, stock balances & sales analytics.
+            Welcome back, <span className="font-semibold text-slate-800">{user?.fullName || 'Operator'}</span>. Live factory production, stock balances & sales analytics.
           </p>
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
-          <div className="text-[11px] text-slate-400 font-medium hidden md:block">
+          <div className="text-[0.6875rem] text-slate-400 font-medium hidden md:block">
             Last updated <span className="font-semibold text-slate-600">{lastUpdated || 'Just now'}</span>
           </div>
           <button
             onClick={() => fetchDashboardData(true)}
-            className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all shadow-3xs flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition-all shadow-3xs flex items-center gap-1.5 cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5 text-slate-600" />
             <span>Refresh</span>
@@ -392,7 +392,7 @@ const Dashboard: React.FC = () => {
       >
         <button
           onClick={() => navigate('/production')}
-          className="px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200/80 hover:bg-rose-100 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-3xs"
+          className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200/80 hover:bg-rose-100 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-3xs"
         >
           <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
           <span>{productionMetrics.overdueWOs} overdue work orders</span>
@@ -400,7 +400,7 @@ const Dashboard: React.FC = () => {
 
         <button
           onClick={() => navigate('/stock-inventory?status=LOW_STOCK')}
-          className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200/80 hover:bg-amber-100 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-3xs"
+          className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200/80 hover:bg-amber-100 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-3xs"
         >
           <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
           <span>{inventoryMetrics.lowStockCount} items at low stock</span>
@@ -408,7 +408,7 @@ const Dashboard: React.FC = () => {
 
         <button
           onClick={() => navigate('/ledgers')}
-          className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50/80 text-amber-800 border border-amber-200/80 hover:bg-amber-100 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-3xs"
+          className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-50/80 text-amber-800 border border-amber-200/80 hover:bg-amber-100 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-3xs"
         >
           <Receipt className="w-3.5 h-3.5 text-amber-600" />
           <span>₹{cashHealthMetrics.receivables.toLocaleString('en-IN')} receivables</span>
@@ -421,18 +421,18 @@ const Dashboard: React.FC = () => {
         {/* Card 1: Sales Orders */}
         <div 
           onClick={() => navigate('/sales/orders')}
-          className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-3xs hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between h-[110px] group"
+          className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-3xs hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between h-[6.875rem] group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500">Sales orders</span>
+            <span className="text-xs font-semibold text-slate-500">Sales orders</span>
             <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-slate-900 transition-colors" />
           </div>
           <div>
-            <div className="text-2xl font-extrabold text-slate-900 leading-tight">
+            <div className="text-2xl font-semibold text-slate-900 leading-tight">
               {orderMetrics.openOrders || orderMetrics.totalOrders || 6}
             </div>
             <div className="text-xs text-slate-500 font-medium mt-0.5">
-              open · <span className="text-rose-600 font-bold">{orderMetrics.overdueOrders} overdue</span>
+              open · <span className="text-rose-600 font-semibold">{orderMetrics.overdueOrders} overdue</span>
             </div>
           </div>
         </div>
@@ -440,18 +440,18 @@ const Dashboard: React.FC = () => {
         {/* Card 2: Purchase Orders */}
         <div 
           onClick={() => navigate('/inventory-v2/purchases')}
-          className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-3xs hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between h-[110px] group"
+          className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-3xs hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between h-[6.875rem] group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500">Purchase orders</span>
+            <span className="text-xs font-semibold text-slate-500">Purchase orders</span>
             <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-slate-900 transition-colors" />
           </div>
           <div>
-            <div className="text-2xl font-extrabold text-slate-900 leading-tight">
+            <div className="text-2xl font-semibold text-slate-900 leading-tight">
               {purchaseMetrics.totalPurchases || 2}
             </div>
             <div className="text-xs text-slate-500 font-medium mt-0.5">
-              pending · <span className="text-rose-600 font-bold">{purchaseMetrics.latePurchases} late</span>
+              pending · <span className="text-rose-600 font-semibold">{purchaseMetrics.latePurchases} late</span>
             </div>
           </div>
         </div>
@@ -459,18 +459,18 @@ const Dashboard: React.FC = () => {
         {/* Card 3: Stock Alerts */}
         <div 
           onClick={() => navigate('/stock-inventory?status=LOW_STOCK')}
-          className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-3xs hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between h-[110px] group"
+          className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-3xs hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between h-[6.875rem] group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500">Stock alerts</span>
+            <span className="text-xs font-semibold text-slate-500">Stock alerts</span>
             <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-slate-900 transition-colors" />
           </div>
           <div>
-            <div className="text-2xl font-extrabold text-slate-900 leading-tight">
+            <div className="text-2xl font-semibold text-slate-900 leading-tight">
               {inventoryMetrics.totalAlerts}
             </div>
             <div className="text-xs text-slate-500 font-medium mt-0.5">
-              low or reorder · <span className="text-rose-600 font-bold">{inventoryMetrics.outOfStockCount} out of stock</span>
+              low or reorder · <span className="text-rose-600 font-semibold">{inventoryMetrics.outOfStockCount} out of stock</span>
             </div>
           </div>
         </div>
@@ -478,14 +478,14 @@ const Dashboard: React.FC = () => {
         {/* Card 4: Cash Flow */}
         <div 
           onClick={() => navigate('/ledgers')}
-          className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-3xs hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between h-[110px] group"
+          className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-3xs hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between h-[6.875rem] group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500">Cash flow</span>
+            <span className="text-xs font-semibold text-slate-500">Cash flow</span>
             <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-slate-900 transition-colors" />
           </div>
           <div>
-            <div className={`text-2xl font-extrabold leading-tight ${cashHealthMetrics.mtdCashFlow >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+            <div className={`text-2xl font-semibold leading-tight ${cashHealthMetrics.mtdCashFlow >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
               {cashHealthMetrics.mtdCashFlow >= 0 ? '+' : ''}₹{cashHealthMetrics.mtdCashFlow.toLocaleString('en-IN')}
             </div>
             <div className="text-xs text-slate-500 font-medium mt-0.5">
@@ -500,13 +500,13 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
         {/* SECTION 1: Work Orders */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-3xs flex flex-col justify-between min-h-[340px]">
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-3xs flex flex-col justify-between min-h-[21.25rem]">
           <div>
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-extrabold text-slate-900">Work orders</h3>
+              <h3 className="text-sm font-semibold text-slate-900">Work orders</h3>
               <button 
                 onClick={() => navigate('/production')}
-                className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-0.5 cursor-pointer"
+                className="text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-0.5 cursor-pointer"
               >
                 <span>View all</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -516,14 +516,14 @@ const Dashboard: React.FC = () => {
             {/* Sub-metrics Header */}
             <div className="grid grid-cols-2 gap-4 py-3 border-b border-slate-100">
               <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Open</div>
-                <div className="text-base font-black text-slate-900 mt-0.5">{productionMetrics.openWOs}</div>
-                <div className="text-[11px] text-slate-500 font-semibold">₹{productionMetrics.totalWipValue.toLocaleString('en-IN')}</div>
+                <div className="text-[0.625rem] font-medium text-slate-400 uppercase tracking-wider">Open</div>
+                <div className="text-base font-semibold text-slate-900 mt-0.5">{productionMetrics.openWOs}</div>
+                <div className="text-[0.6875rem] text-slate-500 font-semibold">₹{productionMetrics.totalWipValue.toLocaleString('en-IN')}</div>
               </div>
               <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Blocked stock</div>
-                <div className="text-base font-black text-slate-900 mt-0.5">{productionMetrics.blockedItemsCount} items</div>
-                <div className="text-[11px] text-slate-500 font-semibold">across {productionMetrics.openWOs} WOs</div>
+                <div className="text-[0.625rem] font-medium text-slate-400 uppercase tracking-wider">Blocked stock</div>
+                <div className="text-base font-semibold text-slate-900 mt-0.5">{productionMetrics.blockedItemsCount} items</div>
+                <div className="text-[0.6875rem] text-slate-500 font-semibold">across {productionMetrics.openWOs} WOs</div>
               </div>
             </div>
 
@@ -532,14 +532,14 @@ const Dashboard: React.FC = () => {
               {productionMetrics.activeJobs.map(job => (
                 <div key={job.id} className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
-                    <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded text-[9px] font-extrabold uppercase shrink-0">
+                    <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded text-[0.5625rem] font-semibold uppercase shrink-0">
                       {job.status}
                     </span>
-                    <span className="font-bold text-slate-800 truncate" title={job.title}>{job.title}</span>
+                    <span className="font-semibold text-slate-800 truncate" title={job.title}>{job.title}</span>
                   </div>
                   <div className="text-right shrink-0">
-                    <span className="text-[11px] font-bold text-slate-900">{job.progress}%</span>
-                    <span className="text-[11px] text-slate-500 font-semibold ml-1">
+                    <span className="text-[0.6875rem] font-semibold text-slate-900">{job.progress}%</span>
+                    <span className="text-[0.6875rem] text-slate-500 font-semibold ml-1">
                       {job.value > 0 ? `₹${job.value.toLocaleString('en-IN')}` : '₹0'}
                     </span>
                   </div>
@@ -550,20 +550,20 @@ const Dashboard: React.FC = () => {
 
           <button
             onClick={() => navigate('/production')}
-            className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200/80 mt-4 cursor-pointer"
+            className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold transition-all border border-slate-200/80 mt-4 cursor-pointer"
           >
             Create New Work Order
           </button>
         </div>
 
         {/* SECTION 2: Dispatch */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-3xs flex flex-col justify-between min-h-[340px]">
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-3xs flex flex-col justify-between min-h-[21.25rem]">
           <div>
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-extrabold text-slate-900">Dispatch</h3>
+              <h3 className="text-sm font-semibold text-slate-900">Dispatch</h3>
               <button 
                 onClick={() => navigate('/dispatch')}
-                className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-0.5 cursor-pointer"
+                className="text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-0.5 cursor-pointer"
               >
                 <span>View all</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -573,19 +573,19 @@ const Dashboard: React.FC = () => {
             {/* Sub-metrics Header */}
             <div className="grid grid-cols-3 gap-2 py-3 border-b border-slate-100 text-center">
               <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Today</div>
-                <div className="text-base font-black text-slate-900 mt-0.5">{dispatchMetrics.todayCount}</div>
-                <div className="text-[10px] text-emerald-600 font-bold">{dispatchMetrics.todayCount > 0 ? `${dispatchMetrics.todayCount} dispatched` : 'nothing today'}</div>
+                <div className="text-[0.625rem] font-medium text-slate-400 uppercase tracking-wider">Today</div>
+                <div className="text-base font-semibold text-slate-900 mt-0.5">{dispatchMetrics.todayCount}</div>
+                <div className="text-[0.625rem] text-emerald-600 font-semibold">{dispatchMetrics.todayCount > 0 ? `${dispatchMetrics.todayCount} dispatched` : 'nothing today'}</div>
               </div>
               <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Delayed</div>
-                <div className="text-base font-black text-slate-900 mt-0.5">{dispatchMetrics.delayedCount}</div>
-                <div className="text-[10px] text-slate-400 font-medium">all on schedule</div>
+                <div className="text-[0.625rem] font-medium text-slate-400 uppercase tracking-wider">Delayed</div>
+                <div className="text-base font-semibold text-slate-900 mt-0.5">{dispatchMetrics.delayedCount}</div>
+                <div className="text-[0.625rem] text-slate-400 font-medium">all on schedule</div>
               </div>
               <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Upcoming</div>
-                <div className="text-base font-black text-slate-900 mt-0.5">{dispatchMetrics.upcomingCount}</div>
-                <div className="text-[10px] text-slate-400 font-medium">scheduled ahead</div>
+                <div className="text-[0.625rem] font-medium text-slate-400 uppercase tracking-wider">Upcoming</div>
+                <div className="text-base font-semibold text-slate-900 mt-0.5">{dispatchMetrics.upcomingCount}</div>
+                <div className="text-[0.625rem] text-slate-400 font-medium">scheduled ahead</div>
               </div>
             </div>
 
@@ -595,10 +595,10 @@ const Dashboard: React.FC = () => {
                 dispatchMetrics.recentDispatches.map(item => (
                   <div key={item.id} className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-150/70 flex items-center justify-between">
                     <div>
-                      <div className="font-bold text-slate-900 text-xs">Challan #{item.number}</div>
-                      <div className="text-[10px] text-slate-400">{item.party} · {item.city}</div>
+                      <div className="font-semibold text-slate-900 text-xs">Challan #{item.number}</div>
+                      <div className="text-[0.625rem] text-slate-400">{item.party} · {item.city}</div>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                    <span className={`px-2 py-0.5 rounded-full font-semibold text-[0.625rem] ${
                       item.status === 'Dispatched'
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                         : 'bg-amber-50 text-amber-700 border border-amber-200'
@@ -615,20 +615,20 @@ const Dashboard: React.FC = () => {
 
           <button
             onClick={() => navigate('/dispatch')}
-            className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200/80 mt-4 cursor-pointer"
+            className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold transition-all border border-slate-200/80 mt-4 cursor-pointer"
           >
             Create Delivery Challan
           </button>
         </div>
 
         {/* SECTION 3: Inventory Health */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-3xs flex flex-col justify-between min-h-[340px]">
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-3xs flex flex-col justify-between min-h-[21.25rem]">
           <div>
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-extrabold text-slate-900">Inventory health</h3>
+              <h3 className="text-sm font-semibold text-slate-900">Inventory health</h3>
               <button 
                 onClick={() => navigate('/stock-inventory')}
-                className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-0.5 cursor-pointer"
+                className="text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-0.5 cursor-pointer"
               >
                 <span>View all</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -639,22 +639,22 @@ const Dashboard: React.FC = () => {
             <div className="space-y-1.5 py-3 border-b border-slate-100">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-500 font-medium">Blocking WIP</span>
-                <span className="font-extrabold text-slate-900">
+                <span className="font-semibold text-slate-900">
                   {productionMetrics.blockedItemsCount} items <span className="text-slate-400 font-normal">(₹{inventoryMetrics.semiValue.toLocaleString('en-IN')} of WIP)</span>
                 </span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-500 font-medium">Low Stock Items</span>
-                <span className="font-extrabold text-rose-600">{inventoryMetrics.lowStockCount} items</span>
+                <span className="font-semibold text-rose-600">{inventoryMetrics.lowStockCount} items</span>
               </div>
             </div>
 
             {/* Dynamic Value by Category Progress Bars */}
             <div className="space-y-3 pt-3">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">VALUE BY CATEGORY</div>
+              <div className="text-[0.625rem] font-medium text-slate-400 uppercase tracking-wider">VALUE BY CATEGORY</div>
 
               <div>
-                <div className="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
                   <span>Material (Paper, Reels, Board)</span>
                   <span>{inventoryMetrics.matPct}%</span>
                 </div>
@@ -664,7 +664,7 @@ const Dashboard: React.FC = () => {
               </div>
 
               <div>
-                <div className="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
                   <span>Product (Notebooks & FG)</span>
                   <span>{inventoryMetrics.prodPct}%</span>
                 </div>
@@ -674,7 +674,7 @@ const Dashboard: React.FC = () => {
               </div>
 
               <div>
-                <div className="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
                   <span>Semi-Finished / WIP</span>
                   <span>{inventoryMetrics.semiPct}%</span>
                 </div>
@@ -687,7 +687,7 @@ const Dashboard: React.FC = () => {
 
           <button
             onClick={() => navigate('/stock-inventory')}
-            className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200/80 mt-4 cursor-pointer"
+            className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold transition-all border border-slate-200/80 mt-4 cursor-pointer"
           >
             Audit Stock Balances
           </button>
@@ -699,16 +699,16 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
         {/* Left: Dispatch vs Production vs Consumption Chart */}
-        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-3xs flex flex-col justify-between min-h-[380px]">
+        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-3xs flex flex-col justify-between min-h-[23.75rem]">
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-extrabold text-slate-900">Dispatch vs Production vs Consumption</h3>
+                <h3 className="text-sm font-semibold text-slate-900">Dispatch vs Production vs Consumption</h3>
                 <span className="text-xs text-slate-400 font-medium">Last 30 days</span>
               </div>
               <button 
                 onClick={() => navigate('/reports')}
-                className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-0.5 cursor-pointer self-start sm:self-auto"
+                className="text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-0.5 cursor-pointer self-start sm:self-auto"
               >
                 <span>View all</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -716,7 +716,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Chart Legends */}
-            <div className="flex items-center gap-4 py-3 text-xs font-bold text-slate-700">
+            <div className="flex items-center gap-4 py-3 text-xs font-semibold text-slate-700">
               <div className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
                 <span>Dispatch</span>
@@ -771,7 +771,7 @@ const Dashboard: React.FC = () => {
             </div>
             
             {/* Timeline X-Axis */}
-            <div className="flex justify-between text-[10px] text-slate-400 font-bold pt-2 border-t border-slate-100">
+            <div className="flex justify-between text-[0.625rem] text-slate-400 font-semibold pt-2 border-t border-slate-100">
               <span>Week 1</span>
               <span>Week 2</span>
               <span>Week 3</span>
@@ -781,13 +781,13 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Right: Cash Health */}
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-3xs flex flex-col justify-between min-h-[380px]">
+        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-3xs flex flex-col justify-between min-h-[23.75rem]">
           <div>
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-extrabold text-slate-900">Cash health</h3>
+              <h3 className="text-sm font-semibold text-slate-900">Cash health</h3>
               <button 
                 onClick={() => navigate('/ledgers')}
-                className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-0.5 cursor-pointer"
+                className="text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-0.5 cursor-pointer"
               >
                 <span>View all</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
@@ -798,22 +798,22 @@ const Dashboard: React.FC = () => {
             <div className="divide-y divide-slate-100 text-xs">
               <div className="py-3 flex items-center justify-between">
                 <span className="text-slate-600 font-medium">Receivables</span>
-                <span className="font-extrabold text-slate-900">₹{cashHealthMetrics.receivables.toLocaleString('en-IN')}</span>
+                <span className="font-semibold text-slate-900">₹{cashHealthMetrics.receivables.toLocaleString('en-IN')}</span>
               </div>
 
               <div className="py-3 flex items-center justify-between">
                 <span className="text-slate-600 font-medium">Payables</span>
-                <span className="font-extrabold text-slate-900">₹{cashHealthMetrics.payables.toLocaleString('en-IN')}</span>
+                <span className="font-semibold text-slate-900">₹{cashHealthMetrics.payables.toLocaleString('en-IN')}</span>
               </div>
 
               <div className="py-3 flex items-center justify-between">
                 <div>
                   <div className="text-slate-600 font-medium">Cash Flow · MTD</div>
-                  <div className="text-[10px] text-slate-400">
+                  <div className="text-[0.625rem] text-slate-400">
                     In ₹{(cashHealthMetrics.mtdSales / 100000).toFixed(1)}L · Out ₹{(cashHealthMetrics.mtdPurchases / 100000).toFixed(1)}L
                   </div>
                 </div>
-                <span className={`font-extrabold ${cashHealthMetrics.mtdCashFlow >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                <span className={`font-semibold ${cashHealthMetrics.mtdCashFlow >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                   {cashHealthMetrics.mtdCashFlow >= 0 ? '+' : ''}₹{cashHealthMetrics.mtdCashFlow.toLocaleString('en-IN')}
                 </span>
               </div>
@@ -821,24 +821,24 @@ const Dashboard: React.FC = () => {
               <div className="py-3 flex items-center justify-between">
                 <div>
                   <div className="text-slate-600 font-medium">Sales · MTD</div>
-                  <div className="text-[10px] text-slate-400">{cashHealthMetrics.invoicesCount} invoices generated</div>
+                  <div className="text-[0.625rem] text-slate-400">{cashHealthMetrics.invoicesCount} invoices generated</div>
                 </div>
-                <span className="font-extrabold text-slate-900">₹{cashHealthMetrics.mtdSales.toLocaleString('en-IN')}</span>
+                <span className="font-semibold text-slate-900">₹{cashHealthMetrics.mtdSales.toLocaleString('en-IN')}</span>
               </div>
 
               <div className="py-3 flex items-center justify-between">
                 <div>
                   <div className="text-slate-600 font-medium">Purchases · MTD</div>
-                  <div className="text-[10px] text-slate-400">{cashHealthMetrics.billsCount} purchase bills</div>
+                  <div className="text-[0.625rem] text-slate-400">{cashHealthMetrics.billsCount} purchase bills</div>
                 </div>
-                <span className="font-extrabold text-slate-900">₹{cashHealthMetrics.mtdPurchases.toLocaleString('en-IN')}</span>
+                <span className="font-semibold text-slate-900">₹{cashHealthMetrics.mtdPurchases.toLocaleString('en-IN')}</span>
               </div>
             </div>
           </div>
 
           <button
             onClick={() => navigate('/ledgers')}
-            className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200/80 mt-3 cursor-pointer"
+            className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold transition-all border border-slate-200/80 mt-3 cursor-pointer"
           >
             Open Financial Ledgers
           </button>
@@ -853,13 +853,13 @@ const Dashboard: React.FC = () => {
           <span>Quick Actions: Launch Item Master, Sales Order Wizard, or Delivery Slip directly.</span>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => navigate('/inventory-v2/skus')} className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition-colors">
+          <button onClick={() => navigate('/inventory-v2/skus')} className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold transition-colors">
             + Item Master
           </button>
-          <button onClick={() => navigate('/sales/orders')} className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition-colors">
+          <button onClick={() => navigate('/sales/orders')} className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold transition-colors">
             + Sale Order
           </button>
-          <button onClick={() => navigate('/reports')} className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-colors">
+          <button onClick={() => navigate('/reports')} className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors">
             Reports Hub
           </button>
         </div>

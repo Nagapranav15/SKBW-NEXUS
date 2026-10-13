@@ -110,22 +110,22 @@ export const CleanProcessDropdownInput: React.FC<{
           onClick={() => setIsOpen(prev => !prev)}
           className="absolute right-2 text-gray-400 hover:text-gray-600 cursor-pointer p-0.5"
         >
-          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180 text-blue-600' : ''}`} />
+          <ChevronDown className={`w-3.5 h-3.5 ${isOpen ? 'rotate-180 text-blue-600' : ''}`} />
         </button>
       </div>
 
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200/90 rounded-2xl shadow-xl z-[150] max-h-56 overflow-y-auto p-1.5 animate-fadeIn space-y-0.5">
+        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200/90 rounded-2xl shadow-xl z-[150] max-h-56 overflow-y-auto p-1.5 space-y-0.5">
           {filteredOptions.length === 0 ? (
-            <div className="p-3 text-center text-xs text-gray-500">
+            <div className="p-3 text-center text-[0.875rem] text-gray-500">
               <span className="font-semibold text-gray-700 block">Custom Process: "{value}"</span>
-              <span className="text-[10.5px] text-gray-400">Press Add to use this custom operation name.</span>
+              <span className="text-xs text-gray-400">Press Add to use this custom operation name.</span>
             </div>
           ) : (
             <>
-              <div className="px-2 py-1 text-[9.5px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 flex items-center justify-between">
+              <div className="px-2 py-1 text-xs font-medium text-gray-400 uppercase tracking-wider border-b border-gray-100 flex items-center justify-between">
                 <span>Suggested Operations & Routing</span>
-                <span className="text-[9px] text-blue-600 font-normal">Click to select</span>
+                <span className="text-xs text-blue-600 font-normal">Click to select</span>
               </div>
               {filteredOptions.map((item, idx) => {
                 const name = typeof item === 'string' ? item : item.name;
@@ -144,16 +144,16 @@ export const CleanProcessDropdownInput: React.FC<{
                       }
                       setIsOpen(false);
                     }}
-                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs cursor-pointer transition-colors ${
+                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl text-[0.875rem] cursor-pointer ${
                       isSelected
-                        ? 'bg-blue-50 text-blue-700 font-bold'
+                        ? 'bg-blue-50 text-blue-700 font-semibold'
                         : 'text-gray-700 hover:bg-slate-50 hover:text-blue-600'
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="truncate font-semibold">{name}</span>
                       {category && (
-                        <span className="text-[10px] text-gray-400 truncate font-normal">({category})</span>
+                        <span className="text-xs text-gray-400 truncate font-normal">({category})</span>
                       )}
                     </div>
                     {isSelected && (
@@ -372,9 +372,9 @@ export const ManufacturingStepsModal: React.FC<ManufacturingStepsModalProps> = (
   };
 
   const modalContent = (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-xs animate-fadeIn">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-gray-900/40">
       <div 
-        className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col h-[85vh] max-h-[750px] overflow-hidden"
+        className="relative w-full max-w-2xl bg-white flex flex-col h-[calc(85*var(--vh,1vh))] max-h-[46.875rem] overflow-hidden dlg-panel"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -385,12 +385,12 @@ export const ManufacturingStepsModal: React.FC<ManufacturingStepsModalProps> = (
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-xs sm:text-sm font-bold text-gray-900">Manufacturing Process Routing</h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                <h3 className="text-[0.875rem] sm:text-[0.875rem] font-semibold text-gray-900">Manufacturing Process Routing</h3>
+                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                   {sku.skuCode}
                 </span>
               </div>
-              <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-1">
+              <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
                 {sku.name} • <span className="font-semibold text-gray-700">{sku.category || 'Finished Goods'}</span>
               </p>
             </div>
@@ -398,7 +398,7 @@ export const ManufacturingStepsModal: React.FC<ManufacturingStepsModalProps> = (
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
+            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -407,43 +407,43 @@ export const ManufacturingStepsModal: React.FC<ManufacturingStepsModalProps> = (
         {/* Modal Body */}
         <div className="p-4 overflow-y-auto space-y-3.5 flex-1 min-h-0">
           {errorMsg && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-xs font-semibold text-rose-700">
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-[0.875rem] font-semibold text-rose-700">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
           {/* 1. Custom Process Creator Form Box */}
-          <div className="bg-gradient-to-br from-blue-50/50 via-white to-indigo-50/40 border border-blue-200/80 rounded-2xl p-3 sm:p-3.5 shadow-2xs space-y-2.5">
+          <div className="bg-gradient-to-br from-blue-50/50 via-white to-blue-50/40 border border-blue-200/80 rounded-2xl p-3 sm:p-3.5 shadow-2xs space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="p-1 rounded-lg bg-blue-600 text-white">
                   <Wrench className="w-3.5 h-3.5" />
                 </div>
-                <span className="text-xs font-bold text-gray-900">Define Any Custom Process Operation</span>
+                <span className="text-[0.875rem] font-semibold text-gray-900">Define Any Custom Process Operation</span>
               </div>
-              <span className="text-[9.5px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/60">
+              <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/60">
                 Custom Operation
               </span>
             </div>
 
             <form onSubmit={handleAddCustomInputStep} className="grid grid-cols-1 sm:grid-cols-12 gap-2">
               <div className="sm:col-span-10">
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
                   Process Operation Name *
                 </label>
                 <CleanProcessDropdownInput
                   value={customStepName}
                   onChange={(val) => setCustomStepName(val)}
                   placeholder="e.g. Reel Slitting, Paper Ruling, Section Folding, Wire Stitching, Cover Lamination"
-                  className="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl font-semibold text-gray-800 shadow-2xs"
+                  className="w-full px-2.5 py-1.5 text-[0.875rem] bg-white border border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl font-semibold text-gray-800 shadow-2xs"
                 />
               </div>
 
               <div className="sm:col-span-2 flex items-end gap-1 pt-1 sm:pt-0">
                 <button
                   type="submit"
-                  className="flex-1 px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1 shadow-xs shadow-blue-500/20 cursor-pointer transition-all"
+                  className="btn-primary flex-1 justify-center"
                 >
                   <Plus className="w-3 h-3" />
                   <span>Add</span>
@@ -452,7 +452,7 @@ export const ManufacturingStepsModal: React.FC<ManufacturingStepsModalProps> = (
                   <button
                     type="button"
                     onClick={handleSaveAsCustomPreset}
-                    className="p-1.5 bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl cursor-pointer transition-all shadow-2xs"
+                    className="p-1.5 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-xl cursor-pointer shadow-2xs"
                     title="Save to My Presets library for future reuse"
                   >
                     <BookmarkPlus className="w-3.5 h-3.5" />
@@ -464,7 +464,7 @@ export const ManufacturingStepsModal: React.FC<ManufacturingStepsModalProps> = (
             {/* User's Saved Custom Presets */}
             {customPresets.length > 0 && (
               <div className="pt-2 border-t border-blue-100/60 flex items-center gap-1.5 flex-wrap">
-                <span className="text-[10px] font-bold text-indigo-600 flex items-center gap-1">
+                <span className="text-xs font-semibold text-blue-600 flex items-center gap-1">
                   <Tag className="w-3 h-3" />
                   <span>My Saved Custom Presets:</span>
                 </span>
@@ -472,13 +472,13 @@ export const ManufacturingStepsModal: React.FC<ManufacturingStepsModalProps> = (
                   <div
                     key={cp.name}
                     onClick={() => handleAddStep(cp.name, cp.machine)}
-                    className="group inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-lg text-[10.5px] font-semibold cursor-pointer transition-all shadow-2xs"
+                    className="group inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-lg text-xs font-semibold cursor-pointer shadow-2xs"
                   >
                     <span>+ {cp.name}</span>
                     <button
                       type="button"
                       onClick={(e) => handleDeleteCustomPreset(cp.name, e)}
-                      className="p-0.5 text-indigo-400 hover:text-rose-600 rounded cursor-pointer"
+                      className="p-0.5 text-blue-400 hover:text-rose-600 rounded cursor-pointer"
                       title="Delete preset"
                     >
                       <X className="w-2.5 h-2.5" />
@@ -492,14 +492,14 @@ export const ManufacturingStepsModal: React.FC<ManufacturingStepsModalProps> = (
           {/* 2. Standard Presets Bar */}
           <div className="p-3 bg-gray-50/80 border border-gray-200/70 rounded-xl space-y-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 uppercase tracking-wider">
                 <Sparkles className="w-3 h-3 text-blue-600" />
                 <span>Industry Standard Presets:</span>
               </div>
               <button
                 type="button"
                 onClick={handleLoadStandardSteps}
-                className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold rounded-lg text-[10.5px] flex items-center gap-1.5 border border-amber-200/80 transition-all cursor-pointer shadow-2xs"
+                className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 font-semibold rounded-lg text-xs flex items-center gap-1.5 border border-amber-200/80 cursor-pointer shadow-2xs"
                 title="Load full 7-step standard book production sequence"
               >
                 <Zap className="w-3 h-3 text-amber-600" />
@@ -512,7 +512,7 @@ export const ManufacturingStepsModal: React.FC<ManufacturingStepsModalProps> = (
                   key={preset.name}
                   type="button"
                   onClick={() => handleAddStep(preset.name, preset.machine)}
-                  className="px-2 py-0.5 bg-white hover:bg-blue-50 text-gray-700 hover:text-blue-700 border border-gray-200 hover:border-blue-300 rounded-lg text-[10.5px] font-medium transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                  className="px-2 py-0.5 bg-white hover:bg-blue-50 text-gray-700 hover:text-blue-700 border border-gray-200 hover:border-blue-300 rounded-lg text-xs font-medium cursor-pointer flex items-center gap-1 shadow-2xs"
                 >
                   <Plus className="w-2.5 h-2.5 text-blue-500" />
                   <span>{preset.name}</span>
@@ -525,33 +525,33 @@ export const ManufacturingStepsModal: React.FC<ManufacturingStepsModalProps> = (
           {steps.length === 0 ? (
             <div
               onClick={() => handleAddStep()}
-              className="p-6 border-2 border-dashed border-gray-200 hover:border-blue-300 bg-gray-50/50 hover:bg-blue-50/30 rounded-2xl flex flex-col items-center justify-center text-center cursor-pointer transition-all group"
+              className="p-6 border-2 border-dashed border-gray-200 hover:border-blue-300 bg-gray-50/50 hover:bg-blue-50/30 rounded-2xl flex flex-col items-center justify-center text-center cursor-pointer group"
             >
-              <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 group-hover:text-blue-600 group-hover:border-blue-300 transition-colors shadow-2xs mb-2">
+              <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 group-hover:text-blue-600 group-hover:border-blue-300 shadow-2xs mb-2">
                 <Plus className="w-4 h-4" />
               </div>
-              <h4 className="text-xs font-bold text-gray-700 group-hover:text-blue-700">No process steps added yet</h4>
-              <p className="text-[11px] text-gray-400 mt-0.5 max-w-sm">
+              <h4 className="text-[0.875rem] font-semibold text-gray-700 group-hover:text-blue-700">No process steps added yet</h4>
+              <p className="text-xs text-gray-400 mt-0.5 max-w-sm">
                 Use the custom form above or click here to add your custom steps.
               </p>
             </div>
           ) : (
             <div className="space-y-2">
               <div className="flex items-center justify-between px-1">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
                   ACTIVE ROUTING PIPELINE ({steps.length} {steps.length === 1 ? 'OPERATION' : 'OPERATIONS'})
                 </span>
                 <button
                   type="button"
                   onClick={() => handleAddStep()}
-                  className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
                 >
                   <Plus className="w-3 h-3" />
                   <span>Add Blank Row</span>
                 </button>
               </div>
 
-              <div className="grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+              <div className="grid grid-cols-12 gap-2 px-2 text-xs font-medium text-gray-400 uppercase tracking-wider">
                 <div className="col-span-1 text-center">#</div>
                 <div className="col-span-9">PROCESS OPERATION NAME *</div>
                 <div className="col-span-2 text-right">ACTION</div>
@@ -560,11 +560,11 @@ export const ManufacturingStepsModal: React.FC<ManufacturingStepsModalProps> = (
               {steps.map((step, sIdx) => (
                 <div
                   key={step.id}
-                  className="grid grid-cols-12 gap-2 items-center bg-gray-50/70 hover:bg-white p-2 rounded-xl border border-gray-200/80 transition-all shadow-2xs hover:shadow-xs"
+                  className="grid grid-cols-12 gap-2 items-center bg-gray-50/70 hover:bg-white p-2 rounded-xl border border-gray-200/80 shadow-2xs hover:shadow-xs"
                 >
                   {/* Step Number */}
                   <div className="col-span-1 flex items-center justify-center">
-                    <span className="w-5 h-5 rounded-full bg-blue-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0 shadow-2xs">
+                    <span className="w-5 h-5 rounded-full bg-blue-600 text-white font-semibold text-xs flex items-center justify-center shrink-0 shadow-2xs">
                       {sIdx + 1}
                     </span>
                   </div>
@@ -575,7 +575,7 @@ export const ManufacturingStepsModal: React.FC<ManufacturingStepsModalProps> = (
                       value={step.stepName || ''}
                       onChange={(val) => updateStep(step.id, 'stepName', val)}
                       placeholder="Custom Process Step Name (e.g. Reel Slitting, Ruling, Folding, Stitching)"
-                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                   </div>
 
@@ -585,7 +585,7 @@ export const ManufacturingStepsModal: React.FC<ManufacturingStepsModalProps> = (
                       type="button"
                       disabled={sIdx === 0}
                       onClick={() => moveStep(sIdx, 'up')}
-                      className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-25 disabled:cursor-not-allowed hover:bg-gray-200/80 rounded-lg transition-colors cursor-pointer"
+                      className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-25 disabled:cursor-not-allowed hover:bg-gray-200/80 rounded-lg cursor-pointer"
                       title="Move Up in sequence"
                     >
                       <ArrowUp className="w-3.5 h-3.5" />
@@ -594,7 +594,7 @@ export const ManufacturingStepsModal: React.FC<ManufacturingStepsModalProps> = (
                       type="button"
                       disabled={sIdx === steps.length - 1}
                       onClick={() => moveStep(sIdx, 'down')}
-                      className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-25 disabled:cursor-not-allowed hover:bg-gray-200/80 rounded-lg transition-colors cursor-pointer"
+                      className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-25 disabled:cursor-not-allowed hover:bg-gray-200/80 rounded-lg cursor-pointer"
                       title="Move Down in sequence"
                     >
                       <ArrowDown className="w-3.5 h-3.5" />
@@ -602,7 +602,7 @@ export const ManufacturingStepsModal: React.FC<ManufacturingStepsModalProps> = (
                     <button
                       type="button"
                       onClick={() => removeStep(step.id)}
-                      className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer ml-0.5"
+                      className="icon-btn-danger ml-0.5"
                       title="Delete Step"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -615,8 +615,8 @@ export const ManufacturingStepsModal: React.FC<ManufacturingStepsModalProps> = (
         </div>
 
         {/* Modal Footer */}
-        <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/90 flex items-center justify-between shrink-0">
-          <div className="text-xs font-semibold text-gray-500">
+        <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/90 flex items-center justify-between shrink-0 dlg-footer">
+          <div className="text-[0.875rem] font-semibold text-gray-500">
             {steps.length} {steps.length === 1 ? 'Step' : 'Steps'} in Pipeline
           </div>
           <div className="flex items-center gap-2">
@@ -624,7 +624,7 @@ export const ManufacturingStepsModal: React.FC<ManufacturingStepsModalProps> = (
               type="button"
               onClick={onClose}
               disabled={isSaving}
-              className="px-3.5 py-1.5 text-xs font-semibold text-gray-700 bg-white hover:bg-gray-100 border border-gray-200 rounded-xl transition-all cursor-pointer shadow-2xs"
+              className="btn-secondary"
             >
               Cancel
             </button>
@@ -632,7 +632,7 @@ export const ManufacturingStepsModal: React.FC<ManufacturingStepsModalProps> = (
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="px-4 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-xs shadow-blue-500/20 disabled:opacity-50"
+              className="btn-primary disabled:opacity-50"
             >
               <Save className="w-3.5 h-3.5" />
               <span>{isSaving ? 'Saving...' : 'Save Process Routing'}</span>

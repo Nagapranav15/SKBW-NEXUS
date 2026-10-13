@@ -8,8 +8,7 @@ import {
 } from 'lucide-react';
 import { ProductionOrder, ProductionStatus, ItemType } from '../../types/production';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { generateListPdf } from '../../utils/pdfReport';
 import { getActivityLogs } from '../../api/activityLogApi';
 import { showToast } from '../ui/Toast';
 import { formatOrderNo } from './productionUtils';
@@ -202,7 +201,7 @@ const CalendarDateFilterPopover: React.FC<CalendarDateFilterPopoverProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-2xs select-none ${
+        className={`px-3 py-1.5 rounded-xl border text-[0.875rem] font-semibold flex items-center gap-2 cursor-pointer shadow-2xs select-none ${
           hasActiveFilter
             ? 'bg-blue-50/90 border-blue-300 text-blue-700 hover:bg-blue-100/80 ring-1 ring-blue-200'
             : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
@@ -217,18 +216,18 @@ const CalendarDateFilterPopover: React.FC<CalendarDateFilterPopoverProps> = ({
               e.stopPropagation();
               onClear();
             }}
-            className="p-0.5 hover:bg-blue-200/80 rounded-full text-blue-600 transition-colors cursor-pointer"
+            className="p-0.5 hover:bg-blue-200/80 rounded-full text-blue-600 cursor-pointer"
             title="Clear date filter"
           >
             <X className="w-3 h-3" />
           </span>
         )}
-        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${isOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
+        <ChevronDown className={`w-3.5 h-3.5 ${isOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'}`} />
       </button>
 
       {/* Interactive Calendar Popover */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-80 sm:w-[340px] bg-white border border-gray-200/90 rounded-2xl shadow-2xl p-4 z-50 text-xs text-gray-800 space-y-3 animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute right-0 top-full mt-2 w-80 sm:w-[21.25rem] bg-white border border-gray-200/90 rounded-2xl shadow-2xl p-4 z-50 text-[0.875rem] text-gray-800 space-y-3">
           {/* Quick Preset Buttons */}
           <div className="flex flex-wrap gap-1 border-b border-gray-100 pb-2.5">
             {['All', 'Today', 'This Week', 'This Month', 'Last 30 Days'].map(pName => (
@@ -236,7 +235,7 @@ const CalendarDateFilterPopover: React.FC<CalendarDateFilterPopoverProps> = ({
                 key={pName}
                 type="button"
                 onClick={() => applyPreset(pName)}
-                className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold transition-all cursor-pointer ${
+                className={`px-2 py-0.5 rounded-lg text-xs font-semibold cursor-pointer ${
                   draftPreset === pName
                     ? 'bg-blue-600 text-white shadow-2xs'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -252,18 +251,18 @@ const CalendarDateFilterPopover: React.FC<CalendarDateFilterPopoverProps> = ({
             <button
               type="button"
               onClick={handlePrevMonth}
-              className="p-1 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              className="p-1 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg cursor-pointer"
               title="Previous Month"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <div className="font-bold text-gray-900 text-xs">
+            <div className="font-semibold text-gray-900 text-[0.875rem]">
               {monthNames[curMonth]} {curYear}
             </div>
             <button
               type="button"
               onClick={handleNextMonth}
-              className="p-1 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              className="p-1 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg cursor-pointer"
               title="Next Month"
             >
               <ChevronRight className="w-4 h-4" />
@@ -271,7 +270,7 @@ const CalendarDateFilterPopover: React.FC<CalendarDateFilterPopoverProps> = ({
           </div>
 
           {/* Weekday Row */}
-          <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-gray-400 uppercase">
+          <div className="grid grid-cols-7 gap-1 text-center font-semibold text-xs text-gray-400 uppercase">
             {daysOfWeek.map(d => (
               <div key={d} className="py-0.5">{d}</div>
             ))}
@@ -296,13 +295,13 @@ const CalendarDateFilterPopover: React.FC<CalendarDateFilterPopoverProps> = ({
                   key={day}
                   type="button"
                   onClick={() => handleSelectDay(day)}
-                  className={`h-7 w-7 mx-auto rounded-lg text-xs font-semibold flex items-center justify-center transition-all cursor-pointer relative ${
+                  className={`h-7 w-7 mx-auto rounded-lg text-[0.875rem] font-semibold flex items-center justify-center cursor-pointer relative ${
                     isSelected
-                      ? 'bg-blue-600 text-white font-bold shadow-2xs'
+                      ? 'bg-blue-600 text-white font-semibold shadow-2xs'
                       : inRange
-                      ? 'bg-blue-50 text-blue-700 font-bold rounded-none'
+                      ? 'bg-blue-50 text-blue-700 font-semibold rounded-none'
                       : isToday
-                      ? 'bg-blue-50/60 text-blue-700 font-bold border border-blue-300'
+                      ? 'bg-blue-50/60 text-blue-700 font-semibold border border-blue-300'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
@@ -316,7 +315,7 @@ const CalendarDateFilterPopover: React.FC<CalendarDateFilterPopoverProps> = ({
           <div className="pt-2.5 border-t border-gray-100 space-y-2">
             <div className="flex items-center gap-2">
               <div className="flex-1">
-                <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block mb-0.5">From</label>
+                <label className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">From</label>
                 <input
                   type="date"
                   value={draftStart}
@@ -324,11 +323,11 @@ const CalendarDateFilterPopover: React.FC<CalendarDateFilterPopoverProps> = ({
                     setDraftStart(e.target.value);
                     setDraftPreset('Custom');
                   }}
-                  className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium bg-gray-50"
+                  className="w-full px-2 py-1 text-[0.875rem] border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium bg-gray-50"
                 />
               </div>
               <div className="flex-1">
-                <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block mb-0.5">To</label>
+                <label className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">To</label>
                 <input
                   type="date"
                   value={draftEnd}
@@ -336,12 +335,12 @@ const CalendarDateFilterPopover: React.FC<CalendarDateFilterPopoverProps> = ({
                     setDraftEnd(e.target.value);
                     setDraftPreset('Custom');
                   }}
-                  className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium bg-gray-50"
+                  className="w-full px-2 py-1 text-[0.875rem] border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium bg-gray-50"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center justify-between pt-1 dlg-footer">
               <button
                 type="button"
                 onClick={() => {
@@ -351,7 +350,7 @@ const CalendarDateFilterPopover: React.FC<CalendarDateFilterPopoverProps> = ({
                   onClear();
                   setIsOpen(false);
                 }}
-                className="text-xs font-bold text-gray-500 hover:text-gray-700 px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                className="text-[0.875rem] font-semibold text-gray-500 hover:text-gray-700 px-2 py-1 hover:bg-gray-100 rounded-lg cursor-pointer"
               >
                 Reset
               </button>
@@ -359,14 +358,14 @@ const CalendarDateFilterPopover: React.FC<CalendarDateFilterPopoverProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="px-2.5 py-1 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                  className="px-2.5 py-1 text-[0.875rem] font-semibold text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={handleApply}
-                  className="px-3.5 py-1 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all shadow-2xs cursor-pointer"
+                  className="px-3.5 py-1 text-[0.875rem] font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-2xs cursor-pointer"
                 >
                   Apply
                 </button>
@@ -646,26 +645,6 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
       return;
     }
     try {
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-      const pageWidth = doc.internal.pageSize.getWidth();
-
-      // Header Banner
-      doc.setFillColor(30, 58, 138); // Deep Navy Blue
-      doc.rect(0, 0, pageWidth, 20, 'F');
-
-      doc.setFontSize(14);
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.text('SKBW ERP — PRODUCTION ORDERS REPORT', 14, 13);
-
-      doc.setFontSize(8.5);
-      doc.setTextColor(100, 116, 139);
-      doc.text(
-        `Generated: ${new Date().toLocaleDateString('en-IN')}  |  Total Orders: ${filteredOrders.length}`,
-        14,
-        27
-      );
-
       const tableData = filteredOrders.map((o, idx) => [
         idx + 1,
         formatOrderNo(o.orderNumber),
@@ -681,16 +660,14 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
         o.status
       ]);
 
-      autoTable(doc, {
-        head: [['#', 'Order No.', 'Item / Product', 'Code', 'Type', 'Planned', 'Produced', 'Balance', 'Progress', 'Dept', 'Due Date', 'Status']],
+      generateListPdf({
+        companyName: 'SKBW ERP',
+        title: 'Production Orders Report',
+        meta: [`Total Orders: ${filteredOrders.length}`],
+        head: ['#', 'Order No.', 'Item / Product', 'Code', 'Type', 'Planned', 'Produced', 'Balance', 'Progress', 'Dept', 'Due Date', 'Status'],
         body: tableData,
-        startY: 32,
-        styles: { fontSize: 8, cellPadding: 2.5 },
-        headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [248, 250, 252] }
+        fileName: `Production_Orders_${new Date().toISOString().slice(0, 10)}`,
       });
-
-      doc.save(`Production_Orders_${new Date().toISOString().slice(0, 10)}.pdf`);
       showToast('Exported production orders to PDF successfully!', 'success');
     } catch (e) {
       console.error(e);
@@ -699,21 +676,18 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+    <div className="min-h-[calc(100*var(--vh,1vh))] bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
       {/* 1. Header Banner (Matching Sales Orders Header Banner) */}
-      <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
+      <div className="flex flex-row items-center justify-between gap-4 px-1 relative">
         <div className="flex items-center gap-3.5">
-          <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
-            <Factory className="w-6 h-6 stroke-[2.2]" />
-          </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+            <h1 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
               <span>Production Orders</span>
-              <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold transition-all">
+              <span className="text-xs font-medium text-gray-500">
                 {orders.length} Total
               </span>
             </h1>
-            <p className="text-xs text-gray-500 font-medium">
+            <p className="text-[0.875rem] text-gray-500 font-medium">
               Unified master directory for manufacturing batches, stage-wise operations, and finished goods output.
             </p>
           </div>
@@ -723,7 +697,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
       </div>
 
       {/* 2. Top Navigation Tabs Bar (Exact match to Sales Orders tab bar) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-4 rounded-2xl shadow-2xs relative">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-1 relative">
         <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full">
           {[
             { id: 'orders', label: 'Production Orders', icon: Calendar, count: orders.length },
@@ -738,17 +712,17 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+                className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
                   active 
-                    ? 'border-teal-700 text-teal-700 bg-transparent'
+                    ? 'border-blue-700 text-blue-700 bg-transparent'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
                 }`}
               >
-                <Icon className={`w-4 h-4 ${active ? 'text-teal-700' : 'text-slate-400'}`} />
+                <Icon className={`w-4 h-4 ${active ? 'text-blue-700' : 'text-slate-400'}`} />
                 <span>{tab.label}</span>
                 {tab.count !== undefined && (
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                    active ? 'bg-teal-50 text-teal-800' : 'bg-slate-100 text-slate-700'
+                  <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
+                    active ? 'bg-blue-50 text-blue-800' : 'bg-slate-100 text-slate-700'
                   }`}>
                     {tab.count}
                   </span>
@@ -769,7 +743,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               placeholder="Search orders, items..."
-              className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-36 md:w-44 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+              className="pl-8 pr-7 py-1.5 text-[0.875rem] bg-gray-50 border border-gray-200 rounded-xl w-36 md:w-44 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
             />
             {searchTerm && (
               <button 
@@ -790,7 +764,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                 setShowSortMenu(false);
                 setShowColumnPicker(false);
               }}
-              className={`p-2 rounded-xl border transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+              className={`p-2 rounded-xl border flex items-center justify-center cursor-pointer shadow-2xs ${
                 (period !== 'All' || typeFilter !== 'All' || statusFilter !== 'All' || deptFilter !== 'All')
                   ? 'bg-blue-50 border-blue-300 text-blue-700 ring-2 ring-blue-100'
                   : 'bg-white hover:bg-blue-50/60 border-gray-200 hover:border-blue-200 text-blue-600'
@@ -800,15 +774,10 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
             >
               <Filter className="w-4 h-4 text-blue-600" />
             </button>
-            {!showFilterMenu && (
-              <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                Filter Orders
-              </div>
-            )}
             {showFilterMenu && (
-              <div className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-xs text-left">
+              <div className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-3 text-[0.875rem] text-left">
                 <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
-                  <span className="font-bold text-gray-800 text-xs">Filter Orders</span>
+                  <span className="font-semibold text-gray-800 text-[0.875rem]">Filter Orders</span>
                   {(period !== 'All' || typeFilter !== 'All' || statusFilter !== 'All' || deptFilter !== 'All') && (
                     <button
                       onClick={() => {
@@ -817,7 +786,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                         setStatusFilter('All');
                         setDeptFilter('All');
                       }}
-                      className="text-blue-600 hover:text-blue-800 text-[11px] font-bold cursor-pointer"
+                      className="text-blue-600 hover:text-blue-800 text-xs font-semibold cursor-pointer"
                     >
                       Reset All
                     </button>
@@ -826,13 +795,13 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
 
                 {/* Period */}
                 <div>
-                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Period</label>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">Period</label>
                   <div className="grid grid-cols-4 gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200">
                     {['All', '30d', '60d', '90d'].map(p => (
                       <button
                         key={p}
                         onClick={() => setPeriod(p)}
-                        className={`text-xs font-semibold py-1 rounded-lg transition-all text-center cursor-pointer ${
+                        className={`text-[0.875rem] font-semibold py-1 rounded-lg text-center cursor-pointer ${
                           period === p
                             ? 'bg-blue-600 text-white shadow-2xs'
                             : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
@@ -846,11 +815,11 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
 
                 {/* Type */}
                 <div>
-                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Type</label>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">Type</label>
                   <select
                     value={typeFilter}
                     onChange={e => setTypeFilter(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
                   >
                     <option value="All">All Types ({dynamicTypes.length})</option>
                     {dynamicTypes.map(t => (
@@ -861,11 +830,11 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
 
                 {/* Status */}
                 <div>
-                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Status</label>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">Status</label>
                   <select
                     value={statusFilter}
                     onChange={e => setStatusFilter(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
                   >
                     <option value="All">All Statuses</option>
                     <option value="In Production">In Production</option>
@@ -877,11 +846,11 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
 
                 {/* Dept */}
                 <div>
-                  <label className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block mb-1">Department</label>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">Department</label>
                   <select
                     value={deptFilter}
                     onChange={e => setDeptFilter(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 cursor-pointer"
                   >
                     <option value="All">All Departments ({dynamicDepartments.length})</option>
                     {dynamicDepartments.map(d => (
@@ -902,19 +871,14 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                 setShowFilterMenu(false);
                 setShowColumnPicker(false);
               }}
-              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
               title="Sort Order"
               aria-label="Sort Order"
             >
               <ArrowUpDown className="w-4 h-4 text-blue-600" />
             </button>
-            {!showSortMenu && (
-              <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                Sort Orders
-              </div>
-            )}
             {showSortMenu && (
-              <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs text-left">
+              <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-[0.875rem] text-left">
                 <button
                   onClick={() => { setSortField('orderNumber'); setSortAsc(false); setShowSortMenu(false); }}
                   className="w-full text-left px-2.5 py-1.5 rounded-xl font-medium hover:bg-gray-50 text-gray-700"
@@ -958,20 +922,15 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                 setShowSortMenu(false);
                 setShowFilterMenu(false);
               }}
-              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
               title="Column Visibility"
               aria-label="Column Visibility"
             >
               <Columns className="w-4 h-4 text-blue-600" />
             </button>
-            {!showColumnPicker && (
-              <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                Column Visibility
-              </div>
-            )}
             {showColumnPicker && (
-              <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2.5 space-y-1.5 text-xs text-left">
-                <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block border-b border-gray-100 pb-1">Visible Columns</span>
+              <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2.5 space-y-1.5 text-[0.875rem] text-left">
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block border-b border-gray-100 pb-1">Visible Columns</span>
                 {columns.map(col => (
                   <label key={col.id} className="flex items-center gap-2 p-1 text-gray-700 cursor-pointer hover:bg-gray-50 rounded-lg">
                     <input
@@ -994,15 +953,12 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
             <button
               type="button"
               onClick={handleExportExcel}
-              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
               title="Export to Excel Spreadsheet"
               aria-label="Export to Excel Spreadsheet"
             >
               <Download className="w-4 h-4 text-blue-600" />
             </button>
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-              Export Excel (.xlsx)
-            </div>
           </div>
 
           {/* 5. Export PDF Icon Button */}
@@ -1010,15 +966,12 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
             <button
               type="button"
               onClick={handleExportPDF}
-              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
               title="Export to PDF Report"
               aria-label="Export to PDF Report"
             >
               <FileText className="w-4 h-4 text-blue-600" />
             </button>
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-              Export PDF (.pdf)
-            </div>
           </div>
 
           {/* 6. Activity Logs Icon Button */}
@@ -1026,15 +979,12 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
             <button
               type="button"
               onClick={() => { fetchActivityLogs(); setShowActivityLogModal(true); }}
-              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
               title="View Activity Logs"
               aria-label="View Activity Logs"
             >
               <History className="w-4 h-4 text-blue-600" />
             </button>
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-              Activity Logs
-            </div>
           </div>
 
           {/* 7. Refresh Data Icon Button */}
@@ -1042,15 +992,12 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
             <button
               type="button"
               onClick={onRefresh}
-              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
               title="Refresh Data"
               aria-label="Refresh Data"
             >
               <RotateCcw className="w-4 h-4 text-blue-600" />
             </button>
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-              Refresh Data
-            </div>
           </div>
 
           {/* 9. Circular + Add Button (Matching screenshot) */}
@@ -1058,15 +1005,12 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
             <button
               type="button"
               onClick={onNewOrder}
-              className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold shrink-0"
+              className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs cursor-pointer font-semibold shrink-0"
               title="New Production Order"
               aria-label="New Production Order"
             >
               <Plus className="w-4 h-4 text-blue-600 stroke-[2.5]" />
             </button>
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-              New Production Order
-            </div>
           </div>
         </div>
       </div>
@@ -1076,33 +1020,33 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
         {/* Card 1: Total Orders */}
         <button
           onClick={() => setStatusFilter('All')}
-          className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+          className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
             statusFilter === 'All' 
               ? 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-100' 
               : 'bg-white border-gray-200/80 hover:border-gray-300'
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Orders</span>
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Orders</span>
             <span className="w-2 h-2 rounded-full bg-blue-600"></span>
           </div>
-          <p className="text-2xl font-black text-gray-900 mt-1 font-mono">{orders.length}</p>
+          <p className="text-2xl font-semibold text-gray-900 mt-1 font-mono">{orders.length}</p>
         </button>
 
         {/* Card 2: In Production */}
         <button
           onClick={() => setStatusFilter('In Production')}
-          className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+          className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
             statusFilter === 'In Production' 
               ? 'bg-amber-50/40 border-amber-400 ring-2 ring-amber-100' 
               : 'bg-white border-gray-200/80 hover:border-gray-300'
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">In Production</span>
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">In Production</span>
             <span className="w-2 h-2 rounded-full bg-amber-500"></span>
           </div>
-          <p className="text-2xl font-black text-amber-700 mt-1 font-mono">
+          <p className="text-2xl font-semibold text-amber-700 mt-1 font-mono">
             {orders.filter(o => o.status === 'In Production').length}
           </p>
         </button>
@@ -1110,17 +1054,17 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
         {/* Card 3: Planned */}
         <button
           onClick={() => setStatusFilter('Planned')}
-          className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+          className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
             statusFilter === 'Planned' 
-              ? 'bg-indigo-50/40 border-indigo-400 ring-2 ring-indigo-100' 
+              ? 'bg-blue-50/40 border-blue-400 ring-2 ring-blue-100' 
               : 'bg-white border-gray-200/80 hover:border-gray-300'
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Planned</span>
-            <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Planned</span>
+            <span className="w-2 h-2 rounded-full bg-blue-600"></span>
           </div>
-          <p className="text-2xl font-black text-indigo-700 mt-1 font-mono">
+          <p className="text-2xl font-semibold text-blue-700 mt-1 font-mono">
             {orders.filter(o => o.status === 'Planned').length}
           </p>
         </button>
@@ -1128,35 +1072,35 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
         {/* Card 4: Completed */}
         <button
           onClick={() => setStatusFilter('Completed')}
-          className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
+          className={`w-full text-left rounded-2xl shadow-2xs border p-3.5 sm:p-4 cursor-pointer focus:outline-none select-none active:scale-[0.98] ${
             statusFilter === 'Completed' 
               ? 'bg-emerald-50/40 border-emerald-400 ring-2 ring-emerald-100' 
               : 'bg-white border-gray-200/80 hover:border-gray-300'
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Completed</span>
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Completed</span>
             <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
           </div>
-          <p className="text-2xl font-black text-emerald-700 mt-1 font-mono">
+          <p className="text-2xl font-semibold text-emerald-700 mt-1 font-mono">
             {orders.filter(o => o.status === 'Completed').length}
           </p>
         </button>
 
         {/* Card 5: Target Output Qty */}
-        <div className="rounded-2xl shadow-2xs border border-gray-200/80 p-3.5 sm:p-4 bg-white transition-all duration-200 hover:border-gray-300">
+        <div className="rounded-2xl shadow-2xs border border-gray-200/80 p-3.5 sm:p-4 bg-white hover:border-gray-300">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Target Qty</span>
-            <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Target Qty</span>
+            <span className="w-2 h-2 rounded-full bg-blue-600"></span>
           </div>
-          <p className="text-2xl font-black text-purple-700 mt-1 font-mono">
+          <p className="text-2xl font-semibold text-blue-700 mt-1 font-mono">
             {orders.reduce((sum, o) => sum + (o.plannedPcs || o.plannedQuantity || 0), 0).toLocaleString('en-IN')}
           </p>
         </div>
       </div>
 
       {/* 4. Table Sub-bar: Metadata & Actions */}
-      <div className="flex items-center justify-between flex-wrap gap-2 pt-1 text-xs">
+      <div className="flex items-center justify-between flex-wrap gap-2 pt-1 text-[0.875rem]">
         <div className="font-semibold text-gray-600 flex items-center gap-2">
           <span>Showing all {filteredOrders.length} production orders</span>
           {(searchTerm || period !== 'All' || typeFilter !== 'All' || statusFilter !== 'All' || deptFilter !== 'All' || dateFilterPreset !== 'All' || customStartDate || customEndDate) && (
@@ -1172,7 +1116,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                 setSearchTerm('');
                 setCurrentPage(1);
               }}
-              className="text-blue-600 hover:text-blue-800 text-[11px] font-bold px-1.5 py-0.5 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+              className="text-blue-600 hover:text-blue-800 text-xs font-semibold px-1.5 py-0.5 hover:bg-blue-50 rounded cursor-pointer"
             >
               Clear Filters
             </button>
@@ -1191,7 +1135,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                 setCurrentPage(1);
               }}
               placeholder="Search orders, items, codes..."
-              className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-40 md:w-52 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+              className="pl-8 pr-7 py-1.5 text-[0.875rem] bg-gray-50 border border-gray-200 rounded-xl w-40 md:w-52 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
             />
             {searchTerm && (
               <button
@@ -1232,7 +1176,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
               setDeptFilter(e.target.value);
               setCurrentPage(1);
             }}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            className={`px-3 py-1.5 text-[0.875rem] font-semibold rounded-xl border cursor-pointer shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 ${
               deptFilter !== 'All'
                 ? 'bg-blue-50/80 border-blue-300 text-blue-800'
                 : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
@@ -1248,10 +1192,10 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
 
       {/* 6. Main Data Table Container */}
       <div className="bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs">
-        <div className="overflow-x-auto min-h-[380px]">
+        <div className="overflow-x-auto min-h-[23.75rem]">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider select-none">
+              <tr className="border-b border-gray-200 text-xs font-medium text-gray-600 uppercase tracking-wider select-none">
                   <th className="py-3 px-3.5 w-10 text-center">
                     <input
                       type="checkbox"
@@ -1260,10 +1204,10 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                       className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     />
                   </th>
-                  <th className="py-3 px-2 w-10 text-center font-bold">#</th>
+                  <th className="py-3 px-2 w-10 text-center font-semibold">#</th>
                   <th 
                     onClick={() => handleSort('orderNumber')} 
-                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-800"
+                    className="py-3 px-3 font-semibold cursor-pointer hover:text-gray-800"
                   >
                     <div className="flex items-center space-x-1">
                       <span>ORDER NO.</span>
@@ -1272,64 +1216,64 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                   </th>
                   <th 
                     onClick={() => handleSort('itemName')} 
-                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-800 min-w-[200px]"
+                    className="py-3 px-3 font-semibold cursor-pointer hover:text-gray-800 min-w-[12.5rem]"
                   >
                     <div className="flex items-center space-x-1">
                       <span>ITEM / PRODUCT</span>
                     </div>
                   </th>
-                  <th className="py-3 px-3 font-bold">TYPE</th>
+                  <th className="py-3 px-3 font-semibold">TYPE</th>
                   <th 
                     onClick={() => handleSort('plannedPcs')} 
-                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-800"
+                    className="py-3 px-3 font-semibold cursor-pointer hover:text-gray-800"
                   >
                     <div className="flex items-center space-x-1">
                       <span>PLANNED QTY</span>
                       <ArrowUpDown className="w-3 h-3 text-gray-400" />
                     </div>
                   </th>
-                  <th className="py-3 px-3 font-bold">PRODUCED QTY</th>
+                  <th className="py-3 px-3 font-semibold">PRODUCED QTY</th>
                   <th 
                     onClick={() => handleSort('balancePcs')} 
-                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-800"
+                    className="py-3 px-3 font-semibold cursor-pointer hover:text-gray-800"
                   >
                     <div className="flex items-center space-x-1">
                       <span>BALANCE</span>
                       <ArrowUpDown className="w-3 h-3 text-gray-400" />
                     </div>
                   </th>
-                  <th className="py-3 px-3 font-bold">
+                  <th className="py-3 px-3 font-semibold">
                     <div className="flex items-center space-x-1">
                       <span>MATERIAL</span>
                       <ArrowUpDown className="w-3 h-3 text-gray-400" />
                     </div>
                   </th>
-                  <th className="py-3 px-3 font-bold min-w-[150px]">
+                  <th className="py-3 px-3 font-semibold min-w-[9.375rem]">
                     <div className="flex items-center space-x-1">
                       <span>STATUS</span>
                       <ArrowUpDown className="w-3 h-3 text-gray-400" />
                     </div>
                   </th>
-                  <th className="py-3 px-3 font-bold">DEPARTMENT</th>
+                  <th className="py-3 px-3 font-semibold">DEPARTMENT</th>
                   <th 
                     onClick={() => handleSort('requiredCompletionDate')} 
-                    className="py-3 px-3 font-bold cursor-pointer hover:text-gray-800"
+                    className="py-3 px-3 font-semibold cursor-pointer hover:text-gray-800"
                   >
                     <div className="flex items-center space-x-1">
                       <span>DUE DATE</span>
                       <ArrowUpDown className="w-3 h-3 text-gray-400" />
                     </div>
                   </th>
-                  <th className="py-3 px-3 text-center font-bold w-28">ACTIONS</th>
+                  <th className="py-3 px-3 text-center font-semibold w-28">ACTIONS</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 text-xs">
+              <tbody className="bg-white divide-y divide-gray-100 text-[0.875rem]">
                 {paginatedOrders.length === 0 ? (
                   <tr>
                     <td colSpan={13} className="py-12 text-center text-gray-400">
                       <Package className="w-10 h-10 mx-auto text-gray-300 mb-2" />
                       <p className="font-semibold text-gray-600">No production orders found</p>
-                      <p className="text-xs text-gray-400 mt-0.5">Try adjusting your filters or click "+ New Production Order" to start a batch.</p>
+                      <p className="text-[0.875rem] text-gray-400 mt-0.5">Try adjusting your filters or click "+ New Production Order" to start a batch.</p>
                     </td>
                   </tr>
                 ) : (
@@ -1342,7 +1286,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                       <tr 
                         key={order._id}
                         onClick={() => onViewOrder(order)}
-                        className={`hover:bg-blue-50/40 transition-colors group cursor-pointer ${isSelected ? 'bg-blue-50/60' : ''}`}
+                        className={`hover:bg-blue-50/40 group cursor-pointer ${isSelected ? 'bg-blue-50/60' : ''}`}
                       >
                         {/* Checkbox */}
                         <td className="py-3.5 px-3.5 text-center" onClick={(e) => e.stopPropagation()}>
@@ -1358,10 +1302,10 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                         <td className="py-3.5 px-2 text-center font-semibold text-gray-600">{rowNumber}</td>
 
                         {/* Order No */}
-                        <td className="py-3.5 px-3 font-bold text-gray-900 whitespace-nowrap">
+                        <td className="py-3.5 px-3 font-semibold text-gray-900 whitespace-nowrap">
                           <button
                             onClick={() => onViewOrder(order)}
-                            className="hover:text-blue-600 hover:underline transition-colors text-left font-bold cursor-pointer font-mono block"
+                            className="hover:text-blue-600 hover:underline text-left font-semibold cursor-pointer font-mono block"
                           >
                             {formatOrderNo(order.orderNumber)}
                           </button>
@@ -1370,28 +1314,28 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                               href={`/sales/orders?search=${encodeURIComponent(order.reference.replace(/^Sales Order #?/, '').trim())}`}
                               onClick={(e) => e.stopPropagation()}
                               title={`Demand Source: ${order.reference}`}
-                              className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-600 hover:text-blue-800 hover:underline mt-0.5"
+                              className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline mt-0.5"
                             >
                               <ShoppingBag className="w-2.5 h-2.5 text-blue-500 shrink-0" />
-                              <span className="truncate max-w-[120px]">{order.reference}</span>
+                              <span className="truncate max-w-[7.5rem]">{order.reference}</span>
                             </a>
                           )}
                         </td>
 
                         {/* Item / Product */}
                         <td className="py-3.5 px-3">
-                          <div className="font-bold text-gray-900 leading-snug">{order.itemName}</div>
-                          <div className="text-[11px] text-gray-400 font-medium">{order.itemCode}</div>
+                          <div className="font-semibold text-gray-900 leading-snug">{order.itemName}</div>
+                          <div className="text-xs text-gray-400 font-medium">{order.itemCode}</div>
                         </td>
 
                         {/* Type badge */}
                         <td className="py-3.5 px-3 whitespace-nowrap">
                           {order.itemType === 'Finished Good' ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
                               Finished Good
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-200/60">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60">
                               Semi Finished
                             </span>
                           )}
@@ -1401,50 +1345,50 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                         <td className="py-3.5 px-3 whitespace-nowrap">
                           {isDualUom ? (
                             <div>
-                              <div className="font-bold text-gray-900">{order.plannedQty} GBL</div>
-                              <div className="text-[11px] text-gray-400 font-medium">{order.plannedPcs?.toLocaleString()} PCS</div>
+                              <div className="font-semibold text-gray-900">{order.plannedQty} GBL</div>
+                              <div className="text-xs text-gray-400 font-medium">{order.plannedPcs?.toLocaleString()} PCS</div>
                             </div>
                           ) : (
-                            <div className="font-bold text-gray-900">{order.plannedPcs?.toLocaleString()} PCS</div>
+                            <div className="font-semibold text-gray-900">{order.plannedPcs?.toLocaleString()} PCS</div>
                           )}
                         </td>
 
                         {/* Produced Qty */}
                         <td className="py-3.5 px-3 whitespace-nowrap">
                           {order.producedQty === 0 && order.producedPcs === 0 ? (
-                            <span className="font-bold text-gray-700">0</span>
+                            <span className="font-semibold text-gray-700">0</span>
                           ) : isDualUom ? (
                             <div>
-                              <div className="font-bold text-gray-900">{order.producedQty} GBL</div>
-                              <div className="text-[11px] text-gray-400 font-medium">{order.producedPcs?.toLocaleString()} PCS</div>
+                              <div className="font-semibold text-gray-900">{order.producedQty} GBL</div>
+                              <div className="text-xs text-gray-400 font-medium">{order.producedPcs?.toLocaleString()} PCS</div>
                             </div>
                           ) : (
-                            <div className="font-bold text-gray-900">{order.producedPcs?.toLocaleString()} PCS</div>
+                            <div className="font-semibold text-gray-900">{order.producedPcs?.toLocaleString()} PCS</div>
                           )}
                         </td>
 
                         {/* Balance */}
                         <td className="py-3.5 px-3 whitespace-nowrap">
                           {order.balanceQty === 0 && order.balancePcs === 0 ? (
-                            <span className="font-bold text-gray-700">0</span>
+                            <span className="font-semibold text-gray-700">0</span>
                           ) : isDualUom ? (
                             <div>
-                              <div className="font-bold text-gray-900">{order.balanceQty} GBL</div>
-                              <div className="text-[11px] text-gray-400 font-medium">{order.balancePcs?.toLocaleString()} PCS</div>
+                              <div className="font-semibold text-gray-900">{order.balanceQty} GBL</div>
+                              <div className="text-xs text-gray-400 font-medium">{order.balancePcs?.toLocaleString()} PCS</div>
                             </div>
                           ) : (
-                            <div className="font-bold text-gray-900">{order.balancePcs?.toLocaleString()} PCS</div>
+                            <div className="font-semibold text-gray-900">{order.balancePcs?.toLocaleString()} PCS</div>
                           )}
                         </td>
 
                         {/* Material badge */}
                         <td className="py-3.5 px-3 whitespace-nowrap">
                           {order.materialStatus === 'Ready' ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
                               Ready
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/60">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200/60">
                               Shortage
                             </span>
                           )}
@@ -1455,22 +1399,22 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                           <div className="flex flex-col space-y-1.5">
                             <div>
                               {order.status === 'In Production' && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200/60">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200/60">
                                   In Production
                                 </span>
                               )}
                               {order.status === 'Planned' && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/60">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60">
                                   Planned
                                 </span>
                               )}
                               {order.status === 'Completed' && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
                                   Completed
                                 </span>
                               )}
                               {order.status === 'Not Started' && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
                                   Not Started
                                 </span>
                               )}
@@ -1479,7 +1423,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                             <div className="flex items-center space-x-2">
                               <div className="w-20 bg-gray-200 rounded-full h-1.5 overflow-hidden">
                                 <div
-                                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                                  className={`h-1.5 rounded-full ${
                                     order.progress === 100 
                                       ? 'bg-blue-600' 
                                       : order.progress > 0 
@@ -1489,7 +1433,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                                   style={{ width: `${order.progress}%` }}
                                 />
                               </div>
-                              <span className="text-[10px] text-gray-400 font-semibold">{order.progress}%</span>
+                              <span className="text-xs text-gray-400 font-semibold">{order.progress}%</span>
                             </div>
                           </div>
                         </td>
@@ -1511,7 +1455,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                             <button
                               onClick={() => onViewOrder(order)}
                               title="View Details"
-                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors cursor-pointer"
+                              className="icon-btn"
                             >
                               <Eye className="w-4 h-4" />
                             </button>
@@ -1521,7 +1465,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                               <button
                                 onClick={() => onEditOrder(order)}
                                 title="Edit Production Order"
-                                className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors cursor-pointer"
+                                className="icon-btn"
                               >
                                 <Pencil className="w-4 h-4" />
                               </button>
@@ -1531,7 +1475,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                             <button
                               onClick={() => onRecordEntries(order)}
                               title="Record Production Entries"
-                              className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors cursor-pointer"
+                              className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md cursor-pointer"
                             >
                               <CheckCircle2 className="w-4 h-4" />
                             </button>
@@ -1541,7 +1485,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                               <button
                                 onClick={() => setActionMenuOrderId(actionMenuOrderId === order._id ? null : order._id)}
                                 title="More actions"
-                                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+                                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md cursor-pointer"
                               >
                                 <MoreHorizontal className="w-4 h-4" />
                               </button>
@@ -1556,7 +1500,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                                       setActionMenuOrderId(null);
                                       onViewOrder(order);
                                     }}
-                                    className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                                    className="w-full px-3 py-1.5 text-[0.875rem] text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
                                   >
                                     <Eye className="w-3.5 h-3.5 text-gray-400" />
                                     <span>View Overview</span>
@@ -1568,7 +1512,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                                         setActionMenuOrderId(null);
                                         onEditOrder(order);
                                       }}
-                                      className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                                      className="w-full px-3 py-1.5 text-[0.875rem] text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
                                     >
                                       <Pencil className="w-3.5 h-3.5 text-amber-500" />
                                       <span>Edit Order</span>
@@ -1580,7 +1524,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                                       setActionMenuOrderId(null);
                                       onRecordEntries(order);
                                     }}
-                                    className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                                    className="w-full px-3 py-1.5 text-[0.875rem] text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
                                   >
                                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                                     <span>Record Entries</span>
@@ -1591,7 +1535,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                                       setActionMenuOrderId(null);
                                       onPrintOrder(order);
                                     }}
-                                    className="w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                                    className="w-full px-3 py-1.5 text-[0.875rem] text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
                                   >
                                     <Printer className="w-3.5 h-3.5 text-blue-500" />
                                     <span>Print Order</span>
@@ -1606,7 +1550,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                                         onDeleteOrder(order._id);
                                       }
                                     }}
-                                    className="w-full px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 flex items-center space-x-2"
+                                    className="w-full px-3 py-1.5 text-[0.875rem] text-rose-600 hover:bg-rose-50 flex items-center space-x-2"
                                   >
                                     <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                                     <span>Delete Order</span>
@@ -1625,7 +1569,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
           </div>
 
           {/* Table Footer with Pagination */}
-          <div className="px-4 py-3 border-t border-gray-200/80 flex flex-wrap items-center justify-between gap-3 text-xs bg-white rounded-b-2xl text-gray-500">
+          <div className="px-4 py-3 border-t border-gray-200/80 flex flex-wrap items-center justify-between gap-3 text-[0.875rem] bg-white rounded-b-2xl text-gray-500">
             <div>
               Showing <span className="font-semibold text-gray-700">{totalOrders === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + rowsPerPage, totalOrders)}</span> of <span className="font-semibold text-gray-700">{totalOrders}</span> orders
             </div>
@@ -1639,7 +1583,7 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                     setRowsPerPage(Number(e.target.value));
                     setCurrentPage(1);
                   }}
-                  className="bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-700 focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
+                  className="bg-white border border-gray-200 rounded-lg px-2 py-1 text-[0.875rem] text-gray-700 focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
                 >
                   <option value={10}>10</option>
                   <option value={25}>25</option>
@@ -1674,16 +1618,16 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
 
       {/* Activity Log Modal */}
       {showActivityLogModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-gray-900/40 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl max-h-[calc(85*var(--vh,1vh))] flex flex-col overflow-hidden dlg-panel">
             <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
                   <History className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-gray-900 text-sm">Production Activity Log</h3>
-                  <p className="text-xs text-gray-500">Recent actions, status updates, and production order operations</p>
+                  <h3 className="font-semibold text-gray-900 text-[0.875rem]">Production Activity Log</h3>
+                  <p className="text-[0.875rem] text-gray-500">Recent actions, status updates, and production order operations</p>
                 </div>
               </div>
               <button
@@ -1696,17 +1640,17 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
 
             <div className="p-4 flex-1 overflow-y-auto space-y-3">
               {activityLogLoading ? (
-                <div className="py-12 text-center text-gray-400 text-xs">Loading activity logs...</div>
+                <div className="py-12 text-center text-gray-400 text-[0.875rem]">Loading activity logs...</div>
               ) : activityLogs.length === 0 ? (
-                <div className="py-12 text-center text-gray-400 text-xs">No activity logs recorded yet.</div>
+                <div className="py-12 text-center text-gray-400 text-[0.875rem]">No activity logs recorded yet.</div>
               ) : (
                 activityLogs.map((log: any, idx: number) => (
-                  <div key={log._id || idx} className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-xs flex items-start justify-between gap-3">
+                  <div key={log._id || idx} className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-[0.875rem] flex items-start justify-between gap-3">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-gray-900">{log.action || 'Activity'}</span>
+                        <span className="font-semibold text-gray-900">{log.action || 'Activity'}</span>
                         {log.details?.orderNumber && (
-                          <span className="text-[11px] font-mono px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200 font-semibold">
+                          <span className="text-xs font-mono px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200 font-semibold">
                             {formatOrderNo(log.details.orderNumber)}
                           </span>
                         )}
@@ -1714,11 +1658,11 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
                       <p className="text-gray-600">
                         {log.details?.item || log.details?.status || log.details?.action || log.description || 'Production record updated'}
                       </p>
-                      <div className="text-[10px] text-gray-400">
+                      <div className="text-xs text-gray-400">
                         By <span className="font-medium text-gray-600">{log.user?.name || log.userName || 'System User'}</span>
                       </div>
                     </div>
-                    <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                    <span className="text-xs text-gray-400 whitespace-nowrap">
                       {log.createdAt ? new Date(log.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'Recent'}
                     </span>
                   </div>
@@ -1726,10 +1670,10 @@ export const ProductionOrdersList: React.FC<ProductionOrdersListProps> = ({
               )}
             </div>
 
-            <div className="p-3 border-t border-gray-100 bg-gray-50 flex justify-end">
+            <div className="p-3 border-t border-gray-100 bg-gray-50 flex justify-end dlg-footer">
               <button
                 onClick={() => setShowActivityLogModal(false)}
-                className="px-4 py-1.5 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg shadow-2xs cursor-pointer"
+                className="px-4 py-1.5 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 text-[0.875rem] font-semibold rounded-lg shadow-2xs cursor-pointer"
               >
                 Close
               </button>

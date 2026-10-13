@@ -55,7 +55,7 @@ export const DispatchSuccessModal: React.FC<DispatchSuccessModalProps> = ({
       onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full overflow-hidden"
+        className="bg-white w-full overflow-hidden dlg-panel"
         style={{ maxWidth: 580, maxHeight: '92vh', margin: '0 16px' }}
         onMouseDown={e => e.stopPropagation()}
       >
@@ -63,7 +63,7 @@ export const DispatchSuccessModal: React.FC<DispatchSuccessModalProps> = ({
         <div className="flex justify-end p-4 pb-0">
           <button
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -87,18 +87,18 @@ export const DispatchSuccessModal: React.FC<DispatchSuccessModalProps> = ({
                 <CheckCircle2 className="w-9 h-9 text-white stroke-[2.5]" />
               </div>
             </div>
-            <h2 className="text-xl font-black text-emerald-700 tracking-tight">Dispatch Created Successfully!</h2>
-            <p className="text-xs text-gray-500 mt-1.5">Dispatch has been saved and stock has been updated.</p>
+            <h2 className="text-xl font-semibold text-emerald-700 tracking-tight">Dispatch Created Successfully!</h2>
+            <p className="text-[0.875rem] text-gray-500 mt-1.5">Dispatch has been saved and stock has been updated.</p>
           </div>
 
           {/* ── Meta Info Strip */}
           <div className="grid grid-cols-4 gap-2 bg-gray-50 border border-gray-200 rounded-xl p-4">
             <MetaItem icon={<Package className="w-3.5 h-3.5 text-blue-600" />} label="Dispatch No." value={dcNumber} mono />
             <MetaItem icon={<FileText className="w-3.5 h-3.5 text-blue-600" />} label="Sales Order" value={orderNumber} mono />
-            <MetaItem icon={<span className="text-blue-600 text-xs">📅</span>} label="Dispatch Date" value={dateStr} />
+            <MetaItem icon={<span className="text-blue-600 text-[0.875rem]">📅</span>} label="Dispatch Date" value={dateStr} />
             <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Status</p>
-              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Status</p>
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${
                 isPartial
                   ? 'bg-amber-50 text-amber-700 border-amber-200'
                   : 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -114,7 +114,7 @@ export const DispatchSuccessModal: React.FC<DispatchSuccessModalProps> = ({
               <div className="w-5 h-5 rounded-md bg-blue-600 text-white flex items-center justify-center">
                 <Truck className="w-3 h-3" />
               </div>
-              <span className="text-[11px] font-black text-gray-800 uppercase tracking-wider">Dispatch Summary (This Dispatch)</span>
+              <span className="text-xs font-medium text-gray-800 uppercase tracking-wider">Dispatch Summary (This Dispatch)</span>
             </div>
             <div className="grid grid-cols-3 divide-x divide-blue-100 p-0">
               <SummaryCard
@@ -142,13 +142,13 @@ export const DispatchSuccessModal: React.FC<DispatchSuccessModalProps> = ({
           <div className="border border-gray-200 rounded-xl overflow-hidden">
             <div className="bg-blue-50/50 px-4 py-2.5 border-b border-blue-100 flex items-center gap-2">
               <div className="w-5 h-5 rounded-md bg-blue-600 text-white flex items-center justify-center">
-                <span className="text-[10px] font-black">✦</span>
+                <span className="text-xs font-semibold">✦</span>
               </div>
-              <span className="text-[11px] font-black text-gray-800 uppercase tracking-wider">Items Dispatched</span>
+              <span className="text-xs font-medium text-gray-800 uppercase tracking-wider">Items Dispatched</span>
             </div>
-            <table className="w-full text-xs">
+            <table className="doc-table w-full text-[0.875rem]">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-100 text-[10px] font-black text-gray-500 uppercase tracking-wider">
+                <tr className="bg-gray-50 border-b border-gray-100 text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <th className="py-2 px-4 w-8 text-center">#</th>
                   <th className="py-2 px-4">Item Code</th>
                   <th className="py-2 px-4">Item Name</th>
@@ -159,15 +159,15 @@ export const DispatchSuccessModal: React.FC<DispatchSuccessModalProps> = ({
               <tbody className="divide-y divide-gray-50">
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-4 text-center text-gray-400 text-xs">No items</td>
+                    <td colSpan={5} className="py-4 text-center text-gray-400 text-[0.875rem]">No items</td>
                   </tr>
                 ) : (
                   items.map((item: any, idx: number) => (
                     <tr key={idx} className="hover:bg-gray-50/50">
                       <td className="py-2.5 px-4 text-center text-gray-400 font-semibold">{idx + 1}</td>
-                      <td className="py-2.5 px-4 font-mono font-bold text-gray-700">{item.skuCode || item.itemId || '—'}</td>
+                      <td className="py-2.5 px-4 font-mono font-semibold text-gray-700">{item.skuCode || item.itemId || '—'}</td>
                       <td className="py-2.5 px-4 font-semibold text-gray-900">{item.itemName}</td>
-                      <td className="py-2.5 px-4 text-right font-bold font-mono text-blue-700">{Number(item.deliveredQty) || 0}</td>
+                      <td className="py-2.5 px-4 text-right font-semibold font-mono text-blue-700">{Number(item.deliveredQty) || 0}</td>
                       <td className="py-2.5 px-4 text-right font-mono text-gray-600">
                         {(Number(item.deliveredPcs) || Number(item.deliveredQty) || 0).toLocaleString()}
                       </td>
@@ -183,14 +183,14 @@ export const DispatchSuccessModal: React.FC<DispatchSuccessModalProps> = ({
             <div className="border border-amber-200 rounded-xl overflow-hidden">
               <div className="bg-amber-50/60 px-4 py-2.5 border-b border-amber-100 flex items-center gap-2">
                 <div className="w-5 h-5 rounded-md bg-amber-500 text-white flex items-center justify-center">
-                  <span className="text-[10px] font-black">!</span>
+                  <span className="text-xs font-semibold">!</span>
                 </div>
-                <span className="text-[11px] font-black text-gray-800 uppercase tracking-wider">Remaining Pending (After Dispatch)</span>
+                <span className="text-xs font-medium text-gray-800 uppercase tracking-wider">Remaining Pending (After Dispatch)</span>
               </div>
               {remainingItems.length > 0 ? (
-                <table className="w-full text-xs">
+                <table className="doc-table w-full text-[0.875rem]">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100 text-[10px] font-black text-gray-500 uppercase tracking-wider">
+                    <tr className="bg-gray-50 border-b border-gray-100 text-xs font-medium text-gray-500 uppercase tracking-wider">
                       <th className="py-2 px-4 w-8 text-center">#</th>
                       <th className="py-2 px-4">Item Code</th>
                       <th className="py-2 px-4">Item Name</th>
@@ -202,16 +202,16 @@ export const DispatchSuccessModal: React.FC<DispatchSuccessModalProps> = ({
                     {remainingItems.map((ri, idx) => (
                       <tr key={idx} className="hover:bg-amber-50/30">
                         <td className="py-2.5 px-4 text-center text-gray-400 font-semibold">{idx + 1}</td>
-                        <td className="py-2.5 px-4 font-mono font-bold text-gray-700">{ri.itemCode}</td>
+                        <td className="py-2.5 px-4 font-mono font-semibold text-gray-700">{ri.itemCode}</td>
                         <td className="py-2.5 px-4 font-semibold text-gray-900">{ri.itemName}</td>
-                        <td className="py-2.5 px-4 text-right font-bold font-mono text-amber-700">{ri.remainingGbl}</td>
+                        <td className="py-2.5 px-4 text-right font-semibold font-mono text-amber-700">{ri.remainingGbl}</td>
                         <td className="py-2.5 px-4 text-right font-mono text-amber-600">{ri.remainingPcs.toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : (
-                <div className="py-4 px-4 text-center text-xs text-amber-600 font-medium">
+                <div className="py-4 px-4 text-center text-[0.875rem] text-amber-600 font-medium">
                   {remainingGbl} GBL ({remainingPcs.toLocaleString()} PCS) remaining across all items
                 </div>
               )}
@@ -220,16 +220,16 @@ export const DispatchSuccessModal: React.FC<DispatchSuccessModalProps> = ({
         </div>
 
         {/* ── Footer */}
-        <div className="px-6 py-3.5 border-t border-gray-200 bg-gray-50/60 flex items-center justify-between shrink-0">
+        <div className="px-6 py-3.5 border-t border-gray-200 bg-gray-50/60 flex items-center justify-between shrink-0 dlg-footer">
           <button
             onClick={onClose}
-            className="px-5 py-2 text-xs font-bold text-gray-600 bg-white border border-gray-200 hover:bg-gray-100 rounded-xl cursor-pointer transition-colors"
+            className="btn-secondary"
           >
             Close
           </button>
             <button
               onClick={handlePrint}
-              className="px-4 py-2 text-xs font-bold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50 rounded-xl cursor-pointer transition-colors flex items-center gap-1.5"
+              className="px-4 py-2 text-[0.875rem] font-semibold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50 rounded-xl cursor-pointer flex items-center gap-1.5"
             >
               <Printer className="w-3.5 h-3.5" />
               Print Delivery Challan
@@ -237,7 +237,7 @@ export const DispatchSuccessModal: React.FC<DispatchSuccessModalProps> = ({
             {onViewDetails && (
               <button
                 onClick={onViewDetails}
-                className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl cursor-pointer transition-colors flex items-center gap-1.5 shadow-sm shadow-blue-200"
+                className="btn-primary"
               >
                 View Dispatch Details
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -265,9 +265,9 @@ function MetaItem({
     <div>
       <div className="flex items-center gap-1 mb-1">
         {icon}
-        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{label}</p>
+        <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">{label}</p>
       </div>
-      <p className={`font-black text-sm text-gray-900 ${mono ? 'font-mono' : ''}`}>{value}</p>
+      <p className={`font-semibold text-[0.875rem] text-gray-900 ${mono ? 'font-mono' : ''}`}>{value}</p>
     </div>
   );
 }
@@ -286,9 +286,9 @@ function SummaryCard({
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="font-black text-base text-gray-900 leading-tight">{primary}</p>
-        <p className="text-[11px] font-bold text-blue-600 leading-tight">{sub}</p>
-        <p className="text-[11px] text-gray-500 font-medium mt-0.5 truncate">{label}</p>
+        <p className="font-semibold text-base text-gray-900 leading-tight">{primary}</p>
+        <p className="text-xs font-semibold text-blue-600 leading-tight">{sub}</p>
+        <p className="text-xs text-gray-500 font-medium mt-0.5 truncate">{label}</p>
       </div>
     </div>
   );

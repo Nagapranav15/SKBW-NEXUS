@@ -553,7 +553,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
       padding="p-0"
       hideCloseButton={true}
     >
-      <form onSubmit={handleSubmit} className="flex flex-col h-[90vh] max-h-[920px] bg-slate-50 font-sans select-none overflow-hidden rounded-2xl shadow-2xl">
+      <form onSubmit={handleSubmit} className="flex flex-col h-[calc(90*var(--vh,1vh))] max-h-[57.5rem] bg-slate-50 font-sans select-none overflow-hidden rounded-2xl shadow-2xl">
         
         {/* ── 1. VOUCHER TOP HEADER ── */}
         <div className="px-4 py-2.5 bg-white border-b border-blue-200 flex items-center justify-between shrink-0 shadow-3xs">
@@ -563,13 +563,13 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-mono font-bold text-xs sm:text-sm tracking-wider text-blue-900 bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-200">
+                <span className="font-mono font-semibold text-[0.875rem] sm:text-[0.875rem] tracking-wider text-blue-900 bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-200">
                   {voucherNumber}
                 </span>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-900 font-bold border border-blue-200 uppercase tracking-wider">
+                <span className="text-[0.875rem] px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-900 font-medium border border-blue-200 uppercase tracking-wider">
                   Stock Transfer Voucher
                 </span>
-                <span className="hidden sm:inline-block text-[11px] text-slate-500 font-medium">
+                <span className="hidden sm:inline-block text-xs text-slate-500 font-medium">
                   Inter-Godown Transfer Journal
                 </span>
               </div>
@@ -577,14 +577,14 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 text-xs">
+            <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 text-[0.875rem]">
               <Calendar className="w-3.5 h-3.5 text-slate-500" />
-              <span className="text-slate-600 font-bold uppercase text-[11px]">Date:</span>
+              <span className="text-slate-600 font-semibold uppercase text-xs">Date:</span>
               <input 
                 type="date" 
                 value={voucherDate} 
                 onChange={e => setVoucherDate(e.target.value)}
-                className="bg-transparent text-slate-900 font-mono text-xs focus:outline-none cursor-pointer font-bold"
+                className="bg-transparent text-slate-900 font-mono text-[0.875rem] focus:outline-none cursor-pointer font-semibold"
               />
             </div>
 
@@ -592,7 +592,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
               type="button"
               onClick={() => selectedSkuId && fetchLiveStock(selectedSkuId)}
               disabled={isLoadingStock}
-              className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer border border-slate-200"
+              className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer border border-slate-200"
               title="Refresh live stock balances"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoadingStock ? 'animate-spin text-blue-600' : ''}`} />
@@ -601,7 +601,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all cursor-pointer"
+              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -610,48 +610,48 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
 
         {/* ── 2. SKU / ITEM MASTER SELECTOR BAR ── */}
         <div className="px-4 py-2.5 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
-          <div className="relative flex-1 min-w-[280px] max-w-xl" ref={skuDropdownRef}>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+          <div className="relative flex-1 min-w-[17.5rem] max-w-xl" ref={skuDropdownRef}>
+            <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
               Select Item / Material to Transfer:
             </label>
             <div 
               onClick={() => setIsSkuDropdownOpen(!isSkuDropdownOpen)}
-              className="px-3.5 py-2 bg-slate-50 hover:bg-white border border-slate-300 hover:border-blue-500 rounded-xl cursor-pointer flex items-center justify-between gap-2 transition-all shadow-3xs"
+              className="px-3.5 py-2 bg-slate-50 hover:bg-white border border-slate-300 hover:border-blue-500 rounded-xl cursor-pointer flex items-center justify-between gap-2 shadow-3xs"
             >
               {selectedSku ? (
                 <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
-                  <span className="font-mono text-xs font-bold text-blue-900 bg-blue-100/80 px-2 py-0.5 rounded border border-blue-200 shrink-0">
+                  <span className="font-mono text-[0.875rem] font-semibold text-blue-900 bg-blue-100/80 px-2 py-0.5 rounded border border-blue-200 shrink-0">
                     {selectedSku.skuCode}
                   </span>
-                  <span className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                  <span className="text-[0.875rem] sm:text-[0.875rem] font-semibold text-slate-900 truncate">
                     {selectedSku.name}
                   </span>
-                  <span className="text-[10px] font-bold text-slate-500 bg-slate-200/80 px-2 py-0.5 rounded-full uppercase shrink-0">
+                  <span className="text-xs font-semibold text-slate-500 bg-slate-200/80 px-2 py-0.5 rounded-full uppercase shrink-0">
                     {selectedSku.category || 'General'}
                   </span>
                   {getSkuSpecOrConversion(selectedSku) && (
-                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 shrink-0 hidden sm:inline-block">
+                    <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 shrink-0 hidden sm:inline-block">
                       {getSkuSpecOrConversion(selectedSku)}
                     </span>
                   )}
                 </div>
               ) : (
-                <div className="flex items-center gap-2 text-slate-400 text-xs sm:text-sm">
+                <div className="flex items-center gap-2 text-slate-400 text-[0.875rem] sm:text-[0.875rem]">
                   <Search className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>Search &amp; Select Item / Material to Transfer...</span>
                 </div>
               )}
-              <ChevronDown className={`w-4 h-4 text-slate-500 shrink-0 transition-transform ${isSkuDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-4 h-4 text-slate-500 shrink-0 ${isSkuDropdownOpen ? 'rotate-180' : ''}`} />
             </div>
 
             {/* Dropdown Menu Popover with Finishes, Raw, Semi Filter Chips & Card List */}
             {isSkuDropdownOpen && (
-              <div className="absolute top-full left-0 mt-1 w-full min-w-[340px] sm:min-w-[560px] md:min-w-[620px] bg-white border border-slate-200 rounded-2xl shadow-2xl z-[999] overflow-hidden flex flex-col max-h-[420px] animate-in fade-in zoom-in-95">
+              <div className="absolute top-full left-0 mt-1 w-full min-w-[21.25rem] sm:min-w-[35rem] md:min-w-[38.75rem] bg-white border border-slate-200 rounded-2xl shadow-2xl z-[999] overflow-hidden flex flex-col max-h-[26.25rem]">
                 
                 {/* Popover Header: Canonical Category Filters (Finishes, Semi, Raw) & Fast Search */}
-                <div className="sticky top-0 bg-white/95 backdrop-blur-xs p-2.5 border-b border-slate-100 z-10 space-y-2 shadow-3xs">
+                <div className="sticky top-0 bg-white/95 p-2.5 border-b border-slate-100 z-10 space-y-2 shadow-3xs">
                   {/* Category Title & Count */}
-                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                  <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
                     <span className="flex items-center gap-1.5">
                       <Tag className="w-3 h-3 text-blue-600" />
                       <span className="uppercase tracking-wider">Item Classification:</span>
@@ -666,7 +666,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setItemTypeFilter('ALL')}
-                      className={`px-3 py-1 rounded-full text-[10.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                      className={`px-3 py-1 rounded-full text-xs font-semibold shrink-0 cursor-pointer ${
                         itemTypeFilter === 'ALL'
                           ? 'bg-blue-600 text-white shadow-3xs'
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -677,7 +677,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setItemTypeFilter('FINISHED')}
-                      className={`px-3 py-1 rounded-full text-[10.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                      className={`px-3 py-1 rounded-full text-xs font-semibold shrink-0 cursor-pointer ${
                         itemTypeFilter === 'FINISHED'
                           ? 'bg-blue-600 text-white shadow-3xs'
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -688,7 +688,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setItemTypeFilter('SEMI')}
-                      className={`px-3 py-1 rounded-full text-[10.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                      className={`px-3 py-1 rounded-full text-xs font-semibold shrink-0 cursor-pointer ${
                         itemTypeFilter === 'SEMI'
                           ? 'bg-blue-600 text-white shadow-3xs'
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -699,7 +699,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setItemTypeFilter('RAW')}
-                      className={`px-3 py-1 rounded-full text-[10.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                      className={`px-3 py-1 rounded-full text-xs font-semibold shrink-0 cursor-pointer ${
                         itemTypeFilter === 'RAW'
                           ? 'bg-blue-600 text-white shadow-3xs'
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -717,7 +717,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                       value={skuSearchQuery}
                       onChange={e => setSkuSearchQuery(e.target.value)}
                       placeholder="Type SKU code, item name, or brand..."
-                      className="w-full pl-8 pr-7 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                      className="w-full pl-8 pr-7 py-1.5 text-[0.875rem] bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
                       autoFocus
                     />
                     {skuSearchQuery && (
@@ -733,7 +733,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                 </div>
 
                 {/* Items Card List Matching Design */}
-                <div className="overflow-y-auto max-h-[300px] p-2 space-y-1.5">
+                <div className="overflow-y-auto max-h-[18.75rem] p-2 space-y-1.5">
                   {displayedSkus.map(s => {
                     const isSelected = s._id === selectedSkuId;
                     const specBadge = getSkuSpecOrConversion(s);
@@ -744,20 +744,20 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                           setSelectedSkuId(s._id);
                           setIsSkuDropdownOpen(false);
                         }}
-                        className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between text-xs ${
+                        className={`p-2.5 rounded-xl border cursor-pointer flex items-center justify-between text-[0.875rem] ${
                           isSelected
-                            ? 'bg-blue-100/70 border-blue-200 text-blue-950 font-bold shadow-3xs'
+                            ? 'bg-blue-100/70 border-blue-200 text-blue-950 font-semibold shadow-3xs'
                             : 'bg-white border-slate-200/90 hover:border-slate-300 hover:bg-slate-50/80 text-slate-800'
                         }`}
                       >
                         <div className="flex-1 min-w-0 pr-3">
                           {/* Top Row: Item Name */}
-                          <div className="font-bold text-slate-900 text-xs sm:text-[13px] leading-snug break-words">
+                          <div className="font-semibold text-slate-900 text-[0.875rem] sm:text-[0.875rem] leading-snug break-words">
                             {s.name}
                           </div>
 
                           {/* Bottom Row: SKU Code • Category/Brand • Spec/Conversion (e.g. 300 Pcs/GBL) */}
-                          <div className="flex items-center gap-1.5 mt-1 text-[11px] font-medium flex-wrap">
+                          <div className="flex items-center gap-1.5 mt-1 text-xs font-medium flex-wrap">
                             <span className="font-mono text-slate-400 font-semibold">{s.skuCode}</span>
                             <span className="text-slate-300">•</span>
                             <span className="text-slate-500 font-semibold uppercase">
@@ -766,7 +766,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                             {specBadge && (
                               <>
                                 <span className="text-slate-300">•</span>
-                                <span className="font-bold text-blue-600 font-mono">{specBadge}</span>
+                                <span className="font-semibold text-blue-600 font-mono">{specBadge}</span>
                               </>
                             )}
                           </div>
@@ -774,7 +774,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
 
                         {/* Right: Active Status Badge */}
                         <div className="shrink-0 flex items-center">
-                          <span className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase rounded-full border bg-emerald-50 text-emerald-600 border-emerald-200">
+                          <span className="px-2.5 py-0.5 text-xs font-semibold uppercase rounded-full border bg-emerald-50 text-emerald-600 border-emerald-200">
                             {s.status || 'Active'}
                           </span>
                         </div>
@@ -783,7 +783,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                   })}
 
                   {filteredSkus.length === 0 && (
-                    <div className="p-6 text-center text-xs text-slate-400 italic">
+                    <div className="p-6 text-center text-[0.875rem] text-slate-400 italic">
                       No items found matching &ldquo;{skuSearchQuery}&rdquo; in {itemTypeFilter !== 'ALL' ? itemTypeFilter.toLowerCase() : 'all categories'}.
                     </div>
                   )}
@@ -795,14 +795,14 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
           {/* Live SKU Summary Stats */}
           <div className="flex items-center gap-3 shrink-0">
             <div className="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 flex flex-col text-right">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Company Stock</span>
-              <div className="flex items-baseline gap-1 font-mono font-bold text-xs sm:text-sm text-slate-900">
+              <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Company Stock</span>
+              <div className="flex items-baseline gap-1 font-mono font-semibold text-[0.875rem] sm:text-[0.875rem] text-slate-900">
                 {selectedSku ? (
                   <>
                     <span>{totalCompanyStock.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-                    <span className="text-xs text-slate-600">{unit}</span>
+                    <span className="text-[0.875rem] text-slate-600">{unit}</span>
                     {totalCompanyStockAlt && (
-                      <span className="text-[11px] text-blue-700 font-semibold ml-1">({totalCompanyStockAlt})</span>
+                      <span className="text-xs text-blue-700 font-semibold ml-1">({totalCompanyStockAlt})</span>
                     )}
                   </>
                 ) : (
@@ -812,15 +812,15 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
             </div>
 
             <div className="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 flex flex-col text-right">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Godowns with Stock</span>
-              <span className="font-mono font-bold text-xs sm:text-sm text-blue-800">
+              <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Godowns with Stock</span>
+              <span className="font-mono font-semibold text-[0.875rem] sm:text-[0.875rem] text-blue-800">
                 {selectedSku ? `${godownsWithStock.length} Godown${godownsWithStock.length === 1 ? '' : 's'}` : '-'}
               </span>
             </div>
 
             <div className="bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 flex flex-col text-right">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Valuation Rate</span>
-              <span className="font-mono font-bold text-xs sm:text-sm text-slate-900">
+              <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Valuation Rate</span>
+              <span className="font-mono font-semibold text-[0.875rem] sm:text-[0.875rem] text-slate-900">
                 {selectedSku ? (
                   `₹${Number(selectedSku.avgCost || selectedSku.costPrice || selectedSku.standardCost || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${unit}`
                 ) : (
@@ -841,19 +841,19 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
             {/* Header */}
             <div className="px-3.5 py-2.5 bg-gradient-to-r from-blue-50 to-slate-50 border-b border-blue-200 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded bg-blue-600 text-white flex items-center justify-center text-[10px] font-black">
+                <div className="w-5 h-5 rounded bg-blue-600 text-white flex items-center justify-center text-xs font-semibold">
                   OUT
                 </div>
                 <div>
-                  <h3 className="text-xs font-black text-blue-950 uppercase tracking-wider">
+                  <h3 className="text-[0.875rem] font-medium text-blue-950 uppercase tracking-wider">
                     Source Godown (Transfer Out / Dispatch)
                   </h3>
-                  <p className="text-[10px] text-slate-500">Pick where stock will be deducted from</p>
+                  <p className="text-xs text-slate-500">Pick where stock will be deducted from</p>
                 </div>
               </div>
 
               {activeSourceGodown && (
-                <div className="flex items-center gap-1.5 bg-blue-100/70 border border-blue-200 px-2.5 py-0.5 rounded-md text-xs font-bold text-blue-900 font-mono">
+                <div className="flex items-center gap-1.5 bg-blue-100/70 border border-blue-200 px-2.5 py-0.5 rounded-md text-[0.875rem] font-semibold text-blue-900 font-mono">
                   <span>Avail:</span>
                   <span>{sourceAvailableQty.toLocaleString('en-IN', { maximumFractionDigits: 2 })} {unit}</span>
                 </div>
@@ -866,15 +866,15 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                 <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center border border-blue-100 shadow-3xs">
                   <Box className="w-6 h-6 stroke-[1.8]" />
                 </div>
-                <p className="text-xs sm:text-sm font-bold text-slate-700">Select an Item to Transfer</p>
-                <p className="text-[11px] text-slate-400 max-w-xs leading-relaxed">
+                <p className="text-[0.875rem] sm:text-[0.875rem] font-semibold text-slate-700">Select an Item to Transfer</p>
+                <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
                   Choose an item from the top selector to view godowns and available stock layers.
                 </p>
               </div>
             ) : (
               <>
                 <div className="p-3 border-b border-slate-100 bg-slate-50/60 shrink-0 space-y-2">
-                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                  <label className="block text-xs font-medium text-slate-600 uppercase tracking-wider">
                     Select Source Godown with In-Stock Balances:
                   </label>
 
@@ -886,9 +886,9 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                           <div
                             key={g.locationId}
                             onClick={() => setSourceLocationId(g.locationId)}
-                            className={`p-2 rounded-lg border cursor-pointer transition-all flex items-center justify-between text-xs ${
+                            className={`p-2 rounded-lg border cursor-pointer flex items-center justify-between text-[0.875rem] ${
                               isSelected 
-                                ? 'bg-blue-50 border-blue-400 text-blue-950 ring-1 ring-blue-400 font-bold' 
+                                ? 'bg-blue-50 border-blue-400 text-blue-950 ring-1 ring-blue-400 font-semibold' 
                                 : 'bg-white border-slate-200 hover:border-slate-300 text-slate-800'
                             }`}
                           >
@@ -896,20 +896,20 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                               <Building2 className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-blue-600' : 'text-slate-400'}`} />
                               <div className="truncate">
                                 <div className="truncate">{g.locationName}</div>
-                                <div className="text-[10px] text-slate-500 truncate font-normal">{g.hierarchyPath}</div>
+                                <div className="text-xs text-slate-500 truncate font-normal">{g.hierarchyPath}</div>
                               </div>
                             </div>
 
                             <div className="text-right shrink-0 ml-2 font-mono">
-                              <div className="font-bold text-blue-900">{g.onHand.toLocaleString('en-IN', { maximumFractionDigits: 2 })} {unit}</div>
-                              <div className="text-[10px] text-slate-500 font-normal">₹{g.stockValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+                              <div className="font-semibold text-blue-900">{g.onHand.toLocaleString('en-IN', { maximumFractionDigits: 2 })} {unit}</div>
+                              <div className="text-xs text-slate-500 font-normal">₹{g.stockValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
                             </div>
                           </div>
                         );
                       })}
                     </div>
                   ) : (
-                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs flex items-center gap-2">
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[0.875rem] flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
                       <span>No godown currently holds stock for this item. Please select an item that has on-hand balance.</span>
                     </div>
@@ -919,7 +919,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
             {/* Source Batches / Reels Breakdown Table */}
             <div className="flex-1 flex flex-col p-3 overflow-hidden min-h-0">
               <div className="flex items-center justify-between mb-1.5 shrink-0">
-                <span className="text-[11px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="text-xs font-medium text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                   <Package className="w-3.5 h-3.5 text-blue-600" />
                   <span>Available Batches & Stock Layers</span>
                 </span>
@@ -927,7 +927,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                 <button
                   type="button"
                   onClick={handleFifoAutoAllocate}
-                  className="px-2 py-0.5 text-[10px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 rounded border border-blue-200 transition-colors flex items-center gap-1 cursor-pointer"
+                  className="px-2 py-0.5 text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 rounded border border-blue-200 flex items-center gap-1 cursor-pointer"
                 >
                   <Sparkles className="w-3 h-3 text-blue-600" />
                   <span>FIFO Allocate</span>
@@ -937,18 +937,18 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
               {/* Reels Mode if SKU has reels */}
               {hasReels ? (
                 <div className="flex-1 border border-slate-200 rounded-lg overflow-y-auto">
-                  <div className="bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 uppercase tracking-wider border-b border-slate-200 flex items-center justify-between">
+                  <div className="bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 uppercase tracking-wider border-b border-slate-200 flex items-center justify-between">
                     <span>Individual Reels at Source Godown ({availableSourceReels.length} available)</span>
-                    <span className="font-mono text-blue-700 font-bold">Selected: {selectedReelsWeight} {unit}</span>
+                    <span className="font-mono text-blue-700 font-semibold">Selected: {selectedReelsWeight} {unit}</span>
                   </div>
-                  <div className="divide-y divide-slate-100 text-xs">
+                  <div className="divide-y divide-slate-100 text-[0.875rem]">
                     {availableSourceReels.map(r => {
                       const isSel = selectedReelIds.has(r.id || r.reelNumber);
                       return (
                         <div 
                           key={r.id || r.reelNumber}
                           onClick={() => handleToggleReel(r.id || r.reelNumber)}
-                          className={`p-2 flex items-center justify-between cursor-pointer transition-colors ${
+                          className={`p-2 flex items-center justify-between cursor-pointer ${
                             isSel ? 'bg-blue-50 font-semibold text-blue-950' : 'hover:bg-slate-50 text-slate-800'
                           }`}
                         >
@@ -959,12 +959,12 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                               onChange={() => {}} 
                               className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
                             />
-                            <span className="font-mono font-bold">{r.reelNumber}</span>
-                            <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-mono">
+                            <span className="font-mono font-semibold">{r.reelNumber}</span>
+                            <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-mono">
                               Batch: {r.batchNumber}
                             </span>
                           </div>
-                          <div className="font-mono font-bold text-blue-900">
+                          <div className="font-mono font-semibold text-blue-900">
                             {r.weight} {unit}
                           </div>
                         </div>
@@ -975,8 +975,8 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
               ) : (
                 /* Regular Batches Table */
                 <div className="flex-1 border border-slate-200 rounded-lg overflow-y-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead className="bg-slate-100 text-slate-600 sticky top-0 z-10 font-mono text-[10px] uppercase tracking-wider border-b border-slate-200">
+                  <table className="w-full text-left text-[0.875rem] border-collapse">
+                    <thead className="bg-slate-100 text-slate-600 sticky top-0 z-10 font-mono text-xs uppercase tracking-wider border-b border-slate-200">
                       <tr>
                         <th className="py-1.5 px-2 w-8 text-center">Sel</th>
                         <th className="py-1.5 px-2">Batch / Lot #</th>
@@ -986,7 +986,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                         <th className="py-1.5 px-2 text-right">Amount</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 text-xs">
+                    <tbody className="divide-y divide-slate-100 text-[0.875rem]">
                       {batchRows.map((row, idx) => {
                         const lineAmount = row.transferQty * row.rate;
                         return (
@@ -1003,10 +1003,10 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                               />
                             </td>
                             <td className="py-1.5 px-2">
-                              <div className="font-mono font-bold text-slate-900 truncate max-w-[130px]" title={row.batchNumber}>
+                              <div className="font-mono font-semibold text-slate-900 truncate max-w-[8.125rem]" title={row.batchNumber}>
                                 {row.batchNumber}
                               </div>
-                              <div className="text-[10px] text-slate-400 font-mono">
+                              <div className="text-xs text-slate-400 font-mono">
                                 Ref: {row.reference}
                               </div>
                             </td>
@@ -1023,12 +1023,12 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                                   value={row.transferQty === 0 && !row.selected ? '' : row.transferQty}
                                   onChange={e => handleBatchQtyChange(idx, parseFloat(e.target.value) || 0)}
                                   placeholder="0"
-                                  className="w-16 px-1.5 py-1 text-right font-mono text-xs font-bold bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-600"
+                                  className="w-16 px-1.5 py-1 text-right font-mono text-[0.875rem] font-semibold bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-600"
                                 />
                                 <button
                                   type="button"
                                   onClick={() => handleMaxBatchQty(idx)}
-                                  className="px-1 py-0.5 text-[9px] font-bold bg-slate-200 hover:bg-slate-300 text-slate-700 rounded transition-colors cursor-pointer"
+                                  className="px-1 py-0.5 text-xs font-semibold bg-slate-200 hover:bg-slate-300 text-slate-700 rounded cursor-pointer"
                                   title="Allocate entire batch"
                                 >
                                   MAX
@@ -1038,7 +1038,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                             <td className="py-1.5 px-2 text-right font-mono text-slate-600">
                               ₹{row.rate.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                             </td>
-                            <td className="py-1.5 px-2 text-right font-mono font-bold text-slate-900">
+                            <td className="py-1.5 px-2 text-right font-mono font-semibold text-slate-900">
                               ₹{lineAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                             </td>
                           </tr>
@@ -1046,7 +1046,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                       })}
                       {batchRows.length === 0 && (
                         <tr>
-                          <td colSpan={6} className="py-6 text-center text-xs text-slate-400">
+                          <td colSpan={6} className="py-6 text-center text-[0.875rem] text-slate-400">
                             No batches available at this source location.
                           </td>
                         </tr>
@@ -1057,9 +1057,9 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
               )}
 
               {/* Source Outward Subtotal */}
-              <div className="mt-2 pt-2 border-t border-slate-200 flex items-center justify-between text-xs shrink-0">
+              <div className="mt-2 pt-2 border-t border-slate-200 flex items-center justify-between text-[0.875rem] shrink-0">
                 <span className="text-slate-500 font-medium">Source Deductions:</span>
-                <div className="flex items-center gap-3 font-mono font-bold">
+                <div className="flex items-center gap-3 font-mono font-semibold">
                   <span className="text-blue-900">
                     Total: {totalTransferQty.toLocaleString('en-IN', { maximumFractionDigits: 2 })} {unit}
                   </span>
@@ -1081,18 +1081,18 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
             {/* Header */}
             <div className="px-3.5 py-2.5 bg-gradient-to-r from-emerald-50 to-slate-50 border-b border-emerald-200 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black">
+                <div className="w-5 h-5 rounded bg-emerald-600 text-white flex items-center justify-center text-xs font-semibold">
                   IN
                 </div>
                 <div>
-                  <h3 className="text-xs font-black text-emerald-950 uppercase tracking-wider">
+                  <h3 className="text-[0.875rem] font-medium text-emerald-950 uppercase tracking-wider">
                     Destination Godown (Transfer In / Receipt)
                   </h3>
-                  <p className="text-[10px] text-slate-500">Pick destination where stock will be received</p>
+                  <p className="text-xs text-slate-500">Pick destination where stock will be received</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 bg-emerald-100/70 border border-emerald-200 px-2.5 py-0.5 rounded-md text-xs font-bold text-emerald-900 font-mono">
+              <div className="flex items-center gap-1.5 bg-emerald-100/70 border border-emerald-200 px-2.5 py-0.5 rounded-md text-[0.875rem] font-semibold text-emerald-900 font-mono">
                 <span>Inward:</span>
                 <span>+{totalTransferQty.toLocaleString('en-IN', { maximumFractionDigits: 2 })} {unit}</span>
               </div>
@@ -1101,7 +1101,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
             {/* Destination Godown Selection Area */}
             <div className="p-3 border-b border-slate-100 bg-slate-50/60 shrink-0 space-y-2">
               <div className="flex items-center justify-between">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                <label className="block text-xs font-medium text-slate-600 uppercase tracking-wider">
                   Select Destination Location:
                 </label>
                 <LocationSelectPopup
@@ -1126,19 +1126,19 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
               </div>
 
               {/* Hierarchy Breadcrumb Display Card */}
-              <div className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center justify-between text-xs">
+              <div className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center justify-between text-[0.875rem]">
                 <div className="flex items-center gap-2 overflow-hidden">
                   <MapPin className={`w-4 h-4 shrink-0 ${destLocationId ? 'text-emerald-600' : 'text-slate-400'}`} />
                   <div className="truncate">
-                    <span className={`font-bold block truncate ${destLocationId ? 'text-slate-900' : 'text-slate-400 italic'}`}>
+                    <span className={`font-semibold block truncate ${destLocationId ? 'text-slate-900' : 'text-slate-400 italic'}`}>
                       {destLocationId ? (locationMetaMap.get(destLocationId)?.name || 'Destination Godown') : 'Select destination godown...'}
                     </span>
                     {destLocationId ? (
-                      <span className="text-[10px] text-slate-500 font-mono truncate block">
+                      <span className="text-xs text-slate-500 font-mono truncate block">
                         {getHierarchyBreadcrumb(destLocationId)}
                       </span>
                     ) : (
-                      <span className="text-[10px] text-slate-400 font-mono truncate block">
+                      <span className="text-xs text-slate-400 font-mono truncate block">
                         Click picker above to choose destination
                       </span>
                     )}
@@ -1146,7 +1146,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                 </div>
 
                 {isSameLocation && (
-                  <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 shrink-0">
+                  <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 shrink-0">
                     Cannot be identical to source!
                   </span>
                 )}
@@ -1155,27 +1155,27 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
 
             {/* Stock Impact Analysis Card */}
             <div className="p-3 border-b border-slate-100 bg-emerald-50/30 shrink-0">
-              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-2">
+              <span className="text-xs font-medium text-slate-600 uppercase tracking-wider block mb-2">
                 Destination Stock Impact Analysis:
               </span>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="bg-white p-2 rounded-lg border border-slate-200">
-                  <span className="text-[10px] text-slate-500 block uppercase font-bold">Current Stock</span>
-                  <span className="font-mono font-bold text-xs sm:text-sm text-slate-800">
+                  <span className="text-xs text-slate-500 block uppercase font-semibold">Current Stock</span>
+                  <span className="font-mono font-semibold text-[0.875rem] sm:text-[0.875rem] text-slate-800">
                     {destLocationId ? `${destCurrentStock.toLocaleString('en-IN', { maximumFractionDigits: 2 })} ${unit}` : '-'}
                   </span>
                 </div>
 
                 <div className="bg-emerald-50/80 p-2 rounded-lg border border-emerald-300">
-                  <span className="text-[10px] text-emerald-700 block uppercase font-bold">Transfer Inward</span>
-                  <span className="font-mono font-bold text-xs sm:text-sm text-emerald-800">
+                  <span className="text-xs text-emerald-700 block uppercase font-semibold">Transfer Inward</span>
+                  <span className="font-mono font-semibold text-[0.875rem] sm:text-[0.875rem] text-emerald-800">
                     {totalTransferQty > 0 ? `+${totalTransferQty.toLocaleString('en-IN', { maximumFractionDigits: 2 })} ${unit}` : '0'}
                   </span>
                 </div>
 
                 <div className="bg-white p-2 rounded-lg border border-blue-200">
-                  <span className="text-[10px] text-blue-700 block uppercase font-bold">Projected Stock</span>
-                  <span className="font-mono font-bold text-xs sm:text-sm text-blue-900">
+                  <span className="text-xs text-blue-700 block uppercase font-semibold">Projected Stock</span>
+                  <span className="font-mono font-semibold text-[0.875rem] sm:text-[0.875rem] text-blue-900">
                     {destLocationId ? `${projectedDestStock.toLocaleString('en-IN', { maximumFractionDigits: 2 })} ${unit}` : '-'}
                   </span>
                 </div>
@@ -1184,14 +1184,14 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
 
             {/* Inward Batches Preview Table */}
             <div className="flex-1 flex flex-col p-3 overflow-hidden min-h-0">
-              <span className="text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5 shrink-0">
+              <span className="text-xs font-medium text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5 shrink-0">
                 <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Inward Receipt Lot Breakdown</span>
               </span>
 
               <div className="flex-1 border border-slate-200 rounded-lg overflow-y-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-slate-100 text-slate-600 sticky top-0 z-10 font-mono text-[10px] uppercase tracking-wider border-b border-slate-200">
+                <table className="w-full text-left text-[0.875rem] border-collapse">
+                  <thead className="bg-slate-100 text-slate-600 sticky top-0 z-10 font-mono text-xs uppercase tracking-wider border-b border-slate-200">
                     <tr>
                       <th className="py-1.5 px-2">Batch / Lot #</th>
                       <th className="py-1.5 px-2 text-right">Inward Qty</th>
@@ -1199,26 +1199,26 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
                       <th className="py-1.5 px-2 text-right">Value</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 text-xs">
+                  <tbody className="divide-y divide-slate-100 text-[0.875rem]">
                     {batchRows.filter(b => b.selected && b.transferQty > 0).map((b, idx) => (
                       <tr key={b.batchNumber + idx} className="hover:bg-slate-50">
-                        <td className="py-1.5 px-2 font-mono font-bold text-slate-900">
+                        <td className="py-1.5 px-2 font-mono font-semibold text-slate-900">
                           {b.batchNumber}
                         </td>
-                        <td className="py-1.5 px-2 text-right font-mono font-bold text-emerald-700">
+                        <td className="py-1.5 px-2 text-right font-mono font-semibold text-emerald-700">
                           +{b.transferQty.toLocaleString('en-IN', { maximumFractionDigits: 2 })} {unit}
                         </td>
                         <td className="py-1.5 px-2 text-right font-mono text-slate-600">
                           ₹{b.rate.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                         </td>
-                        <td className="py-1.5 px-2 text-right font-mono font-bold text-slate-900">
+                        <td className="py-1.5 px-2 text-right font-mono font-semibold text-slate-900">
                           ₹{(b.transferQty * b.rate).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                         </td>
                       </tr>
                     ))}
                     {batchRows.filter(b => b.selected && b.transferQty > 0).length === 0 && (
                       <tr>
-                        <td colSpan={4} className="py-6 text-center text-xs text-slate-400">
+                        <td colSpan={4} className="py-6 text-center text-[0.875rem] text-slate-400">
                           No items allocated yet. Select batches from the left pane.
                         </td>
                       </tr>
@@ -1228,9 +1228,9 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
               </div>
 
               {/* Destination Inward Subtotal */}
-              <div className="mt-2 pt-2 border-t border-slate-200 flex items-center justify-between text-xs shrink-0">
+              <div className="mt-2 pt-2 border-t border-slate-200 flex items-center justify-between text-[0.875rem] shrink-0">
                 <span className="text-slate-500 font-medium">Destination Addition:</span>
-                <div className="flex items-center gap-3 font-mono font-bold">
+                <div className="flex items-center gap-3 font-mono font-semibold">
                   <span className="text-emerald-800">
                     Total: +{totalTransferQty.toLocaleString('en-IN', { maximumFractionDigits: 2 })} {unit}
                   </span>
@@ -1247,8 +1247,8 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
         {/* ── 4. BOTTOM VOUCHER SUMMARY & ACTIONS BAR ── */}
         <div className="p-3 bg-white border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-lg">
           {/* Narration Input */}
-          <div className="flex-1 min-w-[280px] max-w-xl flex items-center gap-2">
-            <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider shrink-0">
+          <div className="flex-1 min-w-[17.5rem] max-w-xl flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-600 uppercase tracking-wider shrink-0">
               Remarks:
             </span>
             <input
@@ -1256,21 +1256,21 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
               value={remarks}
               onChange={e => setRemarks(e.target.value)}
               placeholder="Enter transfer purpose, requisition reference, or narration..."
-              className="flex-1 px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              className="flex-1 px-3 py-1.5 text-[0.875rem] bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
           {/* Metrics & Submit Buttons */}
           <div className="flex items-center gap-3">
             {/* Summary metrics pill */}
-            <div className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 flex items-center gap-3 text-xs">
+            <div className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 flex items-center gap-3 text-[0.875rem]">
               <div className="flex items-center gap-1">
                 <span className="text-slate-500 font-medium">Transfer Qty:</span>
-                <span className="font-mono font-bold text-blue-900">
+                <span className="font-mono font-semibold text-blue-900">
                   {totalTransferQty.toLocaleString('en-IN', { maximumFractionDigits: 2 })} {unit}
                 </span>
                 {totalTransferAltUnit && (
-                  <span className="text-[11px] font-semibold text-slate-600">({totalTransferAltUnit})</span>
+                  <span className="text-xs font-semibold text-slate-600">({totalTransferAltUnit})</span>
                 )}
               </div>
 
@@ -1278,7 +1278,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
 
               <div className="flex items-center gap-1">
                 <span className="text-slate-500 font-medium">Value:</span>
-                <span className="font-mono font-bold text-slate-900">
+                <span className="font-mono font-semibold text-slate-900">
                   ₹{totalTransferValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
@@ -1289,7 +1289,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-3.5 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl border border-slate-200 transition-all cursor-pointer"
+              className="px-3.5 py-1.5 text-[0.875rem] font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl border border-slate-200 cursor-pointer"
             >
               Cancel
             </button>
@@ -1298,9 +1298,9 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
             <button
               type="submit"
               disabled={!canSubmit}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer ${
+              className={`px-4 py-1.5 rounded-xl text-[0.875rem] font-semibold flex items-center gap-2 shadow-sm cursor-pointer ${
                 canSubmit
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 active:scale-95'
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200'
                   : 'bg-slate-200 text-slate-400 cursor-not-allowed'
               }`}
             >

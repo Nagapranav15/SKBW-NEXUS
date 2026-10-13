@@ -109,20 +109,20 @@ const InventoryBalanceV2: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-3xs">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+          <h1 className="text-xl font-semibold text-gray-900 tracking-tight flex items-center gap-2">
             <Coins className="w-5 h-5 text-blue-600 animate-pulse-slow" />
             Inventory Balances (v2)
           </h1>
-          <p className="text-xs text-gray-500 mt-0.5">Calculated stock on hand, reserved levels, and estimated valuation by location</p>
+          <p className="text-[0.875rem] text-gray-500 mt-0.5">Calculated stock on hand, reserved levels, and estimated valuation by location</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right shrink-0">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Estimated Value</span>
-            <span className="text-base font-black text-emerald-700">₹{totalValue.toLocaleString('en-IN')}</span>
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block">Total Estimated Value</span>
+            <span className="text-base font-semibold text-emerald-700">₹{totalValue.toLocaleString('en-IN')}</span>
           </div>
           <button
             onClick={loadBalances}
-            className="p-2 text-gray-600 hover:bg-gray-50 border border-gray-200 rounded-xl transition-colors bg-white shadow-3xs"
+            className="p-2 text-gray-600 hover:bg-gray-50 border border-gray-200 rounded-xl bg-white shadow-3xs"
             title="Reload Balances"
           >
             <RefreshCw className="w-4 h-4" />
@@ -133,19 +133,19 @@ const InventoryBalanceV2: React.FC = () => {
       {/* Filters Toolbar */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-3xs p-4 flex flex-col sm:flex-row gap-3">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input
             type="text"
             placeholder="Search by SKU Code, SKU Name, or Location..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-gray-50/50 focus:bg-white transition-colors text-gray-900"
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 bg-gray-50/50 focus:bg-white text-gray-900"
           />
         </div>
         <select
           value={categoryFilter}
           onChange={e => setCategoryFilter(e.target.value)}
-          className="w-full sm:w-48 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-700"
+          className="w-full sm:w-48 px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 bg-white text-gray-700"
         >
           <option value="">All Categories</option>
           <option value="Raw Material">Raw Material</option>
@@ -162,9 +162,9 @@ const InventoryBalanceV2: React.FC = () => {
           </div>
         ) : sortedBalances.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full text-left text-[0.875rem] border-collapse">
               <thead>
-                <tr className="bg-gray-50 text-gray-500 uppercase font-bold border-b border-gray-100 select-none">
+                <tr className="bg-gray-50 text-gray-500 uppercase font-semibold border-b border-gray-100 select-none">
                   {[
                     { label: 'SKU Details', key: 'skuName', align: 'text-left' },
                     { label: 'Category', key: 'category', align: 'text-center' },
@@ -178,7 +178,7 @@ const InventoryBalanceV2: React.FC = () => {
                     <th
                       key={col.key}
                       onClick={() => handleSort(col.key)}
-                      className={`px-6 py-3 ${col.align} cursor-pointer hover:bg-gray-100/50 transition-colors`}
+                      className={`px-6 py-3 ${col.align} cursor-pointer hover:bg-gray-100/50`}
                     >
                       <div className={`flex items-center space-x-1 ${col.align === 'text-center' ? 'justify-center' : col.align === 'text-right' ? 'justify-end' : ''}`}>
                         <span>{col.label}</span>
@@ -204,13 +204,13 @@ const InventoryBalanceV2: React.FC = () => {
                   const status = onHandQty <= 0 ? 'Out of Stock' : onHandQty <= minStock ? 'Low Stock' : 'Normal';
 
                   return (
-                    <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                    <tr key={i} className="hover:bg-gray-50/50">
                       <td className="px-6 py-3.5">
-                        <p className="font-bold text-gray-900">{formatSkuName(b.sku?.name || '')}</p>
-                        <p className="font-mono text-[9px] text-gray-400 mt-0.5">{b.sku?.skuCode}</p>
+                        <p className="font-semibold text-gray-900">{formatSkuName(b.sku?.name || '')}</p>
+                        <p className="font-mono text-xs text-gray-400 mt-0.5">{b.sku?.skuCode}</p>
                       </td>
                       <td className="px-6 py-3.5 text-center">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold inline-block ${
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold inline-block ${
                           b.sku?.category === 'Raw Material' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
                           b.sku?.category === 'Semi Finished' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
                           'bg-emerald-50 text-emerald-700 border border-emerald-100'
@@ -220,32 +220,32 @@ const InventoryBalanceV2: React.FC = () => {
                       </td>
                       <td className="px-6 py-3.5">
                         <p className="font-semibold text-gray-700">{b.location?.name}</p>
-                        <p className="text-[10px] text-gray-400 uppercase font-medium">{b.location?.level}</p>
+                        <p className="text-xs text-gray-400 uppercase font-medium">{b.location?.level}</p>
                       </td>
-                      <td className="px-6 py-3.5 text-right font-black text-blue-600">
-                        {available.toLocaleString()} <span className="text-[10px] text-gray-400 font-medium font-mono">{b.sku?.unit}</span>
+                      <td className="px-6 py-3.5 text-right font-semibold text-blue-600">
+                        {available.toLocaleString()} <span className="text-xs text-gray-400 font-medium font-mono">{b.sku?.unit}</span>
                       </td>
-                      <td className="px-6 py-3.5 text-right font-bold text-gray-400">
-                        {reserved.toLocaleString()} <span className="text-[10px] text-gray-400 font-medium font-mono">{b.sku?.unit}</span>
+                      <td className="px-6 py-3.5 text-right font-semibold text-gray-400">
+                        {reserved.toLocaleString()} <span className="text-xs text-gray-400 font-medium font-mono">{b.sku?.unit}</span>
                       </td>
-                      <td className="px-6 py-3.5 text-right font-black text-gray-900">
-                        {onHandQty.toLocaleString()} <span className="text-[10px] text-gray-400 font-medium font-mono">{b.sku?.unit}</span>
+                      <td className="px-6 py-3.5 text-right font-semibold text-gray-900">
+                        {onHandQty.toLocaleString()} <span className="text-xs text-gray-400 font-medium font-mono">{b.sku?.unit}</span>
                       </td>
                       <td className="px-6 py-3.5 text-right font-medium text-gray-600">₹{cost}</td>
-                      <td className="px-6 py-3.5 text-right font-black text-emerald-700">₹{val.toLocaleString('en-IN')}</td>
+                      <td className="px-6 py-3.5 text-right font-semibold text-emerald-700">₹{val.toLocaleString('en-IN')}</td>
                       <td className="px-6 py-3.5 text-center">
                         {status === 'Normal' && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded font-extrabold uppercase bg-emerald-50 text-emerald-700 inline-flex items-center gap-0.5 border border-emerald-100">
+                          <span className="text-xs px-1.5 py-0.5 rounded font-semibold uppercase bg-emerald-50 text-emerald-700 inline-flex items-center gap-0.5 border border-emerald-100">
                             <CheckCircle className="w-2.5 h-2.5" /> Normal
                           </span>
                         )}
                         {status === 'Low Stock' && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded font-extrabold uppercase bg-amber-50 text-amber-700 inline-flex items-center gap-0.5 border border-amber-100">
+                          <span className="text-xs px-1.5 py-0.5 rounded font-semibold uppercase bg-amber-50 text-amber-700 inline-flex items-center gap-0.5 border border-amber-100">
                             <AlertTriangle className="w-2.5 h-2.5" /> Low Stock
                           </span>
                         )}
                         {status === 'Out of Stock' && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded font-extrabold uppercase bg-rose-50 text-rose-700 inline-flex items-center gap-0.5 border border-rose-100">
+                          <span className="text-xs px-1.5 py-0.5 rounded font-semibold uppercase bg-rose-50 text-rose-700 inline-flex items-center gap-0.5 border border-rose-100">
                             <AlertCircle className="w-2.5 h-2.5" /> Out of Stock
                           </span>
                         )}
@@ -259,8 +259,8 @@ const InventoryBalanceV2: React.FC = () => {
         ) : (
           <div className="text-center py-16 text-gray-400">
             <Coins className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-            <p className="text-sm font-semibold">No stock balances found</p>
-            <p className="text-xs text-gray-500 mt-1">Stock balances will compile here automatically from the ledger records.</p>
+            <p className="text-[0.875rem] font-semibold">No stock balances found</p>
+            <p className="text-[0.875rem] text-gray-500 mt-1">Stock balances will compile here automatically from the ledger records.</p>
           </div>
         )}
       </div>

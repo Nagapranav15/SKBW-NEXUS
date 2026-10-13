@@ -471,7 +471,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
       size="max-w-6xl"
       padding="p-0"
     >
-      <form onSubmit={handleSubmit} className="flex flex-col h-[90vh] bg-slate-50 text-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+      <form onSubmit={handleSubmit} className="flex flex-col h-[calc(90*var(--vh,1vh))] bg-slate-50 text-slate-800 rounded-2xl overflow-hidden shadow-2xl">
         
         {/* ── 1. VOUCHER HEADER ── */}
         <div className="px-5 py-3.5 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
@@ -483,13 +483,13 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+                <h2 className="text-[0.875rem] sm:text-base font-semibold text-slate-900 tracking-tight">
                   Stock Adjustment
                 </h2>
-                <span className="font-mono text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
+                <span className="font-mono text-xs font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
                   {voucherNumber}
                 </span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
                   adjustmentType === 'INCREASE' 
                     ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
                     : 'bg-rose-50 text-rose-800 border-rose-200'
@@ -497,7 +497,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                   {adjustmentType === 'INCREASE' ? '+ INWARD ADDITION' : '- OUTWARD DEDUCTION'}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 font-medium">
+              <p className="text-xs text-slate-500 font-medium">
                 Physical count reconciliation, discrepancy correction, and inventory revaluation.
               </p>
             </div>
@@ -505,13 +505,13 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
 
           <div className="flex items-center gap-2.5">
             {/* Voucher Date */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-xs">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-[0.875rem]">
               <Calendar className="w-3.5 h-3.5 text-slate-400" />
               <input
                 type="date"
                 value={voucherDate}
                 onChange={e => setVoucherDate(e.target.value)}
-                className="bg-transparent text-slate-700 font-mono text-xs focus:outline-none cursor-pointer"
+                className="bg-transparent text-slate-700 font-mono text-[0.875rem] focus:outline-none cursor-pointer"
               />
             </div>
 
@@ -519,7 +519,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl cursor-pointer"
               aria-label="Close"
             >
               <X className="w-4 h-4" />
@@ -535,7 +535,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
             <div className="flex items-center gap-2">
               <div 
                 onClick={() => setIsSkuDropdownOpen(!isSkuDropdownOpen)}
-                className={`flex-1 p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                className={`flex-1 p-2.5 rounded-xl border cursor-pointer flex items-center justify-between ${
                   isSkuDropdownOpen 
                     ? 'border-blue-500 ring-2 ring-blue-100 bg-white' 
                     : selectedSku 
@@ -545,30 +545,30 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
               >
                 {selectedSku ? (
                   <div className="flex items-center gap-3 overflow-hidden">
-                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-2xs">
+                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-semibold text-[0.875rem] shrink-0 shadow-2xs">
                       <Box className="w-4 h-4" />
                     </div>
                     <div className="truncate">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 text-xs truncate">{selectedSku.name}</span>
-                        <span className="font-mono text-[10px] font-bold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded shrink-0">
+                        <span className="font-semibold text-slate-900 text-[0.875rem] truncate">{selectedSku.name}</span>
+                        <span className="font-mono text-xs font-semibold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded shrink-0">
                           {selectedSku.skuCode}
                         </span>
                         {selectedSku.brand && (
-                          <span className="text-[10px] font-semibold text-slate-500 shrink-0">
+                          <span className="text-xs font-semibold text-slate-500 shrink-0">
                             • {selectedSku.brand}
                           </span>
                         )}
                       </div>
-                      <div className="text-[10.5px] text-slate-500 font-medium flex items-center gap-2">
+                      <div className="text-xs text-slate-500 font-medium flex items-center gap-2">
                         <span>{getSkuSpecOrConversion(selectedSku)}</span>
                         <span>•</span>
-                        <span className="font-bold text-slate-700">Primary Unit: {unit}</span>
+                        <span className="font-semibold text-slate-700">Primary Unit: {unit}</span>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 text-slate-400 text-xs">
+                  <div className="flex items-center gap-2 text-slate-400 text-[0.875rem]">
                     <Search className="w-4 h-4 text-slate-400" />
                     <span className="font-medium">Search & Select Item / Material to Adjust...</span>
                   </div>
@@ -585,13 +585,13 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                         setQuantity('');
                         setBatchNumber('');
                       }}
-                      className="p-1 hover:bg-slate-200 text-slate-400 hover:text-slate-600 rounded-lg transition-colors cursor-pointer"
+                      className="p-1 hover:bg-slate-200 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
                       title="Clear Selection"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
                   )}
-                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isSkuDropdownOpen ? 'rotate-180 text-blue-600' : ''}`} />
+                  <ChevronDown className={`w-4 h-4 text-slate-400 ${isSkuDropdownOpen ? 'rotate-180 text-blue-600' : ''}`} />
                 </div>
               </div>
 
@@ -603,7 +603,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                     setAdjustmentType('INCREASE');
                     setReason('Physical Count Excess');
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-[0.875rem] font-semibold flex items-center gap-1.5 cursor-pointer ${
                     adjustmentType === 'INCREASE'
                       ? 'bg-emerald-600 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
@@ -618,7 +618,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                     setAdjustmentType('DECREASE');
                     setReason('Physical Count Shortage');
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-[0.875rem] font-semibold flex items-center gap-1.5 cursor-pointer ${
                     adjustmentType === 'DECREASE'
                       ? 'bg-rose-600 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
@@ -632,7 +632,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
 
             {/* ── DROPDOWN POPUP WITH CATEGORY TABS ── */}
             {isSkuDropdownOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[420px]">
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[26.25rem]">
                 
                 {/* Search & Category Filter Header */}
                 <div className="p-2.5 border-b border-slate-100 bg-slate-50 space-y-2">
@@ -645,7 +645,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                       placeholder="Type SKU name, code, or brand..."
                       value={skuSearchQuery}
                       onChange={e => setSkuSearchQuery(e.target.value)}
-                      className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full pl-8 pr-3 py-1.5 text-[0.875rem] bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
 
@@ -654,14 +654,14 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setItemTypeFilter('ALL')}
-                      className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-colors cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-md cursor-pointer flex items-center gap-1.5 ${
                         itemTypeFilter === 'ALL'
                           ? 'bg-blue-600 text-white shadow-xs'
                           : 'bg-white text-slate-600 hover:bg-slate-200/70 border border-slate-200'
                       }`}
                     >
                       <span>All</span>
-                      <span className={`text-[9px] px-1 rounded ${itemTypeFilter === 'ALL' ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                      <span className={`text-xs px-1 rounded ${itemTypeFilter === 'ALL' ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-500'}`}>
                         {counts.ALL}
                       </span>
                     </button>
@@ -669,14 +669,14 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setItemTypeFilter('FINISHED')}
-                      className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-colors cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-md cursor-pointer flex items-center gap-1.5 ${
                         itemTypeFilter === 'FINISHED'
                           ? 'bg-blue-600 text-white shadow-xs'
                           : 'bg-white text-slate-600 hover:bg-slate-200/70 border border-slate-200'
                       }`}
                     >
                       <span>Finishes</span>
-                      <span className={`text-[9px] px-1 rounded ${itemTypeFilter === 'FINISHED' ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                      <span className={`text-xs px-1 rounded ${itemTypeFilter === 'FINISHED' ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-500'}`}>
                         {counts.FINISHED}
                       </span>
                     </button>
@@ -684,14 +684,14 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setItemTypeFilter('SEMI')}
-                      className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-colors cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-md cursor-pointer flex items-center gap-1.5 ${
                         itemTypeFilter === 'SEMI'
                           ? 'bg-blue-600 text-white shadow-xs'
                           : 'bg-white text-slate-600 hover:bg-slate-200/70 border border-slate-200'
                       }`}
                     >
                       <span>Semi</span>
-                      <span className={`text-[9px] px-1 rounded ${itemTypeFilter === 'SEMI' ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                      <span className={`text-xs px-1 rounded ${itemTypeFilter === 'SEMI' ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-500'}`}>
                         {counts.SEMI}
                       </span>
                     </button>
@@ -699,14 +699,14 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setItemTypeFilter('RAW')}
-                      className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-colors cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-md cursor-pointer flex items-center gap-1.5 ${
                         itemTypeFilter === 'RAW'
                           ? 'bg-blue-600 text-white shadow-xs'
                           : 'bg-white text-slate-600 hover:bg-slate-200/70 border border-slate-200'
                       }`}
                     >
                       <span>Raw</span>
-                      <span className={`text-[9px] px-1 rounded ${itemTypeFilter === 'RAW' ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                      <span className={`text-xs px-1 rounded ${itemTypeFilter === 'RAW' ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-500'}`}>
                         {counts.RAW}
                       </span>
                     </button>
@@ -728,18 +728,18 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                           setQuantity('');
                           setBatchNumber('');
                         }}
-                        className={`p-2.5 cursor-pointer transition-colors flex items-center justify-between text-xs ${
-                          isSelected ? 'bg-blue-50/80 font-bold' : 'hover:bg-slate-50'
+                        className={`p-2.5 cursor-pointer flex items-center justify-between text-[0.875rem] ${
+                          isSelected ? 'bg-blue-50/80 font-semibold' : 'hover:bg-slate-50'
                         }`}
                       >
                         <div className="min-w-0 pr-3">
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-900 truncate">{s.name}</span>
-                            <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 shrink-0">
+                            <span className="font-semibold text-slate-900 truncate">{s.name}</span>
+                            <span className="text-xs font-semibold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 shrink-0">
                               ACTIVE
                             </span>
                           </div>
-                          <div className="text-[10px] text-slate-500 font-medium flex items-center gap-1.5 truncate mt-0.5">
+                          <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate mt-0.5">
                             <span className="font-mono text-slate-700">{s.skuCode}</span>
                             {s.brand && <span>• {s.brand}</span>}
                             {specStr && <span>• {specStr}</span>}
@@ -757,14 +757,14 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                   })}
 
                   {displayedSkus.length === 0 && (
-                    <div className="p-6 text-center text-slate-400 text-xs">
+                    <div className="p-6 text-center text-slate-400 text-[0.875rem]">
                       No matching items found.
                     </div>
                   )}
                 </div>
 
                 {/* Dropdown Footer Status */}
-                <div className="p-2 bg-slate-50 border-t border-slate-100 text-[10px] text-slate-500 text-right font-medium">
+                <div className="p-2 bg-slate-50 border-t border-slate-100 text-xs text-slate-500 text-right font-medium">
                   Showing {displayedSkus.length} of {filteredSkus.length} items
                 </div>
 
@@ -784,19 +784,19 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
             {/* Header */}
             <div className="px-3.5 py-2.5 bg-gradient-to-r from-blue-50 to-slate-50 border-b border-blue-200 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded bg-blue-600 text-white flex items-center justify-center text-[10px] font-black">
+                <div className="w-5 h-5 rounded bg-blue-600 text-white flex items-center justify-center text-xs font-semibold">
                   <Building2 className="w-3.5 h-3.5" />
                 </div>
                 <div>
-                  <h3 className="text-xs font-black text-blue-950 uppercase tracking-wider">
+                  <h3 className="text-[0.875rem] font-medium text-blue-950 uppercase tracking-wider">
                     Godown & Stock Layers
                   </h3>
-                  <p className="text-[10px] text-slate-500">Select godown location to adjust balances</p>
+                  <p className="text-xs text-slate-500">Select godown location to adjust balances</p>
                 </div>
               </div>
 
               {activeGodown && (
-                <div className="flex items-center gap-1.5 bg-blue-100/70 border border-blue-200 px-2.5 py-0.5 rounded-md text-xs font-bold text-blue-900 font-mono">
+                <div className="flex items-center gap-1.5 bg-blue-100/70 border border-blue-200 px-2.5 py-0.5 rounded-md text-[0.875rem] font-semibold text-blue-900 font-mono">
                   <span>Current:</span>
                   <span>{currentAvailableQty.toLocaleString('en-IN', { maximumFractionDigits: 2 })} {unit}</span>
                 </div>
@@ -809,8 +809,8 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                 <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center border border-blue-100 shadow-3xs">
                   <Box className="w-6 h-6 stroke-[1.8]" />
                 </div>
-                <p className="text-xs sm:text-sm font-bold text-slate-700">Select an Item to Adjust</p>
-                <p className="text-[11px] text-slate-400 max-w-xs leading-relaxed">
+                <p className="text-[0.875rem] sm:text-[0.875rem] font-semibold text-slate-700">Select an Item to Adjust</p>
+                <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
                   Choose an item from the top selector to inspect godown balances, batches, and record physical reconciliation.
                 </p>
               </div>
@@ -818,7 +818,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
               <>
                 {/* Godowns List */}
                 <div className="p-3 border-b border-slate-100 bg-slate-50/60 shrink-0 space-y-2">
-                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                  <label className="block text-xs font-medium text-slate-600 uppercase tracking-wider">
                     Select Godown:
                   </label>
 
@@ -830,9 +830,9 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                           <div
                             key={g.locationId}
                             onClick={() => setSelectedLocationId(g.locationId)}
-                            className={`p-2 rounded-lg border cursor-pointer transition-all flex items-center justify-between text-xs ${
+                            className={`p-2 rounded-lg border cursor-pointer flex items-center justify-between text-[0.875rem] ${
                               isSelected 
-                                ? 'bg-blue-50 border-blue-400 text-blue-950 ring-1 ring-blue-400 font-bold' 
+                                ? 'bg-blue-50 border-blue-400 text-blue-950 ring-1 ring-blue-400 font-semibold' 
                                 : 'bg-white border-slate-200 hover:border-slate-300 text-slate-800'
                             }`}
                           >
@@ -840,20 +840,20 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                               <Building2 className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-blue-600' : 'text-slate-400'}`} />
                               <div className="truncate">
                                 <div className="truncate">{g.locationName}</div>
-                                <div className="text-[10px] text-slate-500 truncate font-normal">{g.hierarchyPath}</div>
+                                <div className="text-xs text-slate-500 truncate font-normal">{g.hierarchyPath}</div>
                               </div>
                             </div>
 
                             <div className="text-right shrink-0 ml-2 font-mono">
-                              <div className="font-bold text-blue-900">{g.onHand.toLocaleString('en-IN', { maximumFractionDigits: 2 })} {unit}</div>
-                              <div className="text-[10px] text-slate-500 font-normal">₹{g.stockValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+                              <div className="font-semibold text-blue-900">{g.onHand.toLocaleString('en-IN', { maximumFractionDigits: 2 })} {unit}</div>
+                              <div className="text-xs text-slate-500 font-normal">₹{g.stockValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
                             </div>
                           </div>
                         );
                       })}
                     </div>
                   ) : (
-                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs flex items-center gap-2">
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[0.875rem] flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
                       <span>No godowns found for this item.</span>
                     </div>
@@ -863,21 +863,21 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                 {/* Available Batches at this Godown */}
                 <div className="flex-1 flex flex-col p-3 overflow-hidden min-h-0">
                   <div className="flex items-center justify-between mb-1.5 shrink-0">
-                    <span className="text-[11px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-xs font-medium text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                       <Package className="w-3.5 h-3.5 text-blue-600" />
                       <span>Existing Batches & Lots at Godown</span>
                     </span>
                   </div>
 
                   {isLoadingStock ? (
-                    <div className="flex-1 flex items-center justify-center text-slate-400 text-xs gap-2">
+                    <div className="flex-1 flex items-center justify-center text-slate-400 text-[0.875rem] gap-2">
                       <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
                       <span>Loading batch breakdown...</span>
                     </div>
                   ) : (
                     <div className="flex-1 overflow-y-auto border border-slate-200 rounded-lg bg-white min-h-0">
                       <table className="w-full text-left border-collapse">
-                        <thead className="bg-slate-100 text-slate-600 sticky top-0 z-10 font-mono text-[10px] uppercase tracking-wider border-b border-slate-200">
+                        <thead className="bg-slate-100 text-slate-600 sticky top-0 z-10 font-mono text-xs uppercase tracking-wider border-b border-slate-200">
                           <tr>
                             <th className="py-1.5 px-2">Batch / Lot #</th>
                             <th className="py-1.5 px-2 text-right">Balance</th>
@@ -885,10 +885,10 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                             <th className="py-1.5 px-2 text-center">Action</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 text-xs">
+                        <tbody className="divide-y divide-slate-100 text-[0.875rem]">
                           {availableBatches.map((b, idx) => (
                             <tr key={b.batchNumber + idx} className="hover:bg-slate-50">
-                              <td className="py-1.5 px-2 font-mono font-bold text-slate-900">
+                              <td className="py-1.5 px-2 font-mono font-semibold text-slate-900">
                                 {b.batchNumber}
                               </td>
                               <td className="py-1.5 px-2 text-right font-mono text-slate-700">
@@ -901,7 +901,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => handleSelectBatch(b)}
-                                  className="px-2 py-0.5 text-[10px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 rounded border border-blue-200 transition-colors cursor-pointer"
+                                  className="px-2 py-0.5 text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 rounded border border-blue-200 cursor-pointer"
                                 >
                                   Select
                                 </button>
@@ -910,7 +910,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                           ))}
                           {availableBatches.length === 0 && (
                             <tr>
-                              <td colSpan={4} className="py-6 text-center text-xs text-slate-400">
+                              <td colSpan={4} className="py-6 text-center text-[0.875rem] text-slate-400">
                                 {selectedLocationId 
                                   ? 'No lot-specific batches recorded at this godown.' 
                                   : 'Select a godown to view batches.'}
@@ -937,23 +937,23 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                 : 'bg-gradient-to-r from-rose-50 to-slate-50 border-rose-200'
             }`}>
               <div className="flex items-center gap-2">
-                <div className={`w-5 h-5 rounded text-white flex items-center justify-center text-[10px] font-black ${
+                <div className={`w-5 h-5 rounded text-white flex items-center justify-center text-xs font-semibold ${
                   adjustmentType === 'INCREASE' ? 'bg-emerald-600' : 'bg-rose-600'
                 }`}>
                   {adjustmentType === 'INCREASE' ? '+' : '-'}
                 </div>
                 <div>
-                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                  <h3 className="text-[0.875rem] font-medium text-slate-900 uppercase tracking-wider">
                     {adjustmentType === 'INCREASE' ? 'Inward Addition Details' : 'Outward Deduction Details'}
                   </h3>
-                  <p className="text-[10px] text-slate-500">Specify reason, batch, and adjusted quantities</p>
+                  <p className="text-xs text-slate-500">Specify reason, batch, and adjusted quantities</p>
                 </div>
               </div>
 
               {activeGodown && (
                 <div className="text-right">
-                  <span className="text-[10px] font-bold text-slate-400 block uppercase">Godown</span>
-                  <span className="text-xs font-bold text-slate-800">{activeGodown.locationName}</span>
+                  <span className="text-xs font-semibold text-slate-400 block uppercase">Godown</span>
+                  <span className="text-[0.875rem] font-semibold text-slate-800">{activeGodown.locationName}</span>
                 </div>
               )}
             </div>
@@ -963,13 +963,13 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
               
               {/* Reason Selector */}
               <div>
-                <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-medium text-slate-600 uppercase tracking-wider mb-1">
                   Adjustment Reason *
                 </label>
                 <select
                   value={reason}
                   onChange={e => setReason(e.target.value)}
-                  className="w-full px-3 py-2 text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
+                  className="w-full px-3 py-2 text-[0.875rem] font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
                   required
                 >
                   {adjustmentType === 'INCREASE' ? (
@@ -996,7 +996,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
               {/* Batch Number & Rate Inputs */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-medium text-slate-600 uppercase tracking-wider mb-1">
                     Batch / Lot Number
                   </label>
                   <input
@@ -1004,16 +1004,16 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                     value={batchNumber}
                     onChange={e => setBatchNumber(e.target.value)}
                     placeholder={adjustmentType === 'INCREASE' ? 'e.g. ADJ-LOT-01' : 'Pick from left or enter lot'}
-                    className="w-full px-3 py-2 text-xs font-mono font-bold text-slate-800 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 text-[0.875rem] font-mono font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-medium text-slate-600 uppercase tracking-wider mb-1">
                     Valuation Rate (₹/{unit})
                   </label>
                   <div className="relative">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">₹</span>
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[0.875rem] font-semibold">₹</span>
                     <input
                       type="number"
                       step="any"
@@ -1021,7 +1021,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                       value={rate}
                       onChange={e => setRate(e.target.value)}
                       placeholder="0.00"
-                      className="w-full pl-6 pr-3 py-2 text-xs font-mono font-bold text-slate-800 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full pl-6 pr-3 py-2 text-[0.875rem] font-mono font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
                 </div>
@@ -1030,14 +1030,14 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
               {/* Adjustment Quantity Input with Unit */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                  <label className="text-xs font-medium text-slate-600 uppercase tracking-wider">
                     Adjustment Quantity ({unit}) *
                   </label>
                   {adjustmentType === 'DECREASE' && currentAvailableQty > 0 && (
                     <button
                       type="button"
                       onClick={() => setQuantity(String(currentAvailableQty))}
-                      className="text-[10px] font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 cursor-pointer"
                     >
                       Deduct Entire Balance (MAX)
                     </button>
@@ -1052,27 +1052,27 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                     value={quantity}
                     onChange={e => setQuantity(e.target.value)}
                     placeholder="Enter quantity to adjust..."
-                    className={`flex-1 px-3 py-2.5 text-sm font-mono font-black rounded-lg border focus:outline-none focus:ring-1 ${
+                    className={`flex-1 px-3 py-2.5 text-[0.875rem] font-mono font-semibold rounded-lg border focus:outline-none focus:ring-1 ${
                       isInvalidDecrease
                         ? 'border-rose-400 bg-rose-50/50 text-rose-900 focus:ring-rose-500'
                         : 'border-slate-300 bg-white text-slate-900 focus:ring-blue-500 focus:border-blue-500'
                     }`}
                     required
                   />
-                  <span className="px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-700 shrink-0">
+                  <span className="px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-[0.875rem] font-mono font-semibold text-slate-700 shrink-0">
                     {unit}
                   </span>
                 </div>
 
                 {/* Alt Unit Real-Time Display */}
                 {formatAltQty(adjQtyNumber) && (
-                  <p className="text-[11px] font-mono font-semibold text-slate-500 mt-1">
+                  <p className="text-xs font-mono font-semibold text-slate-500 mt-1">
                     ≈ {formatAltQty(adjQtyNumber)}
                   </p>
                 )}
 
                 {isInvalidDecrease && (
-                  <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                  <p className="text-xs font-semibold text-rose-600 mt-1 flex items-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5" />
                     Cannot deduct more than available balance ({currentAvailableQty} {unit}).
                   </p>
@@ -1081,15 +1081,15 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
 
               {/* ── BEFORE & AFTER IMPACT CARD ── */}
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider block">
                   Ledger Impact Summary
                 </span>
 
                 <div className="grid grid-cols-3 gap-2 text-center">
                   {/* Previous Balance */}
                   <div className="p-2 bg-white rounded-lg border border-slate-200">
-                    <span className="text-[9.5px] font-bold text-slate-400 uppercase block">Current</span>
-                    <span className="font-mono text-xs font-bold text-slate-700">
+                    <span className="text-xs font-semibold text-slate-400 uppercase block">Current</span>
+                    <span className="font-mono text-[0.875rem] font-semibold text-slate-700">
                       {currentAvailableQty.toLocaleString('en-IN', { maximumFractionDigits: 2 })} {unit}
                     </span>
                   </div>
@@ -1100,16 +1100,16 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                       ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
                       : 'bg-rose-50 border-rose-200 text-rose-800'
                   }`}>
-                    <span className="text-[9.5px] font-bold uppercase block">Adjustment</span>
-                    <span className="font-mono text-xs font-bold">
+                    <span className="text-xs font-semibold uppercase block">Adjustment</span>
+                    <span className="font-mono text-[0.875rem] font-semibold">
                       {adjustmentType === 'INCREASE' ? '+' : '-'}{adjQtyNumber.toLocaleString('en-IN', { maximumFractionDigits: 2 })} {unit}
                     </span>
                   </div>
 
                   {/* New Balance */}
                   <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-900">
-                    <span className="text-[9.5px] font-bold uppercase block">New Stock</span>
-                    <span className="font-mono text-xs font-black">
+                    <span className="text-xs font-semibold uppercase block">New Stock</span>
+                    <span className="font-mono text-[0.875rem] font-semibold">
                       {newBalance.toLocaleString('en-IN', { maximumFractionDigits: 2 })} {unit}
                     </span>
                   </div>
@@ -1117,7 +1117,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
 
                 {/* Secondary Unit Sub-Note */}
                 {formatAltQty(newBalance) && (
-                  <div className="text-[10.5px] text-center text-slate-500 font-mono">
+                  <div className="text-xs text-center text-slate-500 font-mono">
                     New Secondary Unit Balance: <strong className="text-slate-800">{formatAltQty(newBalance)}</strong>
                   </div>
                 )}
@@ -1130,8 +1130,8 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
         {/* ── 4. BOTTOM VOUCHER SUMMARY & ACTIONS BAR ── */}
         <div className="p-3 bg-white border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-lg">
           {/* Remarks Input */}
-          <div className="flex-1 min-w-[280px] max-w-xl flex items-center gap-2">
-            <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider shrink-0">
+          <div className="flex-1 min-w-[17.5rem] max-w-xl flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-600 uppercase tracking-wider shrink-0">
               Remarks:
             </span>
             <input
@@ -1139,23 +1139,23 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
               value={remarks}
               onChange={e => setRemarks(e.target.value)}
               placeholder="Enter adjustment justification, physical verification note, or audit reference..."
-              className="flex-1 px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              className="flex-1 px-3 py-1.5 text-[0.875rem] bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
           {/* Metrics & Submit Buttons */}
           <div className="flex items-center gap-3">
             {/* Summary metrics pill */}
-            <div className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 flex items-center gap-3 text-xs">
+            <div className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 flex items-center gap-3 text-[0.875rem]">
               <div className="flex items-center gap-1">
                 <span className="text-slate-500 font-medium">Adjustment:</span>
-                <span className={`font-mono font-bold ${
+                <span className={`font-mono font-semibold ${
                   adjustmentType === 'INCREASE' ? 'text-emerald-700' : 'text-rose-700'
                 }`}>
                   {adjustmentType === 'INCREASE' ? '+' : '-'}{adjQtyNumber.toLocaleString('en-IN', { maximumFractionDigits: 2 })} {unit}
                 </span>
                 {formatAltQty(adjQtyNumber) && (
-                  <span className="text-[11px] font-semibold text-slate-600">({formatAltQty(adjQtyNumber)})</span>
+                  <span className="text-xs font-semibold text-slate-600">({formatAltQty(adjQtyNumber)})</span>
                 )}
               </div>
 
@@ -1163,7 +1163,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
 
               <div className="flex items-center gap-1">
                 <span className="text-slate-500 font-medium">Value:</span>
-                <span className="font-mono font-bold text-slate-900">
+                <span className="font-mono font-semibold text-slate-900">
                   ₹{totalAdjustmentValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
@@ -1174,7 +1174,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-3.5 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl border border-slate-200 transition-all cursor-pointer"
+              className="px-3.5 py-1.5 text-[0.875rem] font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl border border-slate-200 cursor-pointer"
             >
               Cancel
             </button>
@@ -1183,11 +1183,11 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
             <button
               type="submit"
               disabled={!canSubmit}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer ${
+              className={`px-4 py-1.5 rounded-xl text-[0.875rem] font-semibold flex items-center gap-2 shadow-sm cursor-pointer ${
                 canSubmit
                   ? adjustmentType === 'INCREASE'
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200 active:scale-95'
-                    : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-200 active:scale-95'
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200'
+                    : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-200'
                   : 'bg-slate-200 text-slate-400 cursor-not-allowed'
               }`}
             >

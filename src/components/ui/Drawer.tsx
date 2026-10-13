@@ -6,7 +6,7 @@ interface DrawerProps {
   onClose: () => void;
   title?: React.ReactNode;
   children: React.ReactNode;
-  /** Tailwind width class, e.g. "max-w-2xl" or "sm:w-[520px]" */
+  /** Tailwind width class, e.g. "max-w-2xl" or "sm:w-[32.5rem]" */
   size?: string;
 }
 
@@ -39,11 +39,11 @@ export const Drawer: React.FC<DrawerProps> = ({
             {title && (
               <div className="bg-gray-50 px-4 py-6 sm:px-6 border-b flex-shrink-0">
                 <div className="flex items-start justify-between">
-                  <h2 className="text-lg font-bold text-gray-900">
+                  <h2 className="text-lg font-semibold text-gray-900">
                     {title}
                   </h2>
                   <div className="ml-3 flex h-7 items-center space-x-2">
-                    <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold text-gray-500 bg-gray-100 rounded border border-gray-200 shadow-xs select-none pointer-events-none">Esc</kbd>
+                    <kbd className="px-1.5 py-0.5 text-[0.625rem] font-mono font-semibold text-gray-500 bg-gray-100 rounded border border-gray-200 shadow-xs select-none pointer-events-none">Esc</kbd>
                     <button type="button" onClick={onClose} className="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none p-1 hover:bg-gray-100">
                       <X className="h-6 w-6" />
                     </button>

@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { generateListPdf } from '../../utils/pdfReport';
 import * as XLSX from 'xlsx';
 import { 
   Users, 
@@ -108,17 +107,17 @@ const TagInput: React.FC<TagInputProps> = ({ tags = [], onChange, placeholder = 
   };
 
   return (
-    <div className="w-full border border-gray-200 rounded-xl px-3 py-2 bg-white shadow-2xs focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all flex flex-wrap items-center gap-1.5 min-h-[42px]">
+    <div className="w-full border border-gray-200 rounded-xl px-3 py-2 bg-white shadow-2xs focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 flex flex-wrap items-center gap-1.5 min-h-[2.625rem]">
       {(tags || []).map((tag, idx) => (
         <span
           key={idx}
-          className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-lg border border-blue-200/60"
+          className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-[0.875rem] font-semibold px-2.5 py-1 rounded-lg border border-blue-200/60"
         >
           <span>{tag}</span>
           <button
             type="button"
             onClick={() => removeTag(idx)}
-            className="hover:bg-blue-200/60 rounded p-0.5 text-blue-500 hover:text-blue-800 transition-colors cursor-pointer"
+            className="hover:bg-blue-200/60 rounded p-0.5 text-blue-500 hover:text-blue-800 cursor-pointer"
           >
             <X className="w-3 h-3 stroke-[2.5]" />
           </button>
@@ -131,13 +130,13 @@ const TagInput: React.FC<TagInputProps> = ({ tags = [], onChange, placeholder = 
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
         placeholder={(tags || []).length === 0 ? placeholder : "Add tag..."}
-        className="flex-1 min-w-[120px] bg-transparent text-xs font-medium border-none focus:outline-none p-0 text-gray-900 placeholder:text-gray-400"
+        className="flex-1 min-w-[7.5rem] bg-transparent text-[0.875rem] font-medium border-none focus:outline-none p-0 text-gray-900 placeholder:text-gray-400"
       />
     </div>
   );
 };
 
-const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4 text-emerald-500 hover:text-emerald-600 transition-all duration-300 transform hover:scale-125 block shrink-0" }) => (
+const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4 text-emerald-500 hover:text-emerald-600 block shrink-0" }) => (
   <svg 
     className={className} 
     viewBox="0 0 24 24" 
@@ -1480,19 +1479,6 @@ export const BusinessDirectoryV2: React.FC = () => {
     const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
     try {
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-
-      // Title Header
-      doc.setFontSize(14);
-      doc.setTextColor(29, 78, 216);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`${companyName} — ${title}`, 14, 14);
-
-      doc.setFontSize(9);
-      doc.setTextColor(100, 116, 139);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Generated on ${dateStr} • Total Records: ${targetItems.length}`, 14, 20);
-
       let headers: string[] = [];
       let rows: (string | number)[][] = [];
 
@@ -1584,31 +1570,16 @@ export const BusinessDirectoryV2: React.FC = () => {
         });
       }
 
-      autoTable(doc, {
-        startY: 25,
-        head: [headers],
+      const fileName = `${companyName.replace(/[^a-zA-Z0-9]/g, '_')}_${tabTitle}_${new Date().toISOString().slice(0, 10)}`;
+      generateListPdf({
+        companyName,
+        title,
+        meta: [`Total Records: ${targetItems.length}`],
+        head: headers,
         body: rows,
-        theme: 'grid',
-        headStyles: {
-          fillColor: [37, 99, 235],
-          textColor: [255, 255, 255],
-          fontSize: 8.5,
-          fontStyle: 'bold',
-          halign: 'left'
-        },
-        bodyStyles: {
-          fontSize: 8,
-          textColor: [51, 65, 85]
-        },
-        alternateRowStyles: {
-          fillColor: [248, 250, 252]
-        },
-        margin: { left: 14, right: 14, bottom: 15 }
+        fileName,
       });
-
-      const fileName = `${companyName.replace(/[^a-zA-Z0-9]/g, '_')}_${tabTitle}_${new Date().toISOString().slice(0, 10)}.pdf`;
-      doc.save(fileName);
-      showToast(`PDF exported successfully! Check downloads: ${fileName}`, 'success');
+      showToast(`PDF exported successfully! Check downloads: ${fileName}.pdf`, 'success');
     } catch (err: any) {
       console.error('PDF export error:', err);
       showToast('Failed to generate PDF download', 'error');
@@ -1645,12 +1616,12 @@ export const BusinessDirectoryV2: React.FC = () => {
       <th
         key={fieldKey}
         onClick={() => handleColumnSort(fieldKey)}
-        className={`py-3 px-3 whitespace-nowrap cursor-pointer hover:bg-slate-200/80 transition-colors select-none group text-left ${extraClasses}`}
+        className={`py-3 px-3 whitespace-nowrap cursor-pointer hover:bg-slate-200/80 select-none group text-left ${extraClasses}`}
         title={`Click to sort by ${label}`}
       >
         <div className="flex items-center justify-between gap-1.5">
-          <span className={isSorted ? 'text-blue-700 font-extrabold' : ''}>{label}</span>
-          <span className="shrink-0 text-xs">
+          <span className={isSorted ? 'text-blue-700 font-semibold' : ''}>{label}</span>
+          <span className="shrink-0 text-[0.875rem]">
             {isSorted ? (
               sortOrder === 'asc' ? (
                 <ChevronUp className="w-3.5 h-3.5 text-blue-600 stroke-[2.5]" />
@@ -1658,7 +1629,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 <ChevronDown className="w-3.5 h-3.5 text-blue-600 stroke-[2.5]" />
               )
             ) : (
-              <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-600 opacity-60 group-hover:opacity-100 transition-opacity" />
+              <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 group-hover:text-gray-600 opacity-60 group-hover:opacity-100" />
             )}
           </span>
         </div>
@@ -2162,30 +2133,21 @@ export const BusinessDirectoryV2: React.FC = () => {
   const totalPages = Math.ceil(totalRecords / limit) || 1;
 
   return (
-    <div className="p-4 md:p-6 space-y-6 bg-white min-h-screen">
-      
-      {/* 1. Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs">
-        <div className="flex items-center gap-3.5">
-          <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
-            <Users className="w-6 h-6 stroke-[2.2]" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-              <span>Business Directory</span>
-              <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold">
-                {totalRecords} Total
-              </span>
-            </h1>
-            <p className="text-xs text-gray-500 font-medium">
-              Unified master directory for Customers, Suppliers, Agents, Transporters, Regions & Cities.
-            </p>
-          </div>
+    <div className="min-h-[calc(100*var(--vh,1vh))] bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+      <div className="flex items-baseline justify-between gap-4 px-1">
+        <div>
+          <h1 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <span>Business Directory</span>
+            <span className="text-xs font-medium text-gray-500">{processedItems.length} total</span>
+          </h1>
+          <p className="text-[0.875rem] text-gray-500">
+            Customers, vendors, agents, transporters, regions &amp; cities.
+          </p>
         </div>
       </div>
 
       {/* 2. Top Navigation Tabs Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-4 rounded-2xl shadow-2xs relative">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between border-b border-gray-200 bg-white px-1 relative">
         {/* Backdrop overlay to close open popovers on outside click */}
         {(showSortMenu || showColumnPicker || showExportMenu) && (
           <div
@@ -2199,82 +2161,83 @@ export const BusinessDirectoryV2: React.FC = () => {
         )}
 
         {/* Tab Selection (Scrollable on small screens) */}
-        <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full">
+        <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full min-w-0">
           <button
             onClick={() => handleTabChange('customers')}
-            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
               activeMainTab === 'customers'
-                ? 'border-teal-700 text-teal-700 bg-transparent'
+                ? 'border-blue-700 text-blue-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Users className={`w-4 h-4 ${activeMainTab === 'customers' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <Users className={`w-4 h-4 ${activeMainTab === 'customers' ? 'text-blue-700' : 'text-slate-400'}`} />
             <span>Customers</span>
           </button>
 
           <button
             onClick={() => handleTabChange('vendors')}
-            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
               activeMainTab === 'vendors'
-                ? 'border-teal-700 text-teal-700 bg-transparent'
+                ? 'border-blue-700 text-blue-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Factory className={`w-4 h-4 ${activeMainTab === 'vendors' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <Factory className={`w-4 h-4 ${activeMainTab === 'vendors' ? 'text-blue-700' : 'text-slate-400'}`} />
             <span>Suppliers</span>
           </button>
 
           <button
             onClick={() => handleTabChange('agents')}
-            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
               activeMainTab === 'agents'
-                ? 'border-teal-700 text-teal-700 bg-transparent'
+                ? 'border-blue-700 text-blue-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Briefcase className={`w-4 h-4 ${activeMainTab === 'agents' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <Briefcase className={`w-4 h-4 ${activeMainTab === 'agents' ? 'text-blue-700' : 'text-slate-400'}`} />
             <span>Agents</span>
           </button>
 
           <button
             onClick={() => handleTabChange('regions')}
-            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
               activeMainTab === 'regions'
-                ? 'border-teal-700 text-teal-700 bg-transparent'
+                ? 'border-blue-700 text-blue-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <MapIcon className={`w-4 h-4 ${activeMainTab === 'regions' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <MapIcon className={`w-4 h-4 ${activeMainTab === 'regions' ? 'text-blue-700' : 'text-slate-400'}`} />
             <span>Regions</span>
           </button>
 
           <button
             onClick={() => handleTabChange('cities')}
-            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
               activeMainTab === 'cities'
-                ? 'border-teal-700 text-teal-700 bg-transparent'
+                ? 'border-blue-700 text-blue-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Building className={`w-4 h-4 ${activeMainTab === 'cities' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <Building className={`w-4 h-4 ${activeMainTab === 'cities' ? 'text-blue-700' : 'text-slate-400'}`} />
             <span>Cities</span>
           </button>
 
           <button
             onClick={() => handleTabChange('transporters')}
-            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
               activeMainTab === 'transporters'
-                ? 'border-teal-700 text-teal-700 bg-transparent'
+                ? 'border-blue-700 text-blue-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Truck className={`w-4 h-4 ${activeMainTab === 'transporters' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <Truck className={`w-4 h-4 ${activeMainTab === 'transporters' ? 'text-blue-700' : 'text-slate-400'}`} />
             <span>Transporters</span>
           </button>
         </div>
 
         {/* Right Action Bar (Search + Icon-Only Action Tools + Add Item Button) */}
         <div className="py-2 flex items-center gap-2 flex-wrap shrink-0 relative z-40">
+          <span className="text-xs text-gray-500 mr-1">{totalRecords} total</span>
           {/* Global Search Box */}
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
@@ -2283,7 +2246,7 @@ export const BusinessDirectoryV2: React.FC = () => {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={`Search ${activeMainTab}...`}
-              className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-40 md:w-52 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+              className="pl-8 pr-7 py-1.5 text-[0.875rem] bg-gray-50 border border-gray-200 rounded-xl w-40 md:w-52 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
             />
             {search && (
               <button 
@@ -2300,7 +2263,7 @@ export const BusinessDirectoryV2: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowFilterPopover(!showFilterPopover)}
-              className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+              className={`p-2 rounded-xl border text-[0.875rem] font-semibold flex items-center justify-center cursor-pointer shadow-2xs ${
                 (filterRules.length > 0 || activeFilterCount > 0)
                   ? 'bg-blue-600 text-white border-blue-600 shadow-blue-100'
                   : 'bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200'
@@ -2312,14 +2275,14 @@ export const BusinessDirectoryV2: React.FC = () => {
             </button>
 
             {showFilterPopover && (
-              <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-2xl border border-gray-100 shadow-2xl p-4 z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-2xl border border-gray-100 shadow-2xl p-4 z-50">
                 <div className="flex justify-between items-center pb-2.5 border-b border-gray-100">
-                  <h4 className="font-bold text-sm text-gray-900">Filters</h4>
+                  <h4 className="font-semibold text-[0.875rem] text-gray-900">Filters</h4>
                   <div className="flex items-center gap-2">
                     {filterRules.length > 0 && (
                       <button 
                         onClick={() => setFilterRules([])}
-                        className="text-xs text-blue-600 font-semibold hover:underline cursor-pointer"
+                        className="text-[0.875rem] text-blue-600 font-semibold hover:underline cursor-pointer"
                       >
                         Clear All
                       </button>
@@ -2336,15 +2299,15 @@ export const BusinessDirectoryV2: React.FC = () => {
                 <div className="mt-3 space-y-3">
                   {filterRules.length === 0 ? (
                     <div className="border border-dashed border-gray-300 rounded-2xl p-6 text-center bg-white">
-                      <p className="text-sm font-bold text-gray-800">No filters applied</p>
-                      <p className="text-xs text-gray-400 mt-1">Add a filter to narrow down rows</p>
+                      <p className="text-[0.875rem] font-semibold text-gray-800">No filters applied</p>
+                      <p className="text-[0.875rem] text-gray-400 mt-1">Add a filter to narrow down rows</p>
                     </div>
                   ) : (
                     <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
                       {filterRules.map((rule) => (
                         <div key={rule.id} className="bg-gray-50/70 border border-gray-200 rounded-xl p-3 space-y-2">
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-gray-400 tracking-wider uppercase">WHERE</span>
+                            <span className="text-xs font-medium text-gray-400 tracking-wider uppercase">WHERE</span>
                             <button
                               onClick={() => setFilterRules(prev => prev.filter(r => r.id !== rule.id))}
                               className="text-gray-400 hover:text-gray-600 cursor-pointer"
@@ -2360,7 +2323,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               const val = e.target.value;
                               setFilterRules(prev => prev.map(r => r.id === rule.id ? { ...r, field: val } : r));
                             }}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 bg-white cursor-pointer"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 bg-white cursor-pointer"
                           >
                             <option value="firmName">Firm / Master Name</option>
                             <option value="contactName">Owner / Contact Name</option>
@@ -2381,7 +2344,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               const val = e.target.value as any;
                               setFilterRules(prev => prev.map(r => r.id === rule.id ? { ...r, operator: val } : r));
                             }}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 bg-white cursor-pointer"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 bg-white cursor-pointer"
                           >
                             <option value="contains">Contains</option>
                             <option value="equals">Equals</option>
@@ -2398,7 +2361,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               const val = e.target.value;
                               setFilterRules(prev => prev.map(r => r.id === rule.id ? { ...r, value: val } : r));
                             }}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 bg-white placeholder-gray-400"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 bg-white placeholder-gray-400"
                           />
                         </div>
                       ))}
@@ -2413,7 +2376,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         { id: 'filter_' + Date.now(), field: 'firmName', operator: 'contains', value: '' }
                       ]);
                     }}
-                    className="w-full py-2.5 border border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50/40 rounded-xl text-xs font-semibold text-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    className="w-full py-2.5 border border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50/40 rounded-xl text-[0.875rem] font-semibold text-gray-700 flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add filter</span>
@@ -2432,47 +2395,42 @@ export const BusinessDirectoryV2: React.FC = () => {
                 setShowColumnPicker(false);
                 setShowExportMenu(false);
               }}
-              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
               title="Sort Records"
               aria-label="Sort Records"
             >
               <ArrowUpDown className="w-4 h-4" />
             </button>
-            {!showSortMenu && (
-              <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                Sort Options
-              </div>
-            )}
             {showSortMenu && (
-              <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs">
-                <div className="px-2 py-1 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Sort Options</div>
+              <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-[0.875rem]">
+                <div className="px-2 py-1 text-xs font-medium text-gray-400 uppercase tracking-wider">Sort Options</div>
                 <button
                   onClick={() => { setSortField('firmName'); setSortOrder('asc'); setShowSortMenu(false); }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'firmName' && sortOrder === 'asc' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'firmName' && sortOrder === 'asc' ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-gray-50 text-gray-700'}`}
                 >
                   <span>Firm Name (A to Z)</span>
                 </button>
                 <button
                   onClick={() => { setSortField('firmName'); setSortOrder('desc'); setShowSortMenu(false); }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'firmName' && sortOrder === 'desc' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'firmName' && sortOrder === 'desc' ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-gray-50 text-gray-700'}`}
                 >
                   <span>Firm Name (Z to A)</span>
                 </button>
                 <button
                   onClick={() => { setSortField('outstandingBalance'); setSortOrder('desc'); setShowSortMenu(false); }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'outstandingBalance' && sortOrder === 'desc' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'outstandingBalance' && sortOrder === 'desc' ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-gray-50 text-gray-700'}`}
                 >
                   <span>Outstanding (High to Low)</span>
                 </button>
                 <button
                   onClick={() => { setSortField('outstandingBalance'); setSortOrder('asc'); setShowSortMenu(false); }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'outstandingBalance' && sortOrder === 'asc' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'outstandingBalance' && sortOrder === 'asc' ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-gray-50 text-gray-700'}`}
                 >
                   <span>Outstanding (Low to High)</span>
                 </button>
                 <button
                   onClick={() => { setSortField('city'); setSortOrder('asc'); setShowSortMenu(false); }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'city' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700'}`}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortField === 'city' ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-gray-50 text-gray-700'}`}
                 >
                   <span>City (A to Z)</span>
                 </button>
@@ -2489,22 +2447,17 @@ export const BusinessDirectoryV2: React.FC = () => {
                 setShowSortMenu(false);
                 setShowExportMenu(false);
               }}
-              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
               title="Toggle Columns"
               aria-label="Toggle Columns"
             >
               <Columns className="w-4 h-4" />
             </button>
-            {!showColumnPicker && (
-              <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                Column Visibility
-              </div>
-            )}
             {showColumnPicker && (
-              <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2.5 space-y-2 text-xs">
+              <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2.5 space-y-2 text-[0.875rem]">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
-                  <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Visible Columns</span>
-                  <button onClick={() => setHiddenColumns({})} className="text-[10px] text-blue-600 font-bold hover:underline">Reset</button>
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Visible Columns</span>
+                  <button onClick={() => setHiddenColumns({})} className="text-xs text-blue-600 font-semibold hover:underline">Reset</button>
                 </div>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto">
                   {getColumnList(activeMainTab).map(col => (
@@ -2534,42 +2487,37 @@ export const BusinessDirectoryV2: React.FC = () => {
                 setShowSortMenu(false);
                 setShowColumnPicker(false);
               }}
-              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
               title="Export Data (PDF / Excel)"
               aria-label="Export Data (PDF / Excel)"
             >
               <Download className="w-4 h-4" />
             </button>
-            {!showExportMenu && (
-              <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                Export Data
-              </div>
-            )}
             {showExportMenu && (
-              <div className="absolute right-0 mt-1.5 w-56 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs">
+              <div className="absolute right-0 mt-1.5 w-56 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-[0.875rem]">
                 <button
                   disabled={isExporting}
                   onClick={() => { handleExportExcel(); setShowExportMenu(false); }}
-                  className="w-full text-left px-3 py-2 rounded-xl font-semibold hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2.5 text-gray-700 cursor-pointer disabled:opacity-50 transition-colors"
+                  className="w-full text-left px-3 py-2 rounded-xl font-semibold hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2.5 text-gray-700 cursor-pointer disabled:opacity-50"
                 >
                   <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
                   <div>
-                    <span className="block font-bold text-gray-900">
+                    <span className="block font-semibold text-gray-900">
                       {selectedIds.length > 0 ? `Export Selected (${selectedIds.length})` : 'Export Whole Data'}
                     </span>
-                    <span className="text-[10.5px] text-gray-400 block font-normal">
+                    <span className="text-xs text-gray-400 block font-normal">
                       {selectedIds.length > 0 ? 'Download selected records (.csv)' : `Download all ${totalRecords} records (.csv)`}
                     </span>
                   </div>
                 </button>
                 <button
                   onClick={() => { handleExportPDF(); setShowExportMenu(false); }}
-                  className="w-full text-left px-3 py-2 rounded-xl font-semibold hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2.5 text-gray-700 cursor-pointer transition-colors"
+                  className="w-full text-left px-3 py-2 rounded-xl font-semibold hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2.5 text-gray-700 cursor-pointer"
                 >
                   <FileText className="w-4 h-4 text-rose-600 shrink-0" />
                   <div>
-                    <span className="block font-bold text-gray-900">Export PDF</span>
-                    <span className="text-[10.5px] text-gray-400 block font-normal">Printable directory view</span>
+                    <span className="block font-semibold text-gray-900">Export PDF</span>
+                    <span className="text-xs text-gray-400 block font-normal">Printable directory view</span>
                   </div>
                 </button>
               </div>
@@ -2581,27 +2529,24 @@ export const BusinessDirectoryV2: React.FC = () => {
             <button
               type="button"
               onClick={handleDownloadSampleCSV}
-              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 text-blue-600 border border-gray-200 hover:border-blue-200 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 text-blue-600 border border-gray-200 hover:border-blue-200 flex items-center justify-center cursor-pointer shadow-2xs"
               title="Download Sample CSV"
               aria-label="Download Sample CSV"
             >
               <FileSpreadsheet className="w-4 h-4 text-blue-600" />
             </button>
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-              Sample CSV
-            </div>
           </div>
 
           {/* 6. Import CSV Icon Button */}
           <div className="relative group">
             <label
-              className={`p-2 rounded-xl border text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
-                isImporting ? 'bg-blue-100 border-blue-300 animate-pulse' : 'bg-white hover:bg-blue-50/60 border-gray-200 hover:border-blue-200'
+              className={`p-2 rounded-xl border text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs ${
+                isImporting ? 'bg-blue-100 border-blue-300' : 'bg-white hover:bg-blue-50/60 border-gray-200 hover:border-blue-200'
               }`}
               title="Import CSV File"
               aria-label="Import CSV File"
             >
-              <Upload className={`w-4 h-4 text-blue-600 ${isImporting ? 'animate-bounce' : ''}`} />
+              <Upload className={`w-4 h-4 text-blue-600`} />
               <input
                 type="file"
                 accept=".csv,.xlsx,.xls"
@@ -2610,9 +2555,6 @@ export const BusinessDirectoryV2: React.FC = () => {
                 className="hidden"
               />
             </label>
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-              Import Excel/CSV
-            </div>
           </div>
 
           {/* 7. Activity Logs Icon Button */}
@@ -2623,15 +2565,12 @@ export const BusinessDirectoryV2: React.FC = () => {
                 fetchActivityLogs();
                 setShowActivityLogModal(true);
               }}
-              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
               title="Activity Logs"
               aria-label="Activity Logs"
             >
               <History className="w-4 h-4 text-blue-600" />
             </button>
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-              Activity Logs
-            </div>
           </div>
 
           {/* 8. Find Duplicates Icon Button */}
@@ -2640,15 +2579,12 @@ export const BusinessDirectoryV2: React.FC = () => {
               type="button"
               onClick={handleFindDuplicates}
               disabled={isScanningDuplicates}
-              className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100/80 border border-amber-200 text-amber-700 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100/80 border border-amber-200 text-amber-700 flex items-center justify-center cursor-pointer shadow-2xs"
               title="Scan for Duplicate Records"
               aria-label="Scan for Duplicate Records"
             >
               <Copy className={`w-4 h-4 text-amber-600 ${isScanningDuplicates ? 'animate-spin' : ''}`} />
             </button>
-            <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-              Find Duplicates
-            </div>
           </div>
 
           {/* 9. Add New Item Icon Button (Circular + Button matching SkuMasterV2) */}
@@ -2656,15 +2592,12 @@ export const BusinessDirectoryV2: React.FC = () => {
             <button
               type="button"
               onClick={() => openModal()}
-              className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold shrink-0"
+              className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs cursor-pointer font-semibold shrink-0"
               title={`Add New ${activeMainTab === 'customers' ? 'Customer' : activeMainTab === 'vendors' ? 'Supplier' : activeMainTab === 'agents' ? 'Agent' : activeMainTab === 'transporters' ? 'Transporter' : activeMainTab === 'regions' ? 'Region' : 'City'}`}
               aria-label={`Add New ${activeMainTab === 'customers' ? 'Customer' : activeMainTab === 'vendors' ? 'Supplier' : activeMainTab === 'agents' ? 'Agent' : activeMainTab === 'transporters' ? 'Transporter' : activeMainTab === 'regions' ? 'Region' : 'City'}`}
             >
               <Plus className="w-4 h-4 text-blue-600 stroke-[2.5]" />
             </button>
-            <div className="absolute top-full mt-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-              Add {activeMainTab === 'customers' ? 'Customer' : activeMainTab === 'vendors' ? 'Supplier' : activeMainTab === 'agents' ? 'Agent' : activeMainTab === 'transporters' ? 'Transporter' : activeMainTab === 'regions' ? 'Region' : 'City'}
-            </div>
           </div>
         </div>
       </div>
@@ -2675,24 +2608,24 @@ export const BusinessDirectoryV2: React.FC = () => {
           <div className="flex items-center justify-between border-b border-gray-200/80 pb-2">
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-blue-600" />
-              <h3 className="font-bold text-xs text-gray-900">Advanced Filter Controls</h3>
+              <h3 className="font-semibold text-[0.875rem] text-gray-900">Advanced Filter Controls</h3>
               {activeFilterCount > 0 && (
-                <span className="bg-blue-600 text-white text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full">
+                <span className="bg-blue-600 text-white text-xs font-mono font-semibold px-1.5 py-0.2 rounded-full">
                   {activeFilterCount} Active
                 </span>
               )}
             </div>
             <button
               onClick={resetFilters}
-              className="text-xs text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
+              className="text-[0.875rem] text-blue-600 hover:text-blue-800 font-semibold hover:underline cursor-pointer"
             >
               Reset All Filters
             </button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 text-[0.875rem]">
             <div>
-              <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Status</label>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Status</label>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
@@ -2707,7 +2640,7 @@ export const BusinessDirectoryV2: React.FC = () => {
 
             {(activeMainTab === 'customers' || activeMainTab === 'vendors') && (
               <div>
-                <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">City</label>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">City</label>
                 <select
                   value={filterCity}
                   onChange={(e) => setFilterCity(e.target.value)}
@@ -2723,7 +2656,7 @@ export const BusinessDirectoryV2: React.FC = () => {
 
             {(activeMainTab === 'customers' || activeMainTab === 'cities') && (
               <div>
-                <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Region / Route</label>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Region / Route</label>
                 <select
                   value={filterRoute}
                   onChange={(e) => setFilterRoute(e.target.value)}
@@ -2739,7 +2672,7 @@ export const BusinessDirectoryV2: React.FC = () => {
 
             {activeMainTab === 'vendors' && (
               <div>
-                <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Vendor Category</label>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Vendor Category</label>
                 <select
                   value={filterVendorType}
                   onChange={(e) => setFilterVendorType(e.target.value)}
@@ -2760,7 +2693,7 @@ export const BusinessDirectoryV2: React.FC = () => {
 
             {activeMainTab === 'customers' && (
               <div>
-                <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Assigned Agent</label>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Assigned Agent</label>
                 <select
                   value={filterAgent}
                   onChange={(e) => setFilterAgent(e.target.value)}
@@ -2775,7 +2708,7 @@ export const BusinessDirectoryV2: React.FC = () => {
             )}
 
             <div>
-              <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Min Outstanding (₹)</label>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Min Outstanding (₹)</label>
               <input
                 type="number"
                 value={filterMinBal}
@@ -2786,7 +2719,7 @@ export const BusinessDirectoryV2: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Max Outstanding (₹)</label>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Max Outstanding (₹)</label>
               <input
                 type="number"
                 value={filterMaxBal}
@@ -2797,7 +2730,7 @@ export const BusinessDirectoryV2: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-wider mb-1">Filter by Tag</label>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Filter by Tag</label>
               <input
                 type="text"
                 value={filterTag}
@@ -2812,16 +2745,16 @@ export const BusinessDirectoryV2: React.FC = () => {
 
       {/* 2.5 Bulk Selection Bar (Grey Theme) */}
       {selectedIds.length > 0 && (
-        <div className="bg-gray-100 border border-gray-200 text-gray-800 px-4 py-2.5 rounded-2xl shadow-xs flex items-center justify-between flex-wrap gap-2 text-xs font-semibold animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="bg-gray-100 border border-gray-200 text-gray-800 px-4 py-2.5 rounded-2xl shadow-xs flex items-center justify-between flex-wrap gap-2 text-[0.875rem] font-semibold">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
             <span><strong className="text-gray-900">{selectedIds.length}</strong> {activeMainTab} selected</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handleExportExcel}
               disabled={isExporting}
-              className="px-3.5 py-1.5 bg-white hover:bg-gray-200/60 text-gray-700 border border-gray-300 font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all disabled:opacity-50"
+              className="px-3.5 py-1.5 bg-white hover:bg-gray-200/60 text-gray-700 border border-gray-300 font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
               title={`Export ${selectedIds.length} selected records`}
             >
               <Download className="w-3.5 h-3.5" />
@@ -2829,7 +2762,7 @@ export const BusinessDirectoryV2: React.FC = () => {
             </button>
             <button
               onClick={() => setShowBulkEditModal(true)}
-              className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-900 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+              className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-900 text-white font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs"
               title={`Bulk edit ${selectedIds.length} selected records`}
             >
               <Edit className="w-3.5 h-3.5" />
@@ -2837,7 +2770,7 @@ export const BusinessDirectoryV2: React.FC = () => {
             </button>
             <button
               onClick={() => setShowBulkDeleteModal(true)}
-              className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all"
+              className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs"
               title={`Delete ${selectedIds.length} selected records`}
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -2845,7 +2778,7 @@ export const BusinessDirectoryV2: React.FC = () => {
             </button>
             <button
               onClick={() => setSelectedIds([])}
-              className="px-3 py-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-200/60 rounded-xl cursor-pointer transition-colors flex items-center gap-1 font-medium"
+              className="px-3 py-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-200/60 rounded-xl cursor-pointer flex items-center gap-1 font-medium"
             >
               <X className="w-3.5 h-3.5" />
               <span>Clear</span>
@@ -2855,11 +2788,11 @@ export const BusinessDirectoryV2: React.FC = () => {
       )}
 
       {/* 3. Directory Table */}
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="bg-gray-50 rounded-xl overflow-hidden panel-table">
+        <div className="overflow-x-auto px-2 pt-2">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-100/70 border-b border-gray-200 text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+              <tr className="border-b border-gray-200 text-xs font-medium text-gray-600 uppercase tracking-wider">
                 <th className="py-3 px-3 w-10 text-center">
                   <input
                     type="checkbox"
@@ -2875,7 +2808,7 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                 {activeMainTab === 'customers' && (
                   <>
-                    {renderSortHeader('CUSTOMER FIRM', 'firmName', hiddenColumns['firmName'])}
+                    {renderSortHeader('CUSTOMER FIRM', 'firmName', hiddenColumns['firmName'], 'col-left')}
                     {renderSortHeader('MOBILE / WHATSAPP', 'phone', hiddenColumns['phone'])}
                     {renderSortHeader('CITY & DISTRICT', 'city', hiddenColumns['city'])}
                     {renderSortHeader('REGION', 'route', hiddenColumns['route'])}
@@ -2918,8 +2851,7 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                 {activeMainTab === 'regions' && (
                   <>
-                    {renderSortHeader('REGION NAME', 'name')}
-                    {renderSortHeader('REGION CODE', 'code')}
+                    {renderSortHeader('REGION CODE / NAME', 'name')}
                     {renderSortHeader('ASSIGNED AGENT', 'agent')}
                     {renderSortHeader('CITIES COUNT', 'citiesCount')}
                     {renderSortHeader('CUSTOMERS COUNT', 'customersCount')}
@@ -2942,7 +2874,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 <th className="py-3 px-3 text-right whitespace-nowrap">ACTIONS</th>
               </tr>
             </thead>
-            <tbody key={animationKey} className="divide-y divide-gray-100 text-xs text-gray-700">
+            <tbody key={animationKey} className="divide-y divide-gray-100 text-[0.875rem] text-gray-700">
               {loading ? (
                 <tr>
                   <td colSpan={12} className="py-12 text-center text-gray-400 whitespace-nowrap">
@@ -2958,7 +2890,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                     <div className="flex flex-col items-center gap-2">
                       <Users className="w-8 h-8 text-gray-300" />
                       <p className="font-semibold text-gray-600">No {activeMainTab} found in backend</p>
-                      <p className="text-[11px]">Click "+ Add New" above to create an entry</p>
+                      <p className="text-xs">Click "+ Add New" above to create an entry</p>
                     </div>
                   </td>
                 </tr>
@@ -2971,11 +2903,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                     <tr
                       key={item._id || index}
                       onClick={() => setSelectedDetails(item)}
-                      style={{
-                        animation: 'slideDownFade 0.35s ease-out forwards',
-                        animationDelay: `${index * 35}ms`
-                      }}
-                      className={`hover:bg-blue-50/20 transition-all cursor-pointer opacity-0 whitespace-nowrap ${isSelected ? 'bg-blue-50/30' : ''}`}
+                      className={`cursor-pointer whitespace-nowrap ${isSelected ? 'bg-blue-50' : 'bg-white hover:bg-blue-50/40'}`}
                     >
                       <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
                         <input
@@ -2988,7 +2916,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                         />
                       </td>
-                      <td className="py-3 px-3 text-center text-gray-400 font-mono font-semibold text-xs">
+                      <td className="py-3 px-3 text-center text-gray-400 font-mono font-semibold text-[0.875rem]">
                         {index + 1}
                       </td>
 
@@ -2996,20 +2924,18 @@ export const BusinessDirectoryV2: React.FC = () => {
                       {activeMainTab === 'customers' && (
                         <>
                           {!hiddenColumns['firmName'] && (
-                            <td className="py-3 px-3 font-semibold text-gray-900">
+                            <td className="col-left py-3 px-3 font-semibold text-gray-900">
                               <div className="flex items-center gap-2">
                                 <Users className="w-4 h-4 text-blue-600 shrink-0" />
                                 <div className="flex flex-col">
                                   <div className="flex items-center gap-1.5">
-                                    <span className="font-bold text-gray-900">{item.firmName}</span>
-                                    {item.code && (
-                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200/80">
-                                        {item.code}
-                                      </span>
-                                    )}
+                                    <span className="font-semibold text-gray-900">{item.firmName}</span>
                                   </div>
+                                  {item.code && (
+                                    <span className="text-[0.6875rem] font-mono font-medium text-gray-400 tracking-tight whitespace-nowrap">{item.code}</span>
+                                  )}
                                   {(item.contactName || item.ownerName || item.contactPersons?.[0]?.name) && (
-                                    <span className="text-[11px] text-gray-500 font-medium">{item.contactName || item.ownerName || item.contactPersons?.[0]?.name}</span>
+                                    <span className="text-xs text-gray-500 font-medium">{item.contactName || item.ownerName || item.contactPersons?.[0]?.name}</span>
                                   )}
                                 </div>
                               </div>
@@ -3018,9 +2944,9 @@ export const BusinessDirectoryV2: React.FC = () => {
                           {!hiddenColumns['phone'] && (
                             <td className="py-3 px-3 font-mono font-medium text-gray-700 whitespace-nowrap">
                               <div className="inline-flex items-center gap-1.5 leading-none whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                                <span className="inline-block min-w-[100px] font-mono tabular-nums leading-none whitespace-nowrap">{item.phone || '—'}</span>
+                                <span className="inline-block min-w-[6.25rem] font-mono tabular-nums leading-none whitespace-nowrap">{item.phone || '—'}</span>
                                 {item.phone && item.phone.length >= 10 && (
-                                  <a href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="Chat on WhatsApp" className="inline-flex items-center justify-center shrink-0 text-emerald-500 hover:text-emerald-600 transition-transform hover:scale-110 align-middle -translate-y-[1.5px]">
+                                  <a href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="Chat on WhatsApp" className="inline-flex items-center justify-center shrink-0 text-emerald-500 hover:text-emerald-600 align-middle -translate-y-[1.5px]">
                                     <WhatsAppIcon />
                                   </a>
                                 )}
@@ -3037,7 +2963,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     title="Get Directions on Google Maps"
-                                    className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors shrink-0 inline-flex items-center justify-center cursor-pointer"
+                                    className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-md shrink-0 inline-flex items-center justify-center cursor-pointer"
                                   >
                                     <MapPin className="w-3.5 h-3.5" />
                                   </a>
@@ -3049,13 +2975,13 @@ export const BusinessDirectoryV2: React.FC = () => {
                             <td className="py-3 px-3">
                               {item.route ? (
                                 <span
-                                  className="px-2.5 py-0.5 rounded-full bg-white text-blue-700 border border-blue-300 font-extrabold text-xs tracking-wide shadow-2xs inline-block"
+                                  className="px-2.5 py-0.5 rounded-full bg-white text-blue-700 border border-blue-300 font-semibold text-[0.875rem] tracking-wide shadow-2xs inline-block"
                                   title={item.route}
                                 >
                                   {getRegionShortCode(item.route)}
                                 </span>
                               ) : (
-                                <span className="text-gray-400 font-normal text-xs">—</span>
+                                <span className="text-gray-400 font-normal text-[0.875rem]">—</span>
                               )}
                             </td>
                           )}
@@ -3074,7 +3000,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           )}
                           {!hiddenColumns['outstanding'] && (
                             <td className="py-3 px-3">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[0.875rem] font-semibold ${
                                 bal > 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'
                               }`}>
                                 ₹{Math.abs(bal).toLocaleString('en-IN')}
@@ -3086,18 +3012,18 @@ export const BusinessDirectoryV2: React.FC = () => {
                               {Array.isArray(item.tags) && item.tags.length > 0 ? (
                                 <div className="flex items-center gap-1 whitespace-nowrap" title={item.tags.join(', ')}>
                                   {item.tags.slice(0, 2).map((t: string, i: number) => (
-                                    <span key={i} className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-md border border-blue-200 uppercase shrink-0">
+                                    <span key={i} className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-semibold rounded-md border border-blue-200 uppercase shrink-0">
                                       {t}
                                     </span>
                                   ))}
                                   {item.tags.length > 2 && (
-                                    <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-extrabold rounded-md border border-gray-200 shrink-0">
+                                    <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs font-semibold rounded-md border border-gray-200 shrink-0">
                                       +{item.tags.length - 2}
                                     </span>
                                   )}
                                 </div>
                               ) : (
-                                <span className="text-gray-400 font-normal text-[11px]">—</span>
+                                <span className="text-gray-400 font-normal text-xs">—</span>
                               )}
                             </td>
                           )}
@@ -3110,11 +3036,11 @@ export const BusinessDirectoryV2: React.FC = () => {
                           <td className="py-3 px-3 font-semibold text-gray-900">
                             <div className="flex items-center gap-2">
                               <Factory className="w-4 h-4 text-blue-600 shrink-0" />
-                              <span className="font-bold text-gray-900">{item.firmName}</span>
+                              <span className="font-semibold text-gray-900">{item.firmName}</span>
                             </div>
                           </td>
                           <td className="py-3 px-3">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
                               {item.vendorType || 'Paper Mill'}
                             </span>
                           </td>
@@ -3129,7 +3055,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   title="Get Directions on Google Maps"
-                                  className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors shrink-0 inline-flex items-center justify-center cursor-pointer"
+                                  className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-md shrink-0 inline-flex items-center justify-center cursor-pointer"
                                 >
                                   <MapPin className="w-3.5 h-3.5" />
                                 </a>
@@ -3138,7 +3064,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           </td>
                           <td className="py-3 px-3 font-mono text-gray-700">{item.creditDays || 30} Days</td>
                           <td className="py-3 px-3">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[0.875rem] font-semibold ${
                               bal > 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'
                             }`}>
                               ₹{Math.abs(bal).toLocaleString('en-IN')}
@@ -3148,18 +3074,18 @@ export const BusinessDirectoryV2: React.FC = () => {
                             {Array.isArray(item.tags) && item.tags.length > 0 ? (
                               <div className="flex items-center gap-1 whitespace-nowrap" title={item.tags.join(', ')}>
                                 {item.tags.slice(0, 2).map((t: string, i: number) => (
-                                  <span key={i} className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-md border border-blue-200 uppercase shrink-0">
+                                  <span key={i} className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-semibold rounded-md border border-blue-200 uppercase shrink-0">
                                     {t}
                                   </span>
                                 ))}
                                 {item.tags.length > 2 && (
-                                  <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-extrabold rounded-md border border-gray-200 shrink-0">
+                                  <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs font-semibold rounded-md border border-gray-200 shrink-0">
                                     +{item.tags.length - 2}
                                   </span>
                                 )}
                               </div>
                             ) : (
-                              <span className="text-gray-400 font-normal text-[11px]">—</span>
+                              <span className="text-gray-400 font-normal text-xs">—</span>
                             )}
                           </td>
                         </>
@@ -3169,13 +3095,13 @@ export const BusinessDirectoryV2: React.FC = () => {
                       {activeMainTab === 'agents' && (
                         <>
                           <td className="py-3 px-3 font-semibold text-gray-900">
-                            <span className="font-bold text-gray-900">{item.firmName || item.contactName || item.name}</span>
+                            <span className="font-semibold text-gray-900">{item.firmName || item.contactName || item.name}</span>
                           </td>
                           <td className="py-3 px-3 font-mono text-gray-700 whitespace-nowrap">
                             <div className="inline-flex items-center gap-1.5 leading-none whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                              <span className={item.phone ? "inline-block min-w-[100px] font-bold text-blue-600 font-mono tabular-nums leading-none whitespace-nowrap" : "inline-block min-w-[100px] text-gray-400 font-normal font-mono tabular-nums leading-none whitespace-nowrap"}>{item.phone || '—'}</span>
+                              <span className={item.phone ? "inline-block min-w-[6.25rem] font-semibold text-blue-600 font-mono tabular-nums leading-none whitespace-nowrap" : "inline-block min-w-[6.25rem] text-gray-400 font-normal font-mono tabular-nums leading-none whitespace-nowrap"}>{item.phone || '—'}</span>
                               {item.phone && item.phone.length >= 10 && (
-                                <a href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="Chat on WhatsApp" className="inline-flex items-center justify-center shrink-0 text-emerald-500 hover:text-emerald-600 transition-transform hover:scale-110 align-middle -translate-y-[1.5px]">
+                                <a href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="Chat on WhatsApp" className="inline-flex items-center justify-center shrink-0 text-emerald-500 hover:text-emerald-600 align-middle -translate-y-[1.5px]">
                                   <WhatsAppIcon />
                                 </a>
                               )}
@@ -3189,14 +3115,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 (Array.isArray(item.assignedRoutes) && item.assignedRoutes.includes(r._id))
                               );
                               if (assigned.length === 0) {
-                                return <span className="text-gray-400 italic text-xs">No regions assigned</span>;
+                                return <span className="text-gray-400 italic text-[0.875rem]">No regions assigned</span>;
                               }
                               return (
-                                <div className="flex flex-wrap items-center gap-1.5 max-w-[320px]">
+                                <div className="flex flex-wrap items-center gap-1.5 max-w-[20rem]">
                                   {assigned.map((r: any, idx: number) => (
                                     <span
                                       key={r._id || idx}
-                                      className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-bold border border-blue-100/80"
+                                      className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[0.875rem] font-semibold border border-blue-100/80"
                                       title={r.name}
                                     >
                                       {r.code || r.name}
@@ -3213,7 +3139,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       {activeMainTab === 'transporters' && (
                         <>
                           <td className="py-3 px-3 font-semibold text-gray-900">
-                            <span className="font-bold text-gray-900">{item.firmName || item.name}</span>
+                            <span className="font-semibold text-gray-900">{item.firmName || item.name}</span>
                           </td>
                           <td className="py-3 px-3 font-mono font-medium whitespace-nowrap">
                             <div className="inline-flex items-center gap-1.5 leading-none whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
@@ -3227,10 +3153,10 @@ export const BusinessDirectoryV2: React.FC = () => {
                                     if (cp?.phone && !phones.includes(cp.phone)) phones.push(cp.phone);
                                   });
                                 }
-                                if (phones.length === 0) return <span className="inline-block min-w-[100px] text-gray-400 font-normal font-mono tabular-nums leading-none whitespace-nowrap">—</span>;
+                                if (phones.length === 0) return <span className="inline-block min-w-[6.25rem] text-gray-400 font-normal font-mono tabular-nums leading-none whitespace-nowrap">—</span>;
                                 return (
                                   <div className="inline-flex items-center gap-1.5">
-                                    <span className="font-bold text-blue-600 font-mono tabular-nums leading-none whitespace-nowrap">
+                                    <span className="font-semibold text-blue-600 font-mono tabular-nums leading-none whitespace-nowrap">
                                       {phones[0]}
                                     </span>
                                     <a
@@ -3238,12 +3164,12 @@ export const BusinessDirectoryV2: React.FC = () => {
                                       target="_blank"
                                       rel="noreferrer"
                                       title="Chat on WhatsApp"
-                                      className="inline-flex items-center justify-center shrink-0 text-emerald-500 hover:text-emerald-600 transition-transform hover:scale-110 align-middle -translate-y-[1.5px]"
+                                      className="inline-flex items-center justify-center shrink-0 text-emerald-500 hover:text-emerald-600 align-middle -translate-y-[1.5px]"
                                     >
                                       <WhatsAppIcon />
                                     </a>
                                     {phones.length > 1 && (
-                                      <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full" title={`All Numbers (${phones.length}): ${phones.join(', ')}`}>
+                                      <span className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full" title={`All Numbers (${phones.length}): ${phones.join(', ')}`}>
                                         +{phones.length - 1} more
                                       </span>
                                     )}
@@ -3252,7 +3178,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               })()}
                             </div>
                           </td>
-                          <td className="py-3 px-3 font-bold text-gray-900 text-xs">
+                          <td className="py-3 px-3 font-semibold text-gray-900 text-[0.875rem]">
                             {(() => {
                               const transName = (item.firmName || item.name || '').toLowerCase().trim();
                               return allCustomers.filter((c: any) => {
@@ -3269,22 +3195,22 @@ export const BusinessDirectoryV2: React.FC = () => {
                         <>
                           <td className="py-3 px-3 font-semibold text-gray-900">
                             <div className="flex flex-col">
-                              <span className="font-extrabold text-gray-900 text-xs font-mono">{item.code || '—'}</span>
-                              <span className="text-gray-500 text-[11px] font-medium">{item.firmName || item.name}</span>
+                              <span className="font-semibold text-gray-900 text-[0.875rem] font-mono">{item.code || '—'}</span>
+                              <span className="text-gray-500 text-xs font-medium">{item.firmName || item.name}</span>
                             </div>
                           </td>
                           <td className="py-3 px-3">
                             {item.agentAssigned || item.assignedAgent ? (
-                              <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-bold border border-blue-100/60 inline-block">
+                              <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[0.875rem] font-semibold border border-blue-100/60 inline-block">
                                 {item.agentAssigned || item.assignedAgent}
                               </span>
                             ) : (
-                              <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-bold border border-blue-100/60 inline-block">
+                              <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[0.875rem] font-semibold border border-blue-100/60 inline-block">
                                 —
                               </span>
                             )}
                           </td>
-                          <td className="py-3 px-3 font-bold text-gray-900 text-xs">
+                          <td className="py-3 px-3 font-semibold text-gray-900 text-[0.875rem]">
                             {allCities.filter((c: any) => {
                               const rName = (item.firmName || item.name || '').toLowerCase().trim();
                               const rCode = (item.code || '').toLowerCase().trim();
@@ -3292,7 +3218,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               return cRoute && (cRoute === rName || (rCode && cRoute === rCode));
                             }).length}
                           </td>
-                          <td className="py-3 px-3 font-bold text-gray-900 text-xs">
+                          <td className="py-3 px-3 font-semibold text-gray-900 text-[0.875rem]">
                             {(() => {
                               const rName = (item.firmName || item.name || '').toLowerCase().trim();
                               const rCode = (item.code || '').toLowerCase().trim();
@@ -3343,29 +3269,29 @@ export const BusinessDirectoryV2: React.FC = () => {
                               if (totalOut > 0) {
                                 return (
                                   <div className="flex flex-col items-start">
-                                    <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-mono font-bold text-xs">
+                                    <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-mono font-semibold text-[0.875rem]">
                                       ₹{totalOut.toLocaleString('en-IN')}
                                     </span>
-                                    <span className="text-[10px] text-gray-500 font-medium mt-0.5">Outstanding (To Collect)</span>
+                                    <span className="text-xs text-gray-500 font-medium mt-0.5">Outstanding (To Collect)</span>
                                   </div>
                                 );
                               }
                               if (totalOut < 0) {
                                 return (
                                   <div className="flex flex-col items-start">
-                                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono font-bold text-xs">
+                                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono font-semibold text-[0.875rem]">
                                       ₹{Math.abs(totalOut).toLocaleString('en-IN')}
                                     </span>
-                                    <span className="text-[10px] text-gray-500 font-medium mt-0.5">Advance (Credit)</span>
+                                    <span className="text-xs text-gray-500 font-medium mt-0.5">Advance (Credit)</span>
                                   </div>
                                 );
                               }
                               return (
                                 <div className="flex flex-col items-start">
-                                  <span className="font-bold text-xs text-gray-800 font-mono">
+                                  <span className="font-semibold text-[0.875rem] text-gray-800 font-mono">
                                     ₹0
                                   </span>
-                                  <span className="text-[10px] text-gray-400 font-medium mt-0.5">No outstanding</span>
+                                  <span className="text-xs text-gray-400 font-medium mt-0.5">No outstanding</span>
                                 </div>
                               );
                             })()}
@@ -3379,21 +3305,21 @@ export const BusinessDirectoryV2: React.FC = () => {
                           <td className="py-3 px-3 font-semibold text-gray-900">
                             <div className="flex items-center gap-2">
                               <Building className="w-4 h-4 text-blue-600 shrink-0" />
-                              <span className="font-bold text-gray-900">{item.firmName || item.name}</span>
+                              <span className="font-semibold text-gray-900">{item.firmName || item.name}</span>
                             </div>
                           </td>
                           <td className="py-3 px-3">
                             {item.route ? (
-                              <span className="px-2.5 py-0.5 rounded-full bg-white text-blue-700 font-extrabold text-xs border border-blue-300 tracking-wide shadow-2xs inline-block">
+                              <span className="px-2.5 py-0.5 rounded-full bg-white text-blue-700 font-semibold text-[0.875rem] border border-blue-300 tracking-wide shadow-2xs inline-block">
                                 {item.route}
                               </span>
                             ) : (
-                              <span className="text-gray-400 font-normal text-xs">—</span>
+                              <span className="text-gray-400 font-normal text-[0.875rem]">—</span>
                             )}
                           </td>
                           <td className="py-3 px-3 text-gray-600 font-medium">{[item.district, item.state].filter(Boolean).join(', ') || '—'}</td>
                           <td className="py-3 px-3 text-gray-600 font-medium">{item.agentAssigned || '—'}</td>
-                          <td className="py-3 px-3 font-bold text-gray-900 text-xs">
+                          <td className="py-3 px-3 font-semibold text-gray-900 text-[0.875rem]">
                             {(() => {
                               const cityName = (item.firmName || item.name || '').toLowerCase().trim();
                               const cityCusts = allCustomers.filter((c: any) => {
@@ -3412,7 +3338,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                     });
                                     setCardCustomerSearch('');
                                   }}
-                                  className="hover:text-blue-600 font-bold transition-colors cursor-pointer"
+                                  className="hover:text-blue-600 font-semibold cursor-pointer"
                                 >
                                   {cityCusts.length}
                                 </button>
@@ -3430,29 +3356,29 @@ export const BusinessDirectoryV2: React.FC = () => {
                               if (cityOut > 0) {
                                 return (
                                   <div className="flex flex-col items-start">
-                                    <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-mono font-bold text-xs">
+                                    <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-mono font-semibold text-[0.875rem]">
                                       ₹{cityOut.toLocaleString('en-IN')}
                                     </span>
-                                    <span className="text-[10px] text-gray-500 font-medium mt-0.5">Outstanding (To Collect)</span>
+                                    <span className="text-xs text-gray-500 font-medium mt-0.5">Outstanding (To Collect)</span>
                                   </div>
                                 );
                               }
                               if (cityOut < 0) {
                                 return (
                                   <div className="flex flex-col items-start">
-                                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono font-bold text-xs">
+                                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono font-semibold text-[0.875rem]">
                                       ₹{Math.abs(cityOut).toLocaleString('en-IN')}
                                     </span>
-                                    <span className="text-[10px] text-gray-500 font-medium mt-0.5">Advance (Credit)</span>
+                                    <span className="text-xs text-gray-500 font-medium mt-0.5">Advance (Credit)</span>
                                   </div>
                                 );
                               }
                               return (
                                 <div className="flex flex-col items-start">
-                                  <span className="font-bold text-xs text-gray-800 font-mono">
+                                  <span className="font-semibold text-[0.875rem] text-gray-800 font-mono">
                                     ₹0
                                   </span>
-                                  <span className="text-[10px] text-gray-400 font-medium mt-0.5">No outstanding</span>
+                                  <span className="text-xs text-gray-400 font-medium mt-0.5">No outstanding</span>
                                 </div>
                               );
                             })()}
@@ -3462,7 +3388,7 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                       {/* STATUS */}
                       <td className="py-3 px-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-extrabold uppercase border ${
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold uppercase border ${
                           item.status === 'active'
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                             : item.status === 'inactive'
@@ -3481,15 +3407,12 @@ export const BusinessDirectoryV2: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => setSelectedDetails(item)}
-                              className="p-1.5 bg-white hover:bg-blue-50/60 text-blue-600 border border-blue-200 rounded-xl transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                              className="icon-btn"
                               title="View Profile"
                               aria-label="View Profile"
                             >
                               <Eye className="w-3.5 h-3.5" />
                             </button>
-                            <div className="absolute bottom-full mb-1.5 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                              View Profile
-                            </div>
                           </div>
 
                           {/* 2. Edit Record */}
@@ -3497,15 +3420,12 @@ export const BusinessDirectoryV2: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => openModal(item)}
-                              className="p-1.5 bg-white hover:bg-blue-50/60 text-blue-600 border border-blue-200 rounded-xl transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                              className="icon-btn"
                               title="Edit Record"
                               aria-label="Edit Record"
                             >
                               <Edit className="w-3.5 h-3.5" />
                             </button>
-                            <div className="absolute bottom-full mb-1.5 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                              Edit Record
-                            </div>
                           </div>
 
                           {/* 3. Delete Record */}
@@ -3513,15 +3433,12 @@ export const BusinessDirectoryV2: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleDeleteItem(item._id)}
-                              className="p-1.5 bg-white hover:bg-rose-50/60 text-rose-600 border border-rose-200 rounded-xl transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                              className="icon-btn-danger"
                               title="Delete Record"
                               aria-label="Delete Record"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
-                            <div className="absolute bottom-full mb-1.5 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                              Delete Record
-                            </div>
                           </div>
                         </div>
                       </td>
@@ -3534,11 +3451,11 @@ export const BusinessDirectoryV2: React.FC = () => {
         </div>
 
         {/* Footer Item Count Summary */}
-        <div className="p-3 bg-gray-50/80 border-t border-gray-200 flex items-center justify-between text-xs text-gray-500 font-semibold">
+        <div className="px-4 py-3 flex items-center justify-between text-[0.875rem] text-gray-500 font-medium">
           <span>
             Showing all {processedItems.length} {activeMainTab === 'customers' ? 'customers' : activeMainTab === 'vendors' ? 'suppliers' : activeMainTab === 'agents' ? 'agents' : activeMainTab === 'transporters' ? 'transporters' : activeMainTab === 'regions' ? 'routes' : 'cities'}
           </span>
-          <span className="text-[11px] text-gray-400 font-normal">
+          <span className="text-xs text-gray-400 font-normal">
             Continuous scroll enabled
           </span>
         </div>
@@ -3563,22 +3480,22 @@ export const BusinessDirectoryV2: React.FC = () => {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-gray-900 tracking-tight">
+                    <h3 className="text-base font-semibold text-gray-900 tracking-tight">
                       {editingItem ? 'Edit' : 'Add'} {activeMainTab === 'customers' ? 'Customer Master' : activeMainTab === 'vendors' ? 'Vendor Master' : activeMainTab === 'agents' ? 'Agent Master' : activeMainTab === 'regions' ? 'Route / Region Master' : activeMainTab === 'cities' ? 'Market / City Master' : 'Transporter Master'}
                     </h3>
                     {activeMainTab === 'customers' && (
-                      <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-md">
+                      <span className="font-mono text-[0.875rem] font-semibold text-blue-700 bg-blue-50 border border-blue-200/80 px-2 py-0.5 rounded-md">
                         {editingItem?.code ? editingItem.code : 'Auto: CU-XXXX'}
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-gray-400 font-medium">Enter master details below</p>
+                  <p className="text-xs text-gray-400 font-medium">Enter master details below</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+                className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-xl cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3586,11 +3503,11 @@ export const BusinessDirectoryV2: React.FC = () => {
 
             {/* A. ADD CUSTOMER MASTER (Matches Screenshots 100%) */}
             {activeMainTab === 'customers' && (
-              <div className="space-y-5 max-h-[75vh] overflow-y-auto pr-2 text-xs">
+              <div className="space-y-5 max-h-[calc(75*var(--vh,1vh))] overflow-y-auto pr-2 text-[0.875rem]">
                 
                 {/* 1. BASIC INFORMATION */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <h4 className="font-medium text-blue-700 uppercase tracking-wider text-xs flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>BASIC INFORMATION</span>
                   </h4>
@@ -3603,7 +3520,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.firmName}
                         onChange={e => setForm(f => ({ ...f, firmName: e.target.value }))}
                         placeholder="e.g. Sri Krishna Binding Works"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3613,7 +3530,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.ownerName}
                         onChange={e => setForm(f => ({ ...f, ownerName: e.target.value }))}
                         placeholder="e.g. Ram Prasad"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3624,7 +3541,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.phone}
                         onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                         placeholder="10-digit number"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3634,7 +3551,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.whatsapp}
                         onChange={e => setForm(f => ({ ...f, whatsapp: e.target.value }))}
                         placeholder="Leave blank to match Mobile"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3644,7 +3561,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.altPhone}
                         onChange={e => setForm(f => ({ ...f, altPhone: e.target.value }))}
                         placeholder="Alternate number"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div className="col-span-2">
@@ -3654,7 +3571,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.email}
                         onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                         placeholder="e.g. customer@gmail.com"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3664,7 +3581,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.gstNumber}
                         onChange={e => setForm(f => ({ ...f, gstNumber: e.target.value }))}
                         placeholder="e.g. 37AAAAA1111A1Z1"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono uppercase focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono uppercase focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3674,7 +3591,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.aadharNumber}
                         onChange={e => setForm(f => ({ ...f, aadharNumber: e.target.value }))}
                         placeholder="e.g. 123456789012"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                   </div>
@@ -3682,7 +3599,7 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                 {/* 2. ADDRESS INFORMATION */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <h4 className="font-medium text-blue-700 uppercase tracking-wider text-xs flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>ADDRESS INFORMATION</span>
                   </h4>
@@ -3694,7 +3611,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.doorNo}
                         onChange={e => setForm(f => ({ ...f, doorNo: e.target.value }))}
                         placeholder="e.g. 5-3/A"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3704,7 +3621,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.streetName}
                         onChange={e => setForm(f => ({ ...f, streetName: e.target.value }))}
                         placeholder="e.g. Press Bazar"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div className="col-span-2">
@@ -3714,7 +3631,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.address1}
                         onChange={e => setForm(f => ({ ...f, address1: e.target.value }))}
                         placeholder="Building, lane details..."
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3724,7 +3641,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.area}
                         onChange={e => setForm(f => ({ ...f, area: e.target.value }))}
                         placeholder="e.g. Auto Nagar"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3734,14 +3651,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.landmark}
                         onChange={e => setForm(f => ({ ...f, landmark: e.target.value }))}
                         placeholder="e.g. Near Water Tank"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div className="col-span-2">
                       <label className="block text-gray-700 font-semibold mb-1 flex items-center justify-between">
                         <span>City</span>
                         {form.route && (
-                          <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full font-bold">
+                          <span className="text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full font-semibold">
                             Auto Region: {form.route}
                           </span>
                         )}
@@ -3749,7 +3666,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       <select
                         value={form.city}
                         onChange={e => handleCitySelect(e.target.value)}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       >
                         <option value="">Select City</option>
                         {allCities.map((c: any) => {
@@ -3769,7 +3686,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.district}
                         onChange={e => setForm(f => ({ ...f, district: e.target.value }))}
                         placeholder="e.g. Tirupati"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3779,7 +3696,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.state}
                         onChange={e => setForm(f => ({ ...f, state: e.target.value }))}
                         placeholder="Andhra Pradesh"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3789,7 +3706,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.pincode}
                         onChange={e => setForm(f => ({ ...f, pincode: e.target.value }))}
                         placeholder="e.g. 517501"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div className="col-span-2">
@@ -3799,7 +3716,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.gpsLocation}
                         onChange={e => setForm(f => ({ ...f, gpsLocation: e.target.value }))}
                         placeholder="https://maps.google.com/..."
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                   </div>
@@ -3807,7 +3724,7 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                 {/* 3. BUSINESS & LOGISTICS */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <h4 className="font-medium text-blue-700 uppercase tracking-wider text-xs flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>BUSINESS & LOGISTICS</span>
                   </h4>
@@ -3817,7 +3734,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       <select
                         value={form.route}
                         onChange={e => setForm(f => ({ ...f, route: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       >
                         <option value="">Select Region</option>
                         {allRoutes.map((r: any) => (
@@ -3830,7 +3747,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       <select
                         value={form.agentAssigned}
                         onChange={e => setForm(f => ({ ...f, agentAssigned: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       >
                         <option value="">Select Agent</option>
                         {allAgents.map((a: any) => (
@@ -3852,7 +3769,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               transporterPhone: matchedT?.phone || f.transporterPhone || ''
                             }));
                           }}
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         >
                           <option value="">Select Transporter</option>
                           {allTransporters.map((t: any) => (
@@ -3867,7 +3784,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.transporterPhone || ''}
                           onChange={e => setForm(f => ({ ...f, transporterPhone: e.target.value }))}
                           placeholder="Transporter Contact #"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                     </div>
@@ -3876,7 +3793,7 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                 {/* 4. CREDIT & GRADE SETTINGS */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <h4 className="font-medium text-blue-700 uppercase tracking-wider text-xs flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>CREDIT & GRADE SETTINGS</span>
                   </h4>
@@ -3887,7 +3804,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         type="number"
                         value={form.creditDays}
                         onChange={e => setForm(f => ({ ...f, creditDays: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3896,7 +3813,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         type="number"
                         value={form.creditLimit}
                         onChange={e => setForm(f => ({ ...f, creditLimit: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3905,7 +3822,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         type="number"
                         value={form.openingBalance}
                         onChange={e => setForm(f => ({ ...f, openingBalance: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -3914,7 +3831,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         type="number"
                         value={form.outstandingBalance}
                         onChange={e => setForm(f => ({ ...f, outstandingBalance: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-gray-100 shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 bg-gray-100 shadow-2xs"
                       />
                     </div>
                     <div className="col-span-2">
@@ -3932,7 +3849,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.notes}
                         onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                         placeholder="General business remarks..."
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                   </div>
@@ -3943,10 +3860,10 @@ export const BusinessDirectoryV2: React.FC = () => {
 
             {/* B. VENDOR / SUPPLIER FORM (Matches Screenshots 100%) */}
             {activeMainTab === 'vendors' && (
-              <div className="space-y-5 max-h-[75vh] overflow-y-auto pr-2 text-xs">
+              <div className="space-y-5 max-h-[calc(75*var(--vh,1vh))] overflow-y-auto pr-2 text-[0.875rem]">
                 {/* 1. BASIC INFORMATION */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <h4 className="font-medium text-blue-700 uppercase tracking-wider text-xs flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>Basic Information</span>
                   </h4>
@@ -3959,7 +3876,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.firmName}
                         onChange={e => setForm(f => ({ ...f, firmName: e.target.value }))}
                         placeholder="e.g. Tirupati Card Centre"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white shadow-2xs"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -3971,7 +3888,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.ownerName}
                           onChange={e => setForm(f => ({ ...f, ownerName: e.target.value }))}
                           placeholder="e.g. Ramesh Kumar"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                       <div>
@@ -3980,7 +3897,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           required
                           value={form.vendorType}
                           onChange={e => setForm(f => ({ ...f, vendorType: e.target.value }))}
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         >
                           <option value="">Select Vendor Type</option>
                           <option value="PAPER SUPPLIER">PAPER SUPPLIER</option>
@@ -4003,7 +3920,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.phone}
                           onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                           placeholder="e.g. 98765 43210"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                       <div>
@@ -4013,7 +3930,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.whatsapp}
                           onChange={e => setForm(f => ({ ...f, whatsapp: e.target.value }))}
                           placeholder="Leave blank to match Mobile"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                     </div>
@@ -4024,7 +3941,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.altPhone}
                         onChange={e => setForm(f => ({ ...f, altPhone: e.target.value }))}
                         placeholder="Alternate mobile"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -4034,7 +3951,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.email}
                         onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                         placeholder="e.g. example@mail.com"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -4045,7 +3962,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.gstNumber}
                           onChange={e => setForm(f => ({ ...f, gstNumber: e.target.value }))}
                           placeholder="e.g. 37AAAAA1111A1Z1"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono uppercase focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono uppercase focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                       <div>
@@ -4055,7 +3972,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.aadharNumber}
                           onChange={e => setForm(f => ({ ...f, aadharNumber: e.target.value }))}
                           placeholder="e.g. 123456789012"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                     </div>
@@ -4064,7 +3981,7 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                 {/* 2. ADDRESS INFORMATION */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <h4 className="font-medium text-blue-700 uppercase tracking-wider text-xs flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>Address Information</span>
                   </h4>
@@ -4077,7 +3994,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.doorNo}
                           onChange={e => setForm(f => ({ ...f, doorNo: e.target.value }))}
                           placeholder="e.g. 12/A"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                       <div>
@@ -4087,7 +4004,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.streetName}
                           onChange={e => setForm(f => ({ ...f, streetName: e.target.value }))}
                           placeholder="e.g. Gandhi Road"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                     </div>
@@ -4098,7 +4015,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.address1}
                         onChange={e => setForm(f => ({ ...f, address1: e.target.value }))}
                         placeholder="e.g. Near Bus Stand"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -4109,7 +4026,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.area}
                           onChange={e => setForm(f => ({ ...f, area: e.target.value }))}
                           placeholder="e.g. Anna Nagar"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                       <div>
@@ -4119,7 +4036,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.landmark}
                           onChange={e => setForm(f => ({ ...f, landmark: e.target.value }))}
                           placeholder="e.g. Opp. SBI Bank"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                     </div>
@@ -4132,7 +4049,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.city}
                           onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
                           placeholder="e.g. Chennai"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                       <div>
@@ -4143,7 +4060,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.district}
                           onChange={e => setForm(f => ({ ...f, district: e.target.value }))}
                           placeholder="e.g. Chennai"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                     </div>
@@ -4156,7 +4073,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.state}
                           onChange={e => setForm(f => ({ ...f, state: e.target.value }))}
                           placeholder="Andhra Pradesh"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                       <div>
@@ -4167,7 +4084,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.pincode}
                           onChange={e => setForm(f => ({ ...f, pincode: e.target.value }))}
                           placeholder="e.g. 600001"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                     </div>
@@ -4176,7 +4093,7 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                 {/* 3. LOCATION */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <h4 className="font-medium text-blue-700 uppercase tracking-wider text-xs flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>Location</span>
                   </h4>
@@ -4187,14 +4104,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                       value={form.gpsLocation}
                       onChange={e => setForm(f => ({ ...f, gpsLocation: e.target.value }))}
                       placeholder="Paste Google Maps URL"
-                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                     />
                   </div>
                 </div>
 
                 {/* 4. BUSINESS SETTINGS */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <h4 className="font-medium text-blue-700 uppercase tracking-wider text-xs flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>Business Settings</span>
                   </h4>
@@ -4205,7 +4122,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         type="number"
                         value={form.outstandingBalance}
                         onChange={e => setForm(f => ({ ...f, outstandingBalance: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -4223,7 +4140,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.notes}
                         onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                         placeholder="General remarks/instructions..."
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                   </div>
@@ -4232,7 +4149,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 {/* 5. CONTACT PERSONS */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <h4 className="font-medium text-blue-700 uppercase tracking-wider text-xs flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                       <span>CONTACT PERSONS</span>
                     </h4>
@@ -4242,14 +4159,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                         ...f,
                         contactPersons: [...(f.contactPersons || []), { name: '', phone: '', email: '' }]
                       }))}
-                      className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
+                      className="text-[0.875rem] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add Contact</span>
                     </button>
                   </div>
                   {(!form.contactPersons || form.contactPersons.length === 0) ? (
-                    <p className="text-gray-400 italic text-[11px]">No contact persons added yet. Click Add Contact to add.</p>
+                    <p className="text-gray-400 italic text-xs">No contact persons added yet. Click Add Contact to add.</p>
                   ) : (
                     <div className="space-y-2.5">
                       {form.contactPersons.map((cp: any, idx: number) => (
@@ -4275,7 +4192,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 newCP[idx].name = e.target.value;
                                 setForm(f => ({ ...f, contactPersons: newCP }));
                               }}
-                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-blue-600"
+                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600"
                             />
                             <input
                               type="text"
@@ -4286,7 +4203,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 newCP[idx].phone = e.target.value;
                                 setForm(f => ({ ...f, contactPersons: newCP }));
                               }}
-                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-600"
+                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[0.875rem] font-mono focus:outline-none focus:border-blue-600"
                             />
                             <input
                               type="email"
@@ -4297,7 +4214,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 newCP[idx].email = e.target.value;
                                 setForm(f => ({ ...f, contactPersons: newCP }));
                               }}
-                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:border-blue-600"
+                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600"
                             />
                           </div>
                         </div>
@@ -4311,10 +4228,10 @@ export const BusinessDirectoryV2: React.FC = () => {
 
             {/* C. AGENT FORM (Matches User Screenshot 100%) */}
             {activeMainTab === 'agents' && (
-              <div className="space-y-4 text-xs">
+              <div className="space-y-4 text-[0.875rem]">
                 {/* 1. AGENT DETAILS */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <h4 className="font-medium text-blue-700 uppercase tracking-wider text-xs flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>Agent Details</span>
                   </h4>
@@ -4327,7 +4244,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.firmName}
                         onChange={e => setForm(f => ({ ...f, firmName: e.target.value }))}
                         placeholder="e.g. Rajesh Kumar"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -4338,7 +4255,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.phone}
                         onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                         placeholder="e.g. 98765 43210"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -4348,7 +4265,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.altPhone}
                         onChange={e => setForm(f => ({ ...f, altPhone: e.target.value }))}
                         placeholder="Alternate mobile"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                   </div>
@@ -4357,11 +4274,11 @@ export const BusinessDirectoryV2: React.FC = () => {
                 {/* 2. ASSIGNED ROUTES */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
                   <div>
-                    <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <h4 className="font-medium text-blue-700 uppercase tracking-wider text-xs flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                       <span>Assigned Routes</span>
                     </h4>
-                    <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+                    <p className="text-xs text-gray-500 font-medium mt-0.5">
                       Select the routes this agent is assigned to:
                     </p>
                   </div>
@@ -4372,7 +4289,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       allRoutes.map((r: any) => {
                         const checked = form.assignedRoutes.includes(r._id);
                         return (
-                          <label key={r._id} className="flex items-center gap-2.5 cursor-pointer text-xs select-none hover:bg-blue-50/30 p-1.5 rounded-lg transition-all">
+                          <label key={r._id} className="flex items-center gap-2.5 cursor-pointer text-[0.875rem] select-none hover:bg-blue-50/30 p-1.5 rounded-lg">
                             <input
                               type="checkbox"
                               checked={checked}
@@ -4383,9 +4300,9 @@ export const BusinessDirectoryV2: React.FC = () => {
                               className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4"
                             />
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-gray-900">{r.name}</span>
+                              <span className="font-semibold text-gray-900">{r.name}</span>
                               {r.assignedAgent && (
-                                <span className="text-[11px] text-gray-400 font-normal">
+                                <span className="text-xs text-gray-400 font-normal">
                                   (Currently: {r.assignedAgent})
                                 </span>
                               )}
@@ -4401,9 +4318,9 @@ export const BusinessDirectoryV2: React.FC = () => {
 
             {/* D. REGION / ROUTE FORM (Matches Screenshot 100%) */}
             {activeMainTab === 'regions' && (
-              <div className="space-y-4 text-xs">
+              <div className="space-y-4 text-[0.875rem]">
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <h4 className="font-medium text-blue-700 uppercase tracking-wider text-xs flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>Region Details</span>
                   </h4>
@@ -4417,7 +4334,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.firmName}
                           onChange={e => setForm(f => ({ ...f, firmName: e.target.value }))}
                           placeholder="e.g. Andhra Line"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                       <div>
@@ -4428,7 +4345,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                           value={form.code}
                           onChange={e => setForm(f => ({ ...f, code: e.target.value }))}
                           placeholder="e.g. A"
-                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono uppercase focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                          className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono uppercase focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                         />
                       </div>
                     </div>
@@ -4437,7 +4354,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       <select
                         value={form.agentAssigned}
                         onChange={e => setForm(f => ({ ...f, agentAssigned: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       >
                         <option value="">Select Agent</option>
                         {allAgents.map((a: any) => (
@@ -4452,7 +4369,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.notes}
                         onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                         placeholder="Region notes or details"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                   </div>
@@ -4462,17 +4379,17 @@ export const BusinessDirectoryV2: React.FC = () => {
 
             {/* E. CITY / MARKET FORM */}
             {activeMainTab === 'cities' && (
-              <div className="space-y-4 text-xs">
+              <div className="space-y-4 text-[0.875rem]">
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
                   <div>
-                    <label className="block text-gray-700 font-bold mb-1">City Name *</label>
+                    <label className="block text-gray-700 font-semibold mb-1">City Name *</label>
                     <input
                       type="text"
                       required
                       value={form.firmName}
                       onChange={e => setForm(f => ({ ...f, firmName: e.target.value }))}
                       placeholder="e.g. Vijayawada"
-                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                     />
                   </div>
                   <div>
@@ -4481,7 +4398,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       required
                       value={form.route}
                       onChange={e => setForm(f => ({ ...f, route: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                     >
                       <option value="">Select Region</option>
                       {allRoutes.map((r: any) => (
@@ -4497,7 +4414,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.district}
                         onChange={e => setForm(f => ({ ...f, district: e.target.value }))}
                         placeholder="e.g. Krishna"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -4507,7 +4424,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.state}
                         onChange={e => setForm(f => ({ ...f, state: e.target.value }))}
                         placeholder="Andhra Pradesh"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                   </div>
@@ -4516,7 +4433,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                     <select
                       value={form.agentAssigned}
                       onChange={e => setForm(f => ({ ...f, agentAssigned: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                      className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                     >
                       <option value="">Select Agent</option>
                       {allAgents.map((a: any) => (
@@ -4530,10 +4447,10 @@ export const BusinessDirectoryV2: React.FC = () => {
 
             {/* F. TRANSPORTER FORM (Matches Screenshot 100%) */}
             {activeMainTab === 'transporters' && (
-              <div className="space-y-4 text-xs">
+              <div className="space-y-4 text-[0.875rem]">
                 {/* 1. TRANSPORTER DETAILS */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
-                  <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <h4 className="font-medium text-blue-700 uppercase tracking-wider text-xs flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                     <span>Transporter Details</span>
                   </h4>
@@ -4546,7 +4463,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.firmName}
                         onChange={e => setForm(f => ({ ...f, firmName: e.target.value }))}
                         placeholder="e.g. Garuda"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -4556,7 +4473,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.phone}
                         onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                         placeholder="e.g. 9876543210"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-mono focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -4566,7 +4483,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.email}
                         onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                         placeholder="e.g. example@mail.com"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                     <div>
@@ -4576,7 +4493,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         value={form.city}
                         onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
                         placeholder="e.g. Bangalore"
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 bg-white shadow-2xs"
                       />
                     </div>
                   </div>
@@ -4585,7 +4502,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 {/* 2. CONTACT PERSONS */}
                 <div className="bg-slate-50/60 p-4 rounded-2xl border border-gray-200/80 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-blue-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <h4 className="font-medium text-blue-700 uppercase tracking-wider text-xs flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                       <span>CONTACT PERSONS</span>
                     </h4>
@@ -4595,14 +4512,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                         ...f,
                         contactPersons: [...(f.contactPersons || []), { name: '', phone: '', email: '' }]
                       }))}
-                      className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
+                      className="text-[0.875rem] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add Contact</span>
                     </button>
                   </div>
                   {(!form.contactPersons || form.contactPersons.length === 0) ? (
-                    <p className="text-gray-400 italic text-[11px]">No contact persons added yet. Click Add Contact to add.</p>
+                    <p className="text-gray-400 italic text-xs">No contact persons added yet. Click Add Contact to add.</p>
                   ) : (
                     <div className="space-y-2.5">
                       {form.contactPersons.map((cp: any, idx: number) => (
@@ -4628,7 +4545,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 newCP[idx].name = e.target.value;
                                 setForm(f => ({ ...f, contactPersons: newCP }));
                               }}
-                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none focus:border-blue-600"
+                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[0.875rem] font-semibold focus:outline-none focus:border-blue-600"
                             />
                             <input
                               type="text"
@@ -4639,7 +4556,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 newCP[idx].phone = e.target.value;
                                 setForm(f => ({ ...f, contactPersons: newCP }));
                               }}
-                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-600"
+                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[0.875rem] font-mono focus:outline-none focus:border-blue-600"
                             />
                             <input
                               type="email"
@@ -4650,7 +4567,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 newCP[idx].email = e.target.value;
                                 setForm(f => ({ ...f, contactPersons: newCP }));
                               }}
-                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:border-blue-600"
+                              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[0.875rem] font-medium focus:outline-none focus:border-blue-600"
                             />
                           </div>
                         </div>
@@ -4664,12 +4581,12 @@ export const BusinessDirectoryV2: React.FC = () => {
 
             {/* Status Pills */}
             <div className="pt-2 border-t border-gray-100">
-              <label className="block text-gray-700 font-bold mb-1.5 text-xs">Status</label>
+              <label className="block text-gray-700 font-semibold mb-1.5 text-[0.875rem]">Status</label>
               <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => setForm(f => ({ ...f, status: 'active' }))}
-                  className={`py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                  className={`py-2 text-[0.875rem] font-semibold rounded-xl border cursor-pointer ${
                     form.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-300 shadow-2xs' : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
                   }`}
                 >
@@ -4678,7 +4595,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setForm(f => ({ ...f, status: 'inactive' }))}
-                  className={`py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                  className={`py-2 text-[0.875rem] font-semibold rounded-xl border cursor-pointer ${
                     form.status === 'inactive' ? 'bg-rose-50 text-rose-700 border-rose-300 shadow-2xs' : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
                   }`}
                 >
@@ -4687,7 +4604,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setForm(f => ({ ...f, status: 'on-hold' }))}
-                  className={`py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                  className={`py-2 text-[0.875rem] font-semibold rounded-xl border cursor-pointer ${
                     form.status === 'on-hold' ? 'bg-amber-50 text-amber-700 border-amber-300 shadow-2xs' : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
                   }`}
                 >
@@ -4697,18 +4614,18 @@ export const BusinessDirectoryV2: React.FC = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
+            <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3 dlg-footer">
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all cursor-pointer"
+                className="px-4 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-[0.875rem] font-semibold hover:bg-gray-50 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSaving}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm disabled:opacity-50 flex items-center gap-1.5 transition-all cursor-pointer"
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[0.875rem] font-semibold shadow-sm disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
               >
                 {isSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
                 <span>Save {activeMainTab.slice(0, -1).toUpperCase()}</span>
@@ -4740,10 +4657,10 @@ export const BusinessDirectoryV2: React.FC = () => {
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base sm:text-lg font-black text-gray-900 tracking-tight">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 tracking-tight">
                       {selectedDetails.firmName || selectedDetails.name || selectedDetails.contactName}
                     </h3>
-                    <span className={`px-2.5 py-0.5 text-[10px] font-extrabold uppercase rounded-full border ${
+                    <span className={`px-2.5 py-0.5 text-xs font-semibold uppercase rounded-full border ${
                       selectedDetails.status === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                       selectedDetails.status === 'inactive' ? 'bg-rose-50 text-rose-700 border-rose-200' :
                       'bg-amber-50 text-amber-700 border-amber-200'
@@ -4752,13 +4669,13 @@ export const BusinessDirectoryV2: React.FC = () => {
                     </span>
                   </div>
                   {(selectedDetails.contactName || selectedDetails.ownerName || selectedDetails.contactPersons?.[0]?.name) && (
-                    <div className="text-xs text-gray-600 font-medium mt-0.5 flex items-center gap-1">
+                    <div className="text-[0.875rem] text-gray-600 font-medium mt-0.5 flex items-center gap-1">
                       <span className="text-gray-400 font-normal">Contact Person:</span>
-                      <span className="text-blue-700 font-bold">{selectedDetails.contactName || selectedDetails.ownerName || selectedDetails.contactPersons?.[0]?.name}</span>
+                      <span className="text-blue-700 font-semibold">{selectedDetails.contactName || selectedDetails.ownerName || selectedDetails.contactPersons?.[0]?.name}</span>
                     </div>
                   )}
-                  <p className="text-[11px] text-gray-400 font-mono mt-0.5">
-                    {effectiveTab.toUpperCase()} CODE: <span className="font-extrabold text-blue-600">{selectedDetails.code || selectedDetails._id?.slice(-6).toUpperCase()}</span>
+                  <p className="text-xs text-gray-400 font-mono mt-0.5">
+                    {effectiveTab.toUpperCase()} CODE: <span className="font-semibold text-blue-600">{selectedDetails.code || selectedDetails._id?.slice(-6).toUpperCase()}</span>
                   </p>
                 </div>
               </div>
@@ -4768,7 +4685,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                   setSelectedDetails(null);
                   setRegionCitySearch('');
                 }}
-                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -4777,7 +4694,7 @@ export const BusinessDirectoryV2: React.FC = () => {
             {/* Actions Grid Toolbar */}
             <div className="space-y-1 bg-slate-50/80 p-2.5 rounded-2xl border border-gray-200/80">
               <div className="flex items-center justify-between px-0.5 mb-1">
-                <span className="text-[9.5px] font-black text-gray-400 uppercase tracking-wider">ACTIONS</span>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">ACTIONS</span>
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 <button
@@ -4787,11 +4704,11 @@ export const BusinessDirectoryV2: React.FC = () => {
                     setSelectedDetails(null);
                     openModal(target);
                   }}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-[0.875rem] flex items-center gap-1.5 shadow-2xs cursor-pointer"
                 >
                   <Edit className="w-3.5 h-3.5" />
                   <span>Edit Profile</span>
-                  <span className="text-[9px] bg-blue-700/60 text-blue-100 font-mono px-1 rounded hidden sm:inline">Alt+E</span>
+                  <span className="text-xs bg-blue-700/60 text-blue-100 font-mono px-1 rounded hidden sm:inline">Alt+E</span>
                 </button>
                 <button
                   type="button"
@@ -4800,16 +4717,16 @@ export const BusinessDirectoryV2: React.FC = () => {
                     setSelectedDetails(null);
                     handleDeleteItem(id);
                   }}
-                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl text-[0.875rem] flex items-center gap-1.5 shadow-2xs cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Delete</span>
-                  <span className="text-[9px] bg-rose-700/60 text-rose-100 font-mono px-1 rounded hidden sm:inline">Alt+D</span>
+                  <span className="text-xs bg-rose-700/60 text-rose-100 font-mono px-1 rounded hidden sm:inline">Alt+D</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => showToast(`History & Visit records for ${selectedDetails.firmName || selectedDetails.name}`, 'info')}
-                  className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-xl border border-gray-200 text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 font-semibold rounded-xl border border-gray-200 text-[0.875rem] flex items-center gap-1.5 cursor-pointer shadow-2xs"
                 >
                   <History className="w-3.5 h-3.5 text-gray-500" />
                   <span>History / Visit</span>
@@ -4817,7 +4734,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => showToast(`Opening Ledger for ${selectedDetails.firmName || selectedDetails.name}...`, 'info')}
-                  className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-xl border border-gray-200 text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 font-semibold rounded-xl border border-gray-200 text-[0.875rem] flex items-center gap-1.5 cursor-pointer shadow-2xs"
                 >
                   <BookOpen className="w-3.5 h-3.5 text-gray-500" />
                   <span>Ledger</span>
@@ -4825,7 +4742,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => showToast(`Record Payment for ${selectedDetails.firmName || selectedDetails.name}`, 'info')}
-                  className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-xl border border-gray-200 text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 font-semibold rounded-xl border border-gray-200 text-[0.875rem] flex items-center gap-1.5 cursor-pointer shadow-2xs"
                 >
                   <CreditCard className="w-3.5 h-3.5 text-gray-500" />
                   <span>Payment</span>
@@ -4833,7 +4750,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => showToast(`Create Quotation for ${selectedDetails.firmName || selectedDetails.name}`, 'info')}
-                  className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-xl border border-gray-200 text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 font-semibold rounded-xl border border-gray-200 text-[0.875rem] flex items-center gap-1.5 cursor-pointer shadow-2xs"
                 >
                   <FileText className="w-3.5 h-3.5 text-gray-500" />
                   <span>Quotation</span>
@@ -4841,7 +4758,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => showToast(`Create Sale Order for ${selectedDetails.firmName || selectedDetails.name}`, 'info')}
-                  className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-xl border border-gray-200 text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  className="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 font-semibold rounded-xl border border-gray-200 text-[0.875rem] flex items-center gap-1.5 cursor-pointer shadow-2xs"
                 >
                   <ShoppingCart className="w-3.5 h-3.5 text-gray-500" />
                   <span>Sale Order</span>
@@ -4866,21 +4783,21 @@ export const BusinessDirectoryV2: React.FC = () => {
                   <>
                     <div className="grid grid-cols-3 gap-2.5">
                       <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider">ASSIGNED REGION</span>
-                        <span className="block text-xs font-extrabold text-blue-950 mt-0.5 truncate" title={selectedDetails.route || selectedDetails.assignedRegion || 'Unassigned'}>
+                        <span className="block text-xs text-blue-700 font-medium uppercase tracking-wider">ASSIGNED REGION</span>
+                        <span className="block text-[0.875rem] font-semibold text-blue-950 mt-0.5 truncate" title={selectedDetails.route || selectedDetails.assignedRegion || 'Unassigned'}>
                           {selectedDetails.route || selectedDetails.assignedRegion || 'Unassigned'}
                         </span>
                       </div>
                       <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider">ASSIGNED CITY</span>
-                        <span className="block text-xs font-extrabold text-blue-950 mt-0.5 truncate" title={selectedDetails.city || selectedDetails.assignedMarket || 'Unassigned'}>
+                        <span className="block text-xs text-blue-700 font-medium uppercase tracking-wider">ASSIGNED CITY</span>
+                        <span className="block text-[0.875rem] font-semibold text-blue-950 mt-0.5 truncate" title={selectedDetails.city || selectedDetails.assignedMarket || 'Unassigned'}>
                           {selectedDetails.city || selectedDetails.assignedMarket || 'Unassigned'}
                         </span>
                       </div>
                       <div className="bg-rose-50/60 border border-rose-100 p-2.5 rounded-2xl text-center shadow-2xs flex flex-col justify-between">
                         <div>
-                          <span className="block text-[9px] text-rose-700 font-extrabold uppercase tracking-wider">OUTSTANDING BALANCE</span>
-                          <span className={`block text-xs font-mono font-black mt-0.5 ${bal > 0 ? 'text-rose-950' : bal < 0 ? 'text-emerald-950' : 'text-gray-900'}`}>
+                          <span className="block text-xs text-rose-700 font-medium uppercase tracking-wider">OUTSTANDING BALANCE</span>
+                          <span className={`block text-[0.875rem] font-mono font-semibold mt-0.5 ${bal > 0 ? 'text-rose-950' : bal < 0 ? 'text-emerald-950' : 'text-gray-900'}`}>
                             ₹{Math.abs(bal).toLocaleString('en-IN')}
                           </span>
                         </div>
@@ -4890,7 +4807,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                             setCustomerPaymentParty(selectedDetails);
                             setShowCustomerPaymentModal(true);
                           }}
-                          className="mt-1.5 py-1 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-[10px] flex items-center justify-center gap-1 shadow-2xs transition-all cursor-pointer"
+                          className="mt-1.5 py-1 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center justify-center gap-1 shadow-2xs cursor-pointer"
                         >
                           <Receipt className="w-3 h-3" />
                           <span>Record Payment</span>
@@ -4898,7 +4815,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-3.5 text-xs">
+                    <div className="max-h-[calc(60*var(--vh,1vh))] overflow-y-auto pr-1 space-y-3.5 text-[0.875rem]">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                         <div className="space-y-3.5">
                           {/* CARD 1: BASIC INFO */}
@@ -4908,19 +4825,19 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                                   <User className="w-3.5 h-3.5" />
                                 </div>
-                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">BASIC INFORMATION</h4>
+                                <h4 className="font-medium text-gray-900 text-[0.875rem] tracking-wider uppercase">BASIC INFORMATION</h4>
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-[0.875rem]">
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Contact Person</span>
-                                <span className="font-bold text-gray-900 text-xs block truncate">{selectedDetails.contactName || selectedDetails.ownerName || selectedDetails.contactPersons?.[0]?.name || '—'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Contact Person</span>
+                                <span className="font-semibold text-gray-900 text-[0.875rem] block truncate">{selectedDetails.contactName || selectedDetails.ownerName || selectedDetails.contactPersons?.[0]?.name || '—'}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Mobile Number</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Mobile Number</span>
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.phone || selectedDetails.mobile || '—'}</span>
+                                  <span className="font-mono font-semibold text-blue-600 text-[0.875rem]">{selectedDetails.phone || selectedDetails.mobile || '—'}</span>
                                   {selectedDetails.phone && (
                                     <a href={`https://wa.me/91${selectedDetails.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
                                       <WhatsAppIcon />
@@ -4929,9 +4846,9 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 </div>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">WhatsApp Number</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">WhatsApp Number</span>
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.whatsapp || selectedDetails.phone || '—'}</span>
+                                  <span className="font-mono font-semibold text-blue-600 text-[0.875rem]">{selectedDetails.whatsapp || selectedDetails.phone || '—'}</span>
                                   {(selectedDetails.whatsapp || selectedDetails.phone) && (
                                     <a href={`https://wa.me/91${(selectedDetails.whatsapp || selectedDetails.phone).replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
                                       <WhatsAppIcon />
@@ -4940,20 +4857,20 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 </div>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Alt Mobile</span>
-                                <span className="font-mono font-semibold text-gray-800 text-xs">{selectedDetails.altPhone || selectedDetails.altMobile || '—'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Alt Mobile</span>
+                                <span className="font-mono font-semibold text-gray-800 text-[0.875rem]">{selectedDetails.altPhone || selectedDetails.altMobile || '—'}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Email ID</span>
-                                <span className="font-semibold text-gray-800 text-xs truncate block">{selectedDetails.email || '—'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Email ID</span>
+                                <span className="font-semibold text-gray-800 text-[0.875rem] truncate block">{selectedDetails.email || '—'}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">GST Number</span>
-                                <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.gstNumber || selectedDetails.gstin || '—'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">GST Number</span>
+                                <span className="font-mono font-semibold text-blue-600 text-[0.875rem]">{selectedDetails.gstNumber || selectedDetails.gstin || '—'}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Aadhar / PAN</span>
-                                <span className="font-mono font-semibold text-gray-800 text-xs">{selectedDetails.aadharNumber || selectedDetails.pan || '—'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Aadhar / PAN</span>
+                                <span className="font-mono font-semibold text-gray-800 text-[0.875rem]">{selectedDetails.aadharNumber || selectedDetails.pan || '—'}</span>
                               </div>
                             </div>
                           </div>
@@ -4965,36 +4882,36 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                                   <Building2 className="w-3.5 h-3.5" />
                                 </div>
-                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">BUSINESS & CREDIT DETAILS</h4>
+                                <h4 className="font-medium text-gray-900 text-[0.875rem] tracking-wider uppercase">BUSINESS & CREDIT DETAILS</h4>
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-[0.875rem]">
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Assigned Region</span>
-                                <span className="inline-block px-2 py-0.5 bg-blue-50 text-blue-700 font-bold rounded-md border border-blue-200 text-xs">
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Assigned Region</span>
+                                <span className="inline-block px-2 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded-md border border-blue-200 text-[0.875rem]">
                                   {selectedDetails.route || selectedDetails.assignedRegion || 'Unassigned'}
                                 </span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Assigned City</span>
-                                <span className="inline-block px-2 py-0.5 bg-blue-50 text-blue-700 font-bold rounded-md border border-blue-200 text-xs">
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Assigned City</span>
+                                <span className="inline-block px-2 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded-md border border-blue-200 text-[0.875rem]">
                                   {selectedDetails.city || selectedDetails.assignedMarket || 'Unassigned'}
                                 </span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Credit Limit</span>
-                                <span className="font-mono font-bold text-blue-700 text-xs">
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Credit Limit</span>
+                                <span className="font-mono font-semibold text-blue-700 text-[0.875rem]">
                                   {selectedDetails.creditLimit ? `₹${Number(selectedDetails.creditLimit).toLocaleString('en-IN')} (${selectedDetails.creditDays || 30} days)` : '—'}
                                 </span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Opening Balance</span>
-                                <span className="font-mono font-bold text-gray-900 text-xs">₹{(selectedDetails.openingBalance || 0).toLocaleString('en-IN')}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Opening Balance</span>
+                                <span className="font-mono font-semibold text-gray-900 text-[0.875rem]">₹{(selectedDetails.openingBalance || 0).toLocaleString('en-IN')}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Preferred Transport & Contact</span>
-                                <span className="font-bold text-gray-900 text-xs block">
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Preferred Transport & Contact</span>
+                                <span className="font-semibold text-gray-900 text-[0.875rem] block">
                                   {(() => {
                                     const tName = selectedDetails.preferredTransport;
                                     if (!tName) return '—';
@@ -5008,8 +4925,8 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 </span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Assigned Agent</span>
-                                <span className="font-bold text-indigo-700 text-xs">{selectedDetails.agentAssigned || selectedDetails.assignedAgent || 'Direct'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Assigned Agent</span>
+                                <span className="font-semibold text-blue-700 text-[0.875rem]">{selectedDetails.agentAssigned || selectedDetails.assignedAgent || 'Direct'}</span>
                               </div>
                             </div>
                           </div>
@@ -5024,46 +4941,46 @@ export const BusinessDirectoryV2: React.FC = () => {
                                   <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
                                     <MapPin className="w-3.5 h-3.5" />
                                   </div>
-                                  <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">ADDRESS INFORMATION</h4>
+                                  <h4 className="font-medium text-gray-900 text-[0.875rem] tracking-wider uppercase">ADDRESS INFORMATION</h4>
                                 </div>
                               </div>
 
-                              <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                              <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-[0.875rem]">
                                 <div>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Door / Flat No.</span>
-                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.doorNo || selectedDetails.flatNo || '—'}</span>
+                                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Door / Flat No.</span>
+                                  <span className="font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.doorNo || selectedDetails.flatNo || '—'}</span>
                                 </div>
                                 <div>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Street Name</span>
-                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.streetName || selectedDetails.street || '—'}</span>
+                                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Street Name</span>
+                                  <span className="font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.streetName || selectedDetails.street || '—'}</span>
                                 </div>
                                 <div className="col-span-2">
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Address Line 1</span>
-                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.address1 || selectedDetails.address || '—'}</span>
+                                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Address Line 1</span>
+                                  <span className="font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.address1 || selectedDetails.address || '—'}</span>
                                 </div>
                                 <div>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Area / Locality</span>
-                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.area || selectedDetails.locality || '—'}</span>
+                                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Area / Locality</span>
+                                  <span className="font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.area || selectedDetails.locality || '—'}</span>
                                 </div>
                                 <div>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Landmark</span>
-                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.landmark || '—'}</span>
+                                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Landmark</span>
+                                  <span className="font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.landmark || '—'}</span>
                                 </div>
                                 <div>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">City / Town</span>
-                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.city || selectedDetails.assignedMarket || '—'}</span>
+                                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">City / Town</span>
+                                  <span className="font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.city || selectedDetails.assignedMarket || '—'}</span>
                                 </div>
                                 <div>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">District</span>
-                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.district || '—'}</span>
+                                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">District</span>
+                                  <span className="font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.district || '—'}</span>
                                 </div>
                                 <div>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">State</span>
-                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.state || 'Andhra Pradesh'}</span>
+                                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">State</span>
+                                  <span className="font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.state || 'Andhra Pradesh'}</span>
                                 </div>
                                 <div>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Pincode</span>
-                                  <span className="font-mono font-bold text-gray-900 text-xs">{selectedDetails.pincode || selectedDetails.pinCode || '—'}</span>
+                                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Pincode</span>
+                                  <span className="font-mono font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.pincode || selectedDetails.pinCode || '—'}</span>
                                 </div>
                               </div>
                             </div>
@@ -5074,9 +4991,9 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-full py-2 px-3.5 bg-slate-50 hover:bg-blue-50 text-blue-700 font-bold rounded-xl border border-gray-200 hover:border-blue-300 transition-all flex items-center justify-center gap-2 text-xs shadow-2xs group cursor-pointer"
+                                className="w-full py-2 px-3.5 bg-slate-50 hover:bg-blue-50 text-blue-700 font-semibold rounded-xl border border-gray-200 hover:border-blue-300 flex items-center justify-center gap-2 text-[0.875rem] shadow-2xs group cursor-pointer"
                               >
-                                <MapPin className="w-3.5 h-3.5 text-blue-600 group-hover:scale-110 transition-transform" />
+                                <MapPin className="w-3.5 h-3.5 text-blue-600" />
                                 <span>Get Directions / Google Maps</span>
                                 <ExternalLink className="w-3 h-3 text-blue-400 group-hover:text-blue-600 ml-auto" />
                               </a>
@@ -5099,52 +5016,52 @@ export const BusinessDirectoryV2: React.FC = () => {
                 return (
                   <>
                     <div className="grid grid-cols-3 gap-2.5">
-                      <div className="bg-indigo-50/60 border border-indigo-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[9px] text-indigo-700 font-extrabold uppercase tracking-wider">VENDOR TYPE</span>
-                        <span className="block text-xs font-extrabold text-indigo-950 mt-0.5 truncate" title={selectedDetails.vendorType || 'General Supplier'}>
+                      <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                        <span className="block text-xs text-blue-700 font-medium uppercase tracking-wider">VENDOR TYPE</span>
+                        <span className="block text-[0.875rem] font-semibold text-blue-950 mt-0.5 truncate" title={selectedDetails.vendorType || 'General Supplier'}>
                           {selectedDetails.vendorType || 'General Supplier'}
                         </span>
                       </div>
                       <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider">PAYMENT TERMS</span>
-                        <span className="block text-xs font-bold font-mono text-blue-950 mt-0.5">
+                        <span className="block text-xs text-blue-700 font-medium uppercase tracking-wider">PAYMENT TERMS</span>
+                        <span className="block text-[0.875rem] font-semibold font-mono text-blue-950 mt-0.5">
                           {selectedDetails.creditDays || 30} Days
                         </span>
                       </div>
                       <div className="bg-rose-50/60 border border-rose-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[9px] text-rose-700 font-extrabold uppercase tracking-wider">OUTSTANDING PAYABLE</span>
-                        <span className="block text-xs font-mono font-black text-rose-950 mt-0.5">
+                        <span className="block text-xs text-rose-700 font-medium uppercase tracking-wider">OUTSTANDING PAYABLE</span>
+                        <span className="block text-[0.875rem] font-mono font-semibold text-rose-950 mt-0.5">
                           ₹{Math.abs(bal).toLocaleString('en-IN')} (To Pay)
                         </span>
                       </div>
                     </div>
 
-                    <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-3.5 text-xs">
+                    <div className="max-h-[calc(60*var(--vh,1vh))] overflow-y-auto pr-1 space-y-3.5 text-[0.875rem]">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                         <div className="space-y-3.5">
                           {/* SUPPLIER OVERVIEW */}
                           <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
                             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
                               <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                                <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                                   <Factory className="w-3.5 h-3.5" />
                                 </div>
-                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">SUPPLIER OVERVIEW</h4>
+                                <h4 className="font-medium text-gray-900 text-[0.875rem] tracking-wider uppercase">SUPPLIER OVERVIEW</h4>
                               </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-[0.875rem]">
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Firm Name</span>
-                                <span className="font-bold text-gray-900 text-xs block truncate">{name}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Firm Name</span>
+                                <span className="font-semibold text-gray-900 text-[0.875rem] block truncate">{name}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Contact Person / Owner</span>
-                                <span className="font-bold text-gray-900 text-xs block truncate">{selectedDetails.ownerName || selectedDetails.contactName || '—'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Contact Person / Owner</span>
+                                <span className="font-semibold text-gray-900 text-[0.875rem] block truncate">{selectedDetails.ownerName || selectedDetails.contactName || '—'}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Phone / Mobile</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Phone / Mobile</span>
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.phone || '—'}</span>
+                                  <span className="font-mono font-semibold text-blue-600 text-[0.875rem]">{selectedDetails.phone || '—'}</span>
                                   {selectedDetails.phone && (
                                     <a href={`https://wa.me/91${selectedDetails.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
                                       <WhatsAppIcon />
@@ -5153,16 +5070,16 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 </div>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Email ID</span>
-                                <span className="font-semibold text-gray-800 text-xs block truncate">{selectedDetails.email || '—'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Email ID</span>
+                                <span className="font-semibold text-gray-800 text-[0.875rem] block truncate">{selectedDetails.email || '—'}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">GSTIN / Tax ID</span>
-                                <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.gstNumber || selectedDetails.gstin || '—'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">GSTIN / Tax ID</span>
+                                <span className="font-mono font-semibold text-blue-600 text-[0.875rem]">{selectedDetails.gstNumber || selectedDetails.gstin || '—'}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Aadhar / PAN</span>
-                                <span className="font-mono font-semibold text-gray-800 text-xs">{selectedDetails.aadharNumber || selectedDetails.pan || '—'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Aadhar / PAN</span>
+                                <span className="font-mono font-semibold text-gray-800 text-[0.875rem]">{selectedDetails.aadharNumber || selectedDetails.pan || '—'}</span>
                               </div>
                             </div>
                           </div>
@@ -5174,27 +5091,27 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                                   <CreditCard className="w-3.5 h-3.5" />
                                 </div>
-                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">FINANCIAL TERMS</h4>
+                                <h4 className="font-medium text-gray-900 text-[0.875rem] tracking-wider uppercase">FINANCIAL TERMS</h4>
                               </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-[0.875rem]">
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Credit Period</span>
-                                <span className="font-mono font-bold text-gray-900 text-xs">{selectedDetails.creditDays || 30} Days</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Credit Period</span>
+                                <span className="font-mono font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.creditDays || 30} Days</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Credit Limit</span>
-                                <span className="font-mono font-bold text-blue-700 text-xs">
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Credit Limit</span>
+                                <span className="font-mono font-semibold text-blue-700 text-[0.875rem]">
                                   {selectedDetails.creditLimit ? `₹${Number(selectedDetails.creditLimit).toLocaleString('en-IN')}` : '—'}
                                 </span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Opening Balance</span>
-                                <span className="font-mono font-bold text-gray-900 text-xs">₹{(selectedDetails.openingBalance || 0).toLocaleString('en-IN')}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Opening Balance</span>
+                                <span className="font-mono font-semibold text-gray-900 text-[0.875rem]">₹{(selectedDetails.openingBalance || 0).toLocaleString('en-IN')}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Net Payable</span>
-                                <span className="font-mono font-black text-rose-600 text-xs">₹{Math.abs(bal).toLocaleString('en-IN')}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Net Payable</span>
+                                <span className="font-mono font-semibold text-rose-600 text-[0.875rem]">₹{Math.abs(bal).toLocaleString('en-IN')}</span>
                               </div>
                             </div>
                           </div>
@@ -5209,25 +5126,25 @@ export const BusinessDirectoryV2: React.FC = () => {
                                   <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
                                     <Coins className="w-3.5 h-3.5" />
                                   </div>
-                                  <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">BANK ACCOUNT DETAILS</h4>
+                                  <h4 className="font-medium text-gray-900 text-[0.875rem] tracking-wider uppercase">BANK ACCOUNT DETAILS</h4>
                                 </div>
                               </div>
-                              <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                              <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-[0.875rem]">
                                 <div>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Bank Name</span>
-                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.bankName || '—'}</span>
+                                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Bank Name</span>
+                                  <span className="font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.bankName || '—'}</span>
                                 </div>
                                 <div>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Branch</span>
-                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.branchName || selectedDetails.branch || '—'}</span>
+                                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Branch</span>
+                                  <span className="font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.branchName || selectedDetails.branch || '—'}</span>
                                 </div>
                                 <div>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Account Number</span>
-                                  <span className="font-mono font-bold text-blue-700 text-xs">{selectedDetails.accountNo || selectedDetails.accountNumber || '—'}</span>
+                                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Account Number</span>
+                                  <span className="font-mono font-semibold text-blue-700 text-[0.875rem]">{selectedDetails.accountNo || selectedDetails.accountNumber || '—'}</span>
                                 </div>
                                 <div>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">IFSC Code</span>
-                                  <span className="font-mono font-bold text-gray-900 text-xs">{selectedDetails.ifscCode || selectedDetails.ifsc || '—'}</span>
+                                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">IFSC Code</span>
+                                  <span className="font-mono font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.ifscCode || selectedDetails.ifsc || '—'}</span>
                                 </div>
                               </div>
                             </div>
@@ -5240,29 +5157,29 @@ export const BusinessDirectoryV2: React.FC = () => {
                                   <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                                     <MapPin className="w-3.5 h-3.5" />
                                   </div>
-                                  <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">LOCATION / ADDRESS</h4>
+                                  <h4 className="font-medium text-gray-900 text-[0.875rem] tracking-wider uppercase">LOCATION / ADDRESS</h4>
                                 </div>
                               </div>
-                              <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                              <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-[0.875rem]">
                                 <div className="col-span-2">
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Factory / Office Address</span>
-                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.address1 || selectedDetails.address || '—'}</span>
+                                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Factory / Office Address</span>
+                                  <span className="font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.address1 || selectedDetails.address || '—'}</span>
                                 </div>
                                 <div>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">City</span>
-                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.city || '—'}</span>
+                                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">City</span>
+                                  <span className="font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.city || '—'}</span>
                                 </div>
                                 <div>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">District</span>
-                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.district || '—'}</span>
+                                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">District</span>
+                                  <span className="font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.district || '—'}</span>
                                 </div>
                                 <div>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">State</span>
-                                  <span className="font-bold text-gray-900 text-xs">{selectedDetails.state || 'Andhra Pradesh'}</span>
+                                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">State</span>
+                                  <span className="font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.state || 'Andhra Pradesh'}</span>
                                 </div>
                                 <div>
-                                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Pincode</span>
-                                  <span className="font-mono font-bold text-gray-900 text-xs">{selectedDetails.pincode || '—'}</span>
+                                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Pincode</span>
+                                  <span className="font-mono font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.pincode || '—'}</span>
                                 </div>
                               </div>
                               <div className="pt-2 border-t border-gray-100">
@@ -5271,11 +5188,11 @@ export const BusinessDirectoryV2: React.FC = () => {
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   onClick={(e) => e.stopPropagation()}
-                                  className="w-full py-2 px-3.5 bg-slate-50 hover:bg-indigo-50 text-indigo-700 font-bold rounded-xl border border-gray-200 hover:border-indigo-300 transition-all flex items-center justify-center gap-2 text-xs shadow-2xs group cursor-pointer"
+                                  className="w-full py-2 px-3.5 bg-slate-50 hover:bg-blue-50 text-blue-700 font-semibold rounded-xl border border-gray-200 hover:border-blue-300 flex items-center justify-center gap-2 text-[0.875rem] shadow-2xs group cursor-pointer"
                                 >
-                                  <MapPin className="w-3.5 h-3.5 text-indigo-600 group-hover:scale-110 transition-transform" />
+                                  <MapPin className="w-3.5 h-3.5 text-blue-600" />
                                   <span>Get Directions / Google Maps</span>
-                                  <ExternalLink className="w-3 h-3 text-indigo-400 group-hover:text-indigo-600 ml-auto" />
+                                  <ExternalLink className="w-3 h-3 text-blue-400 group-hover:text-blue-600 ml-auto" />
                                 </a>
                               </div>
                             </div>
@@ -5287,16 +5204,16 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                                   <Users className="w-3.5 h-3.5" />
                                 </div>
-                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">CONTACT PERSONS</h4>
+                                <h4 className="font-medium text-gray-900 text-[0.875rem] tracking-wider uppercase">CONTACT PERSONS</h4>
                               </div>
                               <div className="space-y-2">
                                 {contactPersons.map((cp: any, idx: number) => (
                                   <div key={idx} className="p-2.5 bg-slate-50 rounded-xl border border-gray-100 space-y-1">
                                     <div className="flex items-center justify-between">
-                                      <span className="font-extrabold text-gray-900 text-xs">{cp.name || '—'}</span>
-                                      {cp.designation && <span className="text-[10px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-md">{cp.designation}</span>}
+                                      <span className="font-semibold text-gray-900 text-[0.875rem]">{cp.name || '—'}</span>
+                                      {cp.designation && <span className="text-xs bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-md">{cp.designation}</span>}
                                     </div>
-                                    <div className="flex items-center gap-3 text-[11px] text-gray-600">
+                                    <div className="flex items-center gap-3 text-xs text-gray-600">
                                       {cp.phone && <span className="font-mono font-semibold">{cp.phone}</span>}
                                       {cp.email && <span className="text-gray-500 truncate">{cp.email}</span>}
                                     </div>
@@ -5337,14 +5254,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                   <>
                     <div className="grid grid-cols-3 gap-2.5">
                       <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider">ASSIGNED CITIES</span>
-                        <span className="block text-xs font-bold text-blue-950 mt-0.5">
+                        <span className="block text-xs text-blue-700 font-medium uppercase tracking-wider">ASSIGNED CITIES</span>
+                        <span className="block text-[0.875rem] font-semibold text-blue-950 mt-0.5">
                           {assignedCityObjs.length} Cities
                         </span>
                       </div>
                       <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider">ASSIGNED REGIONS</span>
-                        <span className="block text-xs font-bold text-blue-950 mt-0.5">
+                        <span className="block text-xs text-blue-700 font-medium uppercase tracking-wider">ASSIGNED REGIONS</span>
+                        <span className="block text-[0.875rem] font-semibold text-blue-950 mt-0.5">
                           {assignedRoutes.length} Regions
                         </span>
                       </div>
@@ -5358,16 +5275,16 @@ export const BusinessDirectoryV2: React.FC = () => {
                           });
                           setCardCustomerSearch('');
                         }}
-                        className="bg-emerald-50/60 hover:bg-emerald-100/70 border border-emerald-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.01] group"
+                        className="bg-emerald-50/60 hover:bg-emerald-100/70 border border-emerald-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer group"
                       >
-                        <span className="block text-[9px] text-emerald-700 font-extrabold uppercase tracking-wider group-hover:underline">TOTAL CUSTOMERS</span>
-                        <span className="block text-xs font-black text-emerald-950 mt-0.5">
+                        <span className="block text-xs text-emerald-700 font-medium uppercase tracking-wider group-hover:underline">TOTAL CUSTOMERS</span>
+                        <span className="block text-[0.875rem] font-semibold text-emerald-950 mt-0.5">
                           {agentCusts.length} Customers ↗
                         </span>
                       </div>
                     </div>
 
-                    <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-3.5 text-xs">
+                    <div className="max-h-[calc(60*var(--vh,1vh))] overflow-y-auto pr-1 space-y-3.5 text-[0.875rem]">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                         {/* AGENT PROFILE */}
                         <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
@@ -5376,22 +5293,22 @@ export const BusinessDirectoryV2: React.FC = () => {
                               <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                                 <Briefcase className="w-3.5 h-3.5" />
                               </div>
-                              <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">AGENT PROFILE</h4>
+                              <h4 className="font-medium text-gray-900 text-[0.875rem] tracking-wider uppercase">AGENT PROFILE</h4>
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                          <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-[0.875rem]">
                             <div>
-                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Agent Name</span>
-                              <span className="font-bold text-gray-900 text-xs block truncate">{name}</span>
+                              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Agent Name</span>
+                              <span className="font-semibold text-gray-900 text-[0.875rem] block truncate">{name}</span>
                             </div>
                             <div>
-                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Agent Code</span>
-                              <span className="font-mono font-bold text-blue-600 text-xs">{code}</span>
+                              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Agent Code</span>
+                              <span className="font-mono font-semibold text-blue-600 text-[0.875rem]">{code}</span>
                             </div>
                             <div>
-                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Mobile Number</span>
+                              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Mobile Number</span>
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.phone || '—'}</span>
+                                <span className="font-mono font-semibold text-blue-600 text-[0.875rem]">{selectedDetails.phone || '—'}</span>
                                 {selectedDetails.phone && (
                                   <a href={`https://wa.me/91${selectedDetails.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
                                     <WhatsAppIcon />
@@ -5400,8 +5317,8 @@ export const BusinessDirectoryV2: React.FC = () => {
                               </div>
                             </div>
                             <div>
-                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Email ID</span>
-                              <span className="font-semibold text-gray-800 text-xs block truncate">{selectedDetails.email || '—'}</span>
+                              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Email ID</span>
+                              <span className="font-semibold text-gray-800 text-[0.875rem] block truncate">{selectedDetails.email || '—'}</span>
                             </div>
                           </div>
                         </div>
@@ -5414,22 +5331,22 @@ export const BusinessDirectoryV2: React.FC = () => {
                               <div className="w-7 h-7 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
                                 <Building className="w-4 h-4" />
                               </div>
-                              <h4 className="font-extrabold text-gray-800 text-xs tracking-wider uppercase">REGIONS & CITIES COVERAGE</h4>
+                              <h4 className="font-medium text-gray-800 text-[0.875rem] tracking-wider uppercase">REGIONS & CITIES COVERAGE</h4>
                             </div>
-                            <span className="px-3 py-1 bg-slate-100 text-slate-700 font-bold rounded-lg text-xs">
+                            <span className="px-3 py-1 bg-slate-100 text-slate-700 font-semibold rounded-lg text-[0.875rem]">
                               {assignedCityObjs.length} Total
                             </span>
                           </div>
 
                           {/* ASSIGNED REGIONS */}
                           <div className="pb-2 border-b border-gray-100">
-                            <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Assigned Regions / Routes</span>
+                            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">Assigned Regions / Routes</span>
                             <div className="flex flex-wrap gap-1.5">
                               {assignedRoutes.length > 0 ? assignedRoutes.map((r: any) => (
-                                <span key={r._id} className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 font-bold rounded-md text-[11px]">
+                                <span key={r._id} className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 font-semibold rounded-md text-xs">
                                   {r.name} ({r.code})
                                 </span>
-                              )) : <span className="text-gray-400 italic text-xs">No regions assigned</span>}
+                              )) : <span className="text-gray-400 italic text-[0.875rem]">No regions assigned</span>}
                             </div>
                           </div>
 
@@ -5441,7 +5358,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               value={agentCitySearch}
                               onChange={(e) => setAgentCitySearch(e.target.value)}
                               placeholder="Search cities in coverage..."
-                              className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all placeholder:text-gray-400"
+                              className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-[0.875rem] font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 placeholder:text-gray-400"
                             />
                           </div>
 
@@ -5478,27 +5395,27 @@ export const BusinessDirectoryV2: React.FC = () => {
                                           });
                                           setCardCustomerSearch('');
                                         }}
-                                        className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all cursor-pointer group space-y-2"
+                                        className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-blue-500 hover:ring-1 hover:ring-blue-500 cursor-pointer group space-y-2"
                                       >
                                         {/* City Header */}
                                         <div className="flex items-center justify-between">
-                                          <span className="font-extrabold text-gray-900 text-xs group-hover:text-blue-600 transition-colors truncate" title={cityName}>
+                                          <span className="font-semibold text-gray-900 text-[0.875rem] group-hover:text-blue-600 truncate" title={cityName}>
                                             {cityName}
                                           </span>
-                                          <span className="px-2 py-0.5 text-[9.5px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md">
+                                          <span className="px-2 py-0.5 text-xs font-semibold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md">
                                             {c.status || 'ACTIVE'}
                                           </span>
                                         </div>
 
                                         {/* Sub-rows inside city card */}
-                                        <div className="bg-slate-50/80 p-2.5 rounded-xl space-y-1.5 border border-slate-100 text-xs">
+                                        <div className="bg-slate-50/80 p-2.5 rounded-xl space-y-1.5 border border-slate-100 text-[0.875rem]">
                                           <div className="flex items-center justify-between">
-                                            <span className="text-gray-500 text-[11px] font-semibold">Customers</span>
-                                            <span className="font-extrabold text-gray-900 font-mono text-xs">{cityCusts.length}</span>
+                                            <span className="text-gray-500 text-xs font-semibold">Customers</span>
+                                            <span className="font-semibold text-gray-900 font-mono text-[0.875rem]">{cityCusts.length}</span>
                                           </div>
                                           <div className="flex items-center justify-between">
-                                            <span className="text-gray-500 text-[11px] font-semibold">Outstanding</span>
-                                            <span className={`font-extrabold font-mono text-xs ${cityOut > 0 ? 'text-rose-600' : cityOut < 0 ? 'text-emerald-600' : 'text-gray-700'}`}>
+                                            <span className="text-gray-500 text-xs font-semibold">Outstanding</span>
+                                            <span className={`font-semibold font-mono text-[0.875rem] ${cityOut > 0 ? 'text-rose-600' : cityOut < 0 ? 'text-emerald-600' : 'text-gray-700'}`}>
                                               ₹{Math.abs(cityOut).toLocaleString('en-IN')}
                                             </span>
                                           </div>
@@ -5508,7 +5425,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                   })
                                 ) : (
                                   <div className="col-span-2 py-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-gray-200">
-                                    <p className="text-gray-400 font-medium text-xs">No cities found matching "{agentCitySearch}"</p>
+                                    <p className="text-gray-400 font-medium text-[0.875rem]">No cities found matching "{agentCitySearch}"</p>
                                   </div>
                                 )}
                               </div>
@@ -5558,8 +5475,8 @@ export const BusinessDirectoryV2: React.FC = () => {
                   <>
                     <div className="grid grid-cols-3 gap-2.5">
                       <div className="bg-amber-50/60 border border-amber-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[9px] text-amber-700 font-extrabold uppercase tracking-wider">FLEET TYPES</span>
-                        <span className="block text-xs font-bold text-amber-950 mt-0.5 truncate" title={selectedDetails.vehicleTypes || 'Standard Truck'}>
+                        <span className="block text-xs text-amber-700 font-medium uppercase tracking-wider">FLEET TYPES</span>
+                        <span className="block text-[0.875rem] font-semibold text-amber-950 mt-0.5 truncate" title={selectedDetails.vehicleTypes || 'Standard Truck'}>
                           {selectedDetails.vehicleTypes || 'Standard Truck'}
                         </span>
                       </div>
@@ -5573,22 +5490,22 @@ export const BusinessDirectoryV2: React.FC = () => {
                           });
                           setCardCustomerSearch('');
                         }}
-                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.01] group"
+                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer group"
                       >
-                        <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider group-hover:underline">SERVICED CUSTOMERS</span>
-                        <span className="block text-xs font-black text-blue-950 mt-0.5">
+                        <span className="block text-xs text-blue-700 font-medium uppercase tracking-wider group-hover:underline">SERVICED CUSTOMERS</span>
+                        <span className="block text-[0.875rem] font-semibold text-blue-950 mt-0.5">
                           {transCusts.length} Customers ↗
                         </span>
                       </div>
                       <div className="bg-emerald-50/60 border border-emerald-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[9px] text-emerald-700 font-extrabold uppercase tracking-wider">STATUS</span>
-                        <span className="block text-xs font-extrabold text-emerald-950 mt-0.5 uppercase">
+                        <span className="block text-xs text-emerald-700 font-medium uppercase tracking-wider">STATUS</span>
+                        <span className="block text-[0.875rem] font-semibold text-emerald-950 mt-0.5 uppercase">
                           {selectedDetails.status || 'Active'}
                         </span>
                       </div>
                     </div>
 
-                    <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-3.5 text-xs">
+                    <div className="max-h-[calc(60*var(--vh,1vh))] overflow-y-auto pr-1 space-y-3.5 text-[0.875rem]">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                         {/* LEFT COLUMN */}
                         <div className="space-y-3.5">
@@ -5599,22 +5516,22 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
                                   <Truck className="w-3.5 h-3.5" />
                                 </div>
-                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">TRANSPORTER DETAILS</h4>
+                                <h4 className="font-medium text-gray-900 text-[0.875rem] tracking-wider uppercase">TRANSPORTER DETAILS</h4>
                               </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-[0.875rem]">
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Firm / Agency Name</span>
-                                <span className="font-bold text-gray-900 text-xs block truncate">{name}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Firm / Agency Name</span>
+                                <span className="font-semibold text-gray-900 text-[0.875rem] block truncate">{name}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Contact Person</span>
-                                <span className="font-bold text-gray-900 text-xs block truncate">{selectedDetails.contactName || selectedDetails.ownerName || contactPersons?.[0]?.name || '—'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Contact Person</span>
+                                <span className="font-semibold text-gray-900 text-[0.875rem] block truncate">{selectedDetails.contactName || selectedDetails.ownerName || contactPersons?.[0]?.name || '—'}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Primary Phone</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Primary Phone</span>
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.phone || selectedDetails.mobile || '—'}</span>
+                                  <span className="font-mono font-semibold text-blue-600 text-[0.875rem]">{selectedDetails.phone || selectedDetails.mobile || '—'}</span>
                                   {(selectedDetails.phone || selectedDetails.mobile) && (
                                     <a href={`https://wa.me/91${(selectedDetails.phone || selectedDetails.mobile).replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
                                       <WhatsAppIcon />
@@ -5623,9 +5540,9 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 </div>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Alternate Phone</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Alternate Phone</span>
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.altPhone || selectedDetails.altMobile || '—'}</span>
+                                  <span className="font-mono font-semibold text-blue-600 text-[0.875rem]">{selectedDetails.altPhone || selectedDetails.altMobile || '—'}</span>
                                   {(selectedDetails.altPhone || selectedDetails.altMobile) && (
                                     <a href={`https://wa.me/91${(selectedDetails.altPhone || selectedDetails.altMobile).replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
                                       <WhatsAppIcon />
@@ -5634,9 +5551,9 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 </div>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">WhatsApp Number</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">WhatsApp Number</span>
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.whatsapp || selectedDetails.phone || '—'}</span>
+                                  <span className="font-mono font-semibold text-blue-600 text-[0.875rem]">{selectedDetails.whatsapp || selectedDetails.phone || '—'}</span>
                                   {(selectedDetails.whatsapp || selectedDetails.phone) && (
                                     <a href={`https://wa.me/91${(selectedDetails.whatsapp || selectedDetails.phone).replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
                                       <WhatsAppIcon />
@@ -5645,16 +5562,16 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 </div>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Email ID</span>
-                                <span className="font-semibold text-gray-800 text-xs block truncate">{selectedDetails.email || '—'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Email ID</span>
+                                <span className="font-semibold text-gray-800 text-[0.875rem] block truncate">{selectedDetails.email || '—'}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">GSTIN / Tax ID</span>
-                                <span className="font-mono font-bold text-blue-600 text-xs">{selectedDetails.gstNumber || selectedDetails.gstin || '—'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">GSTIN / Tax ID</span>
+                                <span className="font-mono font-semibold text-blue-600 text-[0.875rem]">{selectedDetails.gstNumber || selectedDetails.gstin || '—'}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Vehicle / Fleet No</span>
-                                <span className="font-mono font-semibold text-gray-900 text-xs">{selectedDetails.vehicleNo || '—'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Vehicle / Fleet No</span>
+                                <span className="font-mono font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.vehicleNo || '—'}</span>
                               </div>
                             </div>
                           </div>
@@ -5666,21 +5583,21 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
                                   <MapPin className="w-3.5 h-3.5" />
                                 </div>
-                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">ADDRESS & LOCATION</h4>
+                                <h4 className="font-medium text-gray-900 text-[0.875rem] tracking-wider uppercase">ADDRESS & LOCATION</h4>
                               </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-[0.875rem]">
                               <div className="col-span-2">
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Full Address</span>
-                                <span className="font-bold text-gray-900 text-xs block">{selectedDetails.address1 || selectedDetails.address || '—'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Full Address</span>
+                                <span className="font-semibold text-gray-900 text-[0.875rem] block">{selectedDetails.address1 || selectedDetails.address || '—'}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">City / Location</span>
-                                <span className="font-bold text-gray-900 text-xs">{selectedDetails.city || selectedDetails.assignedMarket || '—'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">City / Location</span>
+                                <span className="font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.city || selectedDetails.assignedMarket || '—'}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">State & Pincode</span>
-                                <span className="font-bold text-gray-900 text-xs">{selectedDetails.state || 'Andhra Pradesh'} {selectedDetails.pincode ? `(${selectedDetails.pincode})` : ''}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">State & Pincode</span>
+                                <span className="font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.state || 'Andhra Pradesh'} {selectedDetails.pincode ? `(${selectedDetails.pincode})` : ''}</span>
                               </div>
                             </div>
 
@@ -5690,9 +5607,9 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-full py-2 px-3.5 bg-slate-50 hover:bg-emerald-50 text-emerald-700 font-bold rounded-xl border border-gray-200 hover:border-emerald-300 transition-all flex items-center justify-center gap-2 text-xs shadow-2xs group cursor-pointer"
+                                className="w-full py-2 px-3.5 bg-slate-50 hover:bg-emerald-50 text-emerald-700 font-semibold rounded-xl border border-gray-200 hover:border-emerald-300 flex items-center justify-center gap-2 text-[0.875rem] shadow-2xs group cursor-pointer"
                               >
-                                <MapPin className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
+                                <MapPin className="w-3.5 h-3.5 text-emerald-600" />
                                 <span>Get Directions / Google Maps</span>
                                 <ExternalLink className="w-3 h-3 text-emerald-400 group-hover:text-emerald-600 ml-auto" />
                               </a>
@@ -5708,9 +5625,9 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                                   <Users className="w-3.5 h-3.5" />
                                 </div>
-                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">CONTACT NUMBERS & PERSONS</h4>
+                                <h4 className="font-medium text-gray-900 text-[0.875rem] tracking-wider uppercase">CONTACT NUMBERS & PERSONS</h4>
                               </div>
-                              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-extrabold rounded-md text-[10px]">
+                              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded-md text-xs">
                                 {allPhones.length} {allPhones.length === 1 ? 'Number' : 'Numbers'}
                               </span>
                             </div>
@@ -5718,31 +5635,31 @@ export const BusinessDirectoryV2: React.FC = () => {
                             {/* List of Contact Persons if available */}
                             {contactPersons.length > 0 && (
                               <div className="space-y-2 mb-3">
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block">Assigned Contact Persons</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block">Assigned Contact Persons</span>
                                 {contactPersons.map((cp: any, idx: number) => (
-                                  <div key={idx} className="p-2.5 bg-slate-50 hover:bg-blue-50/50 rounded-xl border border-gray-200 transition-colors space-y-1">
+                                  <div key={idx} className="p-2.5 bg-slate-50 hover:bg-blue-50/50 rounded-xl border border-gray-200 space-y-1">
                                     <div className="flex items-center justify-between">
-                                      <span className="font-extrabold text-gray-900 text-xs">{cp.name || `Contact Person #${idx + 1}`}</span>
+                                      <span className="font-semibold text-gray-900 text-[0.875rem]">{cp.name || `Contact Person #${idx + 1}`}</span>
                                       {(cp.designation || cp.role) && (
-                                        <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-md">
+                                        <span className="text-xs bg-blue-100 text-blue-800 font-semibold px-2 py-0.5 rounded-md">
                                           {cp.designation || cp.role}
                                         </span>
                                       )}
                                     </div>
-                                    <div className="flex items-center justify-between gap-2 text-xs">
+                                    <div className="flex items-center justify-between gap-2 text-[0.875rem]">
                                       {cp.phone ? (
                                         <div className="flex items-center gap-1.5">
                                           <Phone className="w-3 h-3 text-blue-600" />
-                                          <span className="font-mono font-bold text-blue-600">{cp.phone}</span>
+                                          <span className="font-mono font-semibold text-blue-600">{cp.phone}</span>
                                           <a href={`https://wa.me/91${cp.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
                                             <WhatsAppIcon />
                                           </a>
                                         </div>
                                       ) : (
-                                        <span className="text-gray-400 text-[11px]">No phone listed</span>
+                                        <span className="text-gray-400 text-xs">No phone listed</span>
                                       )}
                                       {cp.email && (
-                                        <span className="text-gray-500 text-[11px] truncate max-w-[150px]">{cp.email}</span>
+                                        <span className="text-gray-500 text-xs truncate max-w-[9.375rem]">{cp.email}</span>
                                       )}
                                     </div>
                                   </div>
@@ -5752,19 +5669,19 @@ export const BusinessDirectoryV2: React.FC = () => {
 
                             {/* Complete list of all phone numbers */}
                             <div className="space-y-2">
-                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block">All Recorded Numbers</span>
+                              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block">All Recorded Numbers</span>
                               {allPhones.length > 0 ? (
                                 allPhones.map((p, idx) => (
-                                  <div key={idx} className="p-2 bg-blue-50/40 rounded-xl border border-blue-100/80 flex items-center justify-between text-xs">
+                                  <div key={idx} className="p-2 bg-blue-50/40 rounded-xl border border-blue-100/80 flex items-center justify-between text-[0.875rem]">
                                     <div>
-                                      <span className="text-[10px] font-extrabold text-blue-700 uppercase tracking-wider block">{p.label}</span>
-                                      {p.name && <span className="text-[11px] font-semibold text-gray-800 block">{p.name}</span>}
-                                      <span className="font-mono font-bold text-gray-900">{p.phone}</span>
+                                      <span className="text-xs font-medium text-blue-700 uppercase tracking-wider block">{p.label}</span>
+                                      {p.name && <span className="text-xs font-semibold text-gray-800 block">{p.name}</span>}
+                                      <span className="font-mono font-semibold text-gray-900">{p.phone}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <a
                                         href={`tel:${p.phone}`}
-                                        className="p-1.5 bg-white hover:bg-blue-100 text-blue-600 rounded-lg border border-blue-200 transition-colors"
+                                        className="p-1.5 bg-white hover:bg-blue-100 text-blue-600 rounded-lg border border-blue-200"
                                         title="Call"
                                       >
                                         <Phone className="w-3.5 h-3.5" />
@@ -5773,7 +5690,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                         href={`https://wa.me/91${p.phone.replace(/\D/g, '')}`}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg border border-emerald-200 transition-colors"
+                                        className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg border border-emerald-200"
                                         title="WhatsApp"
                                       >
                                         <WhatsAppIcon />
@@ -5782,7 +5699,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                   </div>
                                 ))
                               ) : (
-                                <p className="text-xs text-gray-400 italic">No phone numbers found</p>
+                                <p className="text-[0.875rem] text-gray-400 italic">No phone numbers found</p>
                               )}
                             </div>
                           </div>
@@ -5836,10 +5753,10 @@ export const BusinessDirectoryV2: React.FC = () => {
                           });
                           setCardCustomerSearch('');
                         }}
-                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.01] group"
+                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer group"
                       >
-                        <span className="block text-[9.5px] text-blue-700 font-bold uppercase tracking-wider group-hover:underline">NO OF CITIES</span>
-                        <span className="block text-lg font-black text-blue-900 mt-0.5">{citiesInRegion.length} Cities ↗</span>
+                        <span className="block text-xs text-blue-700 font-medium uppercase tracking-wider group-hover:underline">NO OF CITIES</span>
+                        <span className="block text-lg font-semibold text-blue-900 mt-0.5">{citiesInRegion.length} Cities ↗</span>
                       </div>
                       <div 
                         onClick={() => {
@@ -5851,10 +5768,10 @@ export const BusinessDirectoryV2: React.FC = () => {
                           });
                           setCardCustomerSearch('');
                         }}
-                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.01] group"
+                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer group"
                       >
-                        <span className="block text-[9.5px] text-blue-700 font-bold uppercase tracking-wider group-hover:underline">TOTAL CUSTOMERS</span>
-                        <span className="block text-lg font-black text-blue-900 mt-0.5">{regionCusts.length} Customers ↗</span>
+                        <span className="block text-xs text-blue-700 font-medium uppercase tracking-wider group-hover:underline">TOTAL CUSTOMERS</span>
+                        <span className="block text-lg font-semibold text-blue-900 mt-0.5">{regionCusts.length} Customers ↗</span>
                       </div>
                       <div 
                         onClick={() => {
@@ -5872,16 +5789,16 @@ export const BusinessDirectoryV2: React.FC = () => {
                           });
                           setCardCustomerSearch('');
                         }}
-                        className="bg-indigo-50/60 hover:bg-indigo-100/70 border border-indigo-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.01] group"
+                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer group"
                       >
-                        <span className="block text-[9.5px] text-indigo-700 font-bold uppercase tracking-wider group-hover:underline">ASSIGNED AGENT</span>
-                        <span className="block text-xs font-bold text-indigo-900 mt-1 truncate">
+                        <span className="block text-xs text-blue-700 font-medium uppercase tracking-wider group-hover:underline">ASSIGNED AGENT</span>
+                        <span className="block text-[0.875rem] font-semibold text-blue-900 mt-1 truncate">
                           {selectedDetails.agentAssigned || selectedDetails.assignedAgent || 'None'} ↗
                         </span>
                       </div>
                     </div>
 
-                    <div className="max-h-[65vh] overflow-y-auto pr-1 space-y-3.5 text-xs">
+                    <div className="max-h-[calc(65*var(--vh,1vh))] overflow-y-auto pr-1 space-y-3.5 text-[0.875rem]">
                       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 items-start">
                         {/* LEFT COLUMN: REGION PROFILE SUMMARY (col-span-1) */}
                         <div className="lg:col-span-1 bg-white p-4 rounded-2xl border border-gray-200/80 shadow-2xs space-y-3">
@@ -5889,24 +5806,24 @@ export const BusinessDirectoryV2: React.FC = () => {
                             <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
                               <MapIcon className="w-3.5 h-3.5" />
                             </div>
-                            <h4 className="font-extrabold text-gray-800 text-xs tracking-wider uppercase">REGION PROFILE</h4>
+                            <h4 className="font-medium text-gray-800 text-[0.875rem] tracking-wider uppercase">REGION PROFILE</h4>
                           </div>
-                          <div className="space-y-3 text-xs">
+                          <div className="space-y-3 text-[0.875rem]">
                             <div>
-                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Region Name</span>
-                              <span className="font-extrabold text-gray-900 text-sm block truncate">{name}</span>
+                              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Region Name</span>
+                              <span className="font-semibold text-gray-900 text-[0.875rem] block truncate">{name}</span>
                             </div>
                             <div>
-                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Region Code</span>
-                              <span className="font-mono font-extrabold text-blue-600 text-xs">{code}</span>
+                              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Region Code</span>
+                              <span className="font-mono font-semibold text-blue-600 text-[0.875rem]">{code}</span>
                             </div>
                             <div>
-                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Assigned Agent</span>
-                              <span className="font-bold text-indigo-700 text-xs block">{selectedDetails.agentAssigned || selectedDetails.assignedAgent || 'Unassigned'}</span>
+                              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Assigned Agent</span>
+                              <span className="font-semibold text-blue-700 text-[0.875rem] block">{selectedDetails.agentAssigned || selectedDetails.assignedAgent || 'Unassigned'}</span>
                             </div>
                             <div>
-                              <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Total Outlets</span>
-                              <span className="font-extrabold text-gray-900 text-xs block">{regionCusts.length} Outlets</span>
+                              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Total Outlets</span>
+                              <span className="font-semibold text-gray-900 text-[0.875rem] block">{regionCusts.length} Outlets</span>
                             </div>
                           </div>
                         </div>
@@ -5919,7 +5836,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               <div className="w-7 h-7 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
                                 <Building className="w-4 h-4" />
                               </div>
-                              <h4 className="font-extrabold text-gray-800 text-xs tracking-wider uppercase">CITIES IN REGION</h4>
+                              <h4 className="font-medium text-gray-800 text-[0.875rem] tracking-wider uppercase">CITIES IN REGION</h4>
                             </div>
                             <div className="flex items-center gap-2">
                               <button
@@ -5928,12 +5845,12 @@ export const BusinessDirectoryV2: React.FC = () => {
                                   setSelectedDetails(null);
                                   openModal({ partyType: 'market', route: selectedDetails.firmName || selectedDetails.name });
                                 }}
-                                className="px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-bold rounded-lg text-xs transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
+                                className="px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-semibold rounded-lg text-[0.875rem] flex items-center gap-1 cursor-pointer shadow-2xs"
                               >
                                 <Plus className="w-3.5 h-3.5" />
                                 <span>Add City</span>
                               </button>
-                              <span className="px-3 py-1 bg-slate-100 text-slate-700 font-bold rounded-lg text-xs">
+                              <span className="px-3 py-1 bg-slate-100 text-slate-700 font-semibold rounded-lg text-[0.875rem]">
                                 {citiesInRegion.length} Total
                               </span>
                             </div>
@@ -5947,7 +5864,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               value={regionCitySearch}
                               onChange={(e) => setRegionCitySearch(e.target.value)}
                               placeholder="Search cities in this region..."
-                              className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all placeholder:text-gray-400"
+                              className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-[0.875rem] font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 placeholder:text-gray-400"
                             />
                           </div>
 
@@ -5976,27 +5893,27 @@ export const BusinessDirectoryV2: React.FC = () => {
                                       });
                                       setCardCustomerSearch('');
                                     }}
-                                    className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-all cursor-pointer group space-y-2.5"
+                                    className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-blue-500 hover:ring-1 hover:ring-blue-500 cursor-pointer group space-y-2.5"
                                   >
                                     {/* City Header */}
                                     <div className="flex items-center justify-between">
-                                      <span className="font-extrabold text-gray-900 text-sm group-hover:text-blue-600 transition-colors truncate" title={cityName}>
+                                      <span className="font-semibold text-gray-900 text-[0.875rem] group-hover:text-blue-600 truncate" title={cityName}>
                                         {cityName}
                                       </span>
-                                      <span className="px-2 py-0.5 text-[9.5px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md">
+                                      <span className="px-2 py-0.5 text-xs font-semibold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md">
                                         {c.status || 'ACTIVE'}
                                       </span>
                                     </div>
 
                                     {/* Sub-rows inside city card */}
-                                    <div className="bg-slate-50/80 p-2.5 rounded-xl space-y-1.5 border border-slate-100 text-xs">
+                                    <div className="bg-slate-50/80 p-2.5 rounded-xl space-y-1.5 border border-slate-100 text-[0.875rem]">
                                       <div className="flex items-center justify-between">
-                                        <span className="text-gray-500 text-[11px] font-semibold">Customers</span>
-                                        <span className="font-extrabold text-gray-900 font-mono text-xs">{cityCusts.length}</span>
+                                        <span className="text-gray-500 text-xs font-semibold">Customers</span>
+                                        <span className="font-semibold text-gray-900 font-mono text-[0.875rem]">{cityCusts.length}</span>
                                       </div>
                                       <div className="flex items-center justify-between">
-                                        <span className="text-gray-500 text-[11px] font-semibold">Outstanding</span>
-                                        <span className={`font-extrabold font-mono text-xs ${cityOut > 0 ? 'text-rose-600' : cityOut < 0 ? 'text-emerald-600' : 'text-gray-700'}`}>
+                                        <span className="text-gray-500 text-xs font-semibold">Outstanding</span>
+                                        <span className={`font-semibold font-mono text-[0.875rem] ${cityOut > 0 ? 'text-rose-600' : cityOut < 0 ? 'text-emerald-600' : 'text-gray-700'}`}>
                                           ₹{Math.abs(cityOut).toLocaleString('en-IN')}
                                         </span>
                                       </div>
@@ -6006,7 +5923,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               })
                             ) : (
                               <div className="col-span-2 py-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-gray-200">
-                                <p className="text-gray-400 font-medium text-xs">No cities found matching "{regionCitySearch}"</p>
+                                <p className="text-gray-400 font-medium text-[0.875rem]">No cities found matching "{regionCitySearch}"</p>
                               </div>
                             )}
                           </div>
@@ -6027,9 +5944,9 @@ export const BusinessDirectoryV2: React.FC = () => {
                 return (
                   <>
                     <div className="grid grid-cols-3 gap-2.5">
-                      <div className="bg-cyan-50/60 border border-cyan-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[9px] text-cyan-700 font-extrabold uppercase tracking-wider">PARENT REGION</span>
-                        <span className="block text-xs font-bold text-cyan-950 mt-0.5 truncate">
+                      <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
+                        <span className="block text-xs text-blue-700 font-medium uppercase tracking-wider">PARENT REGION</span>
+                        <span className="block text-[0.875rem] font-semibold text-blue-950 mt-0.5 truncate">
                           {selectedDetails.route || selectedDetails.assignedRegion || 'Unassigned'}
                         </span>
                       </div>
@@ -6043,49 +5960,49 @@ export const BusinessDirectoryV2: React.FC = () => {
                           });
                           setCardCustomerSearch('');
                         }}
-                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer transition-all hover:scale-[1.01] group"
+                        className="bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs cursor-pointer group"
                       >
-                        <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider group-hover:underline">TOTAL CUSTOMERS</span>
-                        <span className="block text-xs font-black text-blue-950 mt-0.5">
+                        <span className="block text-xs text-blue-700 font-medium uppercase tracking-wider group-hover:underline">TOTAL CUSTOMERS</span>
+                        <span className="block text-[0.875rem] font-semibold text-blue-950 mt-0.5">
                           {cityCusts.length} Customers ↗
                         </span>
                       </div>
                       <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-center shadow-2xs">
-                        <span className="block text-[9px] text-blue-700 font-extrabold uppercase tracking-wider">DISTRICT</span>
-                        <span className="block text-xs font-extrabold text-blue-950 mt-0.5 truncate">
+                        <span className="block text-xs text-blue-700 font-medium uppercase tracking-wider">DISTRICT</span>
+                        <span className="block text-[0.875rem] font-semibold text-blue-950 mt-0.5 truncate">
                           {selectedDetails.district || '—'}
                         </span>
                       </div>
                     </div>
 
-                    <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-3.5 text-xs">
+                    <div className="max-h-[calc(60*var(--vh,1vh))] overflow-y-auto pr-1 space-y-3.5 text-[0.875rem]">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                         <div className="space-y-3.5">
                           <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs space-y-2.5">
                             <div className="flex items-center justify-between pb-2 border-b border-gray-100">
                               <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-lg bg-cyan-50 flex items-center justify-center text-cyan-600">
+                                <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                                   <Building className="w-3.5 h-3.5" />
                                 </div>
-                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">CITY / MARKET PROFILE</h4>
+                                <h4 className="font-medium text-gray-900 text-[0.875rem] tracking-wider uppercase">CITY / MARKET PROFILE</h4>
                               </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-xs">
+                            <div className="grid grid-cols-2 gap-y-2.5 gap-x-3 text-[0.875rem]">
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">City Name</span>
-                                <span className="font-bold text-gray-900 text-xs block truncate">{name}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">City Name</span>
+                                <span className="font-semibold text-gray-900 text-[0.875rem] block truncate">{name}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">Parent Route</span>
-                                <span className="font-bold text-blue-700 text-xs">{selectedDetails.route || selectedDetails.assignedRegion || 'Unassigned'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">Parent Route</span>
+                                <span className="font-semibold text-blue-700 text-[0.875rem]">{selectedDetails.route || selectedDetails.assignedRegion || 'Unassigned'}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">District</span>
-                                <span className="font-bold text-gray-900 text-xs">{selectedDetails.district || '—'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">District</span>
+                                <span className="font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.district || '—'}</span>
                               </div>
                               <div>
-                                <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">State</span>
-                                <span className="font-bold text-gray-900 text-xs">{selectedDetails.state || 'Andhra Pradesh'}</span>
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">State</span>
+                                <span className="font-semibold text-gray-900 text-[0.875rem]">{selectedDetails.state || 'Andhra Pradesh'}</span>
                               </div>
                             </div>
                           </div>
@@ -6098,15 +6015,15 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                                   <Users className="w-3.5 h-3.5" />
                                 </div>
-                                <h4 className="font-bold text-gray-900 text-xs tracking-wider uppercase">CUSTOMERS IN THIS CITY</h4>
+                                <h4 className="font-medium text-gray-900 text-[0.875rem] tracking-wider uppercase">CUSTOMERS IN THIS CITY</h4>
                               </div>
                             </div>
                             <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                               {cityCusts.length > 0 ? cityCusts.map((c: any) => (
                                 <div key={c._id} className="p-2 bg-slate-50 border border-gray-200 rounded-xl flex items-center justify-between">
                                   <div>
-                                    <span className="font-bold text-gray-900 block text-xs">{c.firmName}</span>
-                                    <span className="text-[10px] text-gray-500">{c.contactName || c.phone}</span>
+                                    <span className="font-semibold text-gray-900 block text-[0.875rem]">{c.firmName}</span>
+                                    <span className="text-xs text-gray-500">{c.contactName || c.phone}</span>
                                   </div>
                                   {c.phone && (
                                     <a href={`https://wa.me/91${c.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp">
@@ -6114,7 +6031,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                     </a>
                                   )}
                                 </div>
-                              )) : <span className="text-gray-400 italic text-xs">No customers recorded in this city</span>}
+                              )) : <span className="text-gray-400 italic text-[0.875rem]">No customers recorded in this city</span>}
                             </div>
                           </div>
                         </div>
@@ -6134,31 +6051,31 @@ export const BusinessDirectoryV2: React.FC = () => {
       {/* Dynamic Customer Data Modal (Triggered by clicking any card) */}
       {cardCustomersModal && (
         <div 
-          className="fixed inset-0 z-[80] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-150"
+          className="fixed inset-0 z-[80] bg-slate-900/40 flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setCardCustomersModal(null);
             }
           }}
         >
-          <div className="relative bg-white rounded-3xl shadow-2xl border border-gray-100 flex flex-col w-full max-w-5xl max-h-[92vh] overflow-hidden">
+          <div className="relative bg-white flex flex-col w-full max-w-5xl max-h-[calc(92*var(--vh,1vh))] overflow-hidden dlg-panel">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-100 bg-linear-to-r from-blue-50/70 via-indigo-50/40 to-white flex items-center justify-between shrink-0">
+            <div className="px-6 py-4 border-b border-gray-100 bg-linear-to-r from-blue-50/70 via-blue-50/40 to-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
                   <Users className="w-5 h-5" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base sm:text-lg font-black text-gray-900 leading-tight">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 leading-tight">
                       {cardCustomersModal.title}
                     </h3>
-                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 font-extrabold text-[11px] rounded-full">
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 font-semibold text-xs rounded-full">
                       {cardCustomersModal.customers.length} Customers
                     </span>
                   </div>
                   {cardCustomersModal.subtitle && (
-                    <p className="text-xs text-gray-500 font-medium mt-0.5">
+                    <p className="text-[0.875rem] text-gray-500 font-medium mt-0.5">
                       {cardCustomersModal.subtitle}
                     </p>
                   )}
@@ -6168,7 +6085,7 @@ export const BusinessDirectoryV2: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setCardCustomersModal(null)}
-                className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100/80 hover:bg-rose-50 text-gray-400 hover:text-rose-600 transition-all cursor-pointer border border-transparent hover:border-rose-200"
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100/80 hover:bg-rose-50 text-gray-400 hover:text-rose-600 cursor-pointer border border-transparent hover:border-rose-200"
                 title="Close dialog"
               >
                 <X className="w-5 h-5" />
@@ -6184,7 +6101,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                   placeholder="Search customer by firm, contact, phone, city, GST..."
                   value={cardCustomerSearch}
                   onChange={(e) => setCardCustomerSearch(e.target.value)}
-                  className="w-full pl-9 pr-8 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:border-blue-600 shadow-2xs"
+                  className="w-full pl-9 pr-8 py-2 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-medium focus:outline-none focus:border-blue-600 shadow-2xs"
                   autoFocus
                 />
                 {cardCustomerSearch && (
@@ -6203,14 +6120,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                 const totalOut = cardCustomersModal.customers.reduce((acc, c) => acc + (Number(c.outstandingBalance) || Number(c.outstanding) || 0), 0);
                 const activeCount = cardCustomersModal.customers.filter(c => (c.status || 'active') === 'active').length;
                 return (
-                  <div className="flex items-center gap-2 shrink-0 text-xs">
+                  <div className="flex items-center gap-2 shrink-0 text-[0.875rem]">
                     <div className="px-3 py-1.5 rounded-xl bg-white border border-gray-200 shadow-2xs flex items-center gap-2">
-                      <span className="text-[10px] uppercase font-bold text-gray-400">Active</span>
-                      <span className="font-extrabold text-emerald-600">{activeCount}</span>
+                      <span className="text-xs uppercase font-semibold text-gray-400">Active</span>
+                      <span className="font-semibold text-emerald-600">{activeCount}</span>
                     </div>
                     <div className="px-3 py-1.5 rounded-xl bg-white border border-gray-200 shadow-2xs flex items-center gap-2">
-                      <span className="text-[10px] uppercase font-bold text-gray-400">Total Outstanding</span>
-                      <span className={`font-mono font-black ${totalOut > 0 ? 'text-rose-600' : totalOut < 0 ? 'text-emerald-600' : 'text-gray-700'}`}>₹{Math.abs(totalOut).toLocaleString('en-IN')}</span>
+                      <span className="text-xs uppercase font-semibold text-gray-400">Total Outstanding</span>
+                      <span className={`font-mono font-semibold ${totalOut > 0 ? 'text-rose-600' : totalOut < 0 ? 'text-emerald-600' : 'text-gray-700'}`}>₹{Math.abs(totalOut).toLocaleString('en-IN')}</span>
                     </div>
                   </div>
                 );
@@ -6247,8 +6164,8 @@ export const BusinessDirectoryV2: React.FC = () => {
                       <div className="w-16 h-16 rounded-3xl bg-blue-50 text-blue-400 flex items-center justify-center mx-auto mb-3">
                         <Users className="w-8 h-8" />
                       </div>
-                      <h4 className="font-bold text-gray-800 text-sm">No customers found</h4>
-                      <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">
+                      <h4 className="font-semibold text-gray-800 text-[0.875rem]">No customers found</h4>
+                      <p className="text-[0.875rem] text-gray-400 mt-1 max-w-sm mx-auto">
                         {cardCustomerSearch 
                           ? `No matching customers found for "${cardCustomerSearch}". Try adjusting your search term.`
                           : 'No customers are currently mapped to this selection.'}
@@ -6257,7 +6174,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setCardCustomerSearch('')}
-                          className="mt-3 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 font-bold text-xs hover:bg-blue-100 transition-colors"
+                          className="mt-3 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 font-semibold text-[0.875rem] hover:bg-blue-100"
                         >
                           Clear Search
                         </button>
@@ -6269,8 +6186,8 @@ export const BusinessDirectoryV2: React.FC = () => {
                 return (
                   <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-2xs bg-white">
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs text-gray-600">
-                        <thead className="bg-slate-50 border-b border-gray-200 text-gray-400 font-bold text-[10px] uppercase tracking-wider select-none">
+                      <table className="w-full text-left text-[0.875rem] text-gray-600">
+                        <thead className="bg-slate-50 border-b border-gray-200 text-gray-400 font-medium text-xs uppercase tracking-wider select-none">
                           <tr>
                             <th className="py-3 px-4 w-12 text-center">#</th>
                             <th className="py-3 px-4">Customer Firm</th>
@@ -6291,30 +6208,28 @@ export const BusinessDirectoryV2: React.FC = () => {
                                   setCardCustomersModal(null);
                                   setSelectedDetails(cust);
                                 }}
-                                className="hover:bg-blue-50/50 transition-colors cursor-pointer group"
+                                className="hover:bg-blue-50/50 cursor-pointer group"
                                 title="Click to view full customer details"
                               >
-                                <td className="py-3 px-4 text-center font-bold text-gray-400 font-mono text-[11px]">
+                                <td className="py-3 px-4 text-center font-semibold text-gray-400 font-mono text-xs">
                                   {idx + 1}
                                 </td>
                                 <td className="py-3 px-4">
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors text-xs">
+                                    <span className="font-semibold text-gray-900 group-hover:text-blue-700 text-[0.875rem]">
                                       {cust.firmName || cust.name || 'Unnamed Customer'}
                                     </span>
-                                    {cust.code && (
-                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200/80">
-                                        {cust.code}
-                                      </span>
-                                    )}
                                   </div>
+                                  {cust.code && (
+                                    <span className="block mt-0.5 text-[0.6875rem] font-mono font-medium text-gray-400 tracking-tight whitespace-nowrap">{cust.code}</span>
+                                  )}
                                   {(cust.contactName || cust.ownerName || cust.contactPersons?.[0]?.name) && (
-                                    <div className="text-[11px] text-gray-500 font-medium mt-0.5">
+                                    <div className="text-xs text-gray-500 font-medium mt-0.5">
                                       {cust.contactName || cust.ownerName || cust.contactPersons?.[0]?.name}
                                     </div>
                                   )}
                                   {cust.gstNumber && (
-                                    <div className="font-mono text-[10px] text-gray-400">
+                                    <div className="font-mono text-xs text-gray-400">
                                       GST: {cust.gstNumber}
                                     </div>
                                   )}
@@ -6329,17 +6244,17 @@ export const BusinessDirectoryV2: React.FC = () => {
                                   <div className="font-medium text-gray-800">
                                     {cust.city || '—'}
                                   </div>
-                                  <div className="text-[10px] text-gray-400">
+                                  <div className="text-xs text-gray-400">
                                     {[cust.district, cust.route].filter(Boolean).join(' • ') || '—'}
                                   </div>
                                 </td>
                                 <td className="py-3 px-4 text-right">
-                                  <span className={`font-mono font-bold text-xs ${outBal > 0 ? 'text-rose-600' : outBal < 0 ? 'text-emerald-600' : 'text-gray-700'}`}>
+                                  <span className={`font-mono font-semibold text-[0.875rem] ${outBal > 0 ? 'text-rose-600' : outBal < 0 ? 'text-emerald-600' : 'text-gray-700'}`}>
                                     ₹{Math.abs(outBal).toLocaleString('en-IN')}
                                   </span>
                                 </td>
                                 <td className="py-3 px-4 text-center">
-                                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${
+                                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold uppercase ${
                                     (cust.status || 'active') === 'active' 
                                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
                                       : 'bg-gray-100 text-gray-500'
@@ -6355,7 +6270,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                       setCardCustomersModal(null);
                                       setSelectedDetails(cust);
                                     }}
-                                    className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white font-bold text-[10px] transition-all cursor-pointer"
+                                    className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white font-semibold text-xs cursor-pointer"
                                   >
                                     View
                                   </button>
@@ -6372,14 +6287,14 @@ export const BusinessDirectoryV2: React.FC = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-3.5 bg-slate-50 border-t border-gray-100 flex items-center justify-between shrink-0 text-xs">
+            <div className="px-6 py-3.5 bg-slate-50 border-t border-gray-100 flex items-center justify-between shrink-0 text-[0.875rem] dlg-footer">
               <span className="text-gray-500 font-medium">
                 Showing {cardCustomersModal.customers.length} total customer{cardCustomersModal.customers.length === 1 ? '' : 's'}
               </span>
               <button
                 type="button"
                 onClick={() => setCardCustomersModal(null)}
-                className="px-4 py-2 bg-gray-200/80 hover:bg-gray-300 text-gray-700 font-bold rounded-xl transition-colors cursor-pointer text-xs"
+                className="px-4 py-2 bg-gray-200/80 hover:bg-gray-300 text-gray-700 font-semibold rounded-xl cursor-pointer text-[0.875rem]"
               >
                 Close
               </button>
@@ -6396,54 +6311,54 @@ export const BusinessDirectoryV2: React.FC = () => {
           title="Directory Activity & Audit Logs"
           maxWidth="max-w-3xl"
         >
-          <div className="space-y-3 p-1 text-xs">
+          <div className="space-y-3 p-1 text-[0.875rem]">
             <div className="flex items-center justify-between gap-3">
               <input
                 type="text"
                 value={logSearch}
                 onChange={(e) => setLogSearch(e.target.value)}
                 placeholder="Search activity logs..."
-                className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs w-full focus:outline-none focus:border-blue-500 font-medium"
+                className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] w-full focus:outline-none focus:border-blue-500 font-medium"
               />
               <button
                 type="button"
                 onClick={fetchActivityLogs}
-                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-gray-600 transition-colors cursor-pointer shrink-0"
+                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-gray-600 cursor-pointer shrink-0"
                 title="Refresh Logs"
               >
                 <RefreshCw className={`w-4 h-4 ${activityLogLoading ? 'animate-spin' : ''}`} />
               </button>
             </div>
 
-            <div className="max-h-[55vh] overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-2xl p-2 bg-slate-50/50 text-xs">
+            <div className="max-h-[calc(55*var(--vh,1vh))] overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-2xl p-2 bg-slate-50/50 text-[0.875rem]">
               {activityLogLoading ? (
-                <div className="p-8 text-center text-gray-400 animate-pulse">Loading activity history...</div>
+                <div className="p-8 text-center text-gray-400">Loading activity history...</div>
               ) : activityLogs.length === 0 ? (
                 <div className="p-8 text-center text-gray-400 italic">No activity logs recorded yet</div>
               ) : (
                 activityLogs
                   .filter(log => !logSearch || JSON.stringify(log).toLowerCase().includes(logSearch.toLowerCase()))
                   .map((log, idx) => (
-                    <div key={log._id || idx} className="py-2.5 px-3 flex items-start justify-between gap-3 hover:bg-white rounded-xl transition-colors">
+                    <div key={log._id || idx} className="py-2.5 px-3 flex items-start justify-between gap-3 hover:bg-white rounded-xl">
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
-                          <span className={`px-2 py-0.5 text-[9px] font-black rounded-full uppercase border ${
+                          <span className={`px-2 py-0.5 text-xs font-semibold rounded-full uppercase border ${
                             log.action === 'CREATE' || log.action === 'IMPORT' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                             log.action === 'DELETE' ? 'bg-rose-50 text-rose-700 border-rose-200' :
                             'bg-blue-50 text-blue-700 border-blue-200'
                           }`}>
                             {log.action || 'ACTIVITY'}
                           </span>
-                          <span className="font-bold text-gray-900">{log.entityName || log.entityType || 'Directory Item'}</span>
+                          <span className="font-semibold text-gray-900">{log.entityName || log.entityType || 'Directory Item'}</span>
                         </div>
-                        <p className="text-gray-600 text-[11px]">{log.details || log.description || 'Record update performed'}</p>
+                        <p className="text-gray-600 text-xs">{log.details || log.description || 'Record update performed'}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <span className="block text-[10px] text-gray-400 font-mono">
+                        <span className="block text-xs text-gray-400 font-mono">
                           {log.createdAt ? new Date(log.createdAt).toLocaleString('en-IN') : 'Just now'}
                         </span>
                         {log.performedBy && (
-                          <span className="block text-[10px] text-blue-600 font-semibold">{log.performedBy}</span>
+                          <span className="block text-xs text-blue-600 font-semibold">{log.performedBy}</span>
                         )}
                       </div>
                     </div>
@@ -6451,11 +6366,11 @@ export const BusinessDirectoryV2: React.FC = () => {
               )}
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex justify-end pt-2 dlg-footer">
               <button
                 type="button"
                 onClick={() => setShowActivityLogModal(false)}
-                className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl text-[0.875rem] cursor-pointer"
               >
                 Close
               </button>
@@ -6478,25 +6393,25 @@ export const BusinessDirectoryV2: React.FC = () => {
                 <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3">
                   <Check className="w-6 h-6 stroke-[3]" />
                 </div>
-                <h3 className="font-bold text-base text-gray-900">No Duplicates Detected!</h3>
-                <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                <h3 className="font-semibold text-base text-gray-900">No Duplicates Detected!</h3>
+                <p className="text-[0.875rem] text-gray-500 mt-1 max-w-md mx-auto">
                   All entries in <span className="font-semibold">{activeMainTab}</span> have unique keys.
                 </p>
               </div>
             ) : (
-              <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+              <div className="space-y-4 max-h-[calc(65*var(--vh,1vh))] overflow-y-auto pr-1">
                 <div className="flex items-center justify-between bg-blue-50/60 border border-blue-100 rounded-xl px-3.5 py-2">
-                  <p className="text-xs text-blue-900 font-semibold flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
+                  <p className="text-[0.875rem] text-blue-900 font-semibold flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                     <span>Found <strong>{duplicateGroups.length}</strong> duplicate group(s) across {totalRecords} records</span>
                   </p>
-                  <span className="text-[11px] text-blue-700 font-medium">Review and merge duplicate records below</span>
+                  <span className="text-xs text-blue-700 font-medium">Review and merge duplicate records below</span>
                 </div>
                 
                 {duplicateGroups.map((group, gIdx) => (
                   <div 
                     key={gIdx}
-                    className={`border rounded-2xl p-4 transition-all duration-150 ${
+                    className={`border rounded-2xl p-4 ${
                       gIdx === highlightedDuplicateIdx
                         ? 'border-blue-500 bg-blue-50/20 ring-2 ring-blue-500/20 shadow-xs'
                         : 'border-red-200 bg-red-50/10'
@@ -6505,10 +6420,10 @@ export const BusinessDirectoryV2: React.FC = () => {
                   >
                     <div className="flex justify-between items-start md:items-center flex-col md:flex-row gap-2 mb-3 border-b pb-2.5 border-red-100">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-bold bg-red-100 text-red-800 px-2.5 py-1 rounded-lg border border-red-200">
+                        <span className="text-[0.875rem] font-semibold bg-red-100 text-red-800 px-2.5 py-1 rounded-lg border border-red-200">
                           Duplicate by {group.field}: <span className="font-mono">{group.value}</span>
                         </span>
-                        <span className="text-xs text-gray-500 font-bold bg-white px-2 py-0.5 rounded-md border border-gray-200">
+                        <span className="text-[0.875rem] text-gray-500 font-semibold bg-white px-2 py-0.5 rounded-md border border-gray-200">
                           {group.items.length} records
                         </span>
                       </div>
@@ -6516,7 +6431,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                         <button
                           onClick={() => setCompareGroup(group)}
                           title="View Both"
-                          className="px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                          className="px-3 py-1.5 text-[0.875rem] font-semibold text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 flex items-center gap-1.5 cursor-pointer shadow-2xs"
                         >
                           <Eye className="w-3.5 h-3.5 text-gray-500" />
                           <span>View Both</span>
@@ -6528,7 +6443,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                               setMergePrimaryId(group.items[0]?._id || '');
                             }}
                             title="Merge"
-                            className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 border border-blue-700 rounded-xl hover:bg-blue-700 flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                            className="px-3 py-1.5 text-[0.875rem] font-semibold text-white bg-blue-600 border border-blue-700 rounded-xl hover:bg-blue-700 flex items-center gap-1.5 cursor-pointer shadow-xs"
                           >
                             <RefreshCw className="w-3.5 h-3.5" />
                             <span>Merge</span>
@@ -6540,7 +6455,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                             setHighlightedDuplicateIdx(prev => (prev > 0 ? prev - 1 : 0));
                           }}
                           title="Keep Both"
-                          className="px-3 py-1.5 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-200 rounded-xl hover:bg-gray-200 flex items-center gap-1.5 transition-all cursor-pointer"
+                          className="px-3 py-1.5 text-[0.875rem] font-semibold text-gray-600 bg-gray-100 border border-gray-200 rounded-xl hover:bg-gray-200 flex items-center gap-1.5 cursor-pointer"
                         >
                           <X className="w-3.5 h-3.5" />
                           <span>Keep Both</span>
@@ -6555,25 +6470,25 @@ export const BusinessDirectoryV2: React.FC = () => {
                         const isActive = (item.status || 'active').toLowerCase() === 'active';
 
                         return (
-                          <div key={item._id} className="flex justify-between items-center bg-white p-3.5 border border-gray-200 rounded-xl text-xs hover:border-gray-300 transition-colors">
+                          <div key={item._id} className="flex justify-between items-center bg-white p-3.5 border border-gray-200 rounded-xl text-[0.875rem] hover:border-gray-300">
                             <div className="space-y-1">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <p className="font-bold text-gray-900 text-sm">
+                                <p className="font-semibold text-gray-900 text-[0.875rem]">
                                   {activeMainTab === 'regions' ? item.name : (item.firmName || item.contactName || item.name)}
                                 </p>
                                 {item.code && (
-                                  <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-1.5 py-0.5 rounded">
+                                  <span className="font-mono text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200/80 px-1.5 py-0.5 rounded">
                                     {item.code}
                                   </span>
                                 )}
-                                <span className={`inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                                <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
                                   isActive ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-gray-100 text-gray-700 border border-gray-200'
                                 }`}>
                                   {isActive ? 'Active' : 'Inactive'}
                                 </span>
                               </div>
 
-                              <div className="text-xs text-gray-500 flex items-center space-x-2 flex-wrap gap-y-1">
+                              <div className="text-[0.875rem] text-gray-500 flex items-center space-x-2 flex-wrap gap-y-1">
                                 {activeMainTab === 'regions' ? (
                                   <span>Agent: <strong>{item.assignedAgent || 'None'}</strong></span>
                                 ) : (
@@ -6589,7 +6504,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                                           href={`https://wa.me/91${item.phone.replace(/\D/g, '')}`}
                                           target="_blank"
                                           rel="noreferrer"
-                                          className="inline-flex items-center shrink-0 text-emerald-500 hover:text-emerald-600 transition-transform hover:scale-110"
+                                          className="inline-flex items-center shrink-0 text-emerald-500 hover:text-emerald-600"
                                         >
                                           <WhatsAppIcon />
                                         </a>
@@ -6619,9 +6534,9 @@ export const BusinessDirectoryV2: React.FC = () => {
                               </div>
 
                               {/* Balance row */}
-                              <div className="flex items-center gap-3 pt-0.5 text-[11px]">
+                              <div className="flex items-center gap-3 pt-0.5 text-xs">
                                 <span className="text-gray-600">
-                                  Outstanding Balance: <strong className={outBal > 0 ? 'text-rose-600 font-bold' : 'text-emerald-600 font-bold'}>
+                                  Outstanding Balance: <strong className={outBal > 0 ? 'text-rose-600 font-semibold' : 'text-emerald-600 font-semibold'}>
                                     ₹{outBal.toLocaleString('en-IN')}
                                   </strong>
                                 </span>
@@ -6635,14 +6550,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                             <div className="flex items-center space-x-2 shrink-0 ml-3">
                               <button
                                 onClick={() => openModal(item)}
-                                className="px-2.5 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                className="px-2.5 py-1 text-[0.875rem] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-semibold flex items-center gap-1 cursor-pointer"
                               >
                                 <Edit className="w-3.5 h-3.5" />
                                 Edit
                               </button>
                               <button
                                 onClick={() => handleDeleteDuplicateRecord(item)}
-                                className="px-2.5 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                className="px-2.5 py-1 text-[0.875rem] bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg font-semibold flex items-center gap-1 cursor-pointer"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                                 Delete
@@ -6657,10 +6572,10 @@ export const BusinessDirectoryV2: React.FC = () => {
               </div>
             )}
 
-            <div className="pt-3 border-t border-gray-100 flex justify-end">
+            <div className="pt-3 border-t border-gray-100 flex justify-end dlg-footer">
               <button
                 onClick={() => setShowDuplicatesModal(false)}
-                className="px-4 py-2 border rounded-xl hover:bg-gray-100 font-bold text-xs cursor-pointer text-gray-700"
+                className="px-4 py-2 border rounded-xl hover:bg-gray-100 font-semibold text-[0.875rem] cursor-pointer text-gray-700"
               >
                 Close Window
               </button>
@@ -6671,30 +6586,30 @@ export const BusinessDirectoryV2: React.FC = () => {
 
       {/* ── COMPARE DUPLICATES MODAL (View Both) ── */}
       {compareGroup && createPortal(
-        <div className="fixed inset-0 z-[10010] overflow-y-auto flex items-center justify-center p-4 bg-gray-950/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative bg-white rounded-2xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[10010] overflow-y-auto flex items-center justify-center p-4 bg-gray-900/40">
+          <div className="relative bg-white max-w-4xl w-full flex flex-col max-h-[calc(90*var(--vh,1vh))] overflow-hidden dlg-panel">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-              <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+              <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
                 <Users className="w-5 h-5 text-blue-600" />
                 Compare Duplicates ({compareGroup.field}: {compareGroup.value})
               </h3>
-              <button onClick={() => setCompareGroup(null)} className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
+              <button onClick={() => setCompareGroup(null)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 overflow-auto flex-1 text-xs">
+            <div className="p-6 overflow-auto flex-1 text-[0.875rem]">
               <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-xl overflow-hidden">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-r border-gray-200 w-[180px]">Field</th>
+                    <th className="px-4 py-3 text-left text-[0.875rem] font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200 w-[11.25rem]">Field</th>
                     {compareGroup.items.map((item: DirectoryItem, idx: number) => (
-                      <th key={item._id} className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider min-w-[200px] border-r last:border-r-0">
+                      <th key={item._id} className="px-4 py-3 text-left text-[0.875rem] font-medium text-gray-700 uppercase tracking-wider min-w-[12.5rem] border-r last:border-r-0">
                         <div className="flex justify-between items-center">
                           <span>Record #{idx + 1}</span>
                           <button
                             onClick={() => handleDeleteDuplicateRecord(item)}
-                            className="text-red-600 hover:text-red-800 p-1 font-bold text-[10px] normal-case flex items-center gap-0.5 border border-red-200 bg-red-50 rounded-lg cursor-pointer"
+                            className="text-red-600 hover:text-red-800 p-1 font-semibold text-xs normal-case flex items-center gap-0.5 border border-red-200 bg-red-50 rounded-lg cursor-pointer"
                             title="Delete Record"
                           >
                             <Trash2 className="w-3 h-3" /> Delete
@@ -6726,27 +6641,27 @@ export const BusinessDirectoryV2: React.FC = () => {
                     { label: 'Status', key: 'status' }
                   ].filter(row => row.showIf !== false).map((row, rIdx) => (
                     <tr key={rIdx} className={rIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-                      <td className="px-4 py-2.5 text-xs font-bold text-gray-500 border-r border-gray-200 bg-gray-50/40">{row.label}</td>
+                      <td className="px-4 py-2.5 text-[0.875rem] font-semibold text-gray-500 border-r border-gray-200 bg-gray-50/40">{row.label}</td>
                       {compareGroup.items.map((item: DirectoryItem) => {
                         const val = (item as any)[row.key];
                         return (
-                          <td key={item._id} className="px-4 py-2.5 text-xs text-gray-800 border-r border-gray-200 last:border-r-0 break-words font-medium">
+                          <td key={item._id} className="px-4 py-2.5 text-[0.875rem] text-gray-800 border-r border-gray-200 last:border-r-0 break-words font-medium">
                             {row.isCurrency ? (
-                              <span className={Number(val) > 0 ? 'text-red-600 font-bold' : 'text-emerald-600 font-bold'}>
+                              <span className={Number(val) > 0 ? 'text-red-600 font-semibold' : 'text-emerald-600 font-semibold'}>
                                 ₹{(Number(val) || 0).toLocaleString('en-IN')}
                               </span>
                             ) : row.key === 'status' ? (
-                              <span className={`inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                              <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
                                 val === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-700'
                               }`}>
                                 {val || 'active'}
                               </span>
                             ) : row.key === 'code' && val ? (
-                              <span className="font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-1.5 py-0.5 rounded">
+                              <span className="font-mono font-semibold text-blue-700 bg-blue-50 border border-blue-200/80 px-1.5 py-0.5 rounded">
                                 {val}
                               </span>
                             ) : (
-                              val || <span className="text-gray-400 italic text-[11px]">Empty</span>
+                              val || <span className="text-gray-400 italic text-xs">Empty</span>
                             )}
                           </td>
                         );
@@ -6757,7 +6672,7 @@ export const BusinessDirectoryV2: React.FC = () => {
               </table>
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-2">
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-2 dlg-footer">
               {activeMainTab !== 'regions' && (
                 <button
                   onClick={() => {
@@ -6766,14 +6681,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                     setMergeGroup(group);
                     setMergePrimaryId(group.items[0]?._id || '');
                   }}
-                  className="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md transition-colors cursor-pointer"
+                  className="px-4 py-2 text-[0.875rem] font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md cursor-pointer"
                 >
                   Merge These Records
                 </button>
               )}
               <button
                 onClick={() => setCompareGroup(null)}
-                className="px-4 py-2 text-xs font-bold border border-gray-300 rounded-xl hover:bg-gray-100 text-gray-700 transition-colors cursor-pointer"
+                className="px-4 py-2 text-[0.875rem] font-semibold border border-gray-300 rounded-xl hover:bg-gray-100 text-gray-700 cursor-pointer"
               >
                 Close
               </button>
@@ -6785,31 +6700,31 @@ export const BusinessDirectoryV2: React.FC = () => {
 
       {/* ── MERGE SELECTION MODAL WITH DIFF (BALANCE AND ACTIVE STATUS) ── */}
       {mergeGroup && createPortal(
-        <div className="fixed inset-0 z-[10010] overflow-y-auto flex items-center justify-center p-4 bg-gray-950/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative bg-white rounded-2xl max-w-3xl w-full shadow-2xl flex flex-col border border-gray-100 animate-in fade-in zoom-in-95 duration-200 overflow-hidden max-h-[90vh]">
+        <div className="fixed inset-0 z-[10010] overflow-y-auto flex items-center justify-center p-4 bg-gray-900/40">
+          <div className="relative bg-white max-w-3xl w-full flex flex-col overflow-hidden max-h-[calc(90*var(--vh,1vh))] dlg-panel">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
               <div>
-                <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
                   <RefreshCw className="w-5 h-5 text-blue-600" />
                   <span>Merge Duplicate Records</span>
                 </h3>
-                <p className="text-[11px] text-gray-500 mt-0.5">
+                <p className="text-xs text-gray-500 mt-0.5">
                   Select the primary record to keep. Duplicate fields, transactions, and balances will be safely combined.
                 </p>
               </div>
-              <button onClick={() => { setMergeGroup(null); setMergePrimaryId(''); }} className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
+              <button onClick={() => { setMergeGroup(null); setMergePrimaryId(''); }} className="text-gray-400 hover:text-gray-600 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4 text-xs overflow-y-auto">
+            <div className="p-6 space-y-4 text-[0.875rem] overflow-y-auto">
               {/* How Merge Works Info Banner */}
-              <div className="bg-blue-50/80 border border-blue-200 rounded-xl p-3.5 text-xs text-blue-800 space-y-1.5">
-                <p className="font-bold flex items-center gap-1.5 text-blue-900">
+              <div className="bg-blue-50/80 border border-blue-200 rounded-xl p-3.5 text-[0.875rem] text-blue-800 space-y-1.5">
+                <p className="font-semibold flex items-center gap-1.5 text-blue-900">
                   <Copy className="w-4 h-4 text-blue-600" />
                   Merge Consolidation Rules:
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-blue-700">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-blue-700">
                   <div>• <strong>Primary Master:</strong> Selected record is kept with its primary profile.</div>
                   <div>• <strong>Balances:</strong> Outstanding & opening balances are <strong>summed up</strong>.</div>
                   <div>• <strong>Transactions:</strong> All sales orders, invoices & receipts point to master.</div>
@@ -6819,7 +6734,7 @@ export const BusinessDirectoryV2: React.FC = () => {
 
               {/* Side-by-Side Diff Table / Cards */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2.5">
+                <label className="block text-[0.875rem] font-medium text-gray-700 uppercase tracking-wider mb-2.5">
                   Side-by-Side Comparison — Choose Master Record:
                 </label>
 
@@ -6834,7 +6749,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                       <div
                         key={item._id}
                         onClick={() => setMergePrimaryId(item._id)}
-                        className={`p-4 border-2 rounded-2xl cursor-pointer transition-all flex flex-col justify-between ${
+                        className={`p-4 border-2 rounded-2xl cursor-pointer flex flex-col justify-between ${
                           isPrimary
                             ? 'border-blue-600 bg-blue-50/40 ring-4 ring-blue-100 shadow-sm'
                             : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/50'
@@ -6851,9 +6766,9 @@ export const BusinessDirectoryV2: React.FC = () => {
                                 onChange={() => setMergePrimaryId(item._id)}
                                 className="w-4 h-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
                               />
-                              <span className="font-bold text-gray-900 text-xs">Record #{idx + 1}</span>
+                              <span className="font-semibold text-gray-900 text-[0.875rem]">Record #{idx + 1}</span>
                             </label>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium uppercase tracking-wider ${
                               isPrimary
                                 ? 'bg-blue-600 text-white shadow-2xs'
                                 : 'bg-gray-100 text-gray-500 border border-gray-200'
@@ -6865,21 +6780,21 @@ export const BusinessDirectoryV2: React.FC = () => {
                           {/* Firm Name & Status */}
                           <div className="pt-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-bold text-gray-900 text-sm">{item.firmName || item.name}</h4>
+                              <h4 className="font-semibold text-gray-900 text-[0.875rem]">{item.firmName || item.name}</h4>
                               {item.code && (
-                                <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-1.5 py-0.5 rounded">
+                                <span className="font-mono text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200/80 px-1.5 py-0.5 rounded">
                                   {item.code}
                                 </span>
                               )}
                             </div>
                             <div className="flex items-center gap-2 mt-1">
-                              <span className={`inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                              <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
                                 isActive ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-gray-100 text-gray-700 border border-gray-200'
                               }`}>
                                 Status: {isActive ? 'Active' : 'Inactive'}
                               </span>
                               {(item.ownerName || item.contactName) && (
-                                <span className="text-[11px] text-gray-600 font-medium truncate">
+                                <span className="text-xs text-gray-600 font-medium truncate">
                                   Contact: {item.ownerName || item.contactName}
                                 </span>
                               )}
@@ -6887,23 +6802,23 @@ export const BusinessDirectoryV2: React.FC = () => {
                           </div>
 
                           {/* Balances Highlight Diff Box */}
-                          <div className="bg-slate-50 border border-gray-200 rounded-xl p-2.5 space-y-1 text-[11.5px]">
+                          <div className="bg-slate-50 border border-gray-200 rounded-xl p-2.5 space-y-1 text-xs">
                             <div className="flex justify-between items-center">
                               <span className="text-gray-500 font-medium">Outstanding Balance:</span>
-                              <span className={`font-bold font-mono ${outBal > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                              <span className={`font-semibold font-mono ${outBal > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                                 ₹{outBal.toLocaleString('en-IN')}
                               </span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-gray-500 font-medium">Opening Balance:</span>
-                              <span className="font-bold font-mono text-gray-800">
+                              <span className="font-semibold font-mono text-gray-800">
                                 ₹{openBal.toLocaleString('en-IN')}
                               </span>
                             </div>
                           </div>
 
                           {/* Contact Details */}
-                          <div className="space-y-1 text-[11px] text-gray-600 pt-1">
+                          <div className="space-y-1 text-xs text-gray-600 pt-1">
                             <div><strong>Phone:</strong> <span className="font-mono">{item.phone || '—'}</span></div>
                             {item.gstNumber && <div><strong>GSTIN:</strong> <span className="font-mono">{item.gstNumber}</span></div>}
                             <div><strong>City / District:</strong> {[item.city, item.district].filter(Boolean).join(', ') || '—'}</div>
@@ -6926,25 +6841,25 @@ export const BusinessDirectoryV2: React.FC = () => {
                 const primaryItem = mergeGroup.items.find((i: any) => i._id === mergePrimaryId) || mergeGroup.items[0];
 
                 return (
-                  <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 space-y-2 text-xs">
-                    <p className="font-bold text-emerald-950 flex items-center gap-2">
+                  <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 space-y-2 text-[0.875rem]">
+                    <p className="font-semibold text-emerald-950 flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
                       <span>Combined Merged Result Preview:</span>
                     </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-[11.5px]">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-xs">
                       <div className="bg-white p-2.5 rounded-xl border border-emerald-100 shadow-2xs">
-                        <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">Master Firm Name</span>
-                        <span className="font-bold text-gray-900 truncate block mt-0.5">{primaryItem?.firmName || primaryItem?.name}</span>
+                        <span className="text-gray-500 block text-xs uppercase font-medium tracking-wider">Master Firm Name</span>
+                        <span className="font-semibold text-gray-900 truncate block mt-0.5">{primaryItem?.firmName || primaryItem?.name}</span>
                       </div>
                       <div className="bg-white p-2.5 rounded-xl border border-emerald-100 shadow-2xs">
-                        <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">Total Combined Outstanding</span>
-                        <span className={`font-bold font-mono block mt-0.5 ${totalOut > 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                        <span className="text-gray-500 block text-xs uppercase font-medium tracking-wider">Total Combined Outstanding</span>
+                        <span className={`font-semibold font-mono block mt-0.5 ${totalOut > 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
                           ₹{totalOut.toLocaleString('en-IN')}
                         </span>
                       </div>
                       <div className="bg-white p-2.5 rounded-xl border border-emerald-100 shadow-2xs">
-                        <span className="text-gray-500 block text-[10px] uppercase font-bold tracking-wider">Final Status & Opening</span>
-                        <span className="font-bold text-emerald-800 block mt-0.5">
+                        <span className="text-gray-500 block text-xs uppercase font-medium tracking-wider">Final Status & Opening</span>
+                        <span className="font-semibold text-emerald-800 block mt-0.5">
                           {anyActive ? 'Active' : 'Inactive'} · ₹{totalOpen.toLocaleString('en-IN')} Opening
                         </span>
                       </div>
@@ -6953,17 +6868,17 @@ export const BusinessDirectoryV2: React.FC = () => {
                 );
               })()}
 
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100 dlg-footer">
                 <button
                   onClick={() => { setMergeGroup(null); setMergePrimaryId(''); }}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs cursor-pointer transition-colors"
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl text-[0.875rem] cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleExecuteMerge}
                   disabled={isMerging || !mergePrimaryId}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-[0.875rem] shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <GitMerge className={`w-4 h-4 ${isMerging ? 'animate-spin' : ''}`} />
                   <span>{isMerging ? 'Merging Records...' : 'Confirm & Merge Records'}</span>
@@ -6984,13 +6899,13 @@ export const BusinessDirectoryV2: React.FC = () => {
           maxWidth="max-w-xl"
         >
           <div className="space-y-4 text-left">
-            <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-700 font-medium leading-relaxed">
+            <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] text-gray-700 font-medium leading-relaxed">
               Check the boxes next to the fields you want to update. Any unchecked fields will remain unchanged across the <strong>{selectedIds.length}</strong> selected records.
             </div>
 
             <div className="space-y-3">
               {/* Status */}
-              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80">
                 <input
                   type="checkbox"
                   id="bd_bulk_status_check"
@@ -6999,14 +6914,14 @@ export const BusinessDirectoryV2: React.FC = () => {
                   className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                 />
                 <div className="flex-1">
-                  <label htmlFor="bd_bulk_status_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                  <label htmlFor="bd_bulk_status_check" className="block text-[0.875rem] font-semibold text-gray-700 cursor-pointer">
                     Status
                   </label>
                   <select
                     disabled={!bulkEditFields.status}
                     value={bulkEditValues.status}
                     onChange={e => setBulkEditValues(prev => ({ ...prev, status: e.target.value }))}
-                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                    className="mt-1 w-full px-3 py-2 text-[0.875rem] border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
                   >
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
@@ -7017,7 +6932,7 @@ export const BusinessDirectoryV2: React.FC = () => {
               </div>
 
               {/* Category */}
-              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80">
                 <input
                   type="checkbox"
                   id="bd_bulk_category_check"
@@ -7026,7 +6941,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                   className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                 />
                 <div className="flex-1">
-                  <label htmlFor="bd_bulk_category_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                  <label htmlFor="bd_bulk_category_check" className="block text-[0.875rem] font-semibold text-gray-700 cursor-pointer">
                     Category / Tag
                   </label>
                   <input
@@ -7035,13 +6950,13 @@ export const BusinessDirectoryV2: React.FC = () => {
                     placeholder="e.g. VIP, Wholesaler, Retailer, Distributor"
                     value={bulkEditValues.category}
                     onChange={e => setBulkEditValues(prev => ({ ...prev, category: e.target.value }))}
-                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                    className="mt-1 w-full px-3 py-2 text-[0.875rem] border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
                   />
                 </div>
               </div>
 
               {/* Credit Period */}
-              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80">
                 <input
                   type="checkbox"
                   id="bd_bulk_credit_check"
@@ -7050,7 +6965,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                   className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                 />
                 <div className="flex-1">
-                  <label htmlFor="bd_bulk_credit_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                  <label htmlFor="bd_bulk_credit_check" className="block text-[0.875rem] font-semibold text-gray-700 cursor-pointer">
                     Credit Period (Days)
                   </label>
                   <input
@@ -7059,13 +6974,13 @@ export const BusinessDirectoryV2: React.FC = () => {
                     placeholder="e.g. 30"
                     value={bulkEditValues.creditPeriod}
                     onChange={e => setBulkEditValues(prev => ({ ...prev, creditPeriod: e.target.value }))}
-                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                    className="mt-1 w-full px-3 py-2 text-[0.875rem] border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
                   />
                 </div>
               </div>
 
               {/* Preferred Transporter */}
-              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80">
                 <input
                   type="checkbox"
                   id="bd_bulk_transporter_check"
@@ -7074,7 +6989,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                   className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                 />
                 <div className="flex-1">
-                  <label htmlFor="bd_bulk_transporter_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                  <label htmlFor="bd_bulk_transporter_check" className="block text-[0.875rem] font-semibold text-gray-700 cursor-pointer">
                     Preferred Transporter
                   </label>
                   <input
@@ -7084,7 +6999,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                     placeholder="Select or enter transporter"
                     value={bulkEditValues.preferredTransporter}
                     onChange={e => setBulkEditValues(prev => ({ ...prev, preferredTransporter: e.target.value }))}
-                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                    className="mt-1 w-full px-3 py-2 text-[0.875rem] border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
                   />
                   <datalist id="bd_bulk_transporters_list">
                     {allTransporters.map((t: any) => (
@@ -7095,7 +7010,7 @@ export const BusinessDirectoryV2: React.FC = () => {
               </div>
 
               {/* Route */}
-              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80">
                 <input
                   type="checkbox"
                   id="bd_bulk_route_check"
@@ -7104,7 +7019,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                   className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                 />
                 <div className="flex-1">
-                  <label htmlFor="bd_bulk_route_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                  <label htmlFor="bd_bulk_route_check" className="block text-[0.875rem] font-semibold text-gray-700 cursor-pointer">
                     Route / Region
                   </label>
                   <input
@@ -7114,7 +7029,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                     placeholder="Select or enter route"
                     value={bulkEditValues.route}
                     onChange={e => setBulkEditValues(prev => ({ ...prev, route: e.target.value }))}
-                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                    className="mt-1 w-full px-3 py-2 text-[0.875rem] border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
                   />
                   <datalist id="bd_bulk_routes_list">
                     {allRoutes.map((r: any) => (
@@ -7125,11 +7040,11 @@ export const BusinessDirectoryV2: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 dlg-footer">
               <button
                 type="button"
                 onClick={() => setShowBulkEditModal(false)}
-                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+                className="px-4 py-2 text-[0.875rem] font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
               >
                 Cancel
               </button>
@@ -7137,7 +7052,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 type="button"
                 onClick={handleBulkEditParties}
                 disabled={isBulkOperating || !Object.values(bulkEditFields).some(Boolean)}
-                className="px-4 py-2 text-xs font-bold bg-[#785b3a] hover:bg-[#634a2d] text-white rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 text-[0.875rem] font-semibold bg-[#785b3a] hover:bg-[#634a2d] text-white rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-2"
               >
                 {isBulkOperating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
                 <span>Apply to {selectedIds.length} Records</span>
@@ -7160,22 +7075,22 @@ export const BusinessDirectoryV2: React.FC = () => {
               <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
                 <Trash2 className="w-5 h-5" />
               </div>
-              <div className="text-xs">
-                <h4 className="font-bold text-rose-900 text-sm">Confirm Bulk Deletion</h4>
+              <div className="text-[0.875rem]">
+                <h4 className="font-semibold text-rose-900 text-[0.875rem]">Confirm Bulk Deletion</h4>
                 <p className="text-rose-700 mt-1 leading-relaxed">
                   Are you sure you want to move <strong>{selectedIds.length}</strong> selected {activeMainTab} records to the Recycle Bin?
                 </p>
-                <p className="text-gray-500 mt-1.5 text-[11px]">
+                <p className="text-gray-500 mt-1.5 text-xs">
                   You can restore these records anytime from the Recycle Bin.
                 </p>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-2 dlg-footer">
               <button
                 type="button"
                 onClick={() => setShowBulkDeleteModal(false)}
-                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+                className="px-4 py-2 text-[0.875rem] font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
               >
                 Cancel
               </button>
@@ -7183,7 +7098,7 @@ export const BusinessDirectoryV2: React.FC = () => {
                 type="button"
                 onClick={handleBulkDeleteParties}
                 disabled={isBulkOperating}
-                className="px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 text-[0.875rem] font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-2"
               >
                 {isBulkOperating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
                 <span>Delete {selectedIds.length} Records</span>
@@ -7203,20 +7118,6 @@ export const BusinessDirectoryV2: React.FC = () => {
         customer={customerPaymentParty}
         onPaymentSuccess={handleCustomerPaymentSuccess}
       />
-
-      {/* Keyframe Animation */}
-      <style>{`
-        @keyframes slideDownFade {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
     </div>
   );
 };

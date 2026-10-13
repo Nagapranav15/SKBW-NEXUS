@@ -55,14 +55,14 @@ export class ErrorBoundary extends Component<Props, State> {
         msg.includes('MIME type of "text/html"');
 
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="min-h-[calc(100*var(--vh,1vh))] flex items-center justify-center bg-gray-50 p-4">
           <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-gray-150 p-6 text-center space-y-4">
             <div className="w-14 h-14 bg-amber-50 border border-amber-200 text-amber-600 rounded-2xl flex items-center justify-center mx-auto">
               <AlertTriangle className="w-7 h-7" />
             </div>
 
             <div>
-              <h3 className="text-base font-black text-gray-900">
+              <h3 className="text-base font-semibold text-gray-900">
                 {isChunk ? 'New Update Available' : 'Connection Interrupted'}
               </h3>
               <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
@@ -74,7 +74,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
             <button
               onClick={this.handleReload}
-              className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-semibold text-xs shadow-sm transition-all cursor-pointer"
             >
               <RotateCcw className="w-4 h-4" />
               <span>Refresh Application</span>

@@ -68,7 +68,7 @@ const AnalyzerDashboard: React.FC = () => {
 
   const fmt = (n: number) => n >= 100000 ? `₹${(n / 100000).toFixed(1)}L` : n >= 1000 ? `₹${(n / 1000).toFixed(1)}K` : `₹${n.toFixed(0)}`;
 
-  if (loading) return <div className="p-6 flex items-center justify-center min-h-[400px]"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>;
+  if (loading) return <div className="p-6 flex items-center justify-center min-h-[25rem]"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>;
 
   const monthly = analytics?.monthly || {};
   const monthKeys = Object.keys(monthly).sort();
@@ -109,7 +109,7 @@ const AnalyzerDashboard: React.FC = () => {
     <div className="p-6">
       <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Analyzer Dashboard</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Analyzer Dashboard</h1>
           <p className="text-gray-600 text-sm mt-1">Financial analytics and year-over-year comparison</p>
         </div>
         <div className="flex items-center gap-3">
@@ -137,7 +137,7 @@ const AnalyzerDashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500 mb-1">{s.title}</p>
-                <p className={`text-2xl font-bold ${s.textColor}`}>{s.value}</p>
+                <p className={`text-2xl font-semibold ${s.textColor}`}>{s.value}</p>
               </div>
               <div className={`${s.color} p-3 rounded-lg`}><s.icon className="w-5 h-5 text-white" /></div>
             </div>
@@ -181,7 +181,7 @@ const AnalyzerDashboard: React.FC = () => {
           <p className="text-xs text-gray-500">Upload a previously exported transaction file to enable year-over-year comparison. Supports CSV, Excel, and JSON.</p>
           {comp && (
             <div className="mt-4 space-y-2">
-              <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Year {comp.year} Summary</h4>
+              <h4 className="text-xs font-medium text-gray-600 uppercase tracking-wider">Year {comp.year} Summary</h4>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="p-2 bg-green-50 rounded-lg"><p className="text-xs text-gray-500">Income</p><p className="font-semibold text-green-600 text-sm">{fmt(comp.totalIncome)}</p></div>
                 <div className="p-2 bg-red-50 rounded-lg"><p className="text-xs text-gray-500">Expenses</p><p className="font-semibold text-red-600 text-sm">{fmt(comp.totalExpense)}</p></div>
@@ -194,7 +194,7 @@ const AnalyzerDashboard: React.FC = () => {
         {/* Monthly Summary Table */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h3 className="text-sm font-semibold text-gray-700 mb-3">Monthly Summary</h3>
-          <div className="overflow-x-auto max-h-[280px]">
+          <div className="overflow-x-auto max-h-[17.5rem]">
             <table className="w-full text-xs">
               <thead className="bg-gray-50 sticky top-0"><tr>
                 <th className="px-3 py-2 text-left font-medium text-gray-600">Month</th>

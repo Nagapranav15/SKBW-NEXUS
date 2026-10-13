@@ -295,7 +295,7 @@ const getNormalizedTypeInfo = (rawType?: string): { displayType: string; icon: R
     return { displayType: 'Production Receipt', icon: <Settings className="w-4 h-4 text-emerald-600 shrink-0" /> };
   }
   if (type.includes('Dispatch') || type.includes('Sales')) {
-    return { displayType: 'Sales Dispatch', icon: <Truck className="w-4 h-4 text-purple-600 shrink-0" /> };
+    return { displayType: 'Sales Dispatch', icon: <Truck className="w-4 h-4 text-blue-600 shrink-0" /> };
   }
   if (type.includes('Reservation')) {
     return { displayType: 'Stock Reservation', icon: <FileText className="w-4 h-4 text-amber-500 shrink-0" /> };
@@ -855,7 +855,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
       size="max-w-5xl"
       padding="p-0"
     >
-      <div className="flex flex-col h-[85vh] max-h-[820px] min-h-[640px] bg-white text-gray-800 rounded-3xl overflow-hidden shadow-2xl">
+      <div className="flex flex-col h-[calc(85*var(--vh,1vh))] max-h-[51.25rem] min-h-[40rem] bg-white text-gray-800 rounded-3xl overflow-hidden shadow-2xl">
         
         {/* ── TOP HEADER ── */}
         <div className="p-4 sm:p-5 bg-white border-b border-gray-100 shrink-0">
@@ -863,13 +863,13 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
             <div className="space-y-1.5 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 {/* SKU Code Box */}
-                <div className="flex items-center gap-1.5 bg-blue-50/80 border border-blue-200 text-blue-800 px-2.5 py-1 rounded-xl text-xs font-mono font-bold">
+                <div className="flex items-center gap-1.5 bg-blue-50/80 border border-blue-200 text-blue-800 px-2.5 py-1 rounded-xl text-[0.875rem] font-mono font-semibold">
                   <Package className="w-3.5 h-3.5 text-blue-600" />
                   <span>{sku.skuCode}</span>
                 </div>
 
                 {/* Category Pill */}
-                <span className="text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                <span className="text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200/80 px-2.5 py-1 rounded-full uppercase tracking-wider">
                   {sku.category || 'General'}
                 </span>
 
@@ -881,7 +881,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       onClose();
                       onOpenItemMaster(sku);
                     }}
-                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50/50 hover:bg-blue-100/70 border border-blue-200 px-2.5 py-1 rounded-xl flex items-center gap-1 transition-all cursor-pointer"
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50/50 hover:bg-blue-100/70 border border-blue-200 px-2.5 py-1 rounded-xl flex items-center gap-1 cursor-pointer"
                     title="Open Item Master"
                   >
                     <ExternalLink className="w-3 h-3" />
@@ -891,14 +891,14 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               </div>
 
               {/* Title */}
-              <h2 className="text-xl font-black text-gray-900 tracking-tight truncate" title={sku.name}>
+              <h2 className="text-xl font-semibold text-gray-900 tracking-tight truncate" title={sku.name}>
                 {sku.name}
               </h2>
             </div>
 
             {/* Top Right Controls: Status Badge + 3-dots + Close */}
             <div className="flex items-center gap-2 shrink-0">
-              <div className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 ${statusBadge.color}`}>
+              <div className={`px-3 py-1 rounded-full text-[0.875rem] font-semibold border flex items-center gap-1.5 ${statusBadge.color}`}>
                 <span className="w-2 h-2 rounded-full bg-current"></span>
                 <span>{statusBadge.label}</span>
               </div>
@@ -907,13 +907,13 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowHeaderMenu(prev => !prev)}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
+                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl cursor-pointer"
                   title="More actions"
                 >
                   <MoreVertical className="w-4 h-4" />
                 </button>
                 {showHeaderMenu && (
-                  <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 py-1 divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100 text-xs font-semibold">
+                  <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 py-1 divide-y divide-gray-100 text-[0.875rem] font-semibold">
                     <button
                       type="button"
                       onClick={() => {
@@ -935,7 +935,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                         }}
                         className="w-full px-3 py-2 text-left hover:bg-blue-50 text-gray-700 flex items-center gap-2 cursor-pointer"
                       >
-                        <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
+                        <Edit3 className="w-3.5 h-3.5 text-blue-600" />
                         <span>Edit Item Master</span>
                       </button>
                     )}
@@ -946,7 +946,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
+                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl cursor-pointer"
                 title="Close"
               >
                 <X className="w-4 h-4" />
@@ -962,12 +962,12 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                 <Box className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">ON HAND</div>
-                <div className={`text-base sm:text-lg font-black leading-tight ${totalStock < 0 ? 'text-rose-600' : 'text-gray-900'}`}>
+                <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">ON HAND</div>
+                <div className={`text-base sm:text-lg font-semibold leading-tight ${totalStock < 0 ? 'text-rose-600' : 'text-gray-900'}`}>
                   {totalStock < 0 ? `-${Math.abs(totalStock).toLocaleString('en-IN')}` : totalStock.toLocaleString('en-IN')}{' '}
-                  <span className={`text-xs font-bold font-sans ${totalStock < 0 ? 'text-rose-600' : 'text-blue-600'}`}>{unit}</span>
+                  <span className={`text-[0.875rem] font-semibold font-sans ${totalStock < 0 ? 'text-rose-600' : 'text-blue-600'}`}>{unit}</span>
                 </div>
-                <div className={`text-[11px] font-medium font-mono truncate ${totalStock < 0 ? 'text-rose-500 font-semibold' : 'text-gray-400'}`}>
+                <div className={`text-xs font-medium font-mono truncate ${totalStock < 0 ? 'text-rose-500 font-semibold' : 'text-gray-400'}`}>
                   ≈ {totalStock < 0 ? `-${Math.abs(totalStock * conversionFactor).toLocaleString('en-IN')}` : (totalStock * conversionFactor).toLocaleString('en-IN')} {altUnit}
                 </div>
               </div>
@@ -979,11 +979,11 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                 <Lock className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">RESERVED</div>
-                <div className="text-base sm:text-lg font-black text-gray-900 leading-tight">
-                  {reservedStock.toLocaleString('en-IN')} <span className="text-xs font-bold text-amber-600 font-sans">{unit}</span>
+                <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">RESERVED</div>
+                <div className="text-base sm:text-lg font-semibold text-gray-900 leading-tight">
+                  {reservedStock.toLocaleString('en-IN')} <span className="text-[0.875rem] font-semibold text-amber-600 font-sans">{unit}</span>
                 </div>
-                <div className="text-[11px] font-medium text-gray-400 font-mono truncate">
+                <div className="text-xs font-medium text-gray-400 font-mono truncate">
                   ≈ {reservedPcs.toLocaleString('en-IN')} {altUnit}
                 </div>
               </div>
@@ -995,28 +995,28 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                 <Layers className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">AVAILABLE</div>
-                <div className={`text-base sm:text-lg font-black leading-tight ${availableStock < 0 ? 'text-rose-600' : 'text-gray-900'}`}>
+                <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">AVAILABLE</div>
+                <div className={`text-base sm:text-lg font-semibold leading-tight ${availableStock < 0 ? 'text-rose-600' : 'text-gray-900'}`}>
                   {availableStock < 0 ? `-${Math.abs(availableStock).toLocaleString('en-IN')}` : availableStock.toLocaleString('en-IN')}{' '}
-                  <span className={`text-xs font-bold font-sans ${availableStock < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{unit}</span>
+                  <span className={`text-[0.875rem] font-semibold font-sans ${availableStock < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{unit}</span>
                 </div>
-                <div className={`text-[11px] font-medium font-mono truncate ${availableStock < 0 ? 'text-rose-500 font-semibold' : 'text-gray-400'}`}>
+                <div className={`text-xs font-medium font-mono truncate ${availableStock < 0 ? 'text-rose-500 font-semibold' : 'text-gray-400'}`}>
                   ≈ {availableStock < 0 ? `-${Math.abs(availablePcs).toLocaleString('en-IN')}` : availablePcs.toLocaleString('en-IN')} {altUnit}
                 </div>
               </div>
             </div>
 
             {/* Card 4: In Production */}
-            <div className="p-3 sm:p-3.5 rounded-2xl bg-white border border-purple-200/80 shadow-2xs flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600 shrink-0">
+            <div className="p-3 sm:p-3.5 rounded-2xl bg-white border border-blue-200/80 shadow-2xs flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 shrink-0">
                 <Settings className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">IN PRODUCTION</div>
-                <div className="text-base sm:text-lg font-black text-gray-900 leading-tight">
-                  {inProcessStock.toLocaleString('en-IN')} <span className="text-xs font-bold text-purple-600 font-sans">{unit}</span>
+                <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">IN PRODUCTION</div>
+                <div className="text-base sm:text-lg font-semibold text-gray-900 leading-tight">
+                  {inProcessStock.toLocaleString('en-IN')} <span className="text-[0.875rem] font-semibold text-blue-600 font-sans">{unit}</span>
                 </div>
-                <div className="text-[11px] font-medium text-gray-400 font-mono truncate">
+                <div className="text-xs font-medium text-gray-400 font-mono truncate">
                   ≈ {inProcessPcs.toLocaleString('en-IN')} {altUnit}
                 </div>
               </div>
@@ -1041,7 +1041,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id as ItemDrawerTab)}
-                className={`flex items-center gap-2 px-4 py-3.5 text-xs font-bold transition-all border-b-2 whitespace-nowrap cursor-pointer ${
+                className={`flex items-center gap-2 px-4 py-3.5 text-[0.875rem] font-semibold border-b-2 whitespace-nowrap cursor-pointer ${
                   isActive
                     ? 'border-blue-600 text-blue-700'
                     : 'border-transparent text-gray-500 hover:text-gray-900'
@@ -1050,7 +1050,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                 <Icon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
                 <span>{tab.label}</span>
                 {tab.count !== undefined && (
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                     isActive ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-500'
                   }`}>
                     {tab.count}
@@ -1066,7 +1066,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
           {loading && (
             <div className="flex items-center justify-center py-16 text-gray-400 gap-2">
               <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />
-              <span className="text-xs font-semibold">Loading live stock data...</span>
+              <span className="text-[0.875rem] font-semibold">Loading live stock data...</span>
             </div>
           )}
 
@@ -1074,7 +1074,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               TAB 1: STOCK OVERVIEW
              ════════════════════════════════════════════════════════════════════ */}
           {!loading && activeTab === 'overview' && (
-            <div className="space-y-4 animate-fadeIn">
+            <div className="space-y-4">
               {/* Row 1: Item Specifications & Stock Control */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Left 2 Cols: Item Specifications */}
@@ -1084,7 +1084,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
                         <Tag className="w-4 h-4" />
                       </div>
-                      <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Item Specifications</h3>
+                      <h3 className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">Item Specifications</h3>
                     </div>
                     {onOpenItemMaster && (
                       <button
@@ -1093,7 +1093,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                           onClose();
                           onOpenItemMaster(sku);
                         }}
-                        className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50/60 hover:bg-blue-100/60 px-2.5 py-1 rounded-lg border border-blue-200/60 transition-all cursor-pointer"
+                        className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50/60 hover:bg-blue-100/60 px-2.5 py-1 rounded-lg border border-blue-200/60 cursor-pointer"
                       >
                         <Edit3 className="w-3 h-3" />
                         <span>Edit</span>
@@ -1101,14 +1101,14 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-[0.875rem]">
                     <div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">SKU CODE</span>
-                      <span className="font-mono font-bold text-gray-900">{sku.skuCode}</span>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">SKU CODE</span>
+                      <span className="font-mono font-semibold text-gray-900">{sku.skuCode}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">ITEM TYPE</span>
-                      <span className="font-bold text-gray-900">
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">ITEM TYPE</span>
+                      <span className="font-semibold text-gray-900">
                         {(() => {
                           const cat = (sku.category || '').toLowerCase();
                           const code = (sku.skuCode || '').toUpperCase();
@@ -1119,16 +1119,16 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">CATEGORY</span>
-                      <span className="font-bold text-gray-900">{sku.category || '—'}</span>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">CATEGORY</span>
+                      <span className="font-semibold text-gray-900">{sku.category || '—'}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">BRAND</span>
-                      <span className="font-bold text-gray-900">{sku.brand || sku.title || '—'}</span>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">BRAND</span>
+                      <span className="font-semibold text-gray-900">{sku.brand || sku.title || '—'}</span>
                     </div>
 
                     <div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">
                         {(() => {
                           const isReel = sku.paperType === 'Reels' || (sku.name || '').toLowerCase().includes('reel');
                           const isSheet = sku.paperType === 'Sheets' || (sku.name || '').toLowerCase().includes('sheet') || (sku.category || '').toLowerCase().includes('semi') || (sku.skuCode || '').startsWith('SM');
@@ -1136,7 +1136,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                           return 'PAGES';
                         })()}
                       </span>
-                      <span className="font-bold text-gray-900">
+                      <span className="font-semibold text-gray-900">
                         {(() => {
                           const isReel = sku.paperType === 'Reels' || (sku.name || '').toLowerCase().includes('reel');
                           if (isReel) return '—';
@@ -1147,16 +1147,16 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">RULING TYPE</span>
-                      <span className="font-bold text-gray-900">{sku.ruleType ? `(${sku.ruleType})` : '—'}</span>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">RULING TYPE</span>
+                      <span className="font-semibold text-gray-900">{sku.ruleType ? `(${sku.ruleType})` : '—'}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">GSM</span>
-                      <span className="font-bold text-gray-900">{sku.gsm ? `${sku.gsm} GSM` : '—'}</span>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">GSM</span>
+                      <span className="font-semibold text-gray-900">{sku.gsm ? `${sku.gsm} GSM` : '—'}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">TRIMMED SIZE</span>
-                      <span className="font-bold text-gray-900">
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">TRIMMED SIZE</span>
+                      <span className="font-semibold text-gray-900">
                         {sku.width && sku.length ? `${sku.width} × ${sku.length} CM` : sku.width ? `${sku.width} CM` : '—'}
                       </span>
                     </div>
@@ -1169,25 +1169,25 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
                       <ShieldAlert className="w-4 h-4" />
                     </div>
-                    <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Stock Control</h3>
+                    <h3 className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">Stock Control</h3>
                   </div>
 
-                  <div className="space-y-3.5 text-xs">
+                  <div className="space-y-3.5 text-[0.875rem]">
                     <div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">MIN STOCK LEVEL</span>
-                      <span className="font-black text-gray-900 text-sm font-mono">
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">MIN STOCK LEVEL</span>
+                      <span className="font-semibold text-gray-900 text-[0.875rem] font-mono">
                         {sku.minStockLevel || (sku as any).minStock ? `${sku.minStockLevel || (sku as any).minStock} ${unit}` : '—'}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">REORDER LEVEL</span>
-                      <span className="font-black text-gray-900 text-sm font-mono">
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-0.5">REORDER LEVEL</span>
+                      <span className="font-semibold text-gray-900 text-[0.875rem] font-mono">
                         {sku.reorderLevel || (sku as any).reorderQty ? `${sku.reorderLevel || (sku as any).reorderQty} ${unit}` : '—'}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">CURRENT STATUS</span>
-                      <span className={`inline-flex px-2.5 py-0.5 rounded-md text-[11px] font-bold border ${statusBadge.color}`}>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">CURRENT STATUS</span>
+                      <span className={`inline-flex px-2.5 py-0.5 rounded-md text-xs font-semibold border ${statusBadge.color}`}>
                         {statusBadge.label}
                       </span>
                     </div>
@@ -1203,24 +1203,24 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600">
                       <RefreshCw className="w-4 h-4" />
                     </div>
-                    <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Units & Conversion Logic</h3>
+                    <h3 className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">Units & Conversion Logic</h3>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div className="grid grid-cols-2 gap-4 text-[0.875rem]">
                     <div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">STOCKING UNIT (UOM)</span>
-                      <span className="font-black text-gray-900 font-mono text-sm">{unit}</span>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">STOCKING UNIT (UOM)</span>
+                      <span className="font-semibold text-gray-900 font-mono text-[0.875rem]">{unit}</span>
                       {avgRate > 0 && (
-                        <span className="text-[11px] font-bold text-blue-700 block mt-0.5 font-mono">
+                        <span className="text-xs font-semibold text-blue-700 block mt-0.5 font-mono">
                           ₹{avgRate < 1 ? avgRate.toFixed(4) : avgRate.toLocaleString('en-IN', { maximumFractionDigits: 2 })} / {unit}
                         </span>
                       )}
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">ALTERNATE UNIT (AUOM)</span>
-                      <span className="font-black text-gray-900 font-mono text-sm">{altUnit || '—'}</span>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">ALTERNATE UNIT (AUOM)</span>
+                      <span className="font-semibold text-gray-900 font-mono text-[0.875rem]">{altUnit || '—'}</span>
                       {altUnit && avgRate > 0 && (
-                        <span className="text-[11px] font-bold text-indigo-700 block mt-0.5 font-mono">
+                        <span className="text-xs font-semibold text-blue-700 block mt-0.5 font-mono">
                           {(() => {
                             const auomRate = convertRateToUom(avgRate, unit, altUnit, sku);
                             return `₹${auomRate < 1 ? auomRate.toFixed(4) : auomRate.toLocaleString('en-IN', { maximumFractionDigits: 2 })} / ${altUnit}`;
@@ -1230,11 +1230,11 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     </div>
                   </div>
 
-                  <div className="bg-purple-50/80 border border-purple-200/80 rounded-xl px-3.5 py-2.5 flex items-center justify-between gap-3">
-                    <span className="text-[10px] font-bold text-purple-900 uppercase tracking-wider whitespace-nowrap">
+                  <div className="bg-blue-50/80 border border-blue-200/80 rounded-xl px-3.5 py-2.5 flex items-center justify-between gap-3">
+                    <span className="text-xs font-medium text-blue-900 uppercase tracking-wider whitespace-nowrap">
                       CONVERSION FORMULA
                     </span>
-                    <span className="font-mono font-bold text-purple-700 text-xs bg-white px-2.5 py-1 rounded-lg border border-purple-200/60 shadow-2xs whitespace-nowrap">
+                    <span className="font-mono font-semibold text-blue-700 text-[0.875rem] bg-white px-2.5 py-1 rounded-lg border border-blue-200/60 shadow-2xs whitespace-nowrap">
                       {sku.altUnit && sku.altUnitConversion
                         ? `1 ${unit} = ${sku.altUnitConversion} ${sku.altUnit}`
                         : `Direct Tracking (${unit})`}
@@ -1249,38 +1249,38 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
                         <Clock className="w-4 h-4" />
                       </div>
-                      <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Latest Activity</h3>
+                      <h3 className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">Latest Activity</h3>
                     </div>
                     <button
                       type="button"
                       onClick={() => setActiveTab('movements')}
-                      className="text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50/60 px-2 py-0.5 rounded-md border border-blue-200/60 cursor-pointer"
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50/60 px-2 py-0.5 rounded-md border border-blue-200/60 cursor-pointer"
                     >
                       View All
                     </button>
                   </div>
 
-                  <div className="space-y-2 text-xs divide-y divide-gray-50">
+                  <div className="space-y-2 text-[0.875rem] divide-y divide-gray-50">
                     {movementsList.slice(0, 3).map((act, idx) => {
                       const isInc = act.direction === 'IN' || (act.qtyIn || 0) > 0;
                       return (
                         <div key={idx} className="pt-2 first:pt-0 flex items-center justify-between">
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-[11px] font-medium text-gray-400 whitespace-nowrap">
+                            <span className="text-xs font-medium text-gray-400 whitespace-nowrap">
                               {new Date(act.timestamp).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                             </span>
-                            <span className="text-[11px] text-gray-400 whitespace-nowrap">
+                            <span className="text-xs text-gray-400 whitespace-nowrap">
                               {new Date(act.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                             </span>
-                            <span className="font-bold text-gray-800 truncate">{act.transactionType}</span>
+                            <span className="font-semibold text-gray-800 truncate">{act.transactionType}</span>
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0 font-mono">
-                            <span className={`font-bold text-xs ${isInc ? 'text-emerald-700' : 'text-rose-600'}`}>
+                            <span className={`font-semibold text-[0.875rem] ${isInc ? 'text-emerald-700' : 'text-rose-600'}`}>
                               {isInc ? '+' : '-'}{Math.abs(act.quantity || act.qtyIn || act.qtyOut || 0)} {unit}
                             </span>
                             {act.referenceId && (
-                              <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded font-bold">
+                              <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded font-semibold">
                                 {act.referenceId}
                               </span>
                             )}
@@ -1290,7 +1290,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     })}
 
                     {movementsList.length === 0 && (
-                      <div className="text-center py-3 text-gray-400 text-xs">
+                      <div className="text-center py-3 text-gray-400 text-[0.875rem]">
                         No recent movements logged.
                       </div>
                     )}
@@ -1306,15 +1306,15 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       <Sliders className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Manufacturing Process Steps</h3>
-                      <p className="text-[11px] text-gray-500 font-normal">Configured process routing for this SKU</p>
+                      <h3 className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">Manufacturing Process Steps</h3>
+                      <p className="text-xs text-gray-500 font-normal">Configured process routing for this SKU</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => setShowMfgStepsModal(true)}
-                      className="text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100/80 px-2.5 py-1.5 rounded-xl border border-blue-200/80 flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100/80 px-2.5 py-1.5 rounded-xl border border-blue-200/80 flex items-center gap-1.5 cursor-pointer shadow-2xs"
                     >
                       <Layers className="w-3.5 h-3.5" />
                       <span>{dynamicSteps.length > 0 ? 'Edit Process Steps' : '+ Configure Steps'}</span>
@@ -1323,7 +1323,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       <button
                         type="button"
                         onClick={() => onOpenItemMaster(sku)}
-                        className="text-[11px] font-medium text-gray-500 hover:text-gray-800 bg-gray-50 hover:bg-gray-100 px-2 py-1.5 rounded-xl border border-gray-200 flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
+                        className="text-xs font-medium text-gray-500 hover:text-gray-800 bg-gray-50 hover:bg-gray-100 px-2 py-1.5 rounded-xl border border-gray-200 flex items-center gap-1 cursor-pointer shadow-2xs"
                         title="Open full item in Item Master"
                       >
                         <Settings className="w-3 h-3" />
@@ -1339,15 +1339,15 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       <React.Fragment key={st.step || idx}>
                         <div 
                           onClick={() => setShowMfgStepsModal(true)}
-                          className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-blue-50/40 border border-gray-200 hover:border-blue-300 rounded-xl text-xs font-semibold text-gray-800 shrink-0 shadow-2xs transition-all cursor-pointer group"
+                          className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-blue-50/40 border border-gray-200 hover:border-blue-300 rounded-xl text-[0.875rem] font-semibold text-gray-800 shrink-0 shadow-2xs cursor-pointer group"
                         >
-                          <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white font-bold flex items-center justify-center text-[10px] shrink-0 transition-colors">
+                          <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white font-semibold flex items-center justify-center text-xs shrink-0">
                             {idx + 1}
                           </span>
                           <div className="flex flex-col text-left">
-                            <span className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors">{st.title}</span>
+                            <span className="font-semibold text-gray-900 group-hover:text-blue-700">{st.title}</span>
                             {st.machine && (
-                              <span className="text-[10px] text-gray-500 font-medium">{st.machine}</span>
+                              <span className="text-xs text-gray-500 font-medium">{st.machine}</span>
                             )}
                           </div>
                         </div>
@@ -1359,14 +1359,14 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                   </div>
                 ) : (
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 bg-gray-50/70 border border-dashed border-gray-200 rounded-xl">
-                    <div className="flex items-center gap-2.5 text-xs text-gray-500">
+                    <div className="flex items-center gap-2.5 text-[0.875rem] text-gray-500">
                       <Sliders className="w-4 h-4 text-gray-400 shrink-0" />
                       <span>No manufacturing process steps configured for this item yet.</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setShowMfgStepsModal(true)}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs cursor-pointer shrink-0 transition-colors"
+                      className="btn-primary shrink-0"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add Steps Now</span>
@@ -1376,7 +1376,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               </div>
 
               {/* Bottom Info Banner */}
-              <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-2xl flex items-center gap-2.5 text-xs text-blue-900">
+              <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-2xl flex items-center gap-2.5 text-[0.875rem] text-blue-900">
                 <AlertCircle className="w-4 h-4 text-blue-600 shrink-0" />
                 <span>
                   Stock movements, batch details, locations and valuation are managed in Inventory modules.
@@ -1389,7 +1389,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               TAB 2: LOCATIONS — MINIMAL CLEAN TABULAR LAYOUT
              ════════════════════════════════════════════════════════════════════ */}
           {!loading && activeTab === 'locations' && (
-            <div className="space-y-3 animate-fadeIn">
+            <div className="space-y-3">
               {/* Compact Top Bar */}
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
@@ -1397,15 +1397,15 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     <MapPin className="w-3.5 h-3.5" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-gray-900">Stock Locations</span>
-                    <span className="ml-2 text-[10px] text-gray-400 font-medium">Physical stock stored at leaf locations</span>
+                    <span className="text-[0.875rem] font-semibold text-gray-900">Stock Locations</span>
+                    <span className="ml-2 text-xs text-gray-400 font-medium">Physical stock stored at leaf locations</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setHideZeroStockLocations(prev => !prev)}
-                    className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold flex items-center gap-1 border transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 border cursor-pointer ${
                       hideZeroStockLocations
                         ? 'bg-blue-600 text-white border-blue-600'
                         : 'bg-white hover:bg-gray-50 text-gray-600 border-gray-200'
@@ -1420,9 +1420,9 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               {/* Clean Flat Table View */}
               <div className="bg-white border border-gray-200/80 rounded-2xl overflow-hidden shadow-2xs">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full text-left text-[0.875rem]">
                     <thead>
-                      <tr className="bg-gray-50/90 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                      <tr className="bg-gray-50/90 border-b border-gray-200 text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
                         <th className="p-3">Factory</th>
                         <th className="p-3">Floor</th>
                         <th className="p-3">Zone</th>
@@ -1438,21 +1438,21 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       {flatLeafLocations
                         .filter(loc => !hideZeroStockLocations || loc.onHand > 0)
                         .map((loc, idx) => (
-                          <tr key={loc.id || idx} className="hover:bg-blue-50/30 transition-colors">
-                            <td className="p-3 font-bold text-gray-900">{loc.factory}</td>
+                          <tr key={loc.id || idx} className="hover:bg-blue-50/30">
+                            <td className="p-3 font-semibold text-gray-900">{loc.factory}</td>
                             <td className="p-3 text-gray-700">{loc.floor}</td>
                             <td className="p-3 text-gray-700">{loc.zone}</td>
-                            <td className="p-3 font-bold text-blue-700 font-mono">{loc.location}</td>
-                            <td className="p-3 text-right font-mono font-bold text-gray-900">{loc.onHand.toLocaleString('en-IN')}</td>
-                            <td className="p-3 text-right font-mono font-bold text-amber-600">{loc.reserved.toLocaleString('en-IN')}</td>
-                            <td className="p-3 text-right font-mono font-bold text-emerald-600">{loc.available.toLocaleString('en-IN')}</td>
-                            <td className="p-3 text-right font-mono font-bold text-gray-900">{formatCurrency(loc.stockValue)}</td>
+                            <td className="p-3 font-semibold text-blue-700 font-mono">{loc.location}</td>
+                            <td className="p-3 text-right font-mono font-semibold text-gray-900">{loc.onHand.toLocaleString('en-IN')}</td>
+                            <td className="p-3 text-right font-mono font-semibold text-amber-600">{loc.reserved.toLocaleString('en-IN')}</td>
+                            <td className="p-3 text-right font-mono font-semibold text-emerald-600">{loc.available.toLocaleString('en-IN')}</td>
+                            <td className="p-3 text-right font-mono font-semibold text-gray-900">{formatCurrency(loc.stockValue)}</td>
                             <td className="p-3 text-center">
                               <div className="flex items-center justify-center gap-1.5">
                                 <button
                                   type="button"
                                   onClick={() => onOpenTransfer?.(sku, loc.locationId)}
-                                  className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all"
+                                  className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
                                   title="Transfer stock from this location"
                                 >
                                   <ArrowRightLeft className="w-3 h-3" />
@@ -1461,7 +1461,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => onOpenAdjustment?.(sku, loc.locationId)}
-                                  className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all"
+                                  className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
                                   title="Adjust stock at this location"
                                 >
                                   <SlidersHorizontal className="w-3 h-3" />
@@ -1480,13 +1480,13 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                         </tr>
                       )}
                     </tbody>
-                    <tfoot className="bg-gray-50 border-t border-gray-200 text-xs font-bold text-gray-900">
+                    <tfoot className="bg-gray-50 border-t border-gray-200 text-[0.875rem] font-semibold text-gray-900">
                       <tr>
-                        <td colSpan={4} className="p-3 uppercase tracking-wider text-gray-500 text-[10px]">TOTAL STOCK AT LOCATIONS</td>
-                        <td className="p-3 text-right font-mono font-black text-gray-900">{totalStock.toLocaleString('en-IN')} {unit}</td>
-                        <td className="p-3 text-right font-mono font-black text-amber-600">{reservedStock.toLocaleString('en-IN')} {unit}</td>
-                        <td className="p-3 text-right font-mono font-black text-emerald-600">{availableStock.toLocaleString('en-IN')} {unit}</td>
-                        <td className="p-3 text-right font-mono font-black text-gray-900">{formatCurrency(stockValue)}</td>
+                        <td colSpan={4} className="p-3 uppercase tracking-wider text-gray-500 text-xs">TOTAL STOCK AT LOCATIONS</td>
+                        <td className="p-3 text-right font-mono font-semibold text-gray-900">{totalStock.toLocaleString('en-IN')} {unit}</td>
+                        <td className="p-3 text-right font-mono font-semibold text-amber-600">{reservedStock.toLocaleString('en-IN')} {unit}</td>
+                        <td className="p-3 text-right font-mono font-semibold text-emerald-600">{availableStock.toLocaleString('en-IN')} {unit}</td>
+                        <td className="p-3 text-right font-mono font-semibold text-gray-900">{formatCurrency(stockValue)}</td>
                         <td></td>
                       </tr>
                     </tfoot>
@@ -1495,7 +1495,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               </div>
 
               {/* Footnote */}
-              <p className="text-[10.5px] text-gray-400 flex items-center gap-1.5 px-1">
+              <p className="text-xs text-gray-400 flex items-center gap-1.5 px-1">
                 <AlertCircle className="w-3 h-3 text-gray-400 shrink-0" />
                 <span>Physical stock is stored strictly at leaf storage locations. Parent totals are calculated aggregations.</span>
               </p>
@@ -1506,7 +1506,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               TAB 3: BATCHES & COSTING
              ════════════════════════════════════════════════════════════════════ */}
           {!loading && activeTab === 'batches' && (
-            <div className="space-y-4 animate-fadeIn">
+            <div className="space-y-4">
               {/* Header Banner with Add Batch */}
               <div className="bg-white border border-gray-200/80 rounded-2xl p-4 shadow-2xs flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2.5">
@@ -1514,8 +1514,8 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     <Package className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-xs font-bold text-gray-900">Batch Wise Stock & Costing</h3>
-                    <p className="text-[11px] text-gray-500">Strict batch costing (no average). Each batch is tracked separately.</p>
+                    <h3 className="text-[0.875rem] font-semibold text-gray-900">Batch Wise Stock & Costing</h3>
+                    <p className="text-xs text-gray-500">Strict batch costing (no average). Each batch is tracked separately.</p>
                   </div>
                 </div>
 
@@ -1523,7 +1523,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                   <button
                     type="button"
                     onClick={handleExportBatches}
-                    className="px-3 py-1.5 bg-gray-50 hover:bg-blue-50 hover:text-blue-700 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                    className="px-3 py-1.5 bg-gray-50 hover:bg-blue-50 hover:text-blue-700 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-700 flex items-center gap-1.5 cursor-pointer shadow-2xs"
                     title="Export batches to Excel"
                   >
                     <Download className="w-3.5 h-3.5 text-blue-600" />
@@ -1532,7 +1532,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                   <button
                     type="button"
                     onClick={() => onAddBatch?.(sku)}
-                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                    className="btn-primary"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add Batch</span>
@@ -1541,13 +1541,13 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     <button
                       type="button"
                       onClick={() => setShowBatchMenu(prev => !prev)}
-                      className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
+                      className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl cursor-pointer"
                       title="More batch options"
                     >
                       <MoreVertical className="w-4 h-4" />
                     </button>
                     {showBatchMenu && (
-                      <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 py-1 divide-y divide-gray-100 text-xs font-semibold animate-in fade-in zoom-in-95 duration-100">
+                      <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 py-1 divide-y divide-gray-100 text-[0.875rem] font-semibold">
                         <button
                           type="button"
                           onClick={() => {
@@ -1590,31 +1590,31 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               {/* 5 Small Metric Cards Row */}
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-3 shadow-2xs">
-                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">TOTAL BATCHES</span>
-                  <span className="text-base font-black text-gray-900">{totalBatchesCount}</span>
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">TOTAL BATCHES</span>
+                  <span className="text-base font-semibold text-gray-900">{totalBatchesCount}</span>
                 </div>
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-3 shadow-2xs">
-                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">TOTAL QUANTITY</span>
-                  <span className="text-base font-black text-gray-900 font-mono leading-tight block">
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">TOTAL QUANTITY</span>
+                  <span className="text-base font-semibold text-gray-900 font-mono leading-tight block">
                     {totalBatchQty.toLocaleString('en-IN')} {unit}
                   </span>
                   {altUnit && conversionFactor > 1 && (
-                    <span className="text-[10px] text-gray-400 font-mono">
+                    <span className="text-xs text-gray-400 font-mono">
                       ≈ {(totalBatchQty * conversionFactor).toLocaleString('en-IN')} {altUnit}
                     </span>
                   )}
                 </div>
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-3 shadow-2xs">
-                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">TOTAL VALUE</span>
-                  <span className="text-base font-black text-gray-900">{formatCurrency(totalBatchValue)}</span>
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">TOTAL VALUE</span>
+                  <span className="text-base font-semibold text-gray-900">{formatCurrency(totalBatchValue)}</span>
                 </div>
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-3 shadow-2xs">
-                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">AVERAGE RATE</span>
-                  <span className="text-base font-black text-gray-900 font-mono">
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">AVERAGE RATE</span>
+                  <span className="text-base font-semibold text-gray-900 font-mono">
                     ₹{avgBatchRate < 1 && avgBatchRate > 0 ? avgBatchRate.toFixed(4) : (avgBatchRate % 1 !== 0 ? avgBatchRate.toFixed(3) : avgBatchRate.toLocaleString('en-IN'))} / {unit}
                   </span>
                   {altUnit && conversionFactor > 1 && avgBatchRate > 0 && (
-                    <span className="text-[10.5px] text-indigo-700 font-mono font-bold block mt-0.5">
+                    <span className="text-xs text-blue-700 font-mono font-semibold block mt-0.5">
                       ≈ ₹{(() => {
                         const r = convertRateToUom(avgBatchRate, unit, altUnit, sku);
                         return r < 1 ? r.toFixed(4) : r.toLocaleString('en-IN', { maximumFractionDigits: 2 });
@@ -1623,18 +1623,18 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                   )}
                 </div>
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-3 shadow-2xs">
-                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">OLDEST BATCH</span>
-                  <span className="text-xs font-bold text-gray-900 font-mono block truncate">{oldestBatch?.batchNumber || 'FG-250901-01'}</span>
-                  <span className="text-[10px] text-gray-400 font-medium">{oldestBatch?.date ? new Date(oldestBatch.date).toLocaleDateString('en-IN') : '20 Sep 2026'}</span>
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">OLDEST BATCH</span>
+                  <span className="text-[0.875rem] font-semibold text-gray-900 font-mono block truncate">{oldestBatch?.batchNumber || 'FG-250901-01'}</span>
+                  <span className="text-xs text-gray-400 font-medium">{oldestBatch?.date ? new Date(oldestBatch.date).toLocaleDateString('en-IN') : '20 Sep 2026'}</span>
                 </div>
               </div>
 
               {/* Batches Table */}
               <div className="bg-white border border-gray-200/80 rounded-2xl overflow-hidden shadow-2xs">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full text-left text-[0.875rem]">
                     <thead>
-                      <tr className="bg-gray-50/90 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                      <tr className="bg-gray-50/90 border-b border-gray-200 text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
                         <th className="p-3 w-8 text-center">
                           <input
                             type="checkbox"
@@ -1663,7 +1663,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       {batchesList.map((b, idx) => {
                         const isChecked = selectedBatchIds.includes(b.id || b.batchNumber);
                         return (
-                          <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
+                          <tr key={idx} className="hover:bg-blue-50/30">
                             <td className="p-3 text-center">
                               <input
                                 type="checkbox"
@@ -1672,27 +1672,27 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                                 className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
                               />
                             </td>
-                            <td className="p-3 text-gray-400 font-mono text-[10px] font-bold">{idx + 1}</td>
-                            <td className="p-3 font-mono font-bold text-gray-900 text-[11px]">{b.batchNumber}</td>
+                            <td className="p-3 text-gray-400 font-mono text-xs font-semibold">{idx + 1}</td>
+                            <td className="p-3 font-mono font-semibold text-gray-900 text-xs">{b.batchNumber}</td>
                             <td className="p-3">
-                              <span className="inline-block px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 font-mono">{b.reference || 'PR-0098'}</span>
+                              <span className="inline-block px-1.5 py-0.5 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/80 font-mono">{b.reference || 'PR-0098'}</span>
                             </td>
-                            <td className="p-3 text-gray-500 whitespace-nowrap text-[11px]">
+                            <td className="p-3 text-gray-500 whitespace-nowrap text-xs">
                               {b.date ? new Date(b.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '20 Sep 2026'}
                             </td>
-                            <td className="p-3 text-gray-700 text-[11px]">{b.source || b.supplier || 'Production PO-0098'}</td>
+                            <td className="p-3 text-gray-700 text-xs">{b.source || b.supplier || 'Production PO-0098'}</td>
                             <td className="p-3 text-gray-600 flex items-center gap-1">
                               <MapPin className="w-3 h-3 text-blue-500 shrink-0" />
-                              <span className="truncate max-w-[120px] text-[11px]">{b.shortLocPath || b.locationName}</span>
+                              <span className="truncate max-w-[7.5rem] text-xs">{b.shortLocPath || b.locationName}</span>
                             </td>
-                            <td className="p-3 text-right font-mono font-bold text-gray-900">{b.remainingQty.toLocaleString('en-IN')}</td>
+                            <td className="p-3 text-right font-mono font-semibold text-gray-900">{b.remainingQty.toLocaleString('en-IN')}</td>
                             {altUnit && conversionFactor > 1 && (
                               <td className="p-3 text-right font-mono text-gray-500">{(b.remainingQty * conversionFactor).toLocaleString('en-IN')}</td>
                             )}
                             <td className="p-3 text-right font-mono text-gray-900">
-                              <span className="font-bold">₹{b.rate < 1 && b.rate > 0 ? b.rate.toFixed(4) : (b.rate % 1 !== 0 ? b.rate.toFixed(3) : b.rate.toLocaleString('en-IN'))}</span>
+                              <span className="font-semibold">₹{b.rate < 1 && b.rate > 0 ? b.rate.toFixed(4) : (b.rate % 1 !== 0 ? b.rate.toFixed(3) : b.rate.toLocaleString('en-IN'))}</span>
                               {altUnit && conversionFactor > 1 && b.rate > 0 && (
-                                <span className="text-[9.5px] text-indigo-600 block">
+                                <span className="text-xs text-blue-600 block">
                                   {(() => {
                                     const r = convertRateToUom(b.rate, unit, altUnit, sku);
                                     return `(₹${r < 1 ? r.toFixed(4) : r.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/${altUnit})`;
@@ -1700,9 +1700,9 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                                 </span>
                               )}
                             </td>
-                            <td className="p-3 text-right font-mono font-bold text-gray-900">{formatCurrency(b.value)}</td>
+                            <td className="p-3 text-right font-mono font-semibold text-gray-900">{formatCurrency(b.value)}</td>
                             <td className="p-3 text-center">
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 {b.status || 'Active'}
                               </span>
                             </td>
@@ -1734,7 +1734,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
 
               {/* Batch Actions Toolbar */}
               <div className="bg-white border border-gray-200/80 rounded-2xl p-3.5 shadow-2xs flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-2 text-xs font-semibold text-gray-700">
+                <div className="flex items-center gap-2 text-[0.875rem] font-semibold text-gray-700">
                   <FileText className="w-4 h-4 text-blue-600" />
                   <span>
                     {selectedBatchIds.length > 0 
@@ -1750,7 +1750,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       const selectedBatch = batchesList.find(b => selectedBatchIds.includes(b.id || b.batchNumber));
                       onOpenTransfer?.(sku, selectedBatch?.locationId);
                     }}
-                    className="px-3 py-1.5 bg-gray-50 hover:bg-blue-50 hover:text-blue-700 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1.5 transition-all cursor-pointer"
+                    className="px-3 py-1.5 bg-gray-50 hover:bg-blue-50 hover:text-blue-700 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-700 flex items-center gap-1.5 cursor-pointer"
                   >
                     <ArrowRightLeft className="w-3.5 h-3.5 text-blue-600" />
                     <span>Transfer</span>
@@ -1761,7 +1761,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       const selectedBatch = batchesList.find(b => selectedBatchIds.includes(b.id || b.batchNumber));
                       onOpenAdjustment?.(sku, selectedBatch?.locationId);
                     }}
-                    className="px-3 py-1.5 bg-gray-50 hover:bg-amber-50 hover:text-amber-700 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1.5 transition-all cursor-pointer"
+                    className="px-3 py-1.5 bg-gray-50 hover:bg-amber-50 hover:text-amber-700 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-700 flex items-center gap-1.5 cursor-pointer"
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5 text-amber-600" />
                     <span>Adjust</span>
@@ -1769,7 +1769,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                   <button
                     type="button"
                     onClick={handleExportBatches}
-                    className="px-3 py-1.5 bg-gray-50 hover:bg-blue-50 hover:text-blue-700 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1.5 transition-all cursor-pointer"
+                    className="px-3 py-1.5 bg-gray-50 hover:bg-blue-50 hover:text-blue-700 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-700 flex items-center gap-1.5 cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5 text-blue-600" />
                     <span>Export</span>
@@ -1777,15 +1777,15 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                   <button
                     type="button"
                     onClick={() => setActiveTab('movements')}
-                    className="px-3 py-1.5 bg-gray-50 hover:bg-indigo-50 hover:text-indigo-700 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1.5 transition-all cursor-pointer"
+                    className="px-3 py-1.5 bg-gray-50 hover:bg-blue-50 hover:text-blue-700 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-700 flex items-center gap-1.5 cursor-pointer"
                   >
-                    <Eye className="w-3.5 h-3.5 text-indigo-600" />
+                    <Eye className="w-3.5 h-3.5 text-blue-600" />
                     <span>View Movements</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => showToast('Batch deactivated', 'info')}
-                    className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl text-xs font-bold text-rose-700 flex items-center gap-1.5 transition-all cursor-pointer"
+                    className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl text-[0.875rem] font-semibold text-rose-700 flex items-center gap-1.5 cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                     <span>Deactivate</span>
@@ -1799,41 +1799,41 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3">
                   <div className="flex items-center gap-2 border-b border-gray-100 pb-2.5">
                     <TrendingUp className="w-4 h-4 text-blue-600" />
-                    <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Costing Summary</h3>
+                    <h3 className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">Costing Summary</h3>
                   </div>
 
-                  <div className="space-y-2 text-xs">
+                  <div className="space-y-2 text-[0.875rem]">
                     <div className="flex justify-between py-1 border-b border-gray-50">
                       <span className="text-gray-500">Total Quantity</span>
-                      <span className="font-bold text-gray-900 font-mono">{totalBatchQty.toLocaleString('en-IN')} {unit}</span>
+                      <span className="font-semibold text-gray-900 font-mono">{totalBatchQty.toLocaleString('en-IN')} {unit}</span>
                     </div>
                     <div className="flex justify-between py-1 border-b border-gray-50">
                       <span className="text-gray-500">Total Value</span>
-                      <span className="font-bold text-gray-900 font-mono">{formatCurrency(totalBatchValue)}</span>
+                      <span className="font-semibold text-gray-900 font-mono">{formatCurrency(totalBatchValue)}</span>
                     </div>
                     <div className="flex justify-between py-1 border-b border-gray-50">
                       <span className="text-gray-500">Average Rate (info only)</span>
-                      <span className="font-bold text-gray-900 font-mono">₹{avgBatchRate} / {unit}</span>
+                      <span className="font-semibold text-gray-900 font-mono">₹{avgBatchRate} / {unit}</span>
                     </div>
                     <div className="flex justify-between py-1 border-b border-gray-50">
                       <span className="text-gray-500">Highest Batch Rate</span>
-                      <span className="font-bold text-gray-900 font-mono">₹{highestBatchRate} / {unit}</span>
+                      <span className="font-semibold text-gray-900 font-mono">₹{highestBatchRate} / {unit}</span>
                     </div>
                     <div className="flex justify-between py-1">
                       <span className="text-gray-500">Lowest Batch Rate</span>
-                      <span className="font-bold text-gray-900 font-mono">₹{lowestBatchRate} / {unit}</span>
+                      <span className="font-semibold text-gray-900 font-mono">₹{lowestBatchRate} / {unit}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Important Rules Banner */}
-                <div className="bg-blue-50/60 border border-blue-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-2.5 text-xs text-blue-950">
+                <div className="bg-blue-50/60 border border-blue-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-2.5 text-[0.875rem] text-blue-950">
                   <div className="flex items-center gap-2 border-b border-blue-200/60 pb-2">
                     <AlertCircle className="w-4 h-4 text-blue-600" />
-                    <h3 className="font-bold uppercase tracking-wider">Important</h3>
+                    <h3 className="font-medium uppercase tracking-wider">Important</h3>
                   </div>
 
-                  <ol className="list-decimal list-inside space-y-1.5 text-[11.5px] text-blue-900 font-medium">
+                  <ol className="list-decimal list-inside space-y-1.5 text-xs text-blue-900 font-medium">
                     <li>Stock valuation uses actual batch rates. No averaging.</li>
                     <li>New batches are created through Production Receipt (FG) or Opening Stock.</li>
                     <li>Use Stock Transfer to move between locations.</li>
@@ -1849,7 +1849,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               TAB 4: MOVEMENTS LEDGER
              ════════════════════════════════════════════════════════════════════ */}
           {!loading && activeTab === 'movements' && (
-            <div className="space-y-4 animate-fadeIn">
+            <div className="space-y-4">
               {/* Header with Export */}
               <div className="bg-white border border-gray-200/80 rounded-2xl p-4 shadow-2xs flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2.5">
@@ -1857,15 +1857,15 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     <History className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-xs font-bold text-gray-900">Stock Movements Ledger</h3>
-                    <p className="text-[11px] text-gray-500">Complete history of all stock movements for this item.</p>
+                    <h3 className="text-[0.875rem] font-semibold text-gray-900">Stock Movements Ledger</h3>
+                    <p className="text-xs text-gray-500">Complete history of all stock movements for this item.</p>
                   </div>
                 </div>
 
                 <button
                   type="button"
                   onClick={handleExportMovements}
-                  className="px-3 py-1.5 bg-gray-50 hover:bg-blue-50 hover:text-blue-700 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1.5 transition-all cursor-pointer"
+                  className="px-3 py-1.5 bg-gray-50 hover:bg-blue-50 hover:text-blue-700 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-700 flex items-center gap-1.5 cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5 text-blue-600" />
                   <span>Export</span>
@@ -1874,24 +1874,24 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
 
               {/* Filter Bar */}
               <div className="bg-white border border-gray-200/80 rounded-2xl p-3.5 shadow-2xs space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-[0.875rem]">
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">DATE RANGE</label>
-                    <div className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-xl bg-gray-50 font-medium text-gray-700 text-xs">
+                    <label className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">DATE RANGE</label>
+                    <div className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-xl bg-gray-50 font-medium text-gray-700 text-[0.875rem]">
                       <Calendar className="w-3.5 h-3.5 text-gray-400" />
                       <span>01 Sep 2026 - 30 Sep 2026</span>
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">TRANSACTION TYPE</label>
+                    <label className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">TRANSACTION TYPE</label>
                     <select
                       value={movementTypeFilter}
                       onChange={e => {
                         setMovementTypeFilter(e.target.value);
                         setMovementPage(1);
                       }}
-                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl bg-white text-xs font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
+                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl bg-white text-[0.875rem] font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
                     >
                       <option value="ALL">All Types</option>
                       <option value="Stock Transfer">Stock Transfer</option>
@@ -1903,14 +1903,14 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">LOCATION</label>
+                    <label className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">LOCATION</label>
                     <select
                       value={movementLocationFilter}
                       onChange={e => {
                         setMovementLocationFilter(e.target.value);
                         setMovementPage(1);
                       }}
-                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl bg-white text-xs font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
+                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl bg-white text-[0.875rem] font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
                     >
                       <option value="ALL">All Locations</option>
                       {locationsList.map(l => (
@@ -1920,7 +1920,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">REFERENCE</label>
+                    <label className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">REFERENCE</label>
                     <div className="flex items-center gap-2">
                       <input
                         type="text"
@@ -1930,7 +1930,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                           setMovementSearch(e.target.value);
                           setMovementPage(1);
                         }}
-                        className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:border-blue-500"
+                        className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl text-[0.875rem] font-medium focus:outline-none focus:border-blue-500"
                       />
                       <button
                         type="button"
@@ -1940,13 +1940,13 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                           setMovementLocationFilter('ALL');
                           setMovementPage(1);
                         }}
-                        className="text-xs font-bold text-gray-500 hover:text-gray-800 whitespace-nowrap cursor-pointer"
+                        className="text-[0.875rem] font-semibold text-gray-500 hover:text-gray-800 whitespace-nowrap cursor-pointer"
                       >
                         Clear
                       </button>
                       <button
                         type="button"
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+                        className="btn-primary"
                       >
                         Apply
                       </button>
@@ -1958,9 +1958,9 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               {/* Movements Table */}
               <div className="bg-white border border-gray-200/80 rounded-2xl overflow-hidden shadow-2xs">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full text-left text-[0.875rem]">
                     <thead>
-                      <tr className="bg-gray-50/90 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                      <tr className="bg-gray-50/90 border-b border-gray-200 text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
                         <th className="p-3 w-8">#</th>
                         <th className="p-3">DATE & TIME</th>
                         <th className="p-3">TRANSACTION TYPE</th>
@@ -1979,13 +1979,13 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       {paginatedMovements.map((m, idx) => {
                         const isInc = m.direction === 'IN' || (m.qtyIn || 0) > 0;
                         return (
-                          <tr key={idx} className="hover:bg-blue-50/30 transition-colors whitespace-nowrap">
+                          <tr key={idx} className="hover:bg-blue-50/30 whitespace-nowrap">
                             <td className="p-3 text-gray-400 font-mono">{m.index || ((movementPage - 1) * movementPageSize + idx + 1)}</td>
                             <td className="p-3 text-gray-600">
                               <div className="font-semibold text-gray-900">
                                 {new Date(m.timestamp).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                               </div>
-                              <div className="text-[10px] text-gray-400 font-mono">
+                              <div className="text-xs text-gray-400 font-mono">
                                 {new Date(m.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                               </div>
                             </td>
@@ -1993,14 +1993,14 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                               {(() => {
                                 const typeInfo = getNormalizedTypeInfo(m.transactionType);
                                 return (
-                                  <div className="flex items-center gap-2 text-xs font-semibold text-gray-800 whitespace-nowrap">
+                                  <div className="flex items-center gap-2 text-[0.875rem] font-semibold text-gray-800 whitespace-nowrap">
                                     <span className="shrink-0">{typeInfo.icon}</span>
                                     <span>{typeInfo.displayType}</span>
                                   </div>
                                 );
                               })()}
                             </td>
-                            <td className="p-3 font-mono text-xs font-semibold text-gray-700 whitespace-nowrap">
+                            <td className="p-3 font-mono text-[0.875rem] font-semibold text-gray-700 whitespace-nowrap">
                               {formatMovementReference(m.transactionType, m.referenceId, ((movementPage - 1) * movementPageSize + idx))}
                             </td>
                             <td className="p-3 text-gray-600">{m.fromLocation || '-'}</td>
@@ -2017,7 +2017,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
 
                               return (
                                 <>
-                                  <td className={`p-3 text-right font-mono font-bold ${textColor}`}>
+                                  <td className={`p-3 text-right font-mono font-semibold ${textColor}`}>
                                     {sign}{Math.abs(qtyVal)}
                                   </td>
                                   <td className={`p-3 text-right font-mono ${textColor}`}>
@@ -2026,9 +2026,9 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                                 </>
                               );
                             })()}
-                            <td className="p-3 text-right font-mono font-black text-gray-900">{m.runningBalance !== undefined && m.runningBalance !== null ? m.runningBalance : totalStock}</td>
+                            <td className="p-3 text-right font-mono font-semibold text-gray-900">{m.runningBalance !== undefined && m.runningBalance !== null ? m.runningBalance : totalStock}</td>
                             <td className="p-3 text-gray-700">{m.userName || 'System'}</td>
-                            <td className="p-3 text-gray-500 italic max-w-[150px] truncate" title={m.remarks}>
+                            <td className="p-3 text-gray-500 italic max-w-[9.375rem] truncate" title={m.remarks}>
                               {m.remarks || '-'}
                             </td>
                           </tr>
@@ -2047,7 +2047,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                 </div>
 
                 {/* Pagination Controls */}
-                <div className="p-3 bg-gray-50/90 border-t border-gray-200 flex items-center justify-between text-xs text-gray-600">
+                <div className="p-3 bg-gray-50/90 border-t border-gray-200 flex items-center justify-between text-[0.875rem] text-gray-600">
                   <div>
                     Showing {filteredMovements.length > 0 ? (movementPage - 1) * movementPageSize + 1 : 0}-{Math.min(movementPage * movementPageSize, filteredMovements.length)} of {filteredMovements.length} entries
                   </div>
@@ -2060,7 +2060,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                           setMovementPageSize(Number(e.target.value));
                           setMovementPage(1);
                         }}
-                        className="border border-gray-300 rounded-lg px-2 py-1 bg-white text-xs cursor-pointer"
+                        className="border border-gray-300 rounded-lg px-2 py-1 bg-white text-[0.875rem] cursor-pointer"
                       >
                         <option value={10}>10</option>
                         <option value={25}>25</option>
@@ -2091,7 +2091,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               </div>
 
               {/* Bottom Info Banner */}
-              <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-2xl flex items-center gap-2.5 text-xs text-blue-900">
+              <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-2xl flex items-center gap-2.5 text-[0.875rem] text-blue-900">
                 <AlertCircle className="w-4 h-4 text-blue-600 shrink-0" />
                 <span>
                   Every stock change is recorded as a movement. Deletion is not allowed — use adjustment or reversal.
@@ -2104,7 +2104,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               TAB 5: RESERVATIONS
              ════════════════════════════════════════════════════════════════════ */}
           {!loading && activeTab === 'reservations' && (
-            <div className="space-y-4 animate-fadeIn">
+            <div className="space-y-4">
               {/* Sub Header Card with Reserve Stock Button */}
               <div className="bg-white border border-gray-200/80 rounded-2xl p-4 shadow-2xs flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2.5">
@@ -2112,15 +2112,15 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     <Bookmark className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-xs font-bold text-gray-900">Reserved for Sales Orders</h3>
-                    <p className="text-[11px] text-gray-500">Stock allocated to confirmed sales orders (not yet dispatched).</p>
+                    <h3 className="text-[0.875rem] font-semibold text-gray-900">Reserved for Sales Orders</h3>
+                    <p className="text-xs text-gray-500">Stock allocated to confirmed sales orders (not yet dispatched).</p>
                   </div>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => showToast('Stock reservations are created automatically upon Sales Order confirmation', 'info')}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                  className="btn-primary"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Reserve Stock</span>
@@ -2130,36 +2130,36 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               {/* 4 Summary Metric Cards Row */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-3.5 shadow-2xs">
-                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">TOTAL RESERVED</span>
-                  <span className="text-base font-black text-gray-900 font-mono leading-tight block">
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">TOTAL RESERVED</span>
+                  <span className="text-base font-semibold text-gray-900 font-mono leading-tight block">
                     {totalReservedQty.toLocaleString('en-IN')} {unit}
                   </span>
-                  <span className="text-[10px] text-gray-400 font-mono">
+                  <span className="text-xs text-gray-400 font-mono">
                     ≈ {(totalReservedQty * conversionFactor).toLocaleString('en-IN')} {altUnit}
                   </span>
                 </div>
 
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-3.5 shadow-2xs">
-                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">OPEN SALES ORDERS</span>
-                  <span className="text-base font-black text-gray-900 font-mono">{openSalesOrdersCount}</span>
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">OPEN SALES ORDERS</span>
+                  <span className="text-base font-semibold text-gray-900 font-mono">{openSalesOrdersCount}</span>
                 </div>
 
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-3.5 shadow-2xs">
-                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">OLDEST REQUIREMENT</span>
-                  <span className="text-xs font-bold text-gray-900 font-mono block">
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">OLDEST REQUIREMENT</span>
+                  <span className="text-[0.875rem] font-semibold text-gray-900 font-mono block">
                     {oldestRequirement?.requiredDate ? new Date(oldestRequirement.requiredDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '25 Sep 2026'}
                   </span>
-                  <span className="text-[10px] font-bold text-rose-600">
+                  <span className="text-xs font-semibold text-rose-600">
                     {oldestRequirement?.daysLeftText || '3 days left'}
                   </span>
                 </div>
 
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-3.5 shadow-2xs">
-                  <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block mb-1">LATEST REQUIREMENT</span>
-                  <span className="text-xs font-bold text-gray-900 font-mono block">
+                  <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">LATEST REQUIREMENT</span>
+                  <span className="text-[0.875rem] font-semibold text-gray-900 font-mono block">
                     {latestRequirement?.requiredDate ? new Date(latestRequirement.requiredDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '05 Oct 2026'}
                   </span>
-                  <span className="text-[10px] font-medium text-gray-500">
+                  <span className="text-xs font-medium text-gray-500">
                     {latestRequirement?.daysLeftText || '13 days left'}
                   </span>
                 </div>
@@ -2167,7 +2167,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
 
               {/* Filter & Search Bar */}
               <div className="bg-white border border-gray-200/80 rounded-2xl p-3.5 shadow-2xs">
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-[0.875rem]">
                   <div className="sm:col-span-1">
                     <div className="relative">
                       <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
@@ -2176,7 +2176,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                         placeholder="Search by SO number, customer name..."
                         value={resSearch}
                         onChange={e => setResSearch(e.target.value)}
-                        className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:border-blue-500"
+                        className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-xl text-[0.875rem] font-medium focus:outline-none focus:border-blue-500"
                       />
                     </div>
                   </div>
@@ -2185,7 +2185,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     <select
                       value={resStatusFilter}
                       onChange={e => setResStatusFilter(e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl bg-white text-xs font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
+                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl bg-white text-[0.875rem] font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
                     >
                       <option value="ALL">All Status</option>
                       <option value="Partially Reserved">Partially Reserved</option>
@@ -2198,7 +2198,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     <select
                       value={resCustomerFilter}
                       onChange={e => setResCustomerFilter(e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl bg-white text-xs font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
+                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-xl bg-white text-[0.875rem] font-semibold text-gray-800 cursor-pointer focus:outline-none focus:border-blue-500"
                     >
                       <option value="ALL">All Customers</option>
                       {availableCustomers.map(c => (
@@ -2208,7 +2208,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-500 text-xs w-full">
+                    <div className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-500 text-[0.875rem] w-full">
                       <Calendar className="w-3.5 h-3.5 text-gray-400" />
                       <span>Required Date</span>
                     </div>
@@ -2219,7 +2219,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                         setResStatusFilter('ALL');
                         setResCustomerFilter('ALL');
                       }}
-                      className="text-xs font-bold text-gray-500 hover:text-gray-800 whitespace-nowrap cursor-pointer px-1"
+                      className="text-[0.875rem] font-semibold text-gray-500 hover:text-gray-800 whitespace-nowrap cursor-pointer px-1"
                     >
                       Clear
                     </button>
@@ -2230,9 +2230,9 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               {/* Reservations Table */}
               <div className="bg-white border border-gray-200/80 rounded-2xl overflow-hidden shadow-2xs">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full text-left text-[0.875rem]">
                     <thead>
-                      <tr className="bg-gray-50/90 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                      <tr className="bg-gray-50/90 border-b border-gray-200 text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
                         <th className="p-3 w-8 text-center">
                           <input
                             type="checkbox"
@@ -2259,7 +2259,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       {filteredReservations.map((res, idx) => {
                         const isChecked = selectedResIds.includes(res.id || res.orderNumber);
                         return (
-                          <tr key={idx} className="hover:bg-blue-50/30 transition-colors whitespace-nowrap">
+                          <tr key={idx} className="hover:bg-blue-50/30 whitespace-nowrap">
                             <td className="p-3 text-center">
                               <input
                                 type="checkbox"
@@ -2275,26 +2275,26 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                               />
                             </td>
                             <td className="p-3 text-gray-400 font-mono">{idx + 1}</td>
-                            <td className="p-3 font-mono font-bold text-gray-900">{res.orderNumber}</td>
-                            <td className="p-3 font-bold text-gray-800">{res.customerName}</td>
-                            <td className="p-3 text-right font-mono font-bold text-gray-900">{res.orderedQty}</td>
-                            <td className="p-3 text-right font-mono font-black text-amber-700">{res.reservedQty}</td>
-                            <td className="p-3 text-right font-mono font-bold text-gray-500">{res.pendingQty || 0}</td>
+                            <td className="p-3 font-mono font-semibold text-gray-900">{res.orderNumber}</td>
+                            <td className="p-3 font-semibold text-gray-800">{res.customerName}</td>
+                            <td className="p-3 text-right font-mono font-semibold text-gray-900">{res.orderedQty}</td>
+                            <td className="p-3 text-right font-mono font-semibold text-amber-700">{res.reservedQty}</td>
+                            <td className="p-3 text-right font-mono font-semibold text-gray-500">{res.pendingQty || 0}</td>
                             <td className="p-3 text-gray-600">
                               <div className="font-semibold text-gray-900">
                                 {res.requiredDate ? new Date(res.requiredDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '25 Sep 2026'}
                               </div>
-                              <div className="text-[10px] font-bold text-rose-600 font-sans">
+                              <div className="text-xs font-semibold text-rose-600 font-sans">
                                 {res.daysLeftText || '3 days left'}
                               </div>
                             </td>
                             <td className="p-3 text-center">
-                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
                                 res.status === 'Partially Reserved' 
                                   ? 'bg-amber-50 text-amber-800 border-amber-200' 
                                   : res.status === 'Reserved'
                                     ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                    : 'bg-purple-50 text-purple-800 border-purple-200'
+                                    : 'bg-blue-50 text-blue-800 border-blue-200'
                               }`}>
                                 {res.status}
                               </span>
@@ -2324,7 +2324,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               </div>
 
               {/* Bottom Info Banner */}
-              <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-2xl flex items-center gap-2.5 text-xs text-blue-900">
+              <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-2xl flex items-center gap-2.5 text-[0.875rem] text-blue-900">
                 <AlertCircle className="w-4 h-4 text-blue-600 shrink-0" />
                 <span>
                   Reserved stock is automatically reduced from Available stock. When dispatch is completed, the reservation will be released.
@@ -2339,32 +2339,32 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               {/* Top 4 KPI Metrics */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {/* Metric 1: Total Reels */}
-                <div className="p-3.5 bg-gradient-to-br from-indigo-50/70 to-blue-50/40 border border-indigo-100 rounded-2xl flex items-center gap-3 shadow-2xs">
-                  <div className="p-2.5 rounded-xl bg-indigo-600 text-white shrink-0 shadow-xs">
+                <div className="p-3.5 bg-gradient-to-br from-blue-50/70 to-blue-50/40 border border-blue-100 rounded-2xl flex items-center gap-3 shadow-2xs">
+                  <div className="p-2.5 rounded-xl bg-blue-600 text-white shrink-0 shadow-xs">
                     <Disc className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[10px] font-bold text-indigo-900/60 uppercase tracking-wider">Total Reels Received</div>
-                    <div className="text-base sm:text-lg font-black text-gray-900 leading-tight">
-                      {reelsList.length} <span className="text-xs font-bold text-indigo-600 font-sans">Reels</span>
+                    <div className="text-xs font-medium text-blue-900/60 uppercase tracking-wider">Total Reels Received</div>
+                    <div className="text-base sm:text-lg font-semibold text-gray-900 leading-tight">
+                      {reelsList.length} <span className="text-[0.875rem] font-semibold text-blue-600 font-sans">Reels</span>
                     </div>
-                    <div className="text-[11px] font-semibold text-gray-500 font-mono truncate">
+                    <div className="text-xs font-semibold text-gray-500 font-mono truncate">
                       {totalReelsWeight.toLocaleString('en-IN')} kg total
                     </div>
                   </div>
                 </div>
 
                 {/* Metric 2: Available in Stock */}
-                <div className="p-3.5 bg-gradient-to-br from-emerald-50/70 to-teal-50/40 border border-emerald-100 rounded-2xl flex items-center gap-3 shadow-2xs">
+                <div className="p-3.5 bg-gradient-to-br from-emerald-50/70 to-blue-50/40 border border-emerald-100 rounded-2xl flex items-center gap-3 shadow-2xs">
                   <div className="p-2.5 rounded-xl bg-emerald-600 text-white shrink-0 shadow-xs">
                     <CheckCircle2 className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[10px] font-bold text-emerald-900/60 uppercase tracking-wider">Available in Stock</div>
-                    <div className="text-base sm:text-lg font-black text-gray-900 leading-tight">
-                      {availableReels.length} <span className="text-xs font-bold text-emerald-600 font-sans">Reels</span>
+                    <div className="text-xs font-medium text-emerald-900/60 uppercase tracking-wider">Available in Stock</div>
+                    <div className="text-base sm:text-lg font-semibold text-gray-900 leading-tight">
+                      {availableReels.length} <span className="text-[0.875rem] font-semibold text-emerald-600 font-sans">Reels</span>
                     </div>
-                    <div className="text-[11px] font-semibold text-emerald-700 font-mono truncate">
+                    <div className="text-xs font-semibold text-emerald-700 font-mono truncate">
                       {availableReelsWeight.toLocaleString('en-IN')} kg available
                     </div>
                   </div>
@@ -2376,27 +2376,27 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     <Layers className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[10px] font-bold text-amber-900/60 uppercase tracking-wider">Consumed / Converted</div>
-                    <div className="text-base sm:text-lg font-black text-gray-900 leading-tight">
-                      {consumedReels.length} <span className="text-xs font-bold text-amber-600 font-sans">Reels</span>
+                    <div className="text-xs font-medium text-amber-900/60 uppercase tracking-wider">Consumed / Converted</div>
+                    <div className="text-base sm:text-lg font-semibold text-gray-900 leading-tight">
+                      {consumedReels.length} <span className="text-[0.875rem] font-semibold text-amber-600 font-sans">Reels</span>
                     </div>
-                    <div className="text-[11px] font-semibold text-amber-700 font-mono truncate">
+                    <div className="text-xs font-semibold text-amber-700 font-mono truncate">
                       {consumedReelsWeight.toLocaleString('en-IN')} kg consumed
                     </div>
                   </div>
                 </div>
 
                 {/* Metric 4: Purchase Batches */}
-                <div className="p-3.5 bg-gradient-to-br from-purple-50/70 to-pink-50/40 border border-purple-100 rounded-2xl flex items-center gap-3 shadow-2xs">
-                  <div className="p-2.5 rounded-xl bg-purple-600 text-white shrink-0 shadow-xs">
+                <div className="p-3.5 bg-gradient-to-br from-blue-50/70 to-pink-50/40 border border-blue-100 rounded-2xl flex items-center gap-3 shadow-2xs">
+                  <div className="p-2.5 rounded-xl bg-blue-600 text-white shrink-0 shadow-xs">
                     <Package className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[10px] font-bold text-purple-900/60 uppercase tracking-wider">Batches Linked</div>
-                    <div className="text-base sm:text-lg font-black text-gray-900 leading-tight">
-                      {reelBatches.length} <span className="text-xs font-bold text-purple-600 font-sans">Batches</span>
+                    <div className="text-xs font-medium text-blue-900/60 uppercase tracking-wider">Batches Linked</div>
+                    <div className="text-base sm:text-lg font-semibold text-gray-900 leading-tight">
+                      {reelBatches.length} <span className="text-[0.875rem] font-semibold text-blue-600 font-sans">Batches</span>
                     </div>
-                    <div className="text-[11px] font-semibold text-gray-500 truncate">
+                    <div className="text-xs font-semibold text-gray-500 truncate">
                       From PO invoices
                     </div>
                   </div>
@@ -2409,19 +2409,19 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                 <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-gray-50/50">
                   <div className="flex items-center gap-2">
                     <Disc className="w-4 h-4 text-blue-600" />
-                    <span className="text-xs font-extrabold text-gray-900 uppercase tracking-wider">Reels Ledger</span>
-                    <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black">
+                    <span className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wider">Reels Ledger</span>
+                    <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">
                       {filteredReels.length} of {reelsList.length}
                     </span>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
                     {/* Status Toggle Pills */}
-                    <div className="flex items-center bg-gray-200/60 p-0.5 rounded-xl text-xs font-bold shrink-0">
+                    <div className="flex items-center bg-gray-200/60 p-0.5 rounded-xl text-[0.875rem] font-semibold shrink-0">
                       <button
                         type="button"
                         onClick={() => { setReelStatusFilter('ALL'); setReelPage(1); }}
-                        className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                        className={`px-2.5 py-1 rounded-lg cursor-pointer whitespace-nowrap ${
                           reelStatusFilter === 'ALL'
                             ? 'bg-white text-gray-900 shadow-2xs'
                             : 'text-gray-500 hover:text-gray-900'
@@ -2432,7 +2432,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       <button
                         type="button"
                         onClick={() => { setReelStatusFilter('Available'); setReelPage(1); }}
-                        className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                        className={`px-2.5 py-1 rounded-lg cursor-pointer whitespace-nowrap ${
                           reelStatusFilter === 'Available'
                             ? 'bg-emerald-600 text-white shadow-2xs'
                             : 'text-emerald-700 hover:text-emerald-900'
@@ -2443,7 +2443,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       <button
                         type="button"
                         onClick={() => { setReelStatusFilter('Consumed'); setReelPage(1); }}
-                        className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                        className={`px-2.5 py-1 rounded-lg cursor-pointer whitespace-nowrap ${
                           reelStatusFilter === 'Consumed'
                             ? 'bg-gray-700 text-white shadow-2xs'
                             : 'text-gray-500 hover:text-gray-900'
@@ -2456,13 +2456,13 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     {/* Batch Number Quick Pills Filter (All in One Line) */}
                     {reelBatches.length > 0 && (
                       <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 shrink-0 bg-gray-100/80 p-0.5 rounded-xl border border-gray-200/60">
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider shrink-0 px-1.5 whitespace-nowrap">
+                        <span className="text-xs font-medium text-gray-500 uppercase tracking-wider shrink-0 px-1.5 whitespace-nowrap">
                           Batch:
                         </span>
                         <button
                           type="button"
                           onClick={() => { setReelBatchFilter('ALL'); setReelPage(1); }}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                          className={`px-2.5 py-1 rounded-lg text-[0.875rem] font-semibold whitespace-nowrap cursor-pointer ${
                             reelBatchFilter === 'ALL'
                               ? 'bg-blue-600 text-white shadow-2xs'
                               : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
@@ -2475,7 +2475,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                             key={b}
                             type="button"
                             onClick={() => { setReelBatchFilter(b); setReelPage(1); }}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono whitespace-nowrap transition-all cursor-pointer ${
+                            className={`px-2.5 py-1 rounded-lg text-[0.875rem] font-semibold font-mono whitespace-nowrap cursor-pointer ${
                               reelBatchFilter === b
                                 ? 'bg-blue-600 text-white shadow-2xs'
                                 : 'text-gray-700 hover:text-gray-900 hover:bg-gray-200/50'
@@ -2495,7 +2495,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                         placeholder="Search reel #, batch, zone..."
                         value={reelSearch}
                         onChange={(e) => { setReelSearch(e.target.value); setReelPage(1); }}
-                        className="pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none w-44 sm:w-52"
+                        className="pl-8 pr-3 py-1.5 text-[0.875rem] bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none w-44 sm:w-52"
                       />
                     </div>
 
@@ -2504,7 +2504,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       type="button"
                       onClick={fetchStockDetails}
                       title="Reload Reel Records"
-                      className="p-1.5 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-xl transition-all cursor-pointer shrink-0"
+                      className="p-1.5 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-xl cursor-pointer shrink-0"
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
                     </button>
@@ -2513,7 +2513,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                     <button
                       type="button"
                       onClick={exportReelsToExcel}
-                      className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0 whitespace-nowrap"
+                      className="btn-secondary shrink-0"
                     >
                       <Download className="w-3.5 h-3.5 text-gray-500" />
                       <span>Excel</span>
@@ -2523,8 +2523,8 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
 
                 {/* Table */}
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead className="bg-gray-50/80 border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                  <table className="w-full text-left text-[0.875rem] border-collapse">
+                    <thead className="bg-gray-50/80 border-b border-gray-100 text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
                       <tr>
                         <th className="px-3.5 py-3 text-center w-12 whitespace-nowrap">#</th>
                         <th className="px-3.5 py-3 whitespace-nowrap">REEL NUMBER</th>
@@ -2542,8 +2542,8 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       {paginatedReels.map((reel, idx) => {
                         const isAvailable = reel.status === 'Available';
                         return (
-                          <tr key={reel.id || `${reel.reelNumber}-${idx}`} className="hover:bg-blue-50/30 transition-colors">
-                            <td className="px-3.5 py-3 text-center font-mono text-gray-400 text-[11px] whitespace-nowrap">
+                          <tr key={reel.id || `${reel.reelNumber}-${idx}`} className="hover:bg-blue-50/30">
+                            <td className="px-3.5 py-3 text-center font-mono text-gray-400 text-xs whitespace-nowrap">
                               {(reelPage - 1) * reelPageSize + idx + 1}
                             </td>
                             <td className="px-3.5 py-3 whitespace-nowrap">
@@ -2551,18 +2551,18 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                                 <div className={`p-1.5 rounded-lg shrink-0 ${isAvailable ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
                                   <Disc className="w-3.5 h-3.5" />
                                 </div>
-                                <span className="font-mono font-black text-gray-900 tracking-tight text-xs sm:text-sm whitespace-nowrap">
+                                <span className="font-mono font-semibold text-gray-900 tracking-tight text-[0.875rem] sm:text-[0.875rem] whitespace-nowrap">
                                   {reel.reelNumber}
                                 </span>
                               </div>
                             </td>
                             <td className="px-3.5 py-3 whitespace-nowrap">
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 font-mono text-xs font-bold border border-slate-200/80 whitespace-nowrap shadow-3xs">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 font-mono text-[0.875rem] font-semibold border border-slate-200/80 whitespace-nowrap shadow-3xs">
                                 {reel.batchNumber || '-'}
                               </span>
                             </td>
-                            <td className="px-3.5 py-3 text-right font-mono font-black text-xs sm:text-sm text-gray-900 whitespace-nowrap">
-                              {(Number(reel.weight) || 0).toLocaleString('en-IN')} <span className="text-[10px] font-bold text-gray-500 font-sans">KG</span>
+                            <td className="px-3.5 py-3 text-right font-mono font-semibold text-[0.875rem] sm:text-[0.875rem] text-gray-900 whitespace-nowrap">
+                              {(Number(reel.weight) || 0).toLocaleString('en-IN')} <span className="text-xs font-semibold text-gray-500 font-sans">KG</span>
                             </td>
                             <td className="px-3.5 py-3 text-gray-600 font-medium whitespace-nowrap">
                               {reel.width ? `${reel.width} cm` : '-'}
@@ -2576,19 +2576,19 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                             </td>
                             <td className="px-3.5 py-3 text-center whitespace-nowrap">
                               {isAvailable ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 whitespace-nowrap">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 whitespace-nowrap">
                                   <CheckCircle2 className="w-3 h-3" />
                                   Available
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200 whitespace-nowrap">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200 whitespace-nowrap">
                                   Consumed
                                 </span>
                               )}
                             </td>
-                            <td className="px-3.5 py-3 font-mono text-[11px] whitespace-nowrap">
+                            <td className="px-3.5 py-3 font-mono text-xs whitespace-nowrap">
                               {reel.consumedIn ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 font-bold whitespace-nowrap">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-semibold whitespace-nowrap">
                                   {reel.consumedIn}
                                 </span>
                               ) : (
@@ -2609,8 +2609,8 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                         <tr>
                           <td colSpan={10} className="p-12 text-center text-gray-400">
                             <Disc className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                            <div className="font-bold text-gray-600">No reels found</div>
-                            <div className="text-xs text-gray-400 mt-1">
+                            <div className="font-semibold text-gray-600">No reels found</div>
+                            <div className="text-[0.875rem] text-gray-400 mt-1">
                               {reelsList.length === 0 ? 'No physical reels have been recorded for this item yet.' : 'Try clearing your filters or search keywords.'}
                             </div>
                           </td>
@@ -2622,7 +2622,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
 
                 {/* Pagination Toolbar */}
                 {totalReelPages > 1 && (
-                  <div className="p-3 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between text-xs">
+                  <div className="p-3 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between text-[0.875rem]">
                     <span className="text-gray-500">
                       Showing {(reelPage - 1) * reelPageSize + 1} to {Math.min(reelPage * reelPageSize, filteredReels.length)} of {filteredReels.length} reels
                     </span>
@@ -2631,18 +2631,18 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                         type="button"
                         onClick={() => setReelPage(p => Math.max(1, p - 1))}
                         disabled={reelPage === 1}
-                        className="px-2.5 py-1 rounded-lg border border-gray-200 bg-white text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 cursor-pointer text-xs font-bold"
+                        className="btn-secondary disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         Prev
                       </button>
-                      <span className="px-2 text-gray-600 font-bold">
+                      <span className="px-2 text-gray-600 font-semibold">
                         {reelPage} / {totalReelPages}
                       </span>
                       <button
                         type="button"
                         onClick={() => setReelPage(p => Math.min(totalReelPages, p + 1))}
                         disabled={reelPage === totalReelPages}
-                        className="px-2.5 py-1 rounded-lg border border-gray-200 bg-white text-gray-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 cursor-pointer text-xs font-bold"
+                        className="btn-secondary disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         Next
                       </button>
@@ -2652,7 +2652,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               </div>
 
               {/* Bottom Info Banner */}
-              <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-2xl flex items-center gap-2.5 text-xs text-blue-900">
+              <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-2xl flex items-center gap-2.5 text-[0.875rem] text-blue-900">
                 <AlertCircle className="w-4 h-4 text-blue-600 shrink-0" />
                 <span>
                   Physical reels are registered during Purchase Inward (GRN) and tracked individually. Consuming reels via Cutting Slips automatically marks them as Consumed and logs the cutting voucher reference.
@@ -2664,11 +2664,11 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
         </div>
 
         {/* ── FOOTER ACTIONS BAR ── */}
-        <div className="p-4 bg-white border-t border-gray-100 flex items-center justify-between gap-3 shrink-0">
+        <div className="p-4 bg-white border-t border-gray-100 flex items-center justify-between gap-3 shrink-0 dlg-footer">
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl shadow-2xs transition-all cursor-pointer"
+            className="btn-secondary"
           >
             Close
           </button>
@@ -2678,7 +2678,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveTab('movements')}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                className="btn-primary"
               >
                 <History className="w-4 h-4" />
                 <span>View Movements</span>
@@ -2689,7 +2689,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               <button
                 type="button"
                 onClick={exportReelsToExcel}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                className="btn-primary"
               >
                 <Download className="w-4 h-4" />
                 <span>Export Reels (Excel)</span>
@@ -2700,7 +2700,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               <button
                 type="button"
                 onClick={() => onOpenTransfer?.(sku)}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                className="btn-primary"
               >
                 <ArrowRightLeft className="w-4 h-4" />
                 <span>Transfer Stock</span>
@@ -2711,7 +2711,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
               <button
                 type="button"
                 onClick={() => onAddBatch?.(sku)}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                className="btn-primary"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Batch</span>
@@ -2723,14 +2723,14 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowNewTxMenu(prev => !prev)}
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="btn-primary"
                 >
                   <Plus className="w-4 h-4" />
                   <span>+ New Transaction</span>
                   <ChevronDown className="w-3.5 h-3.5 ml-0.5" />
                 </button>
                 {showNewTxMenu && (
-                  <div className="absolute right-0 bottom-full mb-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 py-1 divide-y divide-gray-100 text-xs font-bold animate-in fade-in zoom-in-95 duration-100">
+                  <div className="absolute right-0 bottom-full mb-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 py-1 divide-y divide-gray-100 text-[0.875rem] font-semibold">
                     <button
                       type="button"
                       onClick={() => {
@@ -2765,7 +2765,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                   onClose();
                   showToast('Navigating to Sales Orders', 'info');
                 }}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                className="btn-primary"
               >
                 <span>View Sales Order</span>
                 <ArrowRight className="w-4 h-4" />

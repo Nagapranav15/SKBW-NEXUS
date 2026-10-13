@@ -233,8 +233,8 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               <Receipt className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Record Payment</h3>
-              <p className="text-[11px] text-slate-500 font-medium">
+              <h3 className="text-[0.875rem] font-semibold text-slate-900">Record Payment</h3>
+              <p className="text-xs text-slate-500 font-medium">
                 {customerDisplayName ? customerDisplayName : 'Receipt Voucher'}
                 {order?.orderNumber && <span className="ml-1.5 text-slate-400 font-mono">({order.orderNumber})</span>}
               </p>
@@ -244,7 +244,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center transition-colors cursor-pointer"
+            className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -252,38 +252,38 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
         {/* Minimal Financial Strip (If order total exists) */}
         {totalAmount > 0 ? (
-          <div className="grid grid-cols-3 gap-2 px-5 py-2.5 bg-slate-50/80 border-b border-slate-100 text-xs">
+          <div className="grid grid-cols-3 gap-2 px-5 py-2.5 bg-slate-50/80 border-b border-slate-100 text-[0.875rem]">
             <div>
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block">Order Total</span>
-              <span className="text-xs font-bold font-mono text-slate-800">
+              <span className="text-xs font-medium text-slate-400 uppercase tracking-wide block">Order Total</span>
+              <span className="text-[0.875rem] font-semibold font-mono text-slate-800">
                 ₹{totalAmount.toLocaleString('en-IN')}
               </span>
             </div>
             <div>
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block">Paid</span>
-              <span className="text-xs font-bold font-mono text-emerald-600">
+              <span className="text-xs font-medium text-slate-400 uppercase tracking-wide block">Paid</span>
+              <span className="text-[0.875rem] font-semibold font-mono text-emerald-600">
                 ₹{alreadyPaid.toLocaleString('en-IN')}
               </span>
             </div>
             <div>
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block">Due</span>
-              <span className={`text-xs font-bold font-mono ${currentDue > 0 ? 'text-rose-600' : 'text-slate-600'}`}>
+              <span className="text-xs font-medium text-slate-400 uppercase tracking-wide block">Due</span>
+              <span className={`text-[0.875rem] font-semibold font-mono ${currentDue > 0 ? 'text-rose-600' : 'text-slate-600'}`}>
                 ₹{currentDue.toLocaleString('en-IN')}
               </span>
             </div>
           </div>
         ) : (
-          <div className="px-5 py-2 bg-blue-50/50 border-b border-blue-100/60 text-[11px] text-blue-700 flex items-center gap-1.5 font-medium">
+          <div className="px-5 py-2 bg-blue-50/50 border-b border-blue-100/60 text-xs text-blue-700 flex items-center gap-1.5 font-medium">
             <AlertCircle className="w-3.5 h-3.5 text-blue-500 shrink-0" />
             <span>Advance Cash Receipt (will adjust against order total)</span>
           </div>
         )}
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto max-h-[75vh]">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto max-h-[calc(75*var(--vh,1vh))]">
           {/* Payment Mode Selector - Clean & Minimal */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-medium text-slate-600 uppercase tracking-wider mb-1.5">
               Payment Mode
             </label>
             <div className="grid grid-cols-4 gap-2">
@@ -294,14 +294,14 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                     key={tab.id}
                     type="button"
                     onClick={() => setPaymentMethod(tab.id)}
-                    className={`py-2 px-1.5 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                    className={`py-2 px-1.5 rounded-xl border text-[0.875rem] font-semibold flex flex-col items-center gap-1 cursor-pointer ${
                       isActive
-                        ? 'bg-blue-50/90 border-blue-500 text-blue-700 shadow-2xs font-bold'
+                        ? 'bg-blue-50/90 border-blue-500 text-blue-700 shadow-2xs font-semibold'
                         : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
                     }`}
                   >
                     <tab.icon className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
-                    <span className="text-[11px]">{tab.label}</span>
+                    <span className="text-xs">{tab.label}</span>
                   </button>
                 );
               })}
@@ -312,11 +312,11 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Amount Field */}
             <div>
-              <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-medium text-slate-600 uppercase tracking-wider mb-1.5">
                 Paying Amount <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm pointer-events-none select-none">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-[0.875rem] pointer-events-none select-none">
                   ₹
                 </span>
                 <input
@@ -327,7 +327,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.00"
-                  className="w-full pl-7 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold font-mono text-slate-900 placeholder:text-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 focus:outline-none transition-all"
+                  className="w-full pl-7 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-[0.875rem] font-semibold font-mono text-slate-900 placeholder:text-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 focus:outline-none"
                 />
               </div>
 
@@ -338,7 +338,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleQuickAmount(currentDue)}
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-colors cursor-pointer ${
+                      className={`text-xs font-semibold px-2 py-0.5 rounded-lg border cursor-pointer ${
                         isFullPayment
                           ? 'bg-blue-600 text-white border-blue-600'
                           : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
@@ -349,7 +349,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleQuickAmount(currentDue / 2)}
-                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg border transition-colors cursor-pointer ${
+                      className={`text-xs font-semibold px-2 py-0.5 rounded-lg border cursor-pointer ${
                         isHalfPayment
                           ? 'bg-blue-600 text-white border-blue-600'
                           : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
@@ -364,7 +364,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                     key={val}
                     type="button"
                     onClick={() => handleQuickAmount(val)}
-                    className="text-[10px] font-medium px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200/80 transition-colors cursor-pointer"
+                    className="text-xs font-medium px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200/80 cursor-pointer"
                   >
                     ₹{val / 1000}k
                   </button>
@@ -374,7 +374,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
             {/* Date Field */}
             <div>
-              <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-medium text-slate-600 uppercase tracking-wider mb-1.5">
                 Payment Date <span className="text-rose-500">*</span>
               </label>
               <input
@@ -382,7 +382,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 required
                 value={paymentDate}
                 onChange={(e) => setPaymentDate(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 focus:outline-none transition-all"
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-[0.875rem] font-semibold text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 focus:outline-none"
               />
             </div>
           </div>
@@ -391,19 +391,19 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200/80 space-y-2.5">
             {paymentMethod === 'cash' && (
               <div className="space-y-2.5">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                <div className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-slate-800">
                   <Wallet className="w-3.5 h-3.5 text-blue-600" />
                   <span>Cash Payment Details</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-1">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">
                       Cash Register / Godown
                     </label>
                     <select
                       value={cashLocation}
                       onChange={(e) => setCashLocation(e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[0.875rem] font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
                     >
                       <option value="Main Cash Counter">Main Cash Counter</option>
                       <option value="Factory Office Drawer">Factory Office Drawer</option>
@@ -413,13 +413,13 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <label className="text-[10px] font-semibold text-slate-500">
+                      <label className="text-xs font-semibold text-slate-500">
                         Receipt / Voucher Number
                       </label>
                       <button
                         type="button"
                         onClick={() => setReceiptNumber(generateReceiptId())}
-                        className="text-[9px] text-blue-600 hover:text-blue-800 flex items-center gap-0.5 cursor-pointer font-medium"
+                        className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-0.5 cursor-pointer font-medium"
                       >
                         <RefreshCw className="w-2.5 h-2.5" />
                         Auto
@@ -430,7 +430,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                       value={receiptNumber}
                       onChange={(e) => setReceiptNumber(e.target.value)}
                       placeholder="e.g. REC-514903"
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[0.875rem] font-mono font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -439,13 +439,13 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
             {paymentMethod === 'cheque' && (
               <div className="space-y-2.5">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                <div className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-slate-800">
                   <FileCheck className="w-3.5 h-3.5 text-blue-600" />
                   <span>Cheque Details</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-1">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">
                       Cheque Number <span className="text-rose-500">*</span>
                     </label>
                     <input
@@ -454,22 +454,22 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                       value={chequeNumber}
                       onChange={(e) => setChequeNumber(e.target.value)}
                       placeholder="e.g. 000124"
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[0.875rem] font-mono font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-1">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">
                       Cheque Date
                     </label>
                     <input
                       type="date"
                       value={chequeDate}
                       onChange={(e) => setChequeDate(e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[0.875rem] font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-1">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">
                       Bank Name
                     </label>
                     <input
@@ -477,11 +477,11 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                       value={bankName}
                       onChange={(e) => setBankName(e.target.value)}
                       placeholder="e.g. HDFC Bank, SBI"
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[0.875rem] font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-1">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">
                       Branch / City
                     </label>
                     <input
@@ -489,7 +489,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                       value={bankBranch}
                       onChange={(e) => setBankBranch(e.target.value)}
                       placeholder="e.g. Main Branch"
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[0.875rem] font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -498,19 +498,19 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
             {paymentMethod === 'upi' && (
               <div className="space-y-2.5">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                <div className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-slate-800">
                   <Smartphone className="w-3.5 h-3.5 text-blue-600" />
                   <span>UPI / QR Details</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-1">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">
                       UPI App / Provider
                     </label>
                     <select
                       value={upiProvider}
                       onChange={(e) => setUpiProvider(e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[0.875rem] font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
                     >
                       <option value="PhonePe">PhonePe</option>
                       <option value="Google Pay">Google Pay</option>
@@ -520,7 +520,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-1">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">
                       UPI Ref / UTR <span className="text-rose-500">*</span>
                     </label>
                     <input
@@ -529,11 +529,11 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                       value={upiReference}
                       onChange={(e) => setUpiReference(e.target.value)}
                       placeholder="e.g. 427819381729"
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[0.875rem] font-mono font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-1">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">
                       Credited Account
                     </label>
                     <input
@@ -541,7 +541,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                       value={accountName}
                       onChange={(e) => setAccountName(e.target.value)}
                       placeholder="e.g. Primary Current Account"
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[0.875rem] font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -550,19 +550,19 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
             {paymentMethod === 'bank_transfer' && (
               <div className="space-y-2.5">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                <div className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-slate-800">
                   <Building2 className="w-3.5 h-3.5 text-blue-600" />
                   <span>Bank Wire Details</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-1">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">
                       Transfer Type
                     </label>
                     <select
                       value={transferType}
                       onChange={(e) => setTransferType(e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[0.875rem] font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
                     >
                       <option value="NEFT">NEFT</option>
                       <option value="RTGS">RTGS</option>
@@ -571,7 +571,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-1">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">
                       UTR / Transaction Ref <span className="text-rose-500">*</span>
                     </label>
                     <input
@@ -580,11 +580,11 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                       value={bankUtr}
                       onChange={(e) => setBankUtr(e.target.value)}
                       placeholder="e.g. UTIB260901238491"
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[0.875rem] font-mono font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-semibold text-slate-500 mb-1">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">
                       Remitting Bank Name
                     </label>
                     <input
@@ -592,7 +592,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                       value={bankName}
                       onChange={(e) => setBankName(e.target.value)}
                       placeholder="e.g. State Bank of India"
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[0.875rem] font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -602,7 +602,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
           {/* Notes / Remarks - Clean */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-medium text-slate-600 uppercase tracking-wider mb-1">
               Notes / Remarks
             </label>
             <input
@@ -610,15 +610,15 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
               placeholder="e.g. Advance cash received against order"
-              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none"
+              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-[0.875rem] font-medium text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none"
             />
           </div>
 
           {/* Clean Receipt Summary Box */}
-          <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/80 space-y-1.5 text-xs">
+          <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/80 space-y-1.5 text-[0.875rem]">
             <div className="flex items-center justify-between">
               <span className="font-medium text-slate-600">Paying Now:</span>
-              <span className="font-bold font-mono text-slate-900">
+              <span className="font-semibold font-mono text-slate-900">
                 ₹{parsedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
             </div>
@@ -626,35 +626,35 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             {totalAmount > 0 ? (
               <div className="flex items-center justify-between">
                 <span className="font-medium text-slate-600">Remaining Balance:</span>
-                <span className={`font-bold font-mono ${remainingAfterPayment > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                <span className={`font-semibold font-mono ${remainingAfterPayment > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                   ₹{remainingAfterPayment.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               </div>
             ) : (
-              <div className="flex items-center justify-between text-[11px] text-slate-500">
+              <div className="flex items-center justify-between text-xs text-slate-500">
                 <span>Order Status:</span>
                 <span className="italic">Remaining balance will calculate when items are added</span>
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/60 text-[11px]">
+            <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/60 text-xs">
               <span className="text-slate-500 font-medium">Payment Status:</span>
               {totalAmount > 0 ? (
                 remainingAfterPayment <= 0 && parsedAmount > 0 ? (
-                  <span className="px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  <span className="px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
                     Paid in Full
                   </span>
                 ) : parsedAmount > 0 ? (
-                  <span className="px-2 py-0.5 rounded-full font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                  <span className="px-2 py-0.5 rounded-full font-semibold bg-blue-100 text-blue-800 border border-blue-200">
                     Partial (Bal: ₹{remainingAfterPayment.toLocaleString('en-IN')})
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                  <span className="px-2 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-800 border border-amber-200">
                     Pending
                   </span>
                 )
               ) : (
-                <span className="px-2 py-0.5 rounded-full font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                <span className="px-2 py-0.5 rounded-full font-semibold bg-blue-100 text-blue-800 border border-blue-200">
                   {parsedAmount > 0 ? `Advance Cash: ₹${parsedAmount.toLocaleString('en-IN')}` : 'Pending Amount'}
                 </span>
               )}
@@ -662,19 +662,19 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dlg-footer">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              className="px-4 py-2 border border-slate-200 rounded-xl text-[0.875rem] font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || parsedAmount <= 0}
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+              className="btn-primary disabled:opacity-50"
             >
               {isSubmitting ? (
                 <>

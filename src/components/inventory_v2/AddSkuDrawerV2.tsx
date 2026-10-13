@@ -130,12 +130,12 @@ export const SearchableMaterialDropdown: React.FC<{
           if (!open) updatePosition();
           setOpen(!open);
         }}
-        className={className || "w-full px-3 py-2 bg-white border border-gray-200 hover:border-blue-300 rounded-xl text-xs font-semibold text-gray-800 flex items-center justify-between shadow-2xs transition-all cursor-pointer"}
+        className={className || "w-full px-3 py-2 bg-white border border-gray-200 hover:border-blue-300 rounded-xl text-[0.875rem] font-semibold text-gray-800 flex items-center justify-between shadow-2xs cursor-pointer"}
       >
         <span className="truncate">
           {value || <span className="text-gray-400 font-normal">{placeholder || '-- Select Raw Material --'}</span>}
         </span>
-        <ChevronDown className={`${compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`${compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-gray-400 ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && createPortal(
@@ -151,7 +151,7 @@ export const SearchableMaterialDropdown: React.FC<{
             width: `${coords.width}px`,
             zIndex: 999999
           }}
-          className="bg-white border border-gray-200 rounded-2xl shadow-2xl p-2.5 space-y-2 text-xs animate-in fade-in zoom-in-95 duration-75"
+          className="bg-white border border-gray-200 rounded-2xl shadow-2xl p-2.5 space-y-2 text-[0.875rem]"
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="relative">
@@ -170,7 +170,7 @@ export const SearchableMaterialDropdown: React.FC<{
                 }
               }}
               placeholder="Search or type raw material..."
-              className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50/50"
+              className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none bg-gray-50/50"
             />
           </div>
 
@@ -182,7 +182,7 @@ export const SearchableMaterialDropdown: React.FC<{
                   setOpen(false);
                   setSearch('');
                 }}
-                className="p-2.5 hover:bg-emerald-50 text-emerald-700 font-bold rounded-xl cursor-pointer transition-colors flex items-center gap-1.5"
+                className="p-2.5 hover:bg-emerald-50 text-emerald-700 font-semibold rounded-xl cursor-pointer flex items-center gap-1.5"
               >
                 <Plus className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Add "{search.trim()}"</span>
@@ -199,14 +199,14 @@ export const SearchableMaterialDropdown: React.FC<{
                     setOpen(false);
                     setSearch('');
                   }}
-                  className={`p-2.5 hover:bg-blue-50/80 rounded-xl cursor-pointer transition-colors flex items-center justify-between gap-3 group ${
-                    isSelected ? 'bg-blue-50 text-blue-900 font-bold' : ''
+                  className={`p-2.5 hover:bg-blue-50/80 rounded-xl cursor-pointer flex items-center justify-between gap-3 group ${
+                    isSelected ? 'bg-blue-50 text-blue-900 font-semibold' : ''
                   }`}
                 >
                   <div className="space-y-1 flex-1 min-w-0">
-                    <div className="font-semibold text-gray-900 text-xs leading-snug group-hover:text-blue-700 break-words">{mat.name}</div>
-                    <div className="text-[10.5px] text-gray-400 flex items-center gap-1.5 flex-wrap">
-                      <span className="bg-gray-100 px-1.5 py-0.2 rounded text-gray-700 font-mono font-bold">{mat.skuCode}</span>
+                    <div className="font-semibold text-gray-900 text-[0.875rem] leading-snug group-hover:text-blue-700 break-words">{mat.name}</div>
+                    <div className="text-[0.875rem] text-gray-400 flex items-center gap-1.5 flex-wrap">
+                      <span className="bg-gray-100 px-1.5 py-0.2 rounded text-gray-700 font-mono font-semibold">{mat.skuCode}</span>
                       <span>·</span>
                       <span className="capitalize">{mat.category || 'Raw Material'}</span>
                       {mat.gsm && (
@@ -223,7 +223,7 @@ export const SearchableMaterialDropdown: React.FC<{
                       )}
                     </div>
                   </div>
-                  <span className="shrink-0 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                  <span className="shrink-0 text-[0.875rem] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
                     {mat.unit || 'Kg'}
                   </span>
                 </div>
@@ -231,7 +231,7 @@ export const SearchableMaterialDropdown: React.FC<{
             })}
 
             {filtered.length === 0 && !search.trim() && (
-              <div className="p-4 text-center text-xs text-gray-400 italic">
+              <div className="p-4 text-center text-[0.875rem] text-gray-400 italic">
                 No raw materials found
               </div>
             )}
@@ -1674,14 +1674,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-gray-900 text-base">
+                  <span className="font-semibold text-gray-900 text-base">
                     {editSku ? 'Edit SKU Item' : 'Add New SKU Item'}
                   </span>
-                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-md flex items-center gap-1 uppercase tracking-wider ${
+                  <span className={`text-[0.875rem] font-medium px-2.5 py-0.5 rounded-md flex items-center gap-1 uppercase tracking-wider ${
                     itemMainType === 'Materials'
                       ? 'bg-amber-50 text-amber-700 border border-amber-200'
                       : itemMainType === 'Semi'
-                        ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
                         : 'bg-blue-50 text-blue-700 border border-blue-200'
                   }`}>
                     {itemMainType}
@@ -1691,41 +1691,41 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             </div>
           }
         >
-          <form onSubmit={handleSubmit} className="p-2 space-y-6 max-h-[75vh] overflow-y-auto text-left">
+          <form onSubmit={handleSubmit} className="p-2 space-y-6 max-h-[calc(75*var(--vh,1vh))] overflow-y-auto text-left">
             {errorMsg && (
-              <div className="p-3 bg-red-50 border border-red-150 rounded-xl text-xs font-semibold text-red-700">
+              <div className="p-3 bg-red-50 border border-red-150 rounded-xl text-[0.875rem] font-semibold text-red-700">
                 {errorMsg}
               </div>
             )}
 
             {/* Group 1: General Information */}
             <div className="space-y-4">
-              <h3 className="text-xs font-bold text-gray-900 border-b border-gray-100 pb-1.5 flex items-center gap-2">
+              <h3 className="text-[0.875rem] font-semibold text-gray-900 border-b border-gray-100 pb-1.5 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                 General Information
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-[11px] font-semibold text-gray-600 mb-1">SKU CODE *</label>
+                  <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">SKU CODE *</label>
                   <input
                     type="text"
                     placeholder="e.g. RM-REEL-01"
                     value={form.skuCode}
                     onChange={e => setForm({ ...form, skuCode: e.target.value.toUpperCase() })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                     required
                   />
                 </div>
 
                 {/* ITEM TYPE (Selectable & Interchangeable: Products / Materials / Semi) */}
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-[11px] font-semibold text-gray-600 mb-1 flex items-center justify-between">
+                  <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1 flex items-center justify-between">
                     <span>ITEM TYPE *</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                    <span className={`text-[0.875rem] font-medium px-2 py-0.5 rounded-md uppercase tracking-wider ${
                       selectedType === 'materials'
                         ? 'bg-amber-50 text-amber-700 border border-amber-200'
                         : selectedType === 'semi'
-                          ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
                           : 'bg-blue-50 text-blue-700 border border-blue-200'
                     }`}>
                       {itemMainType}
@@ -1735,7 +1735,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     <select
                       value={selectedType}
                       onChange={e => handleItemTypeChange(e.target.value as 'products' | 'materials' | 'semi')}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-white text-gray-900 font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer appearance-none shadow-2xs pr-8"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] bg-white text-gray-900 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer appearance-none shadow-2xs pr-8"
                     >
                       <option value="products">PRODUCTS (Finished Goods)</option>
                       <option value="materials">MATERIALS (Raw Materials)</option>
@@ -1748,12 +1748,12 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                 </div>
                 {/* 2. CATEGORY (Selectable & Editable whether creating or editing) */}
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-[11px] font-semibold text-gray-600 mb-1 flex items-center justify-between">
+                  <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1 flex items-center justify-between">
                     <span>CATEGORY *</span>
                     <button
                       type="button"
                       onClick={handleOpenAddCategoryModal}
-                      className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-0.5 cursor-pointer"
+                      className="text-[0.875rem] font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-0.5 cursor-pointer"
                     >
                       <Plus className="w-3 h-3" />
                       <span>Add Category</span>
@@ -1783,14 +1783,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           }
                         }
                       }}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-bold text-gray-800 cursor-pointer appearance-none shadow-2xs pr-8"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer appearance-none shadow-2xs pr-8"
                       required
                     >
                       <option value="">Select Category</option>
                       {availableCategories.map(cat => (
                         <option key={cat} value={cat}>{cat}</option>
                       ))}
-                      <option value="__ADD_NEW__" className="font-bold text-blue-600 bg-blue-50">
+                      <option value="__ADD_NEW__" className="font-semibold text-blue-600 bg-blue-50">
                         + Add New Category...
                       </option>
                     </select>
@@ -1804,24 +1804,24 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
                 {/* 4. PROMINENT ACTIVE / INACTIVE STATUS TOGGLE */}
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1 flex items-center justify-between">
+                  <label className="block text-[0.875rem] font-semibold text-gray-700 mb-1 flex items-center justify-between">
                     <span>ITEM STATUS</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${form.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`text-[0.875rem] font-semibold px-2 py-0.5 rounded-full ${form.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}`}>
                       {form.status === 'Active' ? 'Active' : 'Inactive'}
                     </span>
                   </label>
-                  <div className="flex items-center gap-3 h-[38px] px-3 py-1.5 bg-gray-50/90 border border-gray-200 rounded-xl">
+                  <div className="flex items-center gap-3 h-[2.375rem] px-3 py-1.5 bg-gray-50/90 border border-gray-200 rounded-xl">
                     <button
                       type="button"
                       onClick={() => setForm(prev => ({ ...prev, status: prev.status === 'Active' ? 'Inactive' : 'Active' }))}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${form.status === 'Active' ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent ease-in-out focus:outline-none ${form.status === 'Active' ? 'bg-emerald-500' : 'bg-gray-300'}`}
                     >
                       <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${form.status === 'Active' ? 'translate-x-4' : 'translate-x-0'}`}
+                        className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 ease-in-out ${form.status === 'Active' ? 'translate-x-4' : 'translate-x-0'}`}
                       />
                     </button>
                     <span 
-                      className="text-xs font-semibold text-gray-700 cursor-pointer select-none truncate" 
+                      className="text-[0.875rem] font-semibold text-gray-700 cursor-pointer select-none truncate" 
                       onClick={() => setForm(prev => ({ ...prev, status: prev.status === 'Active' ? 'Inactive' : 'Active' }))}
                     >
                       {form.status === 'Active' ? 'Item is Active (Usable)' : 'Item is Inactive (Disabled)'}
@@ -1834,9 +1834,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                 {/* Format Category Radio Selector (Only for Materials, completely removed for Semi) */}
                 {activeFields.includes('paperType') && resolvedSection !== 'semi' && form.category !== 'Semi Finished' && form.category !== 'Semi' && (
                   <div className="col-span-2 bg-gray-50/70 p-3 rounded-xl border border-gray-100 flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-gray-600">FORMAT CATEGORY</span>
+                    <span className="text-[0.875rem] font-semibold text-gray-600">FORMAT CATEGORY</span>
                     <div className="flex items-center gap-4">
-                      <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
+                      <label className="inline-flex items-center gap-1.5 cursor-pointer text-[0.875rem] font-semibold text-gray-700">
                         <input
                           type="radio"
                           name="paperType"
@@ -1847,7 +1847,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         />
                         Reels
                       </label>
-                      <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
+                      <label className="inline-flex items-center gap-1.5 cursor-pointer text-[0.875rem] font-semibold text-gray-700">
                         <input
                           type="radio"
                           name="paperType"
@@ -1864,14 +1864,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
                 <div className="col-span-2">
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block text-[11px] font-semibold text-gray-600 flex items-center gap-1.5">
+                    <label className="block text-[0.875rem] font-semibold text-gray-600 flex items-center gap-1.5">
                       <span>SKU NAME *</span>
                       {!isNameManuallyEdited ? (
-                        <span className="text-[9.5px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        <span className="text-[0.875rem] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                           Auto-Syncing
                         </span>
                       ) : (
-                        <span className="text-[9.5px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                        <span className="text-[0.875rem] text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
                           Custom Name
                         </span>
                       )}
@@ -1885,7 +1885,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           setForm(prev => ({ ...prev, name: compiled }));
                         }
                       }}
-                      className="text-[11px] text-blue-600 font-bold hover:underline hover:text-blue-800 flex items-center gap-1 cursor-pointer transition-colors"
+                      className="text-[0.875rem] text-blue-600 font-semibold hover:underline hover:text-blue-800 flex items-center gap-1 cursor-pointer"
                       title="Force re-sync name from current fields"
                     >
                       ⚡ Re-sync auto name
@@ -1899,7 +1899,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       setForm(prev => ({ ...prev, name: e.target.value }));
                       setIsNameManuallyEdited(true);
                     }}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                     required
                   />
                 </div>
@@ -1910,7 +1910,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     {/* 1. Pages */}
                     {activeFields.includes('pages') && (
                       <div>
-                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                        <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">
                           {form.paperType === 'Sheets' ? 'STANDARD SHEETS/REAM' : 'PAGES'}
                         </label>
                         <input
@@ -1918,7 +1918,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           placeholder={form.paperType === 'Sheets' ? 'e.g. 500' : 'e.g. 112 / 132'}
                           value={form.pages}
                           onChange={e => updateFormField({ pages: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                         />
                       </div>
                     )}
@@ -1926,7 +1926,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     {/* 2. Brand */}
                     {activeFields.includes('brand') && (
                       <div>
-                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">BRAND</label>
+                        <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">BRAND</label>
                         <div className="relative" ref={brandContainerRef}>
                           <input
                             type="text"
@@ -1940,7 +1940,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                               setShowBrandDropdown(true);
                               setBrandAtFocus(form.brand);
                             }}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                           />
                           {showBrandDropdown && (
                             <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-20 divide-y divide-gray-50">
@@ -1958,7 +1958,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                       setBrandSearch(b);
                                       setShowBrandDropdown(false);
                                     }}
-                                    className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors font-semibold text-gray-700 block"
+                                    className="w-full px-3 py-2 text-left text-[0.875rem] hover:bg-blue-50 hover:text-blue-600 font-semibold text-gray-700 block"
                                   >
                                     {b}
                                   </button>
@@ -1968,13 +1968,13 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                 <button
                                   type="button"
                                   onClick={() => handleAddNewBrand(brandSearch)}
-                                  className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 text-green-600 font-bold transition-colors block"
+                                  className="w-full px-3 py-2 text-left text-[0.875rem] hover:bg-green-50 text-green-600 font-semibold block"
                                 >
                                   + Add Brand "{brandSearch.trim()}"
                                 </button>
                               )}
                               {availableBrands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase().trim())).length === 0 && !brandSearch.trim() && (
-                                <div className="px-3 py-2 text-xs text-gray-400 italic">No brands found</div>
+                                <div className="px-3 py-2 text-[0.875rem] text-gray-400 italic">No brands found</div>
                               )}
                             </div>
                           )}
@@ -1985,7 +1985,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     {/* 3. Ruling Types */}
                     {activeFields.includes('ruleType') && (
                       <div>
-                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">RULING TYPE</label>
+                        <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">RULING TYPE</label>
                         <select
                           value={form.ruleType}
                           onChange={e => {
@@ -1995,20 +1995,20 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                               updateFormField({ ruleType: e.target.value });
                             }
                           }}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                         >
                           <option value="">-- Select Rule Type --</option>
                           {displayRuleTypes.map(rule => (
                             <option key={rule} value={rule}>{rule}</option>
                           ))}
-                          <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                          <option value="__ADD_NEW__" className="text-blue-600 font-semibold">+ Add Custom...</option>
                         </select>
                       </div>
                     )}
 
                     {/* 4. UOM (Base Unit) */}
                     <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                      <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">
                         UOM *
                       </label>
                       <select
@@ -2020,21 +2020,21 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             updateFormField({ unit: e.target.value });
                           }
                         }}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                         required
                       >
                         <option value="">Select Units</option>
                         {displayUnits.map(unit => (
                           <option key={unit} value={unit}>{unit}</option>
                         ))}
-                        <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                        <option value="__ADD_NEW__" className="text-blue-600 font-semibold">+ Add Custom...</option>
                       </select>
                     </div>
 
                     {/* 5. AUOM Toggle */}
                     {activeFields.includes('altUnit') && (
                       <div className="flex items-end h-full">
-                        <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/10 rounded-xl px-3 py-2 w-full cursor-pointer select-none transition-all">
+                        <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/10 rounded-xl px-3 py-2 w-full cursor-pointer select-none">
                           <input
                             type="checkbox"
                             checked={hasAltUnit}
@@ -2048,8 +2048,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
                           />
                           <div className="text-left">
-                            <span className="block text-[11px] font-bold text-gray-700">Enable AUOM</span>
-                            <span className="block text-[9px] text-gray-400 font-medium leading-tight">Alternate packaging / sales unit</span>
+                            <span className="block text-[0.875rem] font-semibold text-gray-700">Enable AUOM</span>
+                            <span className="block text-[0.875rem] text-gray-400 font-medium leading-tight">Alternate packaging / sales unit</span>
                           </div>
                         </label>
                       </div>
@@ -2067,9 +2067,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       const inverseFactor = factorNum > 0 ? roundUomQty(1 / factorNum) : 0;
 
                       return (
-                        <div className="col-span-2 space-y-2 bg-gradient-to-br from-blue-50/40 via-indigo-50/20 to-blue-50/40 p-4 rounded-2xl border border-blue-100 shadow-xs animate-in fade-in duration-200">
+                        <div className="col-span-2 space-y-2 bg-gradient-to-br from-blue-50/40 via-blue-50/20 to-blue-50/40 p-4 rounded-2xl border border-blue-100 shadow-xs">
                           <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="text-[0.875rem] font-medium text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
                               <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                               Alternate Unit of Measurement (AUOM)
                             </span>
@@ -2077,7 +2077,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-[11px] font-semibold text-gray-600 mb-1">AUOM</label>
+                              <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">AUOM</label>
                               <select
                                 value={displayUnits.find(u => u.toLowerCase() === (form.altUnit || '').trim().toLowerCase()) || form.altUnit || ''}
                                 onChange={e => {
@@ -2102,17 +2102,17 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                     }));
                                   }
                                 }}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                               >
                                 <option value="">Select Units</option>
                                 {displayUnits.map(unit => (
                                   <option key={unit} value={unit}>{unit}</option>
                                 ))}
-                                <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                                <option value="__ADD_NEW__" className="text-blue-600 font-semibold">+ Add Custom...</option>
                               </select>
                             </div>
                             <div>
-                              <label className="block text-[11px] font-semibold text-gray-600 mb-1">CONVERSION FACTOR</label>
+                              <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">CONVERSION FACTOR</label>
                               <div className="relative">
                                 <input
                                   type="number"
@@ -2121,11 +2121,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                   step="any"
                                   value={form.altUnitConversion}
                                   onChange={e => setForm({ ...form, altUnitConversion: e.target.value })}
-                                  className={`w-full pl-3 pr-20 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-900 font-mono ${
+                                  className={`w-full pl-3 pr-20 py-2 border rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-900 font-mono ${
                                     isFactorInvalid ? 'border-red-400 focus:ring-red-400' : 'border-gray-200'
                                   }`}
                                 />
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-blue-600 font-mono uppercase select-none">
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.875rem] font-semibold text-blue-600 font-mono uppercase select-none">
                                   {targetUnitLabel}
                                 </div>
                               </div>
@@ -2133,14 +2133,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           </div>
 
                           {isUnitSame && (
-                            <div className="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                            <div className="text-[0.875rem] font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
                               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                               UOM and AUOM cannot be identical.
                             </div>
                           )}
 
                           {isFactorInvalid && (
-                            <div className="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                            <div className="text-[0.875rem] font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
                               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                               Conversion factor must be greater than 0.
                             </div>
@@ -2148,13 +2148,13 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
                           {form.altUnit && form.altUnitConversion && factorNum > 0 && !isUnitSame && (
                             <div className="bg-white/90 border border-blue-200/80 rounded-xl p-2.5 shadow-2xs space-y-1 text-center">
-                              <div className="text-xs font-bold text-slate-800 flex items-center justify-center gap-2">
-                                <span className="text-gray-500 font-medium text-[11px]">Relationship:</span>
-                                <span className="bg-blue-100 text-blue-900 px-2.5 py-0.5 rounded-md font-mono text-xs font-extrabold border border-blue-200">
+                              <div className="text-[0.875rem] font-semibold text-slate-800 flex items-center justify-center gap-2">
+                                <span className="text-gray-500 font-medium text-[0.875rem]">Relationship:</span>
+                                <span className="bg-blue-100 text-blue-900 px-2.5 py-0.5 rounded-md font-mono text-[0.875rem] font-semibold border border-blue-200">
                                   1 {baseUnitLabel} = {form.altUnitConversion} {targetUnitLabel}
                                 </span>
                               </div>
-                              <div className="text-[10px] text-gray-500 font-mono">
+                              <div className="text-[0.875rem] text-gray-500 font-mono">
                                 Inverse: 1 {targetUnitLabel} = {inverseFactor} {baseUnitLabel}
                               </div>
                             </div>
@@ -2170,27 +2170,27 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             {/* Group 2: Specifications */}
             {((!isProductCategory && activeFields.includes('ruleType')) || (!isProductCategory && activeFields.includes('title')) || activeFields.includes('gsm') || activeFields.includes('width') || activeFields.includes('length')) && (
               <div className="space-y-4 border-t border-gray-100 pt-4">
-                <h3 className="text-xs font-bold text-gray-900 pb-1.5 flex items-center gap-2">
+                <h3 className="text-[0.875rem] font-semibold text-gray-900 pb-1.5 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                   Specifications
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
                   {activeFields.includes('gsm') && (
                     <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">GSM</label>
+                      <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">GSM</label>
                       <input
                         type="number"
                         placeholder="e.g. 70"
                         value={form.gsm}
                         onChange={e => updateFormField({ gsm: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
                     </div>
                   )}
 
                   {!isProductCategory && activeFields.includes('ruleType') && (
                     <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">RULE TYPE</label>
+                      <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">RULE TYPE</label>
                       <select
                         value={form.ruleType}
                         onChange={e => {
@@ -2200,20 +2200,20 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             updateFormField({ ruleType: e.target.value });
                           }
                         }}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                       >
                         <option value="">-- Select Rule Type --</option>
                         {displayRuleTypes.map(rule => (
                           <option key={rule} value={rule}>{rule}</option>
                         ))}
-                        <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                        <option value="__ADD_NEW__" className="text-blue-600 font-semibold">+ Add Custom...</option>
                       </select>
                     </div>
                   )}
 
                   {!isProductCategory && activeFields.includes('title') && (
                     <div className="col-span-2">
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                      <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">
                         {resolvedSection === 'materials' || form.category === 'Raw Material' || form.category === 'Materials' ? 'PAPER BRAND / MILL (e.g. BILT, CARTILUMIN)' : 'TITLE (DESCRIPTION)'}
                       </label>
                       <input
@@ -2225,14 +2225,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         }
                         value={form.title}
                         onChange={e => updateFormField({ title: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
                     </div>
                   )}
 
                   {(form.paperType === 'Sheets' || resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') && (
                     <div className="col-span-2 sm:col-span-1">
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                      <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">
                         STANDARD SHEETS / REAM *
                       </label>
                       <input
@@ -2240,49 +2240,49 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         placeholder="e.g. 500"
                         value={form.pages}
                         onChange={e => updateFormField({ pages: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-bold text-gray-800"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
                     </div>
                   )}
 
                   {activeFields.includes('width') && (
                     <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">WIDTH (CM)</label>
+                      <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">WIDTH (CM)</label>
                       <input
                         type="number"
                         step="any"
                         placeholder="e.g. 57"
                         value={form.width}
                         onChange={e => updateFormField({ width: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
                     </div>
                   )}
 
                   {activeFields.includes('length') && form.paperType !== 'Reels' && (
                     <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">LENGTH (CM)</label>
+                      <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">LENGTH (CM)</label>
                       <input
                         type="number"
                         step="any"
                         placeholder="e.g. 70"
                         value={form.length}
                         onChange={e => updateFormField({ length: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
                     </div>
                   )}
 
                   {activeFields.includes('reamWeight') && (form.paperType === 'Sheets' || resolvedSection === 'semi' || form.category === 'Semi Finished' || form.category === 'Semi') && (
                     <div>
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">REAM WEIGHT (KG)</label>
+                      <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">REAM WEIGHT (KG)</label>
                       <input
                         type="number"
                         step="any"
                         placeholder="e.g. 10.37"
                         value={form.reamWeight}
                         onChange={e => updateFormField({ reamWeight: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800"
                       />
                     </div>
                   )}
@@ -2293,14 +2293,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             {/* Group 3: Additional Attributes (Hidden for Finished Goods / Products) */}
             {!isProductCategory && (
               <div className="space-y-4 border-t border-gray-100 pt-4">
-                <h3 className="text-xs font-bold text-gray-900 pb-1.5 flex items-center gap-2">
+                <h3 className="text-[0.875rem] font-semibold text-gray-900 pb-1.5 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                   Inventory & Additional Attributes
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
                   {/* UOM */}
                   <div>
-                    <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                    <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">
                       UOM *
                     </label>
                     <select
@@ -2312,20 +2312,20 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           updateFormField({ unit: e.target.value });
                         }
                       }}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                       required
                     >
                       <option value="">Select Units</option>
                       {displayUnits.map(unit => (
                         <option key={unit} value={unit}>{unit}</option>
                       ))}
-                      <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                      <option value="__ADD_NEW__" className="text-blue-600 font-semibold">+ Add Custom...</option>
                     </select>
                   </div>
 
                   {activeFields.includes('altUnit') && (
                     <div className="flex items-end h-full">
-                      <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/10 rounded-xl px-3 py-2 w-full cursor-pointer select-none transition-all">
+                      <label className="flex items-center space-x-2.5 bg-gray-50 border border-gray-200 hover:border-blue-300 hover:bg-blue-50/10 rounded-xl px-3 py-2 w-full cursor-pointer select-none">
                         <input
                           type="checkbox"
                           checked={hasAltUnit}
@@ -2339,8 +2339,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300 cursor-pointer"
                         />
                         <div className="text-left">
-                          <span className="block text-[11px] font-bold text-gray-700">Enable AUOM</span>
-                          <span className="block text-[9px] text-gray-400 font-medium leading-tight">Alternate packaging / sales unit</span>
+                          <span className="block text-[0.875rem] font-semibold text-gray-700">Enable AUOM</span>
+                          <span className="block text-[0.875rem] text-gray-400 font-medium leading-tight">Alternate packaging / sales unit</span>
                         </div>
                       </label>
                     </div>
@@ -2358,9 +2358,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     const inverseFactor = factorNum > 0 ? roundUomQty(1 / factorNum) : 0;
 
                     return (
-                      <div className="col-span-2 space-y-2 bg-gradient-to-br from-blue-50/40 via-indigo-50/20 to-blue-50/40 p-4 rounded-2xl border border-blue-100 shadow-xs animate-in fade-in duration-200">
+                      <div className="col-span-2 space-y-2 bg-gradient-to-br from-blue-50/40 via-blue-50/20 to-blue-50/40 p-4 rounded-2xl border border-blue-100 shadow-xs">
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="text-[0.875rem] font-medium text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                             Alternate Unit of Measurement (AUOM)
                           </span>
@@ -2368,7 +2368,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-[11px] font-semibold text-gray-600 mb-1">AUOM</label>
+                            <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">AUOM</label>
                             <select
                               value={displayUnits.find(u => u.toLowerCase() === (form.altUnit || '').trim().toLowerCase()) || form.altUnit || ''}
                               onChange={e => {
@@ -2392,17 +2392,17 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                   });
                                 }
                               }}
-                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
+                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-semibold text-gray-800 cursor-pointer"
                             >
                               <option value="">Select Units</option>
                               {displayUnits.map(unit => (
                                 <option key={unit} value={unit}>{unit}</option>
                               ))}
-                              <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom...</option>
+                              <option value="__ADD_NEW__" className="text-blue-600 font-semibold">+ Add Custom...</option>
                             </select>
                           </div>
                           <div>
-                            <label className="block text-[11px] font-semibold text-gray-600 mb-1">CONVERSION FACTOR</label>
+                            <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">CONVERSION FACTOR</label>
                             <div className="relative">
                               <input
                                 type="number"
@@ -2411,11 +2411,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                 step="any"
                                 value={form.altUnitConversion}
                                 onChange={e => updateFormField({ altUnitConversion: e.target.value })}
-                                className={`w-full pl-3 pr-20 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-900 font-mono ${
+                                className={`w-full pl-3 pr-20 py-2 border rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-900 font-mono ${
                                   isFactorInvalid ? 'border-red-400 focus:ring-red-400' : 'border-gray-200'
                                 }`}
                               />
-                              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-blue-600 font-mono uppercase select-none">
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.875rem] font-semibold text-blue-600 font-mono uppercase select-none">
                                 {targetUnitLabel}
                               </div>
                             </div>
@@ -2423,14 +2423,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         </div>
 
                         {isUnitSame && (
-                          <div className="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                          <div className="text-[0.875rem] font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
                             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                             UOM and AUOM cannot be identical.
                           </div>
                         )}
 
                         {isFactorInvalid && (
-                          <div className="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                          <div className="text-[0.875rem] font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
                             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                             Conversion factor must be greater than 0.
                           </div>
@@ -2438,13 +2438,13 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
                         {form.altUnit && form.altUnitConversion && factorNum > 0 && !isUnitSame && (
                           <div className="bg-white/90 border border-blue-200/80 rounded-xl p-2.5 shadow-2xs space-y-1 text-center">
-                            <div className="text-xs font-bold text-slate-800 flex items-center justify-center gap-2">
-                              <span className="text-gray-500 font-medium text-[11px]">Relationship:</span>
-                              <span className="bg-blue-100 text-blue-900 px-2.5 py-0.5 rounded-md font-mono text-xs font-extrabold border border-blue-200">
+                            <div className="text-[0.875rem] font-semibold text-slate-800 flex items-center justify-center gap-2">
+                              <span className="text-gray-500 font-medium text-[0.875rem]">Relationship:</span>
+                              <span className="bg-blue-100 text-blue-900 px-2.5 py-0.5 rounded-md font-mono text-[0.875rem] font-semibold border border-blue-200">
                                 1 {baseUnitLabel} = {form.altUnitConversion} {targetUnitLabel}
                               </span>
                             </div>
-                            <div className="text-[10px] text-gray-500 font-mono">
+                            <div className="text-[0.875rem] text-gray-500 font-mono">
                               Inverse: 1 {targetUnitLabel} = {inverseFactor} {baseUnitLabel}
                             </div>
                           </div>
@@ -2460,7 +2460,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
             {/* Stock Levels Section (Available for ALL categories) */}
             <div className="space-y-3 border-t border-gray-100 pt-4">
-              <h3 className="text-xs font-bold text-gray-900 flex items-center gap-2">
+              <h3 className="text-[0.875rem] font-semibold text-gray-900 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-amber-500"></span>
                 Stock Levels & Reorder Configuration
               </h3>
@@ -2468,7 +2468,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* 1. Min Stock Level */}
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1 flex items-center gap-1">
+                  <label className="block text-[0.875rem] font-semibold text-gray-700 mb-1 flex items-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
                     <span>Min Stock Level</span>
                   </label>
@@ -2477,16 +2477,16 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     placeholder="500"
                     value={form.minStockLevel || ''}
                     onChange={(e) => setForm({ ...form, minStockLevel: e.target.value })}
-                    className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-amber-400 bg-white"
+                    className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-amber-400 bg-white"
                   />
-                  <span className="block text-[10px] text-gray-400 mt-1 font-medium leading-tight">
+                  <span className="block text-[0.875rem] text-gray-400 mt-1 font-medium leading-tight">
                     Alert when stock falls at or below this level
                   </span>
                 </div>
 
                 {/* 2. Reorder Level */}
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-700 mb-1 flex items-center gap-1">
+                  <label className="block text-[0.875rem] font-semibold text-gray-700 mb-1 flex items-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
                     <span>Reorder Level</span>
                   </label>
@@ -2495,9 +2495,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     placeholder="e.g. 20"
                     value={form.reorderLevel || ''}
                     onChange={(e) => setForm({ ...form, reorderLevel: e.target.value })}
-                    className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-amber-400 bg-white"
+                    className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-amber-400 bg-white"
                   />
-                  <span className="block text-[10px] text-gray-400 mt-1 font-medium leading-tight">
+                  <span className="block text-[0.875rem] text-gray-400 mt-1 font-medium leading-tight">
                     Reorder when stock reaches this level
                   </span>
                 </div>
@@ -2505,14 +2505,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                 {/* 3. Preferred Vendor (Reorder) - Only for Materials & Semi */}
                 {isRawOrSemi && (
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-700 mb-1 flex items-center gap-1">
+                    <label className="block text-[0.875rem] font-semibold text-gray-700 mb-1 flex items-center gap-1">
                       <Building2 className="w-3.5 h-3.5 text-blue-600" />
                       <span>Select Preferred Vendor (Reorder)</span>
                     </label>
                     <select
                       value={form.preferredVendor || ''}
                       onChange={(e) => setForm({ ...form, preferredVendor: e.target.value })}
-                      className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
+                      className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
                     >
                       <option value="">-- Select Preferred Vendor --</option>
                       {vendorsList.map(v => (
@@ -2521,7 +2521,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         </option>
                       ))}
                     </select>
-                    <span className="block text-[10px] text-gray-400 mt-1 font-medium leading-tight">
+                    <span className="block text-[0.875rem] text-gray-400 mt-1 font-medium leading-tight">
                       Default vendor selected for material reorders
                     </span>
                   </div>
@@ -2532,7 +2532,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             {/* Dynamic Custom Fields Section */}
             {customColumns && customColumns.length > 0 && (
               <div className="space-y-3 border-t border-gray-100 pt-4">
-                <h3 className="text-xs font-bold text-gray-900 flex items-center gap-2">
+                <h3 className="text-[0.875rem] font-semibold text-gray-900 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                   Custom Fields
                 </h3>
@@ -2552,7 +2552,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             }}
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                           />
-                          <label className="text-xs font-semibold text-gray-700">{col}</label>
+                          <label className="text-[0.875rem] font-semibold text-gray-700">{col}</label>
                         </div>
                       );
                     }
@@ -2567,14 +2567,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       const activeOpt = options.find(o => o.label === activeVal) || options[0];
                       return (
                         <div key={col}>
-                          <label className="block text-[11px] font-semibold text-gray-600 mb-1">{col.toLowerCase()}</label>
+                          <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">{col.toLowerCase()}</label>
                           <select
                             value={activeVal}
                             onChange={(e) => {
                               setFormCustomValues(prev => ({ ...prev, [col]: e.target.value }));
                             }}
                             style={{ backgroundColor: activeOpt?.color || '#e0f2fe' }}
-                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 focus:outline-none cursor-pointer shadow-2xs"
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-[0.875rem] font-semibold text-gray-800 focus:outline-none cursor-pointer shadow-2xs"
                           >
                             {options.map(opt => (
                               <option key={opt.label} value={opt.label}>{opt.label}</option>
@@ -2586,7 +2586,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
                     return (
                       <div key={col}>
-                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">{col.toLowerCase()}</label>
+                        <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">{col.toLowerCase()}</label>
                         <input
                           type={colType === 'number' ? 'number' : colType === 'date' ? 'date' : 'text'}
                           value={cellVal ?? ''}
@@ -2594,7 +2594,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           onChange={(e) => {
                             setFormCustomValues(prev => ({ ...prev, [col]: e.target.value }));
                           }}
-                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium text-gray-800 focus:outline-none focus:border-blue-500 shadow-2xs"
+                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-[0.875rem] font-medium text-gray-800 focus:outline-none focus:border-blue-500 shadow-2xs"
                         />
                       </div>
                       );
@@ -2609,11 +2609,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     {/* BOM Header card banner */}
                     <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3 flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-amber-900">
+                        <span className="text-[0.875rem] font-semibold text-amber-900">
                           Bill of Materials — quantities for one batch of this product.
                         </span>
                       </div>
-                      <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                      <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[0.875rem] font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1">
                         ✓ {bomItems.length} items set
                       </span>
                     </div>
@@ -2626,8 +2626,8 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             <BookOpen className="w-4 h-4 text-white" />
                           </div>
                           <div>
-                            <h4 className="font-bold text-gray-900 text-sm">Bill of Materials</h4>
-                            <p className="text-[11px] text-gray-500">
+                            <h4 className="font-semibold text-gray-900 text-[0.875rem]">Bill of Materials</h4>
+                            <p className="text-[0.875rem] text-gray-500">
                               Enter the quantities for one <strong>batch</strong>. Work orders scale consumption by (qty ÷ batch size × units produced).
                             </p>
                           </div>
@@ -2707,7 +2707,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           <button
                             type="button"
                             onClick={handleAddBomItem}
-                            className="px-3 py-1.5 border border-[#064E3B] text-[#064E3B] hover:bg-emerald-50/40 font-medium rounded-md text-xs flex items-center gap-1 transition-all cursor-pointer"
+                            className="px-3 py-1.5 border border-[#064E3B] text-[#064E3B] hover:bg-emerald-50/40 font-medium rounded-md text-[0.875rem] flex items-center gap-1 cursor-pointer"
                           >
                             <Plus className="w-3.5 h-3.5" />
                             <span>Add Item</span>
@@ -2719,46 +2719,46 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       {(() => {
                         const availableYieldUnits = Array.from(new Set([form.unit, form.altUnit].filter(Boolean)));
                         return (
-                          <div className="flex items-center gap-2 text-xs text-gray-600 font-medium py-1 border-b border-gray-100">
+                          <div className="flex items-center gap-2 text-[0.875rem] text-gray-600 font-medium py-1 border-b border-gray-100">
                             <span>This recipe makes</span>
                             <input
                               type="number"
                               min="1"
                               value={form.recipeYieldQty || ''}
                               onChange={(e) => setForm({ ...form, recipeYieldQty: e.target.value })}
-                              className="w-16 px-2 py-0.5 border border-blue-300 rounded-md text-xs font-extrabold text-blue-700 text-center focus:ring-2 focus:ring-blue-500 bg-blue-50/60"
+                              className="w-16 px-2 py-0.5 border border-blue-300 rounded-md text-[0.875rem] font-semibold text-blue-700 text-center focus:ring-2 focus:ring-blue-500 bg-blue-50/60"
                             />
                             {availableYieldUnits.length > 1 ? (
                               <select
                                 value={form.recipeYieldUnit || form.unit || 'Pcs'}
                                 onChange={(e) => setForm({ ...form, recipeYieldUnit: e.target.value })}
-                                className="px-2 py-0.5 border border-blue-300 rounded-md text-xs font-extrabold text-blue-800 bg-blue-50/60 cursor-pointer focus:ring-2 focus:ring-blue-500"
+                                className="px-2 py-0.5 border border-blue-300 rounded-md text-[0.875rem] font-semibold text-blue-800 bg-blue-50/60 cursor-pointer focus:ring-2 focus:ring-blue-500"
                               >
                                 {availableYieldUnits.map(u => (
                                   <option key={u} value={u}>{u}</option>
                                 ))}
                               </select>
                             ) : (
-                              <span className="font-bold text-gray-800 uppercase">{form.unit || 'Pcs'}</span>
+                              <span className="font-semibold text-gray-800 uppercase">{form.unit || 'Pcs'}</span>
                             )}
-                            <span className="italic text-gray-400 text-[11px]">(use 1 for per-unit quantities)</span>
+                            <span className="italic text-gray-400 text-[0.875rem]">(use 1 for per-unit quantities)</span>
                           </div>
                         );
                       })()}
 
                       {/* BOM Table Grid */}
                       {bomItems.length === 0 ? (
-                        <div className="bg-gray-50/60 border border-dashed border-gray-200 rounded-xl p-4 text-center text-xs text-gray-400">
+                        <div className="bg-gray-50/60 border border-dashed border-gray-200 rounded-xl p-4 text-center text-[0.875rem] text-gray-400">
                           No BOM materials added yet — click "+ Add Material" to define raw material consumption
                         </div>
                       ) : (
-                        <div className="overflow-visible relative min-h-[160px]">
-                          <table className="w-full text-left text-xs border-collapse">
+                        <div className="overflow-visible relative min-h-[10rem]">
+                          <table className="w-full text-left text-[0.875rem] border-collapse">
                             <thead>
-                              <tr className="border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase">
+                              <tr className="border-b border-gray-100 text-[0.875rem] font-semibold text-gray-400 uppercase">
                                 <th className="py-2 px-2">ITEM</th>
                                 <th className="py-2 px-2 w-24 text-center">QTY</th>
-                                <th className="py-2 px-2 min-w-[110px] text-center">UOM / AUOM</th>
+                                <th className="py-2 px-2 min-w-[6.875rem] text-center">UOM / AUOM</th>
                                 <th className="py-2 px-2 w-20 text-center">IN STOCK</th>
                                 <th className="py-2 px-1 w-8 text-center"></th>
                               </tr>
@@ -2789,7 +2789,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                       step="any"
                                       value={item.qty}
                                       onChange={(e) => updateBomItem(item.id, 'qty', e.target.value)}
-                                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-gray-800 bg-white font-mono text-center"
+                                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-800 bg-white font-mono text-center"
                                       placeholder="Qty"
                                     />
                                   </td>
@@ -2827,7 +2827,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                             updateBomItem(item.id, 'auom', isAlt ? val : (altUom || ''));
                                             updateBomItem(item.id, 'altUnit', isAlt ? val : (altUom || ''));
                                           }}
-                                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 bg-white text-center cursor-pointer focus:outline-none focus:border-blue-500"
+                                          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-700 bg-white text-center cursor-pointer focus:outline-none focus:border-blue-500"
                                           title="Unit of Measurement (UOM / AUOM)"
                                         >
                                           {options.map(opt => (
@@ -2844,7 +2844,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                     <button
                                       type="button"
                                       onClick={() => removeBomItem(item.id)}
-                                      className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                      className="icon-btn-danger"
                                       title="Remove item"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
@@ -2866,15 +2866,15 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             <Layers className="w-4 h-4" />
                           </div>
                           <div>
-                            <h4 className="font-bold text-gray-900 text-xs">Book Manufacturing Process Routing</h4>
-                            <p className="text-[10px] text-gray-400">Sequential manufacturing steps (Printing, Folding, Stitching, Binding, Custom Operations).</p>
+                            <h4 className="font-semibold text-gray-900 text-[0.875rem]">Book Manufacturing Process Routing</h4>
+                            <p className="text-[0.875rem] text-gray-400">Sequential manufacturing steps (Printing, Folding, Stitching, Binding, Custom Operations).</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
                             onClick={handleLoadStandardProcessSteps}
-                            className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-semibold rounded-xl text-[11px] flex items-center gap-1 transition-all border border-amber-200 cursor-pointer shadow-2xs"
+                            className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-semibold rounded-xl text-[0.875rem] flex items-center gap-1 border border-amber-200 cursor-pointer shadow-2xs"
                             title="Load standard book production steps"
                           >
                             <Zap className="w-3 h-3 text-amber-600" />
@@ -2883,7 +2883,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                           <button
                             type="button"
                             onClick={() => handleAddProcessStep()}
-                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 font-bold rounded-xl text-xs flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 font-semibold rounded-xl text-[0.875rem] flex items-center gap-1 cursor-pointer shadow-2xs"
                           >
                             <Plus className="w-3.5 h-3.5" />
                             <span>Add Blank Step</span>
@@ -2892,10 +2892,10 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       </div>
 
                       {/* Custom Process Input Bar */}
-                      <div className="bg-gradient-to-r from-blue-50/60 via-slate-50 to-indigo-50/40 p-3 rounded-xl border border-blue-100/80 space-y-2">
+                      <div className="bg-gradient-to-r from-blue-50/60 via-slate-50 to-blue-50/40 p-3 rounded-xl border border-blue-100/80 space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-[10.5px] font-bold text-gray-700">Add Any Custom Process Operation:</span>
-                          <span className="text-[9.5px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200/50">Custom Process</span>
+                          <span className="text-[0.875rem] font-semibold text-gray-700">Add Any Custom Process Operation:</span>
+                          <span className="text-[0.875rem] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200/50">Custom Process</span>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
                           <div className="sm:col-span-10">
@@ -2903,14 +2903,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                               value={customProcessStepName}
                               onChange={(val) => setCustomProcessStepName(val)}
                               placeholder="e.g. Reel Slitting, Ruling, Cutting, Folding, Wire Stitching, Cover Lamination"
-                              className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
+                              className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
                             />
                           </div>
                           <div className="sm:col-span-2 flex items-center gap-1">
                             <button
                               type="button"
                               onClick={handleAddCustomInputStep}
-                              className="flex-1 px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 shadow-2xs transition-all cursor-pointer"
+                              className="btn-primary flex-1 justify-center"
                             >
                               <Plus className="w-3 h-3" />
                               <span>Add</span>
@@ -2919,7 +2919,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                               <button
                                 type="button"
                                 onClick={handleSaveUserCustomPreset}
-                                className="px-2 py-1.5 bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold shadow-2xs transition-all cursor-pointer"
+                                className="px-2 py-1.5 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-[0.875rem] font-semibold shadow-2xs cursor-pointer"
                                 title="Save as reusable preset"
                               >
                                 <span>★</span>
@@ -2931,18 +2931,18 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                         {/* User Saved Presets */}
                         {userCustomPresets.length > 0 && (
                           <div className="pt-1.5 border-t border-blue-100/60 flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[10px] font-bold text-indigo-600">Saved Presets:</span>
+                            <span className="text-[0.875rem] font-semibold text-blue-600">Saved Presets:</span>
                             {userCustomPresets.map((cp) => (
                               <div
                                 key={cp.name}
                                 onClick={() => handleAddProcessStep(cp.name, '')}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-md text-[10.5px] font-semibold cursor-pointer transition-all"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-md text-[0.875rem] font-semibold cursor-pointer"
                               >
                                 <span>+ {cp.name}</span>
                                 <button
                                   type="button"
                                   onClick={(e) => handleDeleteUserCustomPreset(cp.name, e)}
-                                  className="p-0.5 text-indigo-400 hover:text-rose-600 rounded cursor-pointer"
+                                  className="p-0.5 text-blue-400 hover:text-rose-600 rounded cursor-pointer"
                                 >
                                   <X className="w-2.5 h-2.5" />
                                 </button>
@@ -2954,7 +2954,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
                       {/* Quick Add Preset Chips */}
                       <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Quick Presets:</span>
+                        <span className="text-[0.875rem] font-medium text-gray-400 uppercase tracking-wider">Quick Presets:</span>
                         {[
                           { name: 'Reel Slitting' },
                           { name: 'Paper Ruling' },
@@ -2970,7 +2970,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                             key={preset.name}
                             type="button"
                             onClick={() => handleAddProcessStep(preset.name, '')}
-                            className="px-2 py-0.5 bg-gray-50 hover:bg-blue-50 text-gray-600 hover:text-blue-700 border border-gray-200 hover:border-blue-200 rounded-lg text-[10.5px] font-medium transition-all cursor-pointer flex items-center gap-1"
+                            className="px-2 py-0.5 bg-gray-50 hover:bg-blue-50 text-gray-600 hover:text-blue-700 border border-gray-200 hover:border-blue-200 rounded-lg text-[0.875rem] font-medium cursor-pointer flex items-center gap-1"
                           >
                             <Plus className="w-2.5 h-2.5 text-blue-500" />
                             <span>{preset.name}</span>
@@ -2981,21 +2981,21 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       {processSteps.length === 0 ? (
                         <div
                           onClick={() => handleAddProcessStep()}
-                          className="bg-gray-50/60 hover:bg-blue-50/40 border border-dashed border-gray-200 hover:border-blue-300 rounded-xl p-5 text-center text-xs text-gray-500 cursor-pointer transition-all flex flex-col items-center justify-center gap-2 group"
+                          className="bg-gray-50/60 hover:bg-blue-50/40 border border-dashed border-gray-200 hover:border-blue-300 rounded-xl p-5 text-center text-[0.875rem] text-gray-500 cursor-pointer flex flex-col items-center justify-center gap-2 group"
                         >
-                          <div className="w-8 h-8 rounded-full bg-white shadow-2xs border border-gray-200 flex items-center justify-center text-gray-400 group-hover:text-blue-600 group-hover:border-blue-300 transition-colors">
+                          <div className="w-8 h-8 rounded-full bg-white shadow-2xs border border-gray-200 flex items-center justify-center text-gray-400 group-hover:text-blue-600 group-hover:border-blue-300">
                             <Plus className="w-4 h-4" />
                           </div>
                           <div>
                             <span className="font-semibold text-gray-700 group-hover:text-blue-700">Click to add your first process routing step</span>
-                            <p className="text-[11px] text-gray-400 mt-0.5">Or use the quick presets above to build your routing pipeline instantly</p>
+                            <p className="text-[0.875rem] text-gray-400 mt-0.5">Or use the quick presets above to build your routing pipeline instantly</p>
                           </div>
                         </div>
                       ) : (
                         <div className="space-y-2">
                           {processSteps.map((step, sIdx) => (
-                            <div key={step.id} className="flex items-center gap-2 bg-gray-50/70 hover:bg-gray-50 p-2.5 rounded-xl border border-gray-200/80 transition-all">
-                              <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                            <div key={step.id} className="flex items-center gap-2 bg-gray-50/70 hover:bg-gray-50 p-2.5 rounded-xl border border-gray-200/80">
+                              <span className="w-6 h-6 rounded-full bg-blue-600 text-white font-semibold text-[0.875rem] flex items-center justify-center shrink-0 shadow-2xs">
                                 {sIdx + 1}
                               </span>
                               <div className="flex-1">
@@ -3003,7 +3003,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                   value={step.stepName || ''}
                                   onChange={(val) => updateProcessStep(step.id, 'stepName', val)}
                                   placeholder="Process step name (e.g. Reel Slitting, Folding)"
-                                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
                               </div>
                               <div className="flex items-center gap-0.5">
@@ -3011,7 +3011,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                   type="button"
                                   disabled={sIdx === 0}
                                   onClick={() => moveProcessStep(sIdx, 'up')}
-                                  className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-200 rounded-lg transition-colors cursor-pointer"
+                                  className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-200 rounded-lg cursor-pointer"
                                   title="Move Up"
                                 >
                                   <ArrowUp className="w-3.5 h-3.5" />
@@ -3020,7 +3020,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                   type="button"
                                   disabled={sIdx === processSteps.length - 1}
                                   onClick={() => moveProcessStep(sIdx, 'down')}
-                                  className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-200 rounded-lg transition-colors cursor-pointer"
+                                  className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-200 rounded-lg cursor-pointer"
                                   title="Move Down"
                                 >
                                   <ArrowDown className="w-3.5 h-3.5" />
@@ -3028,7 +3028,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                                 <button
                                   type="button"
                                   onClick={() => removeProcessStep(step.id)}
-                                  className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer ml-1"
+                                  className="icon-btn-danger ml-1"
                                   title="Remove Step"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -3043,19 +3043,19 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                 )}
 
             {/* Bottom Form Action Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100 dlg-footer">
               <button
                 type="button"
                 onClick={onClose}
                 disabled={isSaving}
-                className="px-4 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 transition-all cursor-pointer shadow-2xs"
+                className="btn-secondary"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSaving}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-xs transition-all shadow-sm cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                className="btn-primary disabled:opacity-50"
               >
                 {isSaving ? (
                   <>
@@ -3079,9 +3079,9 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         size="max-w-sm"
         title={`Add Custom ${modalConfig.type === 'categories' ? 'Category' : modalConfig.type === 'units' ? 'Unit' : modalConfig.type === 'groups' ? 'Group' : 'Rule Type'}`}
       >
-        <div className="space-y-4 text-xs text-left">
+        <div className="space-y-4 text-[0.875rem] text-left">
           <div>
-            <label className="block text-[9px] font-bold text-gray-500 mb-1 uppercase">
+            <label className="block text-[0.875rem] font-semibold text-gray-500 mb-1 uppercase">
               {modalConfig.type === 'categories' ? 'Category Name' : modalConfig.type === 'units' ? 'Unit Symbol' : modalConfig.type === 'groups' ? 'Group Name' : 'Rule Name'} *
             </label>
             <input
@@ -3093,7 +3093,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
               }
               value={modalConfig.nameValue}
               onChange={e => setModalConfig(prev => ({ ...prev, nameValue: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 font-semibold text-gray-800 bg-white"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[0.875rem] focus:ring-2 focus:ring-blue-500 font-semibold text-gray-800 bg-white"
               autoFocus
             />
           </div>
@@ -3101,7 +3101,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           {/* Checklist of fields for new Category */}
           {modalConfig.type === 'categories' && (
             <div className="space-y-2 border-t pt-3">
-              <span className="block text-[9px] font-black text-gray-500 uppercase tracking-wider mb-1">
+              <span className="block text-[0.875rem] font-medium text-gray-500 uppercase tracking-wider mb-1">
                 Select Required Fields
               </span>
               <div className="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-xl border border-gray-100 max-h-40 overflow-y-auto">
@@ -3118,7 +3118,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                   { id: 'booksGbl', label: 'Books / GBL' },
                   { id: 'altUnit', label: 'Alternative Unit' }
                 ].map(f => (
-                  <label key={f.id} className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 transition-colors">
+                  <label key={f.id} className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600">
                     <input
                       type="checkbox"
                       checked={modalConfig.selectedFields.includes(f.id)}
@@ -3130,25 +3130,25 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       }}
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
                     />
-                    <span className="text-[10px] font-semibold text-gray-700">{f.label}</span>
+                    <span className="text-[0.875rem] font-semibold text-gray-700">{f.label}</span>
                   </label>
                 ))}
               </div>
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-2 pt-4 border-t">
+          <div className="flex items-center justify-end gap-2 pt-4 border-t dlg-footer">
             <button
               type="button"
               onClick={() => setModalConfig({ isOpen: false, type: null, nameValue: '', selectedFields: [] })}
-              className="px-3 py-1.5 border border-gray-200 rounded-lg font-bold hover:bg-gray-100 text-gray-600 transition-colors"
+              className="px-3 py-1.5 border border-gray-200 rounded-lg font-semibold hover:bg-gray-100 text-gray-600"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSaveCustomOption}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-sm transition-colors"
+              className="btn-primary"
             >
               Save Option
             </button>
@@ -3167,20 +3167,20 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
         title={
           <div className="flex items-center gap-2">
             <Settings2 className="w-4 h-4 text-amber-600" />
-            <span className="font-bold text-gray-900 text-base">Standardized Sheet Sizes</span>
+            <span className="font-semibold text-gray-900 text-base">Standardized Sheet Sizes</span>
           </div>
         }
       >
-        <div className="space-y-4 text-xs text-left p-1">
+        <div className="space-y-4 text-[0.875rem] text-left p-1">
           {/* Add / Edit Form */}
           <form onSubmit={handleSaveStandardizedSheet} className="bg-amber-50/60 p-3 rounded-xl border border-amber-200/80 space-y-3">
-            <div className="text-[11px] font-bold text-amber-900 flex items-center justify-between">
+            <div className="text-[0.875rem] font-semibold text-amber-900 flex items-center justify-between">
               <span>{sheetForm.id ? 'Edit Sheet Size Preset' : 'Add New Sheet Size Preset'}</span>
               {sheetForm.id && (
                 <button
                   type="button"
                   onClick={() => setSheetForm({ id: '', name: '', w: '', l: '' })}
-                  className="text-[10px] text-amber-700 underline font-semibold cursor-pointer"
+                  className="text-[0.875rem] text-amber-700 underline font-semibold cursor-pointer"
                 >
                   Cancel Edit
                 </button>
@@ -3188,42 +3188,42 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             </div>
             <div className="grid grid-cols-12 gap-2">
               <div className="col-span-6">
-                <label className="block text-[10px] font-bold text-gray-600 mb-1">PRESET NAME *</label>
+                <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">PRESET NAME *</label>
                 <input
                   type="text"
                   placeholder='e.g. 23×36" (Double Demy)'
                   value={sheetForm.name}
                   onChange={e => setSheetForm(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-white font-semibold text-gray-800"
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] bg-white font-semibold text-gray-800"
                 />
               </div>
               <div className="col-span-3">
-                <label className="block text-[10px] font-bold text-gray-600 mb-1">WIDTH (CM) *</label>
+                <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">WIDTH (CM) *</label>
                 <input
                   type="number"
                   step="any"
                   placeholder="e.g. 58.4"
                   value={sheetForm.w}
                   onChange={e => setSheetForm(prev => ({ ...prev, w: e.target.value }))}
-                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-white font-semibold text-gray-800"
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] bg-white font-semibold text-gray-800"
                 />
               </div>
               <div className="col-span-3">
-                <label className="block text-[10px] font-bold text-gray-600 mb-1">LENGTH (CM) *</label>
+                <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1">LENGTH (CM) *</label>
                 <input
                   type="number"
                   step="any"
                   placeholder="e.g. 91.4"
                   value={sheetForm.l}
                   onChange={e => setSheetForm(prev => ({ ...prev, l: e.target.value }))}
-                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs bg-white font-semibold text-gray-800"
+                  className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-[0.875rem] bg-white font-semibold text-gray-800"
                 />
               </div>
             </div>
-            <div className="flex justify-end pt-1">
+            <div className="flex justify-end pt-1 dlg-footer">
               <button
                 type="submit"
-                className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg shadow-2xs text-xs cursor-pointer flex items-center gap-1"
+                className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-2xs text-[0.875rem] cursor-pointer flex items-center gap-1"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>{sheetForm.id ? 'Update Preset' : 'Add Preset'}</span>
@@ -3233,19 +3233,19 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
 
           {/* List of Current Presets */}
           <div className="space-y-2">
-            <span className="block text-[11px] font-bold text-gray-700">Existing Presets</span>
+            <span className="block text-[0.875rem] font-semibold text-gray-700">Existing Presets</span>
             <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
               {standardizedSheets.map(s => (
-                <div key={s.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-200/80 hover:bg-white transition-colors">
+                <div key={s.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-200/80 hover:bg-white">
                   <div>
-                    <span className="font-bold text-gray-800 text-xs">{s.name}</span>
-                    <span className="ml-2 text-[11px] text-gray-500">({s.w} × {s.l} cm)</span>
+                    <span className="font-semibold text-gray-800 text-[0.875rem]">{s.name}</span>
+                    <span className="ml-2 text-[0.875rem] text-gray-500">({s.w} × {s.l} cm)</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => setSheetForm({ id: s.id, name: s.name, w: s.w, l: s.l })}
-                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer"
+                      className="icon-btn"
                       title="Edit Preset"
                     >
                       <Pencil className="w-3.5 h-3.5" />
@@ -3253,7 +3253,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                     <button
                       type="button"
                       onClick={() => handleDeleteStandardizedSheet(s.id)}
-                      className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg cursor-pointer"
+                      className="icon-btn-danger"
                       title="Delete Preset"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -3269,14 +3269,14 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
             </div>
           </div>
 
-          <div className="flex justify-end pt-3 border-t">
+          <div className="flex justify-end pt-3 border-t dlg-footer">
             <button
               type="button"
               onClick={() => {
                 setShowEditSheetsModal(false);
                 setSheetForm({ id: '', name: '', w: '', l: '' });
               }}
-              className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors cursor-pointer"
+              className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl cursor-pointer"
             >
               Close
             </button>
@@ -3306,7 +3306,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
           onClose={() => setShowAddCategoryModal(false)}
           title="Add New Category"
         >
-          <div className="space-y-4 text-xs">
+          <div className="space-y-4 text-[0.875rem]">
             <div>
               <label className="block font-semibold text-gray-700 mb-1">Category Name *</label>
               <input
@@ -3314,7 +3314,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                 value={categoryModalForm.name}
                 onChange={(e) => setCategoryModalForm(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="e.g. Notebooks, Paper Reels, Covers"
-                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 font-semibold"
+                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-[0.875rem] focus:outline-none focus:border-blue-500 font-semibold"
                 autoFocus
               />
             </div>
@@ -3337,7 +3337,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       fieldsText: defaultFields
                     }));
                   }}
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 font-semibold bg-white cursor-pointer"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-[0.875rem] focus:outline-none focus:border-blue-500 font-semibold bg-white cursor-pointer"
                 >
                   <option value="products">Products</option>
                   <option value="materials">Materials</option>
@@ -3374,7 +3374,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       setCategoryModalForm(prev => ({ ...prev, uom: e.target.value }));
                     }
                   }}
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 bg-white font-semibold cursor-pointer"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-[0.875rem] focus:outline-none focus:border-blue-500 bg-white font-semibold cursor-pointer"
                 >
                   <option value="">-- Select UOM --</option>
                   {displayUnits.map(u => (
@@ -3382,7 +3382,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                       {u}
                     </option>
                   ))}
-                  <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom Unit...</option>
+                  <option value="__ADD_NEW__" className="text-blue-600 font-semibold">+ Add Custom Unit...</option>
                 </select>
               </div>
             </div>
@@ -3394,11 +3394,11 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
                 value={categoryModalForm.fieldsText}
                 onChange={(e) => setCategoryModalForm(prev => ({ ...prev, fieldsText: e.target.value }))}
                 placeholder="e.g. Type, Specifications, Notes"
-                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 font-semibold"
+                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-[0.875rem] focus:outline-none focus:border-blue-500 font-semibold"
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-3">
+            <div className="flex justify-end gap-2 pt-3 dlg-footer">
               <button
                 type="button"
                 onClick={() => setShowAddCategoryModal(false)}
@@ -3409,7 +3409,7 @@ const AddSkuDrawerV2: React.FC<AddSkuDrawerV2Props> = ({
               <button
                 type="button"
                 onClick={handleSaveCategoryModal}
-                className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold cursor-pointer shadow-sm"
+                className="btn-primary"
               >
                 Save Category
               </button>

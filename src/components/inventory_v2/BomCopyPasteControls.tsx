@@ -141,7 +141,7 @@ export const BomCopyPasteControls: React.FC<BomCopyPasteControlsProps> = ({
           onClick={handleCopy}
           disabled={!hasItemsToCopy}
           aria-label="Copy BOM"
-          className={`h-8 w-8 rounded-md border flex items-center justify-center transition-all cursor-pointer select-none ${
+          className={`h-8 w-8 rounded-md border flex items-center justify-center cursor-pointer select-none ${
             copiedRecently
               ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-2xs'
               : hasItemsToCopy
@@ -150,7 +150,7 @@ export const BomCopyPasteControls: React.FC<BomCopyPasteControlsProps> = ({
           }`}
         >
           {copiedRecently ? (
-            <Check className="w-4 h-4 text-emerald-600 animate-in zoom-in-50 duration-200" />
+            <Check className="w-4 h-4 text-emerald-600" />
           ) : (
             <Copy className="w-4 h-4 text-[#0B6B63] group-hover:text-[#064E3B]" />
           )}
@@ -159,7 +159,7 @@ export const BomCopyPasteControls: React.FC<BomCopyPasteControlsProps> = ({
         {/* Floating Dark Tooltip matching Makoro Screenshot media_1789142375229.png */}
         {!showPasteOptions && (
           <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 hidden group-hover:block z-50 whitespace-nowrap">
-            <div className="bg-[#323842] text-white text-[12px] font-normal px-3 py-1.5 rounded-lg shadow-xl leading-tight">
+            <div className="bg-[#323842] text-white text-xs font-normal px-3 py-1.5 rounded-lg shadow-xl leading-tight">
               {copiedRecently ? 'Copied to clipboard!' : copyTooltipText}
             </div>
           </div>
@@ -173,7 +173,7 @@ export const BomCopyPasteControls: React.FC<BomCopyPasteControlsProps> = ({
           onClick={handlePasteClick}
           disabled={!canPaste}
           aria-label="Paste BOM"
-          className={`h-8 w-8 rounded-md border flex items-center justify-center transition-all cursor-pointer select-none ${
+          className={`h-8 w-8 rounded-md border flex items-center justify-center cursor-pointer select-none ${
             canPaste
               ? 'border-gray-200 bg-white text-[#0B6B63] hover:border-[#0B6B63]/60 hover:bg-emerald-50/20 hover:text-[#064E3B] shadow-2xs'
               : 'border-gray-200 bg-white text-gray-300 opacity-40 cursor-not-allowed'
@@ -185,7 +185,7 @@ export const BomCopyPasteControls: React.FC<BomCopyPasteControlsProps> = ({
         {/* Floating Dark Tooltip matching Makoro Screenshot media_1789142375229.png */}
         {!showPasteOptions && (
           <div className="pointer-events-none absolute top-full right-0 mt-1.5 hidden group-hover:block z-50 whitespace-nowrap">
-            <div className="bg-[#323842] text-white text-[12px] font-normal px-3 py-1.5 rounded-lg shadow-xl leading-tight">
+            <div className="bg-[#323842] text-white text-xs font-normal px-3 py-1.5 rounded-lg shadow-xl leading-tight">
               {pasteTooltipText}
             </div>
           </div>
@@ -193,12 +193,12 @@ export const BomCopyPasteControls: React.FC<BomCopyPasteControlsProps> = ({
 
         {/* Dropdown Options if target already has existing materials (anchored right-0 to prevent overlapping + Add Item / Save buttons) */}
         {showPasteOptions && canPaste && (
-          <div className="absolute top-full right-0 mt-1.5 w-64 bg-white rounded-xl shadow-xl border border-gray-200 p-1.5 z-50 animate-in fade-in-50 slide-in-from-top-1 duration-150 text-left">
+          <div className="absolute top-full right-0 mt-1.5 w-64 bg-white rounded-xl shadow-xl border border-gray-200 p-1.5 z-50 fade-in-50 text-left">
             <div className="px-2.5 py-1.5 border-b border-gray-100 mb-1">
-              <p className="text-[11px] font-bold text-gray-800 truncate" title={copiedBom?.sourceName}>
+              <p className="text-xs font-semibold text-gray-800 truncate" title={copiedBom?.sourceName}>
                 Source: {copiedBom?.sourceName}
               </p>
-              <p className="text-[10px] text-gray-400">
+              <p className="text-xs text-gray-400">
                 {copiedBom?.lines.length} materials ready to paste
               </p>
             </div>
@@ -206,13 +206,13 @@ export const BomCopyPasteControls: React.FC<BomCopyPasteControlsProps> = ({
             <button
               type="button"
               onClick={() => executePaste('merge')}
-              className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-emerald-50 text-xs text-gray-700 hover:text-emerald-800 transition-colors flex flex-col gap-0.5 cursor-pointer"
+              className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-emerald-50 text-[0.875rem] text-gray-700 hover:text-emerald-800 flex flex-col gap-0.5 cursor-pointer"
             >
-              <span className="font-bold text-[11px] flex items-center justify-between">
+              <span className="font-semibold text-xs flex items-center justify-between">
                 <span>Smart Merge</span>
-                <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-100/60 px-1.5 py-0.2 rounded">Recommended</span>
+                <span className="text-xs text-emerald-600 font-semibold bg-emerald-100/60 px-1.5 py-0.2 rounded">Recommended</span>
               </span>
-              <span className="text-[10px] text-gray-400">
+              <span className="text-xs text-gray-400">
                 Keep existing items, append non-duplicate materials
               </span>
             </button>
@@ -220,10 +220,10 @@ export const BomCopyPasteControls: React.FC<BomCopyPasteControlsProps> = ({
             <button
               type="button"
               onClick={() => executePaste('replace')}
-              className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-rose-50 text-xs text-gray-700 hover:text-rose-800 transition-colors flex flex-col gap-0.5 cursor-pointer"
+              className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-rose-50 text-[0.875rem] text-gray-700 hover:text-rose-800 flex flex-col gap-0.5 cursor-pointer"
             >
-              <span className="font-bold text-[11px] text-rose-700">Replace All Materials</span>
-              <span className="text-[10px] text-gray-400">
+              <span className="font-semibold text-xs text-rose-700">Replace All Materials</span>
+              <span className="text-xs text-gray-400">
                 Overwrite current materials with copied BOM
               </span>
             </button>

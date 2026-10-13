@@ -171,19 +171,19 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
+    <div className="w-full max-w-6xl mx-auto space-y-6 pb-12">
 
       {/* ── HERO CELEBRATION (Matching Screenshot 1:1) ── */}
       <div className="relative py-4 text-center">
         {/* Floating confetti pieces */}
         <div className="absolute inset-0 pointer-events-none flex justify-center items-center overflow-hidden">
-          <span className="absolute -top-1 left-[28%] w-2 h-2.5 bg-blue-500 rounded-xs rotate-45 transform" />
+          <span className="absolute -top-1 left-[28%] w-2 h-2.5 bg-blue-500 rounded-xs rotate-45" />
           <span className="absolute top-2 left-[36%] w-2 h-2 bg-yellow-400 rounded-full" />
           <span className="absolute top-6 left-[22%] w-2 h-2 bg-red-400 rounded-xs rotate-12" />
           <span className="absolute -top-2 right-[28%] w-2 h-2.5 bg-blue-600 rounded-xs -rotate-12" />
           <span className="absolute top-3 right-[35%] w-2.5 h-2 bg-orange-400 rounded-full" />
           <span className="absolute top-7 right-[24%] w-2 h-2 bg-emerald-400 rounded-xs rotate-45" />
-          <span className="absolute bottom-2 left-[31%] w-2 h-2 bg-teal-400 rounded-full" />
+          <span className="absolute bottom-2 left-[31%] w-2 h-2 bg-blue-400 rounded-full" />
           <span className="absolute bottom-3 right-[30%] w-2 h-2 bg-rose-500 rounded-xs rotate-30" />
         </div>
 
@@ -193,12 +193,12 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
         </div>
 
         {/* Headings */}
-        <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight mt-5">
+        <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 tracking-tight mt-5">
           {order.status === 'Draft' ? 'Draft Sales Order Saved Successfully!' : 'Sales Order Created Successfully!'}
         </h1>
-        <p className="text-xs sm:text-sm text-gray-500 mt-1.5 font-medium">
+        <p className="text-[0.875rem] sm:text-[0.875rem] text-gray-500 mt-1.5 font-medium">
           Sales Order{' '}
-          <span className="font-bold text-blue-600 font-mono">{order.orderNumber}</span>
+          <span className="font-semibold text-blue-600 font-mono">{order.orderNumber}</span>
           {' '}has been created and saved.
         </p>
       </div>
@@ -215,11 +215,11 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
 
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
-                <span className="text-base font-black text-gray-900">
+                <span className="text-base font-semibold text-gray-900">
                   Sales Order {order.orderNumber}
                 </span>
 
-                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.875rem] font-semibold border ${
                   order.status === 'Draft'
                     ? 'bg-amber-50 text-amber-700 border-amber-200'
                     : 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -229,7 +229,7 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
                 </span>
               </div>
 
-              <p className="text-[11px] text-gray-400 mt-0.5 font-medium">
+              <p className="text-xs text-gray-400 mt-0.5 font-medium">
                 Created on {fmtDate(order.orderDate)}, 11:45 AM by {createdBy}
               </p>
             </div>
@@ -238,7 +238,7 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
           {/* Top Right Print Button */}
           <button
             onClick={() => onPrintOrder(order)}
-            className="px-3.5 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-blue-600 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            className="px-3.5 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-blue-600 flex items-center gap-1.5 shadow-2xs cursor-pointer"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>Print</span>
@@ -249,26 +249,26 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Column 1: Customer Details */}
           <div className="space-y-3">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700">
+            <div className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-gray-700">
               <User className="w-3.5 h-3.5 text-blue-600" />
               <span>Customer</span>
             </div>
 
-            <div className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
+            <div className="font-semibold text-gray-900 text-[0.875rem] flex items-center gap-1.5">
               <span>{order.customerName}</span>
             </div>
 
-            <div className="flex items-start gap-1.5 text-xs text-gray-500 leading-relaxed">
+            <div className="flex items-start gap-1.5 text-[0.875rem] text-gray-500 leading-relaxed">
               <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
               <span>{billingAddrStr}</span>
             </div>
 
-            <div className="flex items-center gap-2 text-xs font-semibold text-gray-800">
+            <div className="flex items-center gap-2 text-[0.875rem] font-semibold text-gray-800">
               <Phone className="w-3.5 h-3.5 text-gray-400" />
               <span className="font-mono">{order.customerPhone || '9966259732'}</span>
               <button
                 onClick={handleWhatsApp}
-                className="text-emerald-500 hover:text-emerald-600 transition-colors cursor-pointer"
+                className="text-emerald-500 hover:text-emerald-600 cursor-pointer"
                 title="Chat on WhatsApp"
               >
                 <WhatsAppIcon className="w-4 h-4" />
@@ -276,23 +276,23 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5 pt-1">
-              <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                 {customerType}
               </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                 {customerGroup}
               </span>
             </div>
           </div>
 
           {/* Column 2: Order Information */}
-          <div className="space-y-2.5 text-xs">
+          <div className="space-y-2.5 text-[0.875rem]">
             <div className="flex items-center justify-between py-1">
               <span className="text-gray-500 flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-gray-400" />
                 Order Date
               </span>
-              <span className="font-bold text-gray-800 font-mono">{fmtDate(order.orderDate)}</span>
+              <span className="font-semibold text-gray-800 font-mono">{fmtDate(order.orderDate)}</span>
             </div>
 
             <div className="flex items-center justify-between py-1">
@@ -300,7 +300,7 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
                 <Calendar className="w-3.5 h-3.5 text-blue-500" />
                 Expected Delivery Date
               </span>
-              <span className="font-bold text-gray-800 font-mono">{fmtDate(order.promisedDate)}</span>
+              <span className="font-semibold text-gray-800 font-mono">{fmtDate(order.promisedDate)}</span>
             </div>
 
             <div className="flex items-center justify-between py-1">
@@ -308,7 +308,7 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
                 <Truck className="w-3.5 h-3.5 text-gray-400" />
                 Transporter
               </span>
-              <span className="font-bold text-gray-800">{order.transporter || 'Chennupati Cargo Services'}</span>
+              <span className="font-semibold text-gray-800">{order.transporter || 'Chennupati Cargo Services'}</span>
             </div>
 
             <div className="flex items-center justify-between py-1">
@@ -316,7 +316,7 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
                 <Tag className="w-3.5 h-3.5 text-gray-400" />
                 Order Type
               </span>
-              <span className="font-bold text-gray-800">{order.orderType || 'Regular'}</span>
+              <span className="font-semibold text-gray-800">{order.orderType || 'Regular'}</span>
             </div>
 
             <div className="flex items-center justify-between py-1">
@@ -324,20 +324,20 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
                 <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
                 Order Status
               </span>
-              <span className="font-bold text-gray-800">
+              <span className="font-semibold text-gray-800">
                 {order.status === 'Draft' ? 'Draft (Saved)' : 'Confirmed (Active Demand)'}
               </span>
             </div>
           </div>
 
           {/* Column 3: Financial Summary */}
-          <div className="space-y-2.5 text-xs">
+          <div className="space-y-2.5 text-[0.875rem]">
             <div className="flex items-center justify-between py-1">
               <span className="text-gray-500 flex items-center gap-1.5">
                 <Package className="w-3.5 h-3.5 text-gray-400" />
                 Items Total
               </span>
-              <span className="font-bold text-gray-800">{itemsCount} Items</span>
+              <span className="font-semibold text-gray-800">{itemsCount} Items</span>
             </div>
 
             <div className="flex items-center justify-between py-1">
@@ -345,7 +345,7 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
                 <IndianRupee className="w-3.5 h-3.5 text-gray-400" />
                 Items Amount
               </span>
-              <span className="font-bold text-gray-800 font-mono">{fmtMoney(itemsAmount)}</span>
+              <span className="font-semibold text-gray-800 font-mono">{fmtMoney(itemsAmount)}</span>
             </div>
 
             <div className="flex items-center justify-between py-1">
@@ -353,18 +353,18 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
                 <IndianRupee className="w-3.5 h-3.5 text-gray-400" />
                 Other Charges
               </span>
-              <span className="font-bold text-gray-800 font-mono">{fmtMoney(chargesAmount)}</span>
+              <span className="font-semibold text-gray-800 font-mono">{fmtMoney(chargesAmount)}</span>
             </div>
 
             {/* Light Blue Grand Total Box */}
             <div className="bg-[#f0f7ff] border border-blue-100 rounded-xl p-3 flex items-center justify-between mt-2">
-              <div className="flex items-center gap-2 text-blue-700 font-bold text-xs">
+              <div className="flex items-center gap-2 text-blue-700 font-semibold text-[0.875rem]">
                 <div className="w-6 h-6 rounded-lg bg-blue-100/80 flex items-center justify-center text-blue-600">
                   <IndianRupee className="w-3.5 h-3.5" />
                 </div>
                 <span>Grand Total</span>
               </div>
-              <span className="text-xl font-black text-blue-700 font-mono">
+              <span className="text-xl font-semibold text-blue-700 font-mono">
                 {fmtMoney(grandTotal)}
               </span>
             </div>
@@ -379,10 +379,10 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
             <WhatsAppIcon className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-sm font-bold text-gray-900">
+            <div className="text-[0.875rem] font-semibold text-gray-900">
               Do you want to send this Sales Order to customer on WhatsApp?
             </div>
-            <div className="text-xs text-gray-500 mt-0.5">
+            <div className="text-[0.875rem] text-gray-500 mt-0.5">
               Send a PDF copy to the customer now.
             </div>
           </div>
@@ -390,7 +390,7 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
 
         <button
           onClick={handleWhatsApp}
-          className="bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-xl px-4 py-2 text-xs font-bold shadow-2xs flex items-center gap-2 transition-all cursor-pointer shrink-0"
+          className="bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-xl px-4 py-2 text-[0.875rem] font-semibold shadow-2xs flex items-center gap-2 cursor-pointer shrink-0"
         >
           <WhatsAppIcon className="w-4 h-4 text-emerald-600" />
           <span>Send on WhatsApp</span>
@@ -404,7 +404,7 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
           <button
             onClick={handleConfirmClick}
             disabled={isConfirming}
-            className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            className="btn-success disabled:opacity-50"
           >
             <Check className="w-4 h-4 stroke-[3]" />
             <span>{isConfirming ? 'Confirming...' : 'Confirm Order'}</span>
@@ -414,7 +414,7 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
         {/* Button 1: View Sales Order (Solid Blue) */}
         <button
           onClick={() => onViewOrder(order)}
-          className="bg-[#0066ff] hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+          className="btn-primary"
         >
           <FileText className="w-4 h-4" />
           <span>View Sales Order</span>
@@ -423,7 +423,7 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
         {/* Button 2: Print Sales Order (White Outline) */}
         <button
           onClick={() => onPrintOrder(order)}
-          className="bg-white hover:bg-gray-50 text-blue-600 border border-blue-200 font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-2 cursor-pointer"
+          className="bg-white hover:bg-gray-50 text-blue-600 border border-blue-200 font-semibold text-[0.875rem] px-5 py-2.5 rounded-xl shadow-2xs flex items-center gap-2 cursor-pointer"
         >
           <Printer className="w-4 h-4" />
           <span>Print Sales Order</span>
@@ -432,7 +432,7 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
         {/* Button 3: Create New Sales Order (White Outline) */}
         <button
           onClick={onCreateNew}
-          className="bg-white hover:bg-gray-50 text-blue-600 border border-blue-200 font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-2 cursor-pointer"
+          className="bg-white hover:bg-gray-50 text-blue-600 border border-blue-200 font-semibold text-[0.875rem] px-5 py-2.5 rounded-xl shadow-2xs flex items-center gap-2 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Create New Sales Order</span>
@@ -441,7 +441,7 @@ export const SalesOrderSuccessModal: React.FC<SalesOrderSuccessModalProps> = ({
         {/* Button 4: Go to Sales Orders (White Outline) */}
         <button
           onClick={onGoToOrders}
-          className="bg-white hover:bg-gray-50 text-blue-600 border border-blue-200 font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-2xs flex items-center gap-2 cursor-pointer"
+          className="bg-white hover:bg-gray-50 text-blue-600 border border-blue-200 font-semibold text-[0.875rem] px-5 py-2.5 rounded-xl shadow-2xs flex items-center gap-2 cursor-pointer"
         >
           <List className="w-4 h-4" />
           <span>Go to Sales Orders</span>

@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { generateListPdf } from '../../utils/pdfReport';
 import { useSearchParams } from 'react-router-dom';
 import SettingsPage from './SettingsPage';
 import { 
@@ -84,6 +83,8 @@ import AddSkuDrawerV2, { SearchableMaterialDropdown } from './AddSkuDrawerV2';
 import { ManufacturingStepsModal } from '../stock_v2/ManufacturingStepsModal';
 import { normalizeAndDeduplicateUnits } from '../../utils/uomConversion';
 import { getParties } from '../../api/partyApi';
+import { getProductionOrders } from '../../api/productionApi';
+import { getSalesOrdersV2 } from '../../api/salesOrderApiV2';
 import { showToast } from '../ui/Toast';
 import * as XLSX from 'xlsx';
 import Modal from '../ui/Modal';
@@ -109,7 +110,7 @@ const renderItemDomainIcon = (skuItem: SkuV2, currentTab?: string) => {
   }
   if (type === 'semi') {
     return (
-      <div className="w-6 h-6 rounded-md bg-teal-50 text-teal-600 border border-teal-200/70 flex items-center justify-center shrink-0 shadow-2xs" title="Semi Finished">
+      <div className="w-6 h-6 rounded-md bg-blue-50 text-blue-600 border border-blue-200/70 flex items-center justify-center shrink-0 shadow-2xs" title="Semi Finished">
         <Boxes className="w-3.5 h-3.5" />
       </div>
     );
@@ -443,19 +444,61 @@ const SkuMasterV2: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Dynamic work order & dispatch order calculation helpers (Remove fake defaults)
+  // Live work-order / dispatch-order counts per item, computed from real production and sales orders
+  const [orderCounts, setOrderCounts] = useState<{ work: Record<string, number>; dispatch: Record<string, number> }>({ work: {}, dispatch: {} });
+
+  useEffect(() => {
+    if (!currentCompanyId) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [prods, sos] = await Promise.all([
+          getProductionOrders({ companyId: currentCompanyId }).catch(() => []),
+          getSalesOrdersV2(currentCompanyId).catch(() => []),
+        ]);
+        if (cancelled) return;
+        const work: Record<string, number> = {};
+        // Open work orders: anything not completed or cancelled
+        (Array.isArray(prods) ? prods : []).forEach((o: any) => {
+          const st = String(o.status || '').toLowerCase();
+          if (st === 'completed' || st === 'cancelled') return;
+          const key = String(o.itemCode || '').toLowerCase().trim();
+          if (key) work[key] = (work[key] || 0) + 1;
+        });
+        const dispatch: Record<string, number> = {};
+        // Open dispatch orders: live sales orders that still have undelivered quantity for the item
+        (Array.isArray(sos) ? sos : []).forEach((o: any) => {
+          const st = String(o.status || '').toLowerCase();
+          if (['cancelled', 'draft', 'delivered', 'invoiced'].includes(st) || o.fulfillmentStatus === 'Fulfilled') return;
+          const seen = new Set<string>();
+          (o.items || []).forEach((it: any) => {
+            if (!(Number(it.quantity) > Number(it.dispatchedQty || 0))) return;
+            const key = String(it.skuCode || '').toLowerCase().trim();
+            if (key && !seen.has(key)) {
+              seen.add(key);
+              dispatch[key] = (dispatch[key] || 0) + 1;
+            }
+          });
+        });
+        setOrderCounts({ work, dispatch });
+      } catch (err) {
+        console.error('Failed to load order counts for Item Master', err);
+      }
+    };
+    load();
+    const onFocus = () => load();
+    window.addEventListener('focus', onFocus);
+    return () => { cancelled = true; window.removeEventListener('focus', onFocus); };
+  }, [currentCompanyId]);
+
   const getWorkOrderCount = (sku: SkuV2 | null) => {
     if (!sku) return 0;
-    if ((sku as any).workOrderCount !== undefined) return Number((sku as any).workOrderCount) || 0;
-    if ((sku as any).workOrdersCount !== undefined) return Number((sku as any).workOrdersCount) || 0;
-    return 0;
+    return orderCounts.work[String((sku as any).skuCode || '').toLowerCase().trim()] || 0;
   };
 
   const getDispatchOrderCount = (sku: SkuV2 | null) => {
     if (!sku) return 0;
-    if ((sku as any).dispatchOrderCount !== undefined) return Number((sku as any).dispatchOrderCount) || 0;
-    if ((sku as any).dispatchOrdersCount !== undefined) return Number((sku as any).dispatchOrdersCount) || 0;
-    return 0;
+    return orderCounts.dispatch[String((sku as any).skuCode || '').toLowerCase().trim()] || 0;
   };
 
   // Add Custom Column Modal State (exact match to user screenshot!)
@@ -976,8 +1019,8 @@ const SkuMasterV2: React.FC = () => {
     { id: 'pages', label: 'PAGES', visible: true },
     { id: 'bom', label: 'BOM RECIPE', visible: true },
     { id: 'openingStock', label: 'STOCK', visible: false },
-    { id: 'workOrders', label: 'WORK ORDERS', visible: false },
-    { id: 'dispatchOrders', label: 'DISPATCH ORDERS', visible: false }
+    { id: 'workOrders', label: 'WORK ORDERS', visible: true },
+    { id: 'dispatchOrders', label: 'DISPATCH ORDERS', visible: true }
   ];
 
   const DEFAULT_MATERIALS_COLUMNS = [
@@ -1044,8 +1087,14 @@ const SkuMasterV2: React.FC = () => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
+          // One-time: turn on the (now live) Work Orders / Dispatch Orders columns for Products
+          const products = sanitizeColumns(parsed.products, DEFAULT_PRODUCTS_COLUMNS);
+          if (!localStorage.getItem('skbw_item_master_order_cols_v1')) {
+            products.forEach(c => { if (c.id === 'workOrders' || c.id === 'dispatchOrders') c.visible = true; });
+            localStorage.setItem('skbw_item_master_order_cols_v1', '1');
+          }
           return {
-            products: sanitizeColumns(parsed.products, DEFAULT_PRODUCTS_COLUMNS),
+            products,
             materials: sanitizeColumns(parsed.materials, DEFAULT_MATERIALS_COLUMNS),
             semi: sanitizeColumns(parsed.semi, DEFAULT_SEMI_COLUMNS)
           };
@@ -2557,18 +2606,6 @@ const SkuMasterV2: React.FC = () => {
     const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
     try {
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-
-      doc.setFontSize(14);
-      doc.setTextColor(29, 78, 216);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`${companyName} — ${title}`, 14, 14);
-
-      doc.setFontSize(9);
-      doc.setTextColor(100, 116, 139);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Generated on ${dateStr} • Total Records: ${targetSkus.length}`, 14, 20);
-
       const isRawOrSemiTab = activeMainTab === 'materials' || activeMainTab === 'semi';
       const headers = isRawOrSemiTab
         ? ['#', 'Item Code', 'Item Name', 'Category', 'UOM', 'GSM', 'Pages', 'Status']
@@ -2606,18 +2643,14 @@ const SkuMasterV2: React.FC = () => {
         ];
       });
 
-      autoTable(doc, {
-        head: [headers],
+      generateListPdf({
+        companyName,
+        title,
+        meta: [`Total Records: ${targetSkus.length}`],
+        head: headers,
         body: rows,
-        startY: 25,
-        theme: 'striped',
-        styles: { fontSize: 8, cellPadding: 2 },
-        headStyles: { fillColor: [29, 78, 216], textColor: [255, 255, 255], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        margin: { left: 14, right: 14 }
+        fileName: `${companyName.replace(/\s+/g, '_')}_${tabTitle}_${new Date().toISOString().slice(0, 10)}`,
       });
-
-      doc.save(`${companyName.replace(/\s+/g, '_')}_${tabTitle}_${new Date().toISOString().slice(0, 10)}.pdf`);
       showToast(`Exported PDF for ${targetSkus.length} ${selectedIds.length > 0 ? 'selected ' : ''}items`, 'success');
     } catch (err) {
       console.error('PDF export error:', err);
@@ -3580,30 +3613,23 @@ const SkuMasterV2: React.FC = () => {
   }, [activeMainTab, activeCategorySubTab, categoriesData, filteredAndSortedSkus]);
 
   return (
-    <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+    <div className="min-h-[calc(100*var(--vh,1vh))] bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
       
-      {/* 1. Header Banner */}
-      <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
-        <div className="flex items-center gap-3.5">
-          <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
-            <Package className="w-6 h-6 stroke-[2.2]" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-              <span>Item Master</span>
-              <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold transition-all">
-                {dynamicTotalCount} Total
-              </span>
-            </h1>
-            <p className="text-xs text-gray-500 font-medium">
-              Unified master directory for Products, Raw Materials, Semi Finished Goods & Categories.
-            </p>
-          </div>
+      {/* 1. Header */}
+      <div className="flex items-baseline justify-between gap-4 px-1">
+        <div>
+          <h1 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <span>Item Master</span>
+            <span className="text-xs font-medium text-gray-500">{dynamicTotalCount} total</span>
+          </h1>
+          <p className="text-[0.875rem] text-gray-500">
+            Products, raw materials, semi-finished goods &amp; categories.
+          </p>
         </div>
       </div>
 
       {/* ── 2. Top Navigation Tabs Bar & Action Toolbar (Exact match to Business Directory / 1st Image!) ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-4 rounded-2xl shadow-2xs relative">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-1 relative">
         {/* Backdrop overlay to close open popovers on outside click */}
         {(showSortMenu || showColumnPicker || showExportMenu) && (
           <div
@@ -3621,65 +3647,65 @@ const SkuMasterV2: React.FC = () => {
           {/* Tab 1: Products (All Finished Products) */}
           <button
             onClick={() => handleMainTabChange('products')}
-            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
               activeMainTab === 'products'
-                ? 'border-teal-700 text-teal-700 bg-transparent'
+                ? 'border-blue-700 text-blue-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Package className={`w-4 h-4 ${activeMainTab === 'products' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <Package className={`w-4 h-4 ${activeMainTab === 'products' ? 'text-blue-700' : 'text-slate-400'}`} />
             <span>Products</span>
           </button>
 
           {/* Tab 2: Materials (All Raw Materials) */}
           <button
             onClick={() => handleMainTabChange('materials')}
-            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
               activeMainTab === 'materials'
-                ? 'border-teal-700 text-teal-700 bg-transparent'
+                ? 'border-blue-700 text-blue-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Layers className={`w-4 h-4 ${activeMainTab === 'materials' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <Layers className={`w-4 h-4 ${activeMainTab === 'materials' ? 'text-blue-700' : 'text-slate-400'}`} />
             <span>Materials</span>
           </button>
 
           {/* Tab 3: Semi (Only Semi Finished Materials) */}
           <button
             onClick={() => handleMainTabChange('semi')}
-            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
               activeMainTab === 'semi'
-                ? 'border-teal-700 text-teal-700 bg-transparent'
+                ? 'border-blue-700 text-blue-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Boxes className={`w-4 h-4 ${activeMainTab === 'semi' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <Boxes className={`w-4 h-4 ${activeMainTab === 'semi' ? 'text-blue-700' : 'text-slate-400'}`} />
             <span>Semi</span>
           </button>
 
           {/* Tab 4: Categories */}
           <button
             onClick={() => handleMainTabChange('categories')}
-            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
               activeMainTab === 'categories'
-                ? 'border-teal-700 text-teal-700 bg-transparent'
+                ? 'border-blue-700 text-blue-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Folder className={`w-4 h-4 ${activeMainTab === 'categories' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <Folder className={`w-4 h-4 ${activeMainTab === 'categories' ? 'text-blue-700' : 'text-slate-400'}`} />
             <span>Categories</span>
           </button>
 
           {/* Tab 5: Settings */}
           <button
             onClick={() => handleMainTabChange('settings')}
-            className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+            className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
               activeMainTab === 'settings'
-                ? 'border-teal-700 text-teal-700 bg-transparent'
+                ? 'border-blue-700 text-blue-700 bg-transparent'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
             }`}
           >
-            <Settings className={`w-4 h-4 ${activeMainTab === 'settings' ? 'text-teal-700' : 'text-slate-400'}`} />
+            <Settings className={`w-4 h-4 ${activeMainTab === 'settings' ? 'text-blue-700' : 'text-slate-400'}`} />
             <span>Settings</span>
           </button>
         </div>
@@ -3695,7 +3721,7 @@ const SkuMasterV2: React.FC = () => {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder={`Search ${getTabLabel(activeMainTab).toLowerCase()}...`}
-                  className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-40 md:w-52 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                  className="pl-8 pr-7 py-1.5 text-[0.875rem] bg-gray-50 border border-gray-200 rounded-xl w-40 md:w-52 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
                 />
                 {search && (
                   <button 
@@ -3717,7 +3743,7 @@ const SkuMasterV2: React.FC = () => {
                     setShowColumnPicker(false);
                     setShowExportMenu(false);
                   }}
-                  className={`p-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+                  className={`p-2 rounded-xl border text-[0.875rem] font-semibold flex items-center justify-center cursor-pointer shadow-2xs ${
                     filterRules.length > 0
                       ? 'bg-blue-600 text-white border-blue-600 shadow-blue-100'
                       : 'bg-white hover:bg-blue-50/60 text-blue-600 border-gray-200 hover:border-blue-200'
@@ -3727,20 +3753,15 @@ const SkuMasterV2: React.FC = () => {
                 >
                   <Filter className="w-4 h-4" />
                 </button>
-                {!showFilterPanel && (
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    Filters
-                  </div>
-                )}
 
                 {/* Filter Popover matching Business Directory */}
                 {showFilterPanel && (
-                  <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-200 shadow-2xl p-4 z-50 animate-in fade-in zoom-in-95 duration-150 text-left">
+                  <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white/95 rounded-2xl border border-gray-200 shadow-2xl p-4 z-50 text-left">
                     <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-3">
                       <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-bold text-gray-900">Filters</h4>
+                        <h4 className="text-[0.875rem] font-semibold text-gray-900">Filters</h4>
                         {filterRules.length > 0 && (
-                          <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                          <span className="text-[0.875rem] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
                             {filterRules.length} active
                           </span>
                         )}
@@ -3749,7 +3770,7 @@ const SkuMasterV2: React.FC = () => {
                         {filterRules.length > 0 && (
                           <button
                             onClick={() => setFilterRules([])}
-                            className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                            className="text-[0.875rem] font-semibold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
                           >
                             Clear All
                           </button>
@@ -3766,15 +3787,15 @@ const SkuMasterV2: React.FC = () => {
                     {/* Rules list */}
                     {filterRules.length === 0 ? (
                       <div className="border border-dashed border-gray-300 rounded-2xl p-6 text-center bg-white">
-                        <p className="text-sm font-bold text-gray-800">No filters applied</p>
-                        <p className="text-xs text-gray-400 mt-1">Add a filter to narrow down rows</p>
+                        <p className="text-[0.875rem] font-semibold text-gray-800">No filters applied</p>
+                        <p className="text-[0.875rem] text-gray-400 mt-1">Add a filter to narrow down rows</p>
                       </div>
                     ) : (
                       <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
                         {filterRules.map((rule) => (
                           <div key={rule.id} className="bg-gray-50/70 border border-gray-200 rounded-xl p-3 space-y-2">
                             <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-bold text-gray-400 tracking-wider uppercase">WHERE</span>
+                              <span className="text-xs font-medium text-gray-400 tracking-wider uppercase">WHERE</span>
                               <button
                                 onClick={() => setFilterRules(prev => prev.filter(r => r.id !== rule.id))}
                                 className="text-gray-400 hover:text-gray-600 cursor-pointer"
@@ -3790,7 +3811,7 @@ const SkuMasterV2: React.FC = () => {
                                 const val = e.target.value;
                                 setFilterRules(prev => prev.map(r => r.id === rule.id ? { ...r, field: val } : r));
                               }}
-                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 bg-white cursor-pointer"
+                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 bg-white cursor-pointer"
                             >
                               <option value="name">Item Name</option>
                               <option value="skuCode">SKU Code</option>
@@ -3809,7 +3830,7 @@ const SkuMasterV2: React.FC = () => {
                                 const val = e.target.value;
                                 setFilterRules(prev => prev.map(r => r.id === rule.id ? { ...r, operator: val } : r));
                               }}
-                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 bg-white cursor-pointer"
+                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 bg-white cursor-pointer"
                             >
                               <option value="contains">Contains</option>
                               <option value="equals">Equals</option>
@@ -3826,7 +3847,7 @@ const SkuMasterV2: React.FC = () => {
                                 const val = e.target.value;
                                 setFilterRules(prev => prev.map(r => r.id === rule.id ? { ...r, value: val } : r));
                               }}
-                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 bg-white placeholder-gray-400"
+                              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 bg-white placeholder-gray-400"
                             />
                           </div>
                         ))}
@@ -3841,7 +3862,7 @@ const SkuMasterV2: React.FC = () => {
                           { id: 'filter_' + Date.now(), field: 'name', operator: 'contains', value: '' }
                         ]);
                       }}
-                      className="w-full mt-3 py-2.5 border border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50/40 rounded-xl text-xs font-semibold text-gray-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      className="w-full mt-3 py-2.5 border border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50/40 rounded-xl text-[0.875rem] font-semibold text-gray-700 flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add filter</span>
@@ -3860,53 +3881,48 @@ const SkuMasterV2: React.FC = () => {
                     setShowExportMenu(false);
                     setShowFilterPanel(false);
                   }}
-                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
                   title="Sort Records"
                   aria-label="Sort Records"
                 >
                   <ArrowUpDown className="w-4 h-4" />
                 </button>
-                {!showSortMenu && (
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    Sort Options
-                  </div>
-                )}
                 {showSortMenu && (
-                  <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs text-left">
-                    <div className="px-2 py-1 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Sort Options</div>
+                  <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-[0.875rem] text-left">
+                    <div className="px-2 py-1 text-xs font-medium text-gray-400 uppercase tracking-wider">Sort Options</div>
                     <button
                       onClick={() => { setSortRules([{ field: 'name', order: 'asc' }]); setShowSortMenu(false); }}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortRules[0]?.field === 'name' && sortRules[0]?.order === 'asc' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'}`}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortRules[0]?.field === 'name' && sortRules[0]?.order === 'asc' ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'}`}
                     >
                       <span>Item Name (A to Z)</span>
                     </button>
                     <button
                       onClick={() => { setSortRules([{ field: 'name', order: 'desc' }]); setShowSortMenu(false); }}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortRules[0]?.field === 'name' && sortRules[0]?.order === 'desc' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'}`}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortRules[0]?.field === 'name' && sortRules[0]?.order === 'desc' ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'}`}
                     >
                       <span>Item Name (Z to A)</span>
                     </button>
                     <button
                       onClick={() => { setSortRules([{ field: 'openingStock', order: 'desc' }]); setShowSortMenu(false); }}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortRules[0]?.field === 'openingStock' && sortRules[0]?.order === 'desc' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'}`}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortRules[0]?.field === 'openingStock' && sortRules[0]?.order === 'desc' ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'}`}
                     >
                       <span>Stock (High to Low)</span>
                     </button>
                     <button
                       onClick={() => { setSortRules([{ field: 'openingStock', order: 'asc' }]); setShowSortMenu(false); }}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortRules[0]?.field === 'openingStock' && sortRules[0]?.order === 'asc' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'}`}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortRules[0]?.field === 'openingStock' && sortRules[0]?.order === 'asc' ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'}`}
                     >
                       <span>Stock (Low to High)</span>
                     </button>
                     <button
                       onClick={() => { setSortRules([{ field: 'skuCode', order: 'asc' }]); setShowSortMenu(false); }}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortRules[0]?.field === 'skuCode' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'}`}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortRules[0]?.field === 'skuCode' ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'}`}
                     >
                       <span>SKU Code (A to Z)</span>
                     </button>
                     <button
                       onClick={() => { setSortRules([{ field: 'category', order: 'asc' }]); setShowSortMenu(false); }}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortRules[0]?.field === 'category' ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'}`}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-xl font-medium flex items-center justify-between ${sortRules[0]?.field === 'category' ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-gray-50 text-gray-700 cursor-pointer'}`}
                     >
                       <span>Category (A to Z)</span>
                     </button>
@@ -3924,28 +3940,23 @@ const SkuMasterV2: React.FC = () => {
                     setShowExportMenu(false);
                     setShowFilterPanel(false);
                   }}
-                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
                   title="Toggle Columns"
                   aria-label="Toggle Columns"
                 >
                   <Columns className="w-4 h-4" />
                 </button>
-                {!showColumnPicker && (
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    Column Visibility
-                  </div>
-                )}
                 {showColumnPicker && (
-                  <div className="absolute right-0 mt-1.5 w-60 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-2 text-xs text-left">
+                  <div className="absolute right-0 mt-1.5 w-60 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-3 space-y-2 text-[0.875rem] text-left">
                     <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                      <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Visible Columns</span>
+                      <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Visible Columns</span>
                       <button 
                         onClick={() => {
                           if (activeMainTab === 'materials') setColumnsConfig(DEFAULT_MATERIALS_COLUMNS);
                           else if (activeMainTab === 'semi') setColumnsConfig(DEFAULT_SEMI_COLUMNS);
                           else setColumnsConfig(DEFAULT_PRODUCTS_COLUMNS);
                         }} 
-                        className="text-[10.5px] text-blue-600 font-bold hover:underline cursor-pointer"
+                        className="text-xs text-blue-600 font-semibold hover:underline cursor-pointer"
                       >
                         Reset
                       </button>
@@ -3964,14 +3975,14 @@ const SkuMasterV2: React.FC = () => {
                             onDragStart={(e) => handlePopoverDragStart(e, idx)}
                             onDragOver={handlePopoverDragOver}
                             onDrop={(e) => handlePopoverDrop(e, idx)}
-                            className={`flex items-center justify-between p-1.5 rounded-lg border text-xs font-semibold cursor-grab active:cursor-grabbing transition-all select-none ${
+                            className={`flex items-center justify-between p-1.5 rounded-lg border text-[0.875rem] font-semibold cursor-grab active:cursor-grabbing select-none ${
                               draggedPopoverColIdx === idx
                                 ? 'bg-blue-100/90 border-blue-500 shadow-md scale-[1.01] opacity-80'
                                 : 'bg-gray-50/80 border-gray-200/80 hover:bg-blue-50/40 hover:border-blue-300'
                             }`}
                           >
                             <label className="flex items-center gap-2 cursor-pointer text-gray-800 font-semibold" onClick={(e) => e.stopPropagation()}>
-                              <span className="text-gray-400 font-bold select-none text-[10px]">⋮⋮</span>
+                              <span className="text-gray-400 font-semibold select-none text-xs">⋮⋮</span>
                               <input
                                 type="checkbox"
                                 checked={col.visible}
@@ -3981,9 +3992,9 @@ const SkuMasterV2: React.FC = () => {
                                 }}
                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
                               />
-                              <span className="text-xs">{col.label}</span>
+                              <span className="text-[0.875rem]">{col.label}</span>
                             </label>
-                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider bg-white border border-gray-200 px-1 py-0.2 rounded shadow-2xs">
+                            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider bg-white border border-gray-200 px-1 py-0.2 rounded shadow-2xs">
                               Drag
                             </span>
                           </div>
@@ -4003,19 +4014,14 @@ const SkuMasterV2: React.FC = () => {
                     setShowColumnPicker(false);
                     setShowFilterPanel(false);
                   }}
-                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
                   title="Export Data (PDF / Excel)"
                   aria-label="Export Data (PDF / Excel)"
                 >
                   <Download className="w-4 h-4" />
                 </button>
-                {!showExportMenu && (
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    Export Data
-                  </div>
-                )}
                 {showExportMenu && (
-                  <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs text-left">
+                  <div className="absolute right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-[0.875rem] text-left">
                     <button
                       onClick={() => { handleExportCSV(); setShowExportMenu(false); }}
                       className="w-full text-left px-2.5 py-1.5 rounded-xl font-semibold hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 text-gray-700 cursor-pointer"
@@ -4046,27 +4052,24 @@ const SkuMasterV2: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleDownloadSampleCSV}
-                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 text-blue-600 border border-gray-200 hover:border-blue-200 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 text-blue-600 border border-gray-200 hover:border-blue-200 flex items-center justify-center cursor-pointer shadow-2xs"
                   title="Download Sample CSV Template"
                   aria-label="Download Sample CSV Template"
                 >
                   <FileSpreadsheet className="w-4 h-4 text-blue-600" />
                 </button>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                  Sample CSV
-                </div>
               </div>
 
               {/* 7. Import CSV Icon Button */}
               <div className="relative group">
                 <label
-                  className={`p-2 rounded-xl border text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
-                    isImporting ? 'bg-blue-100 border-blue-300 animate-pulse' : 'bg-white hover:bg-blue-50/60 border-gray-200 hover:border-blue-200'
+                  className={`p-2 rounded-xl border text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs ${
+                    isImporting ? 'bg-blue-100 border-blue-300' : 'bg-white hover:bg-blue-50/60 border-gray-200 hover:border-blue-200'
                   }`}
                   title="Import Excel/CSV File"
                   aria-label="Import Excel/CSV File"
                 >
-                  <Upload className={`w-4 h-4 text-blue-600 ${isImporting ? 'animate-bounce' : ''}`} />
+                  <Upload className={`w-4 h-4 text-blue-600`} />
                   <input
                     type="file"
                     accept=".csv,.xlsx,.xls"
@@ -4075,9 +4078,6 @@ const SkuMasterV2: React.FC = () => {
                     className="hidden"
                   />
                 </label>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                  Import Excel/CSV
-                </div>
               </div>
 
               {/* 8. Re-sequence / Renumber Continuous SKU Series */}
@@ -4086,7 +4086,7 @@ const SkuMasterV2: React.FC = () => {
                   type="button"
                   onClick={() => handleRenumberSkus(false)}
                   disabled={isRenumbering}
-                  className={`p-2 rounded-xl border text-amber-700 transition-all flex items-center justify-center cursor-pointer shadow-2xs ${
+                  className={`p-2 rounded-xl border text-amber-700 flex items-center justify-center cursor-pointer shadow-2xs ${
                     isRenumbering ? 'bg-amber-100 border-amber-300 animate-spin' : 'bg-white hover:bg-amber-50/60 border-gray-200 hover:border-amber-200'
                   }`}
                   title="Re-sequence SKU Codes to Continuous Series (FG-001..., SM-001..., RM-001...)"
@@ -4094,9 +4094,6 @@ const SkuMasterV2: React.FC = () => {
                 >
                   <RefreshCw className={`w-4 h-4 text-amber-600 ${isRenumbering ? 'animate-spin' : ''}`} />
                 </button>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                  Renumber Continuous Series
-                </div>
               </div>
 
               {/* 8. Activity Logs Icon Button */}
@@ -4107,15 +4104,12 @@ const SkuMasterV2: React.FC = () => {
                     fetchActivityLogs();
                     setShowActivityLog(true);
                   }}
-                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs"
                   title="Activity Logs"
                   aria-label="Activity Logs"
                 >
                   <History className="w-4 h-4 text-blue-600" />
                 </button>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                  Activity Logs
-                </div>
               </div>
 
               {/* 8.5 Recycle Bin Icon Button */}
@@ -4126,15 +4120,12 @@ const SkuMasterV2: React.FC = () => {
                     fetchRecycleBinSkus();
                     setShowRecycleBinModal(true);
                   }}
-                  className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100/80 border border-rose-200 text-rose-700 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  className="icon-btn-danger"
                   title="Recycle Bin (View / Restore Deleted Items)"
                   aria-label="Recycle Bin"
                 >
                   <Trash2 className="w-4 h-4 text-rose-600" />
                 </button>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                  Recycle Bin
-                </div>
               </div>
 
               {/* 9. Find Duplicates Icon Button */}
@@ -4143,15 +4134,12 @@ const SkuMasterV2: React.FC = () => {
                   type="button"
                   onClick={handleFindDuplicates}
                   disabled={isScanningDuplicates}
-                  className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100/80 border border-amber-200 text-amber-700 transition-all flex items-center justify-center cursor-pointer shadow-2xs"
+                  className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100/80 border border-amber-200 text-amber-700 flex items-center justify-center cursor-pointer shadow-2xs"
                   title="Scan for Duplicate Items"
                   aria-label="Scan for Duplicate Items"
                 >
                   <Copy className={`w-4 h-4 text-amber-600 ${isScanningDuplicates ? 'animate-spin' : ''}`} />
                 </button>
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                  Find Duplicates
-                </div>
               </div>
 
               {/* Build BOMs quick action for Products & Semi tabs */}
@@ -4160,15 +4148,12 @@ const SkuMasterV2: React.FC = () => {
                   <button 
                     type="button"
                     onClick={() => setShowBuildBomsModal(true)}
-                    className="p-2 text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/90 rounded-xl border border-emerald-200/80 transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                    className="p-2 text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/90 rounded-xl border border-emerald-200/80 cursor-pointer shadow-2xs flex items-center justify-center"
                     title="Build BOMs / Bulk Recipe Matrix"
                     aria-label="Build BOMs / Bulk Recipe Matrix"
                   >
                     <ClipboardList className="w-4 h-4 text-emerald-700 stroke-[2.2]" />
                   </button>
-                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                    Build BOMs
-                  </div>
                 </div>
               )}
 
@@ -4184,24 +4169,21 @@ const SkuMasterV2: React.FC = () => {
                       setShowAddDrawer(true); 
                     }
                   }}
-                  className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer font-bold shrink-0"
+                  className="w-8 h-8 rounded-full border border-gray-200 bg-white hover:bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs cursor-pointer font-semibold shrink-0"
                   title={`Add New ${activeMainTab === 'categories' ? 'Category' : getTabLabel(activeMainTab).slice(0, -1)}`}
                   aria-label={`Add New ${activeMainTab === 'categories' ? 'Category' : getTabLabel(activeMainTab).slice(0, -1)}`}
                 >
                   <Plus className="w-4 h-4 text-blue-600 stroke-[2.5]" />
                 </button>
-                <div className="absolute top-full mt-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 whitespace-nowrap bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg border border-gray-800">
-                  Add {activeMainTab === 'categories' ? 'Category' : getTabLabel(activeMainTab).slice(0, -1)}
-                </div>
               </div>
             </div>
           </div>
 
           {/* ── 2.5 Bulk Selection Bar (Grey Theme) ── */}
           {selectedIds.length > 0 && activeMainTab !== 'categories' && (
-            <div className="bg-gray-100 border border-gray-200 text-gray-800 px-4 py-2.5 rounded-2xl shadow-xs flex items-center justify-between flex-wrap gap-2 text-xs font-semibold animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="bg-gray-100 border border-gray-200 text-gray-800 px-4 py-2.5 rounded-2xl shadow-xs flex items-center justify-between flex-wrap gap-2 text-[0.875rem] font-semibold">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
                 <span><strong className="text-gray-900">{selectedIds.length}</strong> {getTabLabel(activeMainTab).toLowerCase()} selected</span>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -4209,7 +4191,7 @@ const SkuMasterV2: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleBulkPasteBom}
-                    className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all"
+                    className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs"
                     title={`Paste BOM from "${copiedBom.sourceName}" to ${selectedIds.length} selected items`}
                   >
                     <ClipboardPaste className="w-3.5 h-3.5 text-emerald-700" />
@@ -4219,7 +4201,7 @@ const SkuMasterV2: React.FC = () => {
                 <button
                   onClick={handleExportExcel}
                   disabled={isExporting}
-                  className="px-3.5 py-1.5 bg-white hover:bg-gray-200/60 text-gray-700 border border-gray-300 font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all disabled:opacity-50"
+                  className="px-3.5 py-1.5 bg-white hover:bg-gray-200/60 text-gray-700 border border-gray-300 font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
                   title={`Export ${selectedIds.length} selected items`}
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -4227,7 +4209,7 @@ const SkuMasterV2: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setShowBulkEditModal(true)}
-                  className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-900 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                  className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-900 text-white font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs"
                   title={`Bulk edit ${selectedIds.length} selected items`}
                 >
                   <Edit className="w-3.5 h-3.5" />
@@ -4235,7 +4217,7 @@ const SkuMasterV2: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setShowBulkDeleteModal(true)}
-                  className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all"
+                  className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-2xs"
                   title={`Delete ${selectedIds.length} selected items`}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -4243,7 +4225,7 @@ const SkuMasterV2: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setSelectedIds([])}
-                  className="px-3 py-1.5 bg-transparent hover:bg-black/5 text-gray-600 font-semibold rounded-xl cursor-pointer transition-all ml-1"
+                  className="px-3 py-1.5 bg-transparent hover:bg-black/5 text-gray-600 font-semibold rounded-xl cursor-pointer ml-1"
                 >
                   Clear
                 </button>
@@ -4253,20 +4235,19 @@ const SkuMasterV2: React.FC = () => {
 
           {/* ── 3. VIEW CONTENT AREA ── */}
           {activeMainTab === 'settings' ? (
-            <div 
-              style={{ animation: 'slideDownFade 0.35s ease-out forwards' }}
-              className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs p-4 opacity-0"
+            <div
+              className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs p-4"
             >
               <SettingsPage />
             </div>
           ) : activeMainTab !== 'categories' ? (
             
             /* ── GOODS / MATERIALS DATA TABLE VIEW ── */
-            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden relative">
+            <div className="bg-gray-50 rounded-xl overflow-hidden panel-table relative">
 
           {/* Filter Panel Drawer if toggled */}
           {showFilterPanel && (
-            <div className="p-4 bg-blue-50/40 border-b border-blue-100 flex items-center justify-between text-xs">
+            <div className="p-4 bg-blue-50/40 border-b border-blue-100 flex items-center justify-between text-[0.875rem]">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-blue-900">Active Filters:</span>
                 {categoryFilter && (
@@ -4293,8 +4274,8 @@ const SkuMasterV2: React.FC = () => {
 
           {/* Drag & Drop Column Reordering Bar */}
           {customColumns.length > 0 && (
-            <div className="bg-blue-50/50 border-b border-blue-100 px-4 py-2 flex items-center gap-2 overflow-x-auto text-xs">
-              <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider whitespace-nowrap flex items-center gap-1">
+            <div className="bg-blue-50/50 border-b border-blue-100 px-4 py-2 flex items-center gap-2 overflow-x-auto text-[0.875rem]">
+              <span className="text-xs font-medium text-blue-700 uppercase tracking-wider whitespace-nowrap flex items-center gap-1">
                 <span>⋮⋮</span> Drag to reorder columns:
               </span>
               {customColumns.map((col, idx) => (
@@ -4304,16 +4285,16 @@ const SkuMasterV2: React.FC = () => {
                   onDragStart={(e) => handleDragStart(e, idx)}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, idx)}
-                  className={`inline-flex items-center gap-1.5 bg-white border border-blue-200 hover:border-blue-400 px-2.5 py-1 rounded-xl text-xs font-semibold text-blue-900 shadow-2xs cursor-grab active:cursor-grabbing transition-all ${
+                  className={`inline-flex items-center gap-1.5 bg-white border border-blue-200 hover:border-blue-400 px-2.5 py-1 rounded-xl text-[0.875rem] font-semibold text-blue-900 shadow-2xs cursor-grab active:cursor-grabbing ${
                     draggedColIdx === idx ? 'opacity-40 ring-2 ring-blue-400' : ''
                   }`}
                 >
-                  <span className="text-gray-400 font-bold select-none text-[10px]">⋮⋮</span>
+                  <span className="text-gray-400 font-semibold select-none text-xs">⋮⋮</span>
                   <span>{col}</span>
                   <button
                     type="button"
                     onClick={() => removeCustomColumn(col)}
-                    className="text-gray-400 hover:text-rose-600 font-bold ml-1 text-xs"
+                    className="text-gray-400 hover:text-rose-600 font-semibold ml-1 text-[0.875rem]"
                   >
                     ×
                   </button>
@@ -4323,10 +4304,10 @@ const SkuMasterV2: React.FC = () => {
           )}
 
           {/* Table Element with All Requested Columns & Actions */}
-          <div className="overflow-x-auto rounded-b-2xl">
+          <div className="overflow-x-auto px-2 pt-2">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider select-none">
+                <tr className="border-b border-gray-200 text-xs font-medium text-gray-600 uppercase tracking-wider select-none">
                   <th className="py-3 px-3 w-8 text-center whitespace-nowrap">
                     <input
                       type="checkbox"
@@ -4344,19 +4325,19 @@ const SkuMasterV2: React.FC = () => {
                       <th
                         key={col.id}
                         onClick={() => handleColumnSort(col.id)}
-                        className="py-3 px-3 whitespace-nowrap cursor-pointer hover:bg-gray-100/80 transition-colors select-none group"
+                        className="py-3 px-3 whitespace-nowrap cursor-pointer hover:bg-gray-100/80 select-none group"
                         title={`Sort by ${col.label}`}
                       >
                         <div className="flex items-center gap-1.5">
-                          <span className={currentSort ? 'text-blue-700 font-bold' : ''}>{col.label}</span>
+                          <span className={currentSort ? 'text-blue-700 font-semibold' : ''}>{col.label}</span>
                           {currentSort ? (
                             currentSort.order === 'asc' ? (
-                              <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-bold shrink-0" />
+                              <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-semibold shrink-0" />
                             ) : (
-                              <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-bold shrink-0" />
+                              <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-semibold shrink-0" />
                             )
                           ) : (
-                            <ArrowUpDown className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                            <ArrowUpDown className="w-3 h-3 text-gray-400 group-hover:opacity-100 shrink-0 opacity-0" />
                           )}
                         </div>
                       </th>
@@ -4373,27 +4354,27 @@ const SkuMasterV2: React.FC = () => {
                         onDragStart={(e) => handleDragStart(e, idx)}
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDrop(e, idx)}
-                        className={`py-3 px-3 whitespace-nowrap group cursor-grab active:cursor-grabbing hover:bg-blue-50 transition-colors select-none ${
+                        className={`py-3 px-3 whitespace-nowrap group cursor-grab active:cursor-grabbing hover:bg-blue-50 select-none ${
                           draggedColIdx === idx ? 'opacity-40 bg-blue-100/50' : ''
                         }`}
                       >
                         <div className="flex items-center gap-1.5">
-                          <span className="text-gray-400 font-bold select-none text-xs">⋮⋮</span>
+                          <span className="text-gray-400 font-semibold select-none text-[0.875rem]">⋮⋮</span>
                           <span 
                             onClick={() => handleColumnSort(`custom_${col}`)}
-                            className="cursor-pointer hover:text-blue-600 transition-colors"
+                            className="cursor-pointer hover:text-blue-600"
                             title={`Sort by ${col}`}
                           >
                             {col}
                           </span>
                           {currentSort && (
                             currentSort.order === 'asc' ? (
-                              <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-bold shrink-0" />
+                              <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-semibold shrink-0" />
                             ) : (
-                              <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-bold shrink-0" />
+                              <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-semibold shrink-0" />
                             )
                           )}
-                          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-all text-xs font-bold text-gray-400 ml-1">
+                          <div className="group-hover:opacity-100 flex items-center gap-0.5 text-[0.875rem] font-semibold text-gray-400 ml-1 opacity-0">
                             {idx > 0 && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); moveColumnLeft(idx); }}
@@ -4429,7 +4410,7 @@ const SkuMasterV2: React.FC = () => {
                   <th className="py-3 px-2 text-center w-8 whitespace-nowrap">
                     <button
                       onClick={handleAddCustomColumn}
-                      className="p-1 rounded-md text-gray-400 hover:text-blue-600 hover:bg-blue-50 font-bold transition-all cursor-pointer"
+                      className="p-1 rounded-md text-gray-400 hover:text-blue-600 hover:bg-blue-50 font-semibold cursor-pointer"
                       title="Add Custom Column"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -4440,7 +4421,7 @@ const SkuMasterV2: React.FC = () => {
                   <th className="py-3 px-3 text-right whitespace-nowrap">ACTIONS</th>
                 </tr>
               </thead>
-              <tbody key={animationKey} className="divide-y divide-gray-100 text-xs text-gray-700">
+              <tbody key={animationKey} className="divide-y divide-gray-100 text-[0.875rem] text-gray-700">
                 {loading ? (
                   <tr>
                     <td colSpan={1 + 1 + visibleColumns.length + customColumns.length + 2} className="py-12 text-center text-gray-400 whitespace-nowrap">
@@ -4456,7 +4437,7 @@ const SkuMasterV2: React.FC = () => {
                       <div className="flex flex-col items-center gap-2">
                         <Package className="w-8 h-8 text-gray-300" />
                         <p className="font-semibold text-gray-600">No {getTabLabel(activeMainTab).toLowerCase()} found</p>
-                        <p className="text-[11px]">Click below to create your first item</p>
+                        <p className="text-xs">Click below to create your first item</p>
                       </div>
                     </td>
                   </tr>
@@ -4471,11 +4452,7 @@ const SkuMasterV2: React.FC = () => {
                           setDetailsSubTab('details');
                           setSelectedSkuDetails(sku);
                         }}
-                        style={{
-                          animation: 'slideDownFade 0.35s ease-out forwards',
-                          animationDelay: `${index * 45}ms`
-                        }}
-                        className={`hover:bg-blue-50/20 transition-all cursor-pointer opacity-0 whitespace-nowrap ${isSelected ? 'bg-blue-50/30' : ''}`}
+                        className={`cursor-pointer whitespace-nowrap ${isSelected ? 'bg-blue-50' : 'bg-white hover:bg-blue-50/40'}`}
                       >
                         <td className="py-3 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           <input
@@ -4485,7 +4462,7 @@ const SkuMasterV2: React.FC = () => {
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                           />
                         </td>
-                        <td className="py-3 px-3 text-center text-gray-400 font-mono font-semibold text-xs whitespace-nowrap">
+                        <td className="py-3 px-3 text-center text-gray-400 font-mono font-semibold text-[0.875rem] whitespace-nowrap">
                           {index + 1}
                         </td>
 
@@ -4494,7 +4471,7 @@ const SkuMasterV2: React.FC = () => {
                           switch (c.id) {
                             case 'skuCode':
                               return (
-                                <td key="skuCode" className="py-3 px-3 font-mono font-semibold text-gray-700 text-xs whitespace-nowrap">
+                                <td key="skuCode" className="py-3 px-3 font-mono font-semibold text-gray-700 text-[0.875rem] whitespace-nowrap">
                                   {sku.skuCode}
                                 </td>
                               );
@@ -4516,7 +4493,7 @@ const SkuMasterV2: React.FC = () => {
 
                               return (
                                 <td key="category" className="py-3 px-3 whitespace-nowrap">
-                                  <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50/90 text-blue-800 border border-blue-200/80 shadow-2xs">
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[0.875rem] font-semibold bg-blue-50/90 text-blue-800 border border-blue-200/80 shadow-2xs">
                                     {catToShow}
                                   </span>
                                 </td>
@@ -4525,7 +4502,7 @@ const SkuMasterV2: React.FC = () => {
                               const isItemActive = (sku.status || 'Active').toLowerCase() === 'active';
                               return (
                                 <td key="status" className="py-3 px-3 whitespace-nowrap">
-                                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[0.875rem] font-semibold ${
                                     isItemActive 
                                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' 
                                       : 'bg-gray-100 text-gray-600 border border-gray-200/60'
@@ -4539,7 +4516,7 @@ const SkuMasterV2: React.FC = () => {
                               return (
                                 <td key="brand" className="py-3 px-3 whitespace-nowrap">
                                   {sku.brand ? (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-800 border border-gray-200/80">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[0.875rem] font-semibold bg-gray-100 text-gray-800 border border-gray-200/80">
                                       {sku.brand}
                                     </span>
                                   ) : (
@@ -4551,7 +4528,7 @@ const SkuMasterV2: React.FC = () => {
                             case 'itemCategory':
                               return (
                                 <td key={c.id} className="py-3 px-3 whitespace-nowrap">
-                                  <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200/80">
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[0.875rem] font-semibold bg-gray-100 text-gray-700 border border-gray-200/80">
                                     {sku.group || '—'}
                                   </span>
                                 </td>
@@ -4574,7 +4551,7 @@ const SkuMasterV2: React.FC = () => {
                               return (
                                 <td key="altUnit" className="py-3 px-3 whitespace-nowrap">
                                   {!isInvalidAlt ? (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-700">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-700">
                                       {cleanAlt}
                                     </span>
                                   ) : (
@@ -4605,7 +4582,7 @@ const SkuMasterV2: React.FC = () => {
                               const hasValidConRate = !!sku.altUnitConversion && Number(sku.altUnitConversion) > 0;
 
                               return (
-                                <td key="altUnitConversion" className="py-3 px-3 text-gray-700 font-mono text-[11px] font-semibold whitespace-nowrap">
+                                <td key="altUnitConversion" className="py-3 px-3 text-gray-700 font-mono text-xs font-semibold whitespace-nowrap">
                                   {!isInvalidAlt && hasValidConRate ? (
                                     <span><strong>1 {outerUnit}</strong> = <strong>{sku.altUnitConversion} {innerUnit}</strong></span>
                                   ) : (
@@ -4618,7 +4595,7 @@ const SkuMasterV2: React.FC = () => {
                               return (
                                 <td key="unit" className="py-3 px-3 whitespace-nowrap">
                                   {sku.unit ? (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-gray-50 text-gray-700 border border-gray-200/60">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200/60">
                                       {sku.unit}
                                     </span>
                                   ) : (
@@ -4668,7 +4645,7 @@ const SkuMasterV2: React.FC = () => {
                               const isBomApplicable = activeMainTab !== 'materials' && getItemType(sku) !== 'materials' && !(sku.category || '').toLowerCase().includes('raw');
                               if (!isBomApplicable) {
                                 return (
-                                  <td key="bom" className="py-3 px-3 text-center text-gray-400 font-bold whitespace-nowrap">
+                                  <td key="bom" className="py-3 px-3 text-center text-gray-400 font-semibold whitespace-nowrap">
                                     —
                                   </td>
                                 );
@@ -4685,7 +4662,7 @@ const SkuMasterV2: React.FC = () => {
                                         setActiveBomProduct(sku);
                                         setShowBuildBomsModal(true);
                                       }}
-                                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer shadow-3xs ${
+                                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer shadow-3xs ${
                                         hasBom
                                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/90 hover:bg-emerald-100 hover:border-emerald-300'
                                           : 'bg-amber-50 text-amber-700 border border-amber-200/90 hover:bg-amber-100 hover:border-amber-300'
@@ -4721,7 +4698,7 @@ const SkuMasterV2: React.FC = () => {
                                           });
                                           showToast(`BOM copied from "${sku.name || sku.skuCode}" (${(sku as any).bomItems?.length} items)! Ready to paste.`, 'success');
                                         }}
-                                        className="p-1 text-gray-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-md transition-all cursor-pointer"
+                                        className="icon-btn"
                                         title={`Copy BOM from ${sku.name || sku.skuCode}`}
                                       >
                                         <Copy className="w-3.5 h-3.5" />
@@ -4736,7 +4713,7 @@ const SkuMasterV2: React.FC = () => {
                                           e.stopPropagation();
                                           handleDirectPasteBomToSku(sku);
                                         }}
-                                        className="p-1 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-100 rounded-md transition-all cursor-pointer"
+                                        className="p-1 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-100 rounded-md cursor-pointer"
                                         title={`Paste BOM from "${copiedBom.sourceName}" to this product`}
                                       >
                                         <ClipboardPaste className="w-3.5 h-3.5" />
@@ -4750,19 +4727,19 @@ const SkuMasterV2: React.FC = () => {
                               const minThreshold = Number((sku as any).minStockLevel || 0);
 
                               let stockBadge = (
-                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono font-extrabold bg-emerald-100 text-emerald-800 shadow-2xs">
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[0.875rem] font-mono font-semibold bg-emerald-100 text-emerald-800 shadow-2xs">
                                   {liveStockQty.toLocaleString('en-IN')} {sku.unit || 'Pcs'}
                                 </span>
                               );
                               if (liveStockQty <= 0) {
                                 stockBadge = (
-                                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700 shadow-2xs">
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[0.875rem] font-semibold bg-rose-100 text-rose-700 shadow-2xs">
                                     0 {sku.unit || 'Pcs'}
                                   </span>
                                 );
                               } else if (minThreshold > 0 && liveStockQty <= minThreshold) {
                                 stockBadge = (
-                                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-100 text-amber-800 shadow-2xs">
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[0.875rem] font-mono font-semibold bg-amber-100 text-amber-800 shadow-2xs">
                                     Low ({liveStockQty.toLocaleString('en-IN')} {sku.unit || 'Pcs'})
                                   </span>
                                 );
@@ -4775,7 +4752,7 @@ const SkuMasterV2: React.FC = () => {
                             case 'workOrders':
                               return (
                                 <td key="workOrders" className="py-3 px-3 whitespace-nowrap">
-                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200">
+                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[0.875rem] font-semibold bg-blue-50 text-blue-600 border border-blue-200">
                                     {getWorkOrderCount(sku)}
                                   </span>
                                 </td>
@@ -4783,7 +4760,7 @@ const SkuMasterV2: React.FC = () => {
                             case 'dispatchOrders':
                               return (
                                 <td key="dispatchOrders" className="py-3 px-3 whitespace-nowrap">
-                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200">
+                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[0.875rem] font-semibold bg-blue-50 text-blue-600 border border-blue-200">
                                     {getDispatchOrderCount(sku)}
                                   </span>
                                 </td>
@@ -4792,7 +4769,7 @@ const SkuMasterV2: React.FC = () => {
                               return (
                                 <td key="preferredVendor" className="py-3 px-3 whitespace-nowrap">
                                   {(sku as any).preferredVendor ? (
-                                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 shadow-2xs">
+                                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[0.875rem] font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 shadow-2xs">
                                       {(sku as any).preferredVendor}
                                     </span>
                                   ) : (
@@ -4822,7 +4799,7 @@ const SkuMasterV2: React.FC = () => {
                                 <select
                                   value={val}
                                   onChange={(e) => setRowGrades(prev => ({ ...prev, [sku._id || index]: e.target.value }))}
-                                  className="bg-emerald-50/70 hover:bg-emerald-100 border border-emerald-200 rounded-lg px-2.5 py-1 text-xs font-bold text-emerald-800 focus:outline-none cursor-pointer shadow-2xs transition-all"
+                                  className="bg-emerald-50/70 hover:bg-emerald-100 border border-emerald-200 rounded-lg px-2.5 py-1 text-[0.875rem] font-semibold text-emerald-800 focus:outline-none cursor-pointer shadow-2xs"
                                 >
                                   <option value="Option 1">Option 1</option>
                                   <option value="Option 2">Option 2</option>
@@ -4853,7 +4830,7 @@ const SkuMasterV2: React.FC = () => {
                                   value={cellVal ?? ''}
                                   placeholder="0"
                                   onChange={(e) => setCustomColumnValues(prev => ({ ...prev, [valKey]: e.target.value }))}
-                                  className="px-2 py-1 text-xs font-mono font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-1 focus:ring-blue-400 focus:border-blue-400 w-24"
+                                  className="px-2 py-1 text-[0.875rem] font-mono font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-1 focus:ring-blue-400 focus:border-blue-400 w-24"
                                 />
                               </td>
                             );
@@ -4866,7 +4843,7 @@ const SkuMasterV2: React.FC = () => {
                                   type="date"
                                   value={cellVal ?? ''}
                                   onChange={(e) => setCustomColumnValues(prev => ({ ...prev, [valKey]: e.target.value }))}
-                                  className="px-2 py-1 text-xs font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-1 focus:ring-blue-400 focus:border-blue-400"
+                                  className="px-2 py-1 text-[0.875rem] font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-1 focus:ring-blue-400 focus:border-blue-400"
                                 />
                               </td>
                             );
@@ -4886,7 +4863,7 @@ const SkuMasterV2: React.FC = () => {
                                   value={activeVal}
                                   onChange={(e) => setCustomColumnValues(prev => ({ ...prev, [valKey]: e.target.value }))}
                                   style={{ backgroundColor: activeOpt?.color || '#e0f2fe' }}
-                                  className="border border-gray-200/80 rounded-xl px-2.5 py-1 text-xs font-bold text-gray-800 focus:outline-none cursor-pointer shadow-2xs transition-all"
+                                  className="border border-gray-200/80 rounded-xl px-2.5 py-1 text-[0.875rem] font-semibold text-gray-800 focus:outline-none cursor-pointer shadow-2xs"
                                 >
                                   {options.map(opt => (
                                     <option key={opt.label} value={opt.label}>{opt.label}</option>
@@ -4900,7 +4877,7 @@ const SkuMasterV2: React.FC = () => {
                             const expression = customColumnFormulas[col] || '';
                             const calculatedVal = evaluateFormula(expression, sku);
                             return (
-                              <td key={col} className="py-3 px-3 whitespace-nowrap font-mono font-bold text-blue-700 text-xs">
+                              <td key={col} className="py-3 px-3 whitespace-nowrap font-mono font-semibold text-blue-700 text-[0.875rem]">
                                 {calculatedVal}
                               </td>
                             );
@@ -4913,7 +4890,7 @@ const SkuMasterV2: React.FC = () => {
                                 value={cellVal ?? ''}
                                 placeholder={`Set ${col.toLowerCase()}...`}
                                 onChange={(e) => setCustomColumnValues(prev => ({ ...prev, [valKey]: e.target.value }))}
-                                className="px-2.5 py-1 text-xs font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-1 focus:ring-blue-400 focus:border-blue-400 w-28"
+                                className="px-2.5 py-1 text-[0.875rem] font-semibold bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-1 focus:ring-blue-400 focus:border-blue-400 w-28"
                               />
                             </td>
                           );
@@ -4933,7 +4910,7 @@ const SkuMasterV2: React.FC = () => {
                                 setEditSku(sku);
                                 setShowAddDrawer(true);
                               }}
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer font-bold"
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer font-semibold"
                               title="Edit item"
                             >
                               <Edit className="w-4 h-4 text-blue-600" />
@@ -4949,7 +4926,7 @@ const SkuMasterV2: React.FC = () => {
                                 }
                                 setDeleteConfirmSku(sku);
                               }}
-                              className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                              className="icon-btn-danger"
                               title="Delete item"
                             >
                               <Trash2 className="w-4 h-4 text-rose-500" />
@@ -4968,7 +4945,7 @@ const SkuMasterV2: React.FC = () => {
           <div className="p-4 border-t border-gray-100 bg-gray-50/40">
             <button
               onClick={() => { setEditSku(null); setShowAddDrawer(true); }}
-              className="px-4 py-2 border border-blue-300 text-blue-600 hover:bg-blue-50 bg-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+              className="px-4 py-2 border border-blue-300 text-blue-600 hover:bg-blue-50 bg-white rounded-xl text-[0.875rem] font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Add {activeMainTab === 'products' ? 'product' : activeMainTab === 'materials' ? 'raw material' : 'semi finished material'}</span>
@@ -4980,7 +4957,7 @@ const SkuMasterV2: React.FC = () => {
       ) : (
 
         /* ── CATEGORIES TAB VIEW ── */
-        <div className="space-y-4 text-left animate-in fade-in duration-200">
+        <div className="space-y-4 text-left">
           
           {/* Top Categories Toolbar & Section Navigation */}
           <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -4988,13 +4965,13 @@ const SkuMasterV2: React.FC = () => {
             {/* Left: Section Header & Cute Segmented Subtabs */}
             <div className="flex flex-col md:flex-row md:items-center gap-4">
               <div>
-                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
                   <span>Categories Master</span>
-                  <span className="bg-blue-50 text-blue-700 border border-blue-200/80 text-[11px] font-bold px-2 py-0.5 rounded-full">
+                  <span className="bg-blue-50 text-blue-700 border border-blue-200/80 text-xs font-semibold px-2 py-0.5 rounded-full">
                     {categoriesData.length} Total
                   </span>
                 </h2>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-[0.875rem] text-gray-500 mt-0.5">
                   Configure structural categories, default UOMs, and variant attribute fields
                 </p>
               </div>
@@ -5003,7 +4980,7 @@ const SkuMasterV2: React.FC = () => {
               <div className="bg-slate-100/90 p-1 rounded-xl inline-flex items-center gap-1 border border-slate-200/80 shadow-2xs self-start md:self-auto">
                 <button
                   onClick={() => setActiveCategorySubTab('products')}
-                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-2 ${
+                  className={`px-3.5 py-1.5 text-[0.875rem] font-semibold rounded-lg cursor-pointer flex items-center gap-2 ${
                     activeCategorySubTab === 'products'
                       ? 'bg-white text-blue-700 shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
@@ -5011,7 +4988,7 @@ const SkuMasterV2: React.FC = () => {
                 >
                   <Package className={`w-3.5 h-3.5 ${activeCategorySubTab === 'products' ? 'text-blue-600' : 'text-slate-400'}`} />
                   <span>Products</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  <span className={`text-xs px-1.5 py-0.2 rounded-full font-semibold ${
                     activeCategorySubTab === 'products' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-600'
                   }`}>
                     {categoriesData.filter(c => c.type === 'products').length}
@@ -5020,7 +4997,7 @@ const SkuMasterV2: React.FC = () => {
 
                 <button
                   onClick={() => setActiveCategorySubTab('materials')}
-                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-2 ${
+                  className={`px-3.5 py-1.5 text-[0.875rem] font-semibold rounded-lg cursor-pointer flex items-center gap-2 ${
                     activeCategorySubTab === 'materials'
                       ? 'bg-white text-amber-800 shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
@@ -5028,7 +5005,7 @@ const SkuMasterV2: React.FC = () => {
                 >
                   <Layers className={`w-3.5 h-3.5 ${activeCategorySubTab === 'materials' ? 'text-amber-600' : 'text-slate-400'}`} />
                   <span>Materials</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  <span className={`text-xs px-1.5 py-0.2 rounded-full font-semibold ${
                     activeCategorySubTab === 'materials' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-600'
                   }`}>
                     {categoriesData.filter(c => c.type === 'materials').length}
@@ -5037,16 +5014,16 @@ const SkuMasterV2: React.FC = () => {
 
                 <button
                   onClick={() => setActiveCategorySubTab('semi')}
-                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-2 ${
+                  className={`px-3.5 py-1.5 text-[0.875rem] font-semibold rounded-lg cursor-pointer flex items-center gap-2 ${
                     activeCategorySubTab === 'semi'
-                      ? 'bg-white text-purple-700 shadow-xs'
+                      ? 'bg-white text-blue-700 shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
                   }`}
                 >
-                  <Boxes className={`w-3.5 h-3.5 ${activeCategorySubTab === 'semi' ? 'text-purple-600' : 'text-slate-400'}`} />
+                  <Boxes className={`w-3.5 h-3.5 ${activeCategorySubTab === 'semi' ? 'text-blue-600' : 'text-slate-400'}`} />
                   <span>Semi</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                    activeCategorySubTab === 'semi' ? 'bg-purple-100 text-purple-800' : 'bg-slate-200 text-slate-600'
+                  <span className={`text-xs px-1.5 py-0.2 rounded-full font-semibold ${
+                    activeCategorySubTab === 'semi' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-600'
                   }`}>
                     {categoriesData.filter(c => c.type === 'semi').length}
                   </span>
@@ -5063,7 +5040,7 @@ const SkuMasterV2: React.FC = () => {
                   value={categorySearchQuery}
                   onChange={(e) => setCategorySearchQuery(e.target.value)}
                   placeholder={`Search ${activeCategorySubTab}...`}
-                  className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl w-36 sm:w-48 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                  className="pl-8 pr-7 py-1.5 text-[0.875rem] bg-gray-50 border border-gray-200 rounded-xl w-36 sm:w-48 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
                 />
                 {categorySearchQuery && (
                   <button 
@@ -5077,7 +5054,7 @@ const SkuMasterV2: React.FC = () => {
 
               <button 
                 onClick={handleOpenAddCategoryModal}
-                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-md flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-xl text-[0.875rem] font-semibold shadow-xs hover:shadow-md flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add {activeCategorySubTab === 'products' ? 'Product' : activeCategorySubTab === 'materials' ? 'Material' : 'Semi'} Category</span>
@@ -5097,12 +5074,12 @@ const SkuMasterV2: React.FC = () => {
             if (filtered.length === 0) {
               return (
                 <div className="py-14 px-6 text-center flex flex-col items-center justify-center space-y-4 rounded-2xl border-2 border-dashed border-gray-200/90 bg-white shadow-2xs">
-                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-xs transition-transform hover:scale-105 ${
+                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-xs ${
                     activeCategorySubTab === 'products'
                       ? 'bg-blue-50 border border-blue-100 text-blue-600'
                       : activeCategorySubTab === 'materials'
                         ? 'bg-amber-50 border border-amber-100 text-amber-600'
-                        : 'bg-purple-50 border border-purple-100 text-purple-600'
+                        : 'bg-blue-50 border border-blue-100 text-blue-600'
                   }`}>
                     {activeCategorySubTab === 'products' ? (
                       <Package className="w-8 h-8" />
@@ -5113,10 +5090,10 @@ const SkuMasterV2: React.FC = () => {
                     )}
                   </div>
                   <div className="max-w-md space-y-1.5">
-                    <h3 className="text-sm font-bold text-gray-900">
+                    <h3 className="text-[0.875rem] font-semibold text-gray-900">
                       {categorySearchQuery ? 'No matching categories found' : `No ${activeCategorySubTab === 'products' ? 'Product' : activeCategorySubTab === 'materials' ? 'Material' : 'Semi'} Categories Yet`}
                     </h3>
-                    <p className="text-xs text-gray-500 leading-relaxed">
+                    <p className="text-[0.875rem] text-gray-500 leading-relaxed">
                       {categorySearchQuery 
                         ? `We couldn't find any categories matching "${categorySearchQuery}".`
                         : `Create your first category to organize your ${activeCategorySubTab === 'products' ? 'finished products' : activeCategorySubTab === 'materials' ? 'raw materials' : 'semi-finished items'} with customized variant attributes and default measurement units.`}
@@ -5125,7 +5102,7 @@ const SkuMasterV2: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleOpenAddCategoryModal}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-md flex items-center gap-1.5 cursor-pointer mt-1"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[0.875rem] font-semibold shadow-xs hover:shadow-md flex items-center gap-1.5 cursor-pointer mt-1"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Create {activeCategorySubTab === 'products' ? 'Product' : activeCategorySubTab === 'materials' ? 'Material' : 'Semi'} Category</span>
@@ -5149,22 +5126,18 @@ const SkuMasterV2: React.FC = () => {
                     return (
                       <div 
                         key={cat.id}
-                        style={{
-                          animation: 'slideDownFade 0.3s ease-out forwards',
-                          animationDelay: `${index * 35}ms`
-                        }}
-                        className="bg-white border border-gray-200/80 hover:border-blue-300 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all space-y-3 opacity-0 group"
+                        className="bg-white border border-gray-200/80 hover:border-blue-300 rounded-2xl p-4 shadow-2xs hover:shadow-xs space-y-3 group"
                       >
                         <div className="flex items-start justify-between gap-3">
                           
                           {/* Left: Avatar Icon + Category Name + UOM */}
                           <div className="flex items-start gap-3">
-                            <div className={`p-2.5 rounded-xl border shrink-0 transition-transform group-hover:scale-105 ${
+                            <div className={`p-2.5 rounded-xl border shrink-0 ${
                               cat.type === 'products' 
                                 ? 'bg-blue-50 text-blue-600 border-blue-100' 
                                 : cat.type === 'materials' 
                                   ? 'bg-amber-50 text-amber-600 border-amber-100' 
-                                  : 'bg-purple-50 text-purple-600 border-purple-100'
+                                  : 'bg-blue-50 text-blue-600 border-blue-100'
                             }`}>
                               {cat.type === 'products' ? <Package className="w-4 h-4" /> : cat.type === 'materials' ? <Layers className="w-4 h-4" /> : <Boxes className="w-4 h-4" />}
                             </div>
@@ -5176,12 +5149,12 @@ const SkuMasterV2: React.FC = () => {
                                     handleMainTabChange(cat.type === 'products' ? 'products' : cat.type === 'semi' ? 'semi' : 'materials');
                                     setCategoryFilter(cat.name);
                                   }}
-                                  className="font-bold text-gray-900 text-sm hover:text-blue-600 cursor-pointer transition-colors"
+                                  className="font-semibold text-gray-900 text-[0.875rem] hover:text-blue-600 cursor-pointer"
                                   title={`View all ${cat.name} items`}
                                 >
                                   {cat.name}
                                 </span>
-                                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-xs font-semibold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
                                   <Paperclip className="w-2.5 h-2.5" />
                                   {cat.uom || 'Unit'}
                                 </span>
@@ -5191,12 +5164,12 @@ const SkuMasterV2: React.FC = () => {
                               <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                                 {cat.fields && cat.fields.length > 0 ? (
                                   cat.fields.map(field => (
-                                    <span key={field} className="text-[10px] font-semibold bg-slate-50 text-slate-600 border border-slate-200/70 px-2 py-0.5 rounded-md">
+                                    <span key={field} className="text-xs font-semibold bg-slate-50 text-slate-600 border border-slate-200/70 px-2 py-0.5 rounded-md">
                                       {field}
                                     </span>
                                   ))
                                 ) : (
-                                  <span className="text-[10px] text-gray-400 italic">No custom fields</span>
+                                  <span className="text-xs text-gray-400 italic">No custom fields</span>
                                 )}
                               </div>
                             </div>
@@ -5210,10 +5183,10 @@ const SkuMasterV2: React.FC = () => {
                                 handleMainTabChange(cat.type === 'products' ? 'products' : cat.type === 'semi' ? 'semi' : 'materials');
                                 setCategoryFilter(cat.name);
                               }}
-                              className="text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 border border-emerald-200/80 px-2.5 py-1 rounded-lg shadow-2xs cursor-pointer transition-all flex items-center gap-1.5"
+                              className="text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 border border-emerald-200/80 px-2.5 py-1 rounded-lg shadow-2xs cursor-pointer flex items-center gap-1.5"
                               title={`Filter items by category '${cat.name}'`}
                             >
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                               <span>{linkedItemsCount} {cat.type === 'products' ? 'product' : 'material'}{linkedItemsCount === 1 ? '' : 's'}</span>
                             </button>
 
@@ -5221,7 +5194,7 @@ const SkuMasterV2: React.FC = () => {
                             <div className="flex items-center gap-0.5">
                               <button 
                                 onClick={() => handleOpenEditCategoryModal(cat)}
-                                className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-all cursor-pointer"
+                                className="icon-btn"
                                 title="Edit category"
                               >
                                 <Edit className="w-3.5 h-3.5" />
@@ -5229,7 +5202,7 @@ const SkuMasterV2: React.FC = () => {
 
                               <button 
                                 onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                                className="p-1.5 text-gray-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-all cursor-pointer"
+                                className="icon-btn-danger"
                                 title="Delete category"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -5246,7 +5219,7 @@ const SkuMasterV2: React.FC = () => {
                 {/* Bottom Dashed Add Category Dropzone */}
                 <div
                   onClick={handleOpenAddCategoryModal}
-                  className="border-2 border-dashed border-gray-200 hover:border-blue-400 rounded-2xl p-3.5 text-center text-blue-600 font-semibold text-xs hover:bg-blue-50/40 cursor-pointer transition-all flex items-center justify-center gap-2 shadow-2xs hover:shadow-xs"
+                  className="border-2 border-dashed border-gray-200 hover:border-blue-400 rounded-2xl p-3.5 text-center text-blue-600 font-semibold text-[0.875rem] hover:bg-blue-50/40 cursor-pointer flex items-center justify-center gap-2 shadow-2xs hover:shadow-xs"
                 >
                   <Plus className="w-4 h-4" />
                   <span>+ Add {activeCategorySubTab === 'products' ? 'Product' : activeCategorySubTab === 'materials' ? 'Material' : 'Semi'} Category</span>
@@ -5261,7 +5234,7 @@ const SkuMasterV2: React.FC = () => {
 
       {/* ── TABLE SUMMARY FOOTER ── */}
       {activeMainTab !== 'categories' && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 py-3 px-4 bg-gray-50/70 border-t border-gray-200/80 rounded-b-2xl">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-[0.875rem] text-gray-500 py-3 px-4">
           <div>
             Showing all <strong className="text-gray-900">{filteredAndSortedSkus.length}</strong> items
           </div>
@@ -5280,7 +5253,7 @@ const SkuMasterV2: React.FC = () => {
           onClose={() => setShowCategoryModal(false)}
           title={editingCategory ? 'Edit Category' : 'Add New Category'}
         >
-          <div className="space-y-4 text-xs">
+          <div className="space-y-4 text-[0.875rem]">
             <div>
               <label className="block font-semibold text-gray-700 mb-1">Category Name</label>
               <input
@@ -5288,7 +5261,7 @@ const SkuMasterV2: React.FC = () => {
                 value={categoryForm.name}
                 onChange={(e) => setCategoryForm(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="e.g. Notebooks, Paper Reels"
-                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-[0.875rem] focus:outline-none focus:border-blue-500"
               />
             </div>
 
@@ -5298,7 +5271,7 @@ const SkuMasterV2: React.FC = () => {
                 <select
                   value={categoryForm.type}
                   onChange={(e) => setCategoryForm(prev => ({ ...prev, type: e.target.value as any }))}
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-[0.875rem] focus:outline-none focus:border-blue-500"
                 >
                   <option value="products">Products</option>
                   <option value="materials">Materials</option>
@@ -5332,7 +5305,7 @@ const SkuMasterV2: React.FC = () => {
                       setCategoryForm(prev => ({ ...prev, uom: e.target.value }));
                     }
                   }}
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500 bg-white"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-[0.875rem] focus:outline-none focus:border-blue-500 bg-white"
                 >
                   <option value="">-- Select UOM --</option>
                   {unitsList.map(u => (
@@ -5340,7 +5313,7 @@ const SkuMasterV2: React.FC = () => {
                       {u}
                     </option>
                   ))}
-                  <option value="__ADD_NEW__" className="text-blue-600 font-bold">+ Add Custom Unit...</option>
+                  <option value="__ADD_NEW__" className="text-blue-600 font-semibold">+ Add Custom Unit...</option>
                 </select>
               </div>
             </div>
@@ -5352,11 +5325,11 @@ const SkuMasterV2: React.FC = () => {
                 value={categoryForm.fieldsText}
                 onChange={(e) => setCategoryForm(prev => ({ ...prev, fieldsText: e.target.value }))}
                 placeholder="e.g. Type, Specifications, Notes"
-                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-[0.875rem] focus:outline-none focus:border-blue-500"
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-3">
+            <div className="flex justify-end gap-2 pt-3 dlg-footer">
               <button
                 onClick={() => setShowCategoryModal(false)}
                 className="px-4 py-2 border border-gray-300 rounded-xl text-gray-600 hover:bg-gray-100 font-semibold"
@@ -5426,10 +5399,10 @@ const SkuMasterV2: React.FC = () => {
           onClose={() => setDeleteConfirmSku(null)}
           title="Confirm Delete"
         >
-          <div className="space-y-4 text-xs">
+          <div className="space-y-4 text-[0.875rem]">
             {Number(deleteConfirmSku.presentStock || 0) > 0 ? (
               <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-1.5">
-                <div className="flex items-center gap-2 text-rose-800 font-bold">
+                <div className="flex items-center gap-2 text-rose-800 font-semibold">
                   <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
                   <span>Deletion Blocked: Active Stock Present</span>
                 </div>
@@ -5442,7 +5415,7 @@ const SkuMasterV2: React.FC = () => {
                 Are you sure you want to delete item <strong className="text-gray-900">{deleteConfirmSku.skuCode}</strong> ({deleteConfirmSku.name})?
               </p>
             )}
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-2 dlg-footer">
               <button
                 onClick={() => setDeleteConfirmSku(null)}
                 className="px-4 py-2 border border-gray-300 rounded-xl text-gray-600 font-semibold cursor-pointer"
@@ -5467,17 +5440,17 @@ const SkuMasterV2: React.FC = () => {
           isOpen={!!selectedSkuDetails}
           onClose={() => setSelectedSkuDetails(null)}
           size="max-w-4xl"
-          className="h-[84vh] min-h-[580px]"
+          className="h-[calc(84*var(--vh,1vh))] min-h-[36.25rem]"
           title={
             <div className="flex items-center justify-between w-full pr-6 text-left">
               <div className="flex items-center gap-2.5 flex-wrap">
                 {renderItemDomainIcon(selectedSkuDetails, activeMainTab)}
-                <span className="font-black text-gray-900 text-base tracking-tight">{selectedSkuDetails.name}</span>
-                <div className="flex items-center gap-1.5 bg-blue-50/80 border border-blue-200 text-blue-800 px-2.5 py-0.5 rounded-xl text-xs font-mono font-bold">
+                <span className="font-semibold text-gray-900 text-[0.9375rem]">{selectedSkuDetails.name}</span>
+                <div className="flex items-center gap-1.5 text-gray-500 text-[0.875rem] font-mono font-semibold">
                   <Package className="w-3.5 h-3.5 text-blue-600" />
                   <span>{selectedSkuDetails.skuCode}</span>
                 </div>
-                <span className="text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/80 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                <span className="text-xs font-semibold bg-blue-50 text-blue-700 px-3 py-1 rounded-full">
                   {selectedSkuDetails.category || (
                     (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('RM') ? 'Raw Material' :
                     (selectedSkuDetails.skuCode || '').toUpperCase().startsWith('SEM') ? 'Semi Finished' : 'Finished Goods'
@@ -5493,7 +5466,7 @@ const SkuMasterV2: React.FC = () => {
                     setEditSku(itemToEdit);
                     setShowAddDrawer(true);
                   }}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                  className="btn-primary"
                 >
                   <Edit className="w-3.5 h-3.5" />
                   <span>Edit Item</span>
@@ -5505,7 +5478,7 @@ const SkuMasterV2: React.FC = () => {
                     setSelectedSkuDetails(null);
                     setDeleteConfirmSku(itemToDelete);
                   }}
-                  className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold border border-rose-200 rounded-xl text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                  className="btn-danger-outline"
                 >
                   <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                   <span>Delete</span>
@@ -5514,14 +5487,14 @@ const SkuMasterV2: React.FC = () => {
             </div>
           }
         >
-          <div className="space-y-4 text-xs text-left h-full flex flex-col overflow-y-auto pr-1">
+          <div className="space-y-4 text-[0.875rem] text-left h-full flex flex-col overflow-y-auto pr-1">
             
             {/* Modal Subtabs */}
-            <div className="border-b border-gray-200 flex items-center gap-6 text-xs font-semibold text-gray-500 shrink-0">
+            <div className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-gray-500 shrink-0 bg-gray-100/80 p-1 rounded-full w-fit">
               <button
                 type="button"
                 onClick={() => setDetailsSubTab('details')}
-                className={`pb-2.5 transition-all cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'details' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
+                className={`px-3.5 py-1.5 rounded-full cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'details' ? 'bg-white text-blue-700 shadow-sm font-semibold' : 'hover:text-gray-800'}`}
               >
                 <Package className="w-3.5 h-3.5" />
                 <span>Details & Categories</span>
@@ -5529,12 +5502,12 @@ const SkuMasterV2: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setDetailsSubTab('locations')}
-                className={`pb-2.5 transition-all cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'locations' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
+                className={`px-3.5 py-1.5 rounded-full cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'locations' ? 'bg-white text-blue-700 shadow-sm font-semibold' : 'hover:text-gray-800'}`}
               >
                 <MapPin className="w-3.5 h-3.5" />
                 <span>Locations</span>
                 {modalLocationsBreakdown.length > 0 && (
-                  <span className="bg-blue-100 text-blue-700 font-bold px-1.5 py-0.2 rounded-full text-[10px]">
+                  <span className="bg-blue-100 text-blue-700 font-semibold px-1.5 py-0.2 rounded-full text-xs">
                     {modalLocationsBreakdown.length}
                   </span>
                 )}
@@ -5542,22 +5515,22 @@ const SkuMasterV2: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setDetailsSubTab('work-orders')}
-                className={`pb-2.5 transition-all cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'work-orders' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
+                className={`px-3.5 py-1.5 rounded-full cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'work-orders' ? 'bg-white text-blue-700 shadow-sm font-semibold' : 'hover:text-gray-800'}`}
               >
                 <ClipboardList className="w-3.5 h-3.5" />
                 <span>Work Orders</span>
-                <span className="bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded-full text-[10px] font-bold">
+                <span className="bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded-full text-xs font-semibold">
                   {getWorkOrderCount(selectedSkuDetails)}
                 </span>
               </button>
               <button
                 type="button"
                 onClick={() => setDetailsSubTab('dispatches')}
-                className={`pb-2.5 transition-all cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'dispatches' ? 'text-blue-700 border-b-2 border-blue-600 font-bold' : 'hover:text-gray-800'}`}
+                className={`px-3.5 py-1.5 rounded-full cursor-pointer flex items-center gap-1.5 ${detailsSubTab === 'dispatches' ? 'bg-white text-blue-700 shadow-sm font-semibold' : 'hover:text-gray-800'}`}
               >
                 <Package className="w-3.5 h-3.5" />
                 <span>Dispatches</span>
-                <span className="bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded-full text-[10px] font-bold">
+                <span className="bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded-full text-xs font-semibold">
                   {getDispatchOrderCount(selectedSkuDetails)}
                 </span>
               </button>
@@ -5565,8 +5538,8 @@ const SkuMasterV2: React.FC = () => {
 
             {/* TAB CONTENT: Details & Categories arranged in symmetrical 2x2 cards */}
             {detailsSubTab === 'details' && (
-              <div className="space-y-4 animate-fadeIn">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+              <div className="space-y-4">
+                <div className="detail-sections grid grid-cols-1 md:grid-cols-2 items-start">
                   
                   {/* CARD 1 (Top-Left): Item Specifications */}
                   {(() => {
@@ -5600,13 +5573,13 @@ const SkuMasterV2: React.FC = () => {
                     const isSheet = selectedSkuDetails.paperType === 'Sheets' || (selectedSkuDetails.name || '').toLowerCase().includes('sheet') || (selectedSkuDetails.category || '').toLowerCase().includes('semi') || (selectedSkuDetails.skuCode || '').startsWith('SM') || activeMainTab === 'semi' || activeMainTab === 'materials';
 
                     return (
-                      <div className="bg-white border border-gray-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
-                        <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between pb-0">
                           <div className="flex items-center gap-2">
-                            <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                            <div className="p-1.5 rounded-full bg-blue-50 text-blue-600">
                               <Tag className="w-4 h-4" />
                             </div>
-                            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Item Specifications</h3>
+                            <h3 className="text-sm font-semibold text-gray-900">Item Specifications</h3>
                           </div>
                           <button
                             type="button"
@@ -5616,36 +5589,36 @@ const SkuMasterV2: React.FC = () => {
                               setEditSku(itemToEdit);
                               setShowAddDrawer(true);
                             }}
-                            className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50/60 hover:bg-blue-100/60 px-2.5 py-1 rounded-lg border border-blue-200/60 transition-all cursor-pointer"
+                            className="btn-ghost"
                           >
                             <Edit className="w-3 h-3" />
                             <span>Edit</span>
                           </button>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-y-3.5 gap-x-4 text-xs">
+                        <div className="field-grid text-[0.875rem]">
                           <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">SKU CODE</span>
-                            <span className="font-mono font-bold text-gray-900 text-xs block truncate">{selectedSkuDetails.skuCode}</span>
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">SKU CODE</span>
+                            <span className="font-mono font-semibold text-gray-900 text-[0.875rem] block truncate">{selectedSkuDetails.skuCode}</span>
                           </div>
                           <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">ITEM TYPE</span>
-                            <span className="font-bold text-gray-900 text-xs block truncate">{itemTypeLabel}</span>
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">ITEM TYPE</span>
+                            <span className="font-semibold text-gray-900 text-[0.875rem] block truncate">{itemTypeLabel}</span>
                           </div>
                           <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">CATEGORY</span>
-                            <span className="font-bold text-gray-900 text-xs block truncate">{selectedSkuDetails.category || '—'}</span>
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">CATEGORY</span>
+                            <span className="font-semibold text-gray-900 text-[0.875rem] block truncate">{selectedSkuDetails.category || '—'}</span>
                           </div>
                           <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">BRAND</span>
-                            <span className="font-bold text-gray-900 text-xs block truncate">{selectedSkuDetails.brand || (selectedSkuDetails as any).title || '—'}</span>
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">BRAND</span>
+                            <span className="font-semibold text-gray-900 text-[0.875rem] block truncate">{selectedSkuDetails.brand || (selectedSkuDetails as any).title || '—'}</span>
                           </div>
 
                           <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">
                               {isReel || isSheet ? 'SHEETS PER REAM' : 'PAGES'}
                             </span>
-                            <span className="font-bold text-gray-900 text-xs block">
+                            <span className="font-semibold text-gray-900 text-[0.875rem] block">
                               {(() => {
                                 const detailPages = (selectedSkuDetails as any).pages ?? (selectedSkuDetails as any).sheetsPerReam ?? (selectedSkuDetails as any).standardSheets;
                                 const hasVal = detailPages !== undefined && detailPages !== null && detailPages !== '';
@@ -5654,16 +5627,16 @@ const SkuMasterV2: React.FC = () => {
                             </span>
                           </div>
                           <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">RULING SPEC</span>
-                            <span className="font-bold text-gray-900 text-xs block truncate">{selectedSkuDetails.ruleType || '—'}</span>
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">RULING SPEC</span>
+                            <span className="font-semibold text-gray-900 text-[0.875rem] block truncate">{selectedSkuDetails.ruleType || '—'}</span>
                           </div>
                           <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">GSM</span>
-                            <span className="font-bold text-gray-900 text-xs block">{selectedSkuDetails.gsm ? `${selectedSkuDetails.gsm} GSM` : '—'}</span>
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">GSM</span>
+                            <span className="font-semibold text-gray-900 text-[0.875rem] block">{selectedSkuDetails.gsm ? `${selectedSkuDetails.gsm} GSM` : '—'}</span>
                           </div>
                           <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">TRIMMED SIZE</span>
-                            <span className="font-bold text-gray-900 text-xs block truncate">
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">TRIMMED SIZE</span>
+                            <span className="font-semibold text-gray-900 text-[0.875rem] block truncate">
                               {selectedSkuDetails.width && selectedSkuDetails.length
                                 ? `${selectedSkuDetails.width} × ${selectedSkuDetails.length} CM`
                                 : selectedSkuDetails.width
@@ -5674,8 +5647,8 @@ const SkuMasterV2: React.FC = () => {
                             </span>
                           </div>
                           <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">REAM WEIGHT</span>
-                            <span className="font-bold text-gray-900 text-xs block truncate">
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">REAM WEIGHT</span>
+                            <span className="font-semibold text-gray-900 text-[0.875rem] block truncate">
                               {selectedSkuDetails.reamWeight ? `${selectedSkuDetails.reamWeight} KG` : '—'}
                             </span>
                           </div>
@@ -5711,13 +5684,13 @@ const SkuMasterV2: React.FC = () => {
                     }
 
                     return (
-                      <div className="bg-white border border-gray-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-4">
-                        <div className="flex items-center justify-between border-b border-gray-100 pb-2.5 gap-2">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between pb-0 gap-2">
                           <div className="flex items-center gap-2 shrink-0">
                             <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
                               <ShieldAlert className="w-4 h-4" />
                             </div>
-                            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider whitespace-nowrap">Stock & Thresholds</h3>
+                            <h3 className="text-sm font-semibold text-gray-900 whitespace-nowrap">Stock & Thresholds</h3>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             {isEditingThresholds ? (
@@ -5726,7 +5699,7 @@ const SkuMasterV2: React.FC = () => {
                                   type="button"
                                   onClick={handleSaveThresholds}
                                   disabled={isSavingThresholds}
-                                  className="h-6.5 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-2 rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                  className="btn-success"
                                 >
                                   <Check className="w-3 h-3" />
                                   <span>{isSavingThresholds ? 'Saving...' : 'Save'}</span>
@@ -5734,7 +5707,7 @@ const SkuMasterV2: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => setIsEditingThresholds(false)}
-                                  className="h-6.5 text-[10px] font-bold text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 px-2 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                                  className="h-6.5 text-xs font-semibold text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 px-2 rounded-lg flex items-center gap-1 cursor-pointer"
                                 >
                                   <X className="w-3 h-3" />
                                   <span>Cancel</span>
@@ -5749,60 +5722,60 @@ const SkuMasterV2: React.FC = () => {
                                   setTempVendor((selectedSkuDetails as any).preferredVendor || '');
                                   setIsEditingThresholds(true);
                                 }}
-                                className="h-6.5 text-[10px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2 rounded-lg border border-amber-200/80 flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
+                                className="btn-ghost"
                               >
                                 <Edit className="w-3 h-3 shrink-0" />
                                 <span>Edit</span>
                               </button>
                             )}
-                            <span className={`h-6.5 px-2.5 rounded-lg text-[10px] font-bold uppercase border flex items-center justify-center whitespace-nowrap ${statusBadge.bg}`}>
+                            <span className={`h-6.5 px-2.5 rounded-lg text-xs font-semibold uppercase border flex items-center justify-center whitespace-nowrap ${statusBadge.bg}`}>
                               {statusBadge.label}
                             </span>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-y-3.5 gap-x-4 text-xs">
+                        <div className="field-grid text-[0.875rem]">
                           <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">LIVE ON-HAND</span>
-                            <span className="font-mono font-extrabold text-emerald-600 text-sm block truncate">
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">LIVE ON-HAND</span>
+                            <span className="font-mono font-semibold text-emerald-600 text-[0.875rem] block truncate">
                               {liveStockQty.toLocaleString('en-IN')} {stockUnit}
                             </span>
                           </div>
                           <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">STOCK STATUS</span>
-                            <span className="font-bold text-gray-800 text-xs block truncate">
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">STOCK STATUS</span>
+                            <span className="font-semibold text-gray-800 text-[0.875rem] block truncate">
                               {liveStockQty === 0 ? 'Depleted' : hasMinStock && liveStockQty <= minStockNum ? 'Below Minimum' : 'Healthy Inventory'}
                             </span>
                           </div>
                           <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">MIN STOCK LEVEL</span>
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">MIN STOCK LEVEL</span>
                             {isEditingThresholds ? (
                               <input
                                 type="number"
                                 value={tempMinStock}
                                 onChange={(e) => setTempMinStock(e.target.value)}
-                                className="w-full px-2 py-1 border border-amber-400 rounded-lg text-xs font-bold text-gray-900 bg-white"
+                                className="w-full px-2 py-1 border border-amber-400 rounded-lg text-[0.875rem] font-semibold text-gray-900 bg-white"
                                 placeholder="e.g. 500"
                                 autoFocus
                               />
                             ) : (
-                              <span className="font-mono font-black text-gray-900 text-sm block truncate">
+                              <span className="font-mono font-semibold text-gray-900 text-[0.875rem] block truncate">
                                 {minStockDisplay}
                               </span>
                             )}
                           </div>
                           <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">REORDER LEVEL</span>
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">REORDER LEVEL</span>
                             {isEditingThresholds ? (
                               <input
                                 type="number"
                                 value={tempReorder}
                                 onChange={(e) => setTempReorder(e.target.value)}
-                                className="w-full px-2 py-1 border border-amber-400 rounded-lg text-xs font-bold text-gray-900 bg-white"
+                                className="w-full px-2 py-1 border border-amber-400 rounded-lg text-[0.875rem] font-semibold text-gray-900 bg-white"
                                 placeholder="e.g. 100"
                               />
                             ) : (
-                              <span className="font-mono font-black text-gray-900 text-sm block truncate">
+                              <span className="font-mono font-semibold text-gray-900 text-[0.875rem] block truncate">
                                 {reorderDisplay}
                               </span>
                             )}
@@ -5815,32 +5788,32 @@ const SkuMasterV2: React.FC = () => {
                   {/* CARD 3 (Bottom-Left): Units & Conversion Logic */}
                   {(() => {
                     return (
-                      <div className="bg-white border border-gray-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3.5">
-                        <div className="flex items-center gap-2 border-b border-gray-100 pb-2.5">
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 pb-0">
                           <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600">
                             <RefreshCw className="w-4 h-4" />
                           </div>
-                          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Units & Conversion Logic</h3>
+                          <h3 className="text-sm font-semibold text-gray-900">Units & Conversion Logic</h3>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 text-xs">
+                        <div className="field-grid text-[0.875rem]">
                           <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">STOCKING UNIT (UOM)</span>
-                            <span className="font-black text-gray-900 font-mono text-sm">{selectedSkuDetails.unit || 'Pcs'}</span>
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">STOCKING UNIT (UOM)</span>
+                            <span className="font-semibold text-gray-900 font-mono text-[0.875rem]">{selectedSkuDetails.unit || 'Pcs'}</span>
                           </div>
                           <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">ALTERNATE UNIT (AUOM)</span>
-                            <span className="font-black text-gray-900 font-mono text-sm">
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">ALTERNATE UNIT (AUOM)</span>
+                            <span className="font-semibold text-gray-900 font-mono text-[0.875rem]">
                               {selectedSkuDetails.altUnit || '—'}
                             </span>
                           </div>
                         </div>
 
-                        <div className="bg-purple-50/80 border border-purple-200/80 rounded-xl px-3.5 py-2.5 flex items-center justify-between gap-3">
-                          <span className="text-[10px] font-bold text-purple-900 uppercase tracking-wider whitespace-nowrap">
+                        <div className="bg-blue-50/60 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+                          <span className="text-xs font-medium text-blue-900 uppercase tracking-wider whitespace-nowrap">
                             CONVERSION FORMULA
                           </span>
-                          <span className="font-mono font-bold text-purple-700 text-xs bg-white px-2.5 py-1 rounded-lg border border-purple-200/60 shadow-2xs whitespace-nowrap">
+                          <span className="font-mono font-semibold text-blue-700 text-[0.875rem] bg-white px-2.5 py-1 rounded-lg border border-blue-200/60 whitespace-nowrap">
                             {selectedSkuDetails.altUnit && selectedSkuDetails.altUnitConversion ? (() => {
                               const isAltPcs = (selectedSkuDetails.altUnit || '').toLowerCase().includes('pc');
                               const isPrimaryPcs = (selectedSkuDetails.unit || '').toLowerCase().includes('pc');
@@ -5865,22 +5838,22 @@ const SkuMasterV2: React.FC = () => {
                     const totalEstVal = liveStockQty * unitRate;
 
                     return (
-                      <div className="bg-white border border-gray-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3.5">
-                        <div className="flex items-center gap-2 border-b border-gray-100 pb-2.5">
-                          <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 pb-0">
+                          <div className="p-1.5 rounded-full bg-blue-50 text-blue-600">
                             <Building2 className="w-4 h-4" />
                           </div>
-                          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Procurement & Valuation</h3>
+                          <h3 className="text-sm font-semibold text-gray-900">Procurement & Valuation</h3>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 text-xs">
+                        <div className="field-grid text-[0.875rem]">
                           <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">PREFERRED VENDOR</span>
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">PREFERRED VENDOR</span>
                             {isEditingThresholds ? (
                               <select
                                 value={tempVendor}
                                 onChange={(e) => setTempVendor(e.target.value)}
-                                className="w-full px-2 py-1 border border-amber-400 rounded-lg text-xs font-bold text-gray-900 bg-white cursor-pointer"
+                                className="w-full px-2 py-1 border border-amber-400 rounded-lg text-[0.875rem] font-semibold text-gray-900 bg-white cursor-pointer"
                               >
                                 <option value="">-- Select Vendor --</option>
                                 {modalVendorsList.map(v => (
@@ -5888,22 +5861,22 @@ const SkuMasterV2: React.FC = () => {
                                 ))}
                               </select>
                             ) : (
-                              <span className="font-bold text-gray-900 text-xs block truncate">
+                              <span className="font-semibold text-gray-900 text-[0.875rem] block truncate">
                                 {(selectedSkuDetails as any).preferredVendor || '—'}
                               </span>
                             )}
                           </div>
                           <div>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">EST. LIVE VALUE</span>
-                            <span className="font-mono font-extrabold text-slate-800 text-sm block">
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">EST. LIVE VALUE</span>
+                            <span className="font-mono font-semibold text-slate-800 text-[0.875rem] block">
                               ₹{totalEstVal.toLocaleString('en-IN')}
                             </span>
                           </div>
                         </div>
 
-                        <div className="bg-slate-50/80 border border-slate-200/70 rounded-xl px-3.5 py-2.5 flex items-center justify-between text-xs">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">UNIT RATE / COST</span>
-                          <span className="font-mono font-bold text-gray-700">
+                        <div className="bg-slate-50/80 border border-slate-200/70 rounded-md px-3.5 py-2.5 flex items-center justify-between text-[0.875rem]">
+                          <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">UNIT RATE / COST</span>
+                          <span className="font-mono font-semibold text-gray-700">
                             {unitRate > 0 ? `₹${unitRate.toLocaleString('en-IN')} / ${selectedSkuDetails.unit || 'Pcs'}` : '—'}
                           </span>
                         </div>
@@ -5927,9 +5900,9 @@ const SkuMasterV2: React.FC = () => {
                   return (
                   <div className="space-y-3 border-t border-gray-100 pt-4">
                     {/* Yellow Notice Banner */}
-                    <div className="bg-amber-50/90 border border-amber-200/90 rounded-xl p-3 flex items-center justify-between text-xs font-semibold text-amber-900 shadow-2xs">
+                    <div className="bg-amber-50 rounded-xl px-4 py-3 flex items-center justify-between text-[0.875rem] font-semibold text-amber-900">
                       <span>Bill of Materials — quantities for one batch of this product.</span>
-                      <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-0.5 rounded-full text-xs font-semibold">
+                      <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-0.5 rounded-full text-[0.875rem] font-semibold">
                         ✓ {bomRecipeItems.length} items set
                       </span>
                     </div>
@@ -5937,12 +5910,12 @@ const SkuMasterV2: React.FC = () => {
                     {/* Header row */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-start gap-2.5">
-                        <div className="p-2 bg-blue-100 text-blue-700 rounded-xl shrink-0 shadow-2xs">
+                        <div className="p-2 bg-blue-100 text-blue-700 rounded-md shrink-0">
                           <ClipboardList className="w-4 h-4 text-blue-700" />
                         </div>
                         <div>
-                          <h4 className="font-bold text-gray-900 text-sm">Bill of Materials</h4>
-                          <p className="text-[11px] text-gray-500">
+                          <h4 className="font-semibold text-gray-900 text-[0.875rem]">Bill of Materials</h4>
+                          <p className="text-xs text-gray-500">
                             Quantities for one <strong>batch</strong>. Work orders scale consumption by (qty ÷ batch size × units produced).
                           </p>
                         </div>
@@ -6029,7 +6002,7 @@ const SkuMasterV2: React.FC = () => {
                           <button 
                             type="button"
                             onClick={() => setIsEditingItemBom(true)}
-                            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                            className="btn-primary"
                           >
                             <Edit className="w-3.5 h-3.5" /> Edit BOM
                           </button>
@@ -6037,7 +6010,7 @@ const SkuMasterV2: React.FC = () => {
                           <button 
                             type="button"
                             onClick={handleAddBomItem}
-                            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
+                            className="btn-primary"
                           >
                             <Plus className="w-3.5 h-3.5 stroke-[2.5]" /> Add Item
                           </button>
@@ -6051,7 +6024,7 @@ const SkuMasterV2: React.FC = () => {
                       const activeUnit = recipeYieldUnit || selectedSkuDetails?.unit || 'Pcs';
 
                       return (
-                        <div className="border border-gray-200 rounded-xl p-2.5 px-3.5 text-xs text-gray-700 font-medium flex items-center gap-2 bg-gray-50/60">
+                        <div className="border border-gray-200 rounded-md p-2.5 px-3.5 text-[0.875rem] text-gray-700 font-medium flex items-center gap-2 bg-gray-50/60">
                           <span>This recipe makes</span>
                           {isEditingItemBom ? (
                             <>
@@ -6060,13 +6033,13 @@ const SkuMasterV2: React.FC = () => {
                                 min="1"
                                 value={recipeYieldQty || ''}
                                 onChange={(e) => setRecipeYieldQty(e.target.value)}
-                                className="w-16 px-2 py-1 border border-blue-300 rounded-lg font-bold text-gray-900 text-center bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                className="w-16 px-2 py-1 border border-blue-300 rounded-lg font-semibold text-gray-900 text-center bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
                               />
                               {availableYieldUnits.length > 1 ? (
                                 <select
                                   value={activeUnit}
                                   onChange={(e) => setRecipeYieldUnit(e.target.value)}
-                                  className="px-2.5 py-1 border border-blue-300 rounded-lg font-bold text-blue-800 bg-blue-50 cursor-pointer focus:ring-2 focus:ring-blue-500"
+                                  className="px-2.5 py-1 border border-blue-300 rounded-lg font-semibold text-blue-800 bg-blue-50 cursor-pointer focus:ring-2 focus:ring-blue-500"
                                 >
                                   {availableYieldUnits.map(u => (
                                     <option key={u} value={u}>{u}</option>
@@ -6079,7 +6052,7 @@ const SkuMasterV2: React.FC = () => {
                             </>
                           ) : (
                             <>
-                              <strong className="text-blue-900 font-extrabold bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md font-mono">
+                              <strong className="text-blue-900 font-semibold bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md font-mono">
                                 {recipeYieldQty || '1'} {activeUnit}
                               </strong>
                               <span className="text-gray-400 font-normal">(quantities are configured per batch)</span>
@@ -6090,32 +6063,32 @@ const SkuMasterV2: React.FC = () => {
                     })()}
 
                     {/* Recipe Items Table */}
-                    <div className="border border-gray-200 rounded-xl overflow-x-auto shadow-2xs bg-white">
+                    <div className="border border-gray-200 rounded-md overflow-x-auto bg-white">
                       {bomRecipeItems.length === 0 && !isEditingItemBom ? (
-                        <div className="text-center py-10 text-gray-400 text-xs space-y-2">
+                        <div className="text-center py-10 text-gray-400 text-[0.875rem] space-y-2">
                           <ClipboardList className="w-8 h-8 mx-auto text-gray-300" />
                           <p className="font-semibold text-gray-600">No Bill of Materials configured yet</p>
-                          <p className="text-[11px]">Click "Edit BOM" above to add ingredients and raw material ratios.</p>
+                          <p className="text-xs">Click "Edit BOM" above to add ingredients and raw material ratios.</p>
                           <button
                             type="button"
                             onClick={() => {
                               setIsEditingItemBom(true);
                               handleAddBomItem();
                             }}
-                            className="mt-1 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                            className="mt-1 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md text-[0.875rem] inline-flex items-center gap-1.5 cursor-pointer"
                           >
                             <Plus className="w-3.5 h-3.5" /> Configure BOM Now
                           </button>
                         </div>
                       ) : (
-                        <table className="w-full text-left text-xs border-collapse min-w-[500px]">
-                          <thead className="bg-gray-50/80 text-gray-500 font-bold text-[11px] border-b border-gray-200">
+                        <table className="w-full text-left text-[0.875rem] border-collapse min-w-[31.25rem]">
+                          <thead className="bg-gray-50/80 text-gray-500 font-semibold text-xs border-b border-gray-200">
                             <tr>
                               <th className="py-2.5 px-3">Item</th>
                               <th className="py-2.5 px-3 text-center w-24">Qty</th>
-                              <th className="py-2.5 px-3 text-center min-w-[110px]">UOM / AUOM</th>
+                              <th className="py-2.5 px-3 text-center min-w-[6.875rem]">UOM / AUOM</th>
                               <th className="py-2.5 px-3 text-center w-20">In Stock</th>
-                              <th className="py-2.5 px-3 text-center w-20 font-bold">Runs</th>
+                              <th className="py-2.5 px-3 text-center w-20 font-semibold">Runs</th>
                               {isEditingItemBom && <th className="py-2.5 px-3 text-right w-10"></th>}
                             </tr>
                           </thead>
@@ -6153,7 +6126,7 @@ const SkuMasterV2: React.FC = () => {
                                         />
                                       </div>
                                     ) : (
-                                      <div className="font-bold text-gray-900 text-xs leading-snug">
+                                      <div className="font-semibold text-gray-900 text-[0.875rem] leading-snug">
                                         {b.name || '—'}
                                       </div>
                                     )}
@@ -6169,10 +6142,10 @@ const SkuMasterV2: React.FC = () => {
                                           const val = e.target.value;
                                           setBomRecipeItems(prev => prev.map(item => item.id === b.id ? { ...item, qty: val === '' ? ('' as any) : Number(val) } : item));
                                         }}
-                                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold font-mono text-center focus:outline-none focus:border-blue-500 bg-white"
+                                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-[0.875rem] font-semibold font-mono text-center focus:outline-none focus:border-blue-500 bg-white"
                                       />
                                     ) : (
-                                      <span className="font-mono font-bold text-gray-900">{b.qty !== undefined && b.qty !== '' ? b.qty : '—'}</span>
+                                      <span className="font-mono font-semibold text-gray-900">{b.qty !== undefined && b.qty !== '' ? b.qty : '—'}</span>
                                     )}
                                   </td>
                                   <td className="py-2 px-3 text-center">
@@ -6213,7 +6186,7 @@ const SkuMasterV2: React.FC = () => {
                                                 altUnit: isAlt ? val : (altUom || '')
                                               } : item));
                                             }}
-                                            className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold text-center focus:outline-none focus:border-blue-500 bg-white cursor-pointer"
+                                            className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-[0.875rem] font-semibold text-center focus:outline-none focus:border-blue-500 bg-white cursor-pointer"
                                             title="Unit of Measurement (UOM / AUOM)"
                                           >
                                             {options.map(opt => (
@@ -6225,13 +6198,13 @@ const SkuMasterV2: React.FC = () => {
                                         );
                                       })()
                                     ) : (
-                                      <span className="text-gray-700 font-semibold whitespace-nowrap text-xs bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-md">
+                                      <span className="text-gray-700 font-semibold whitespace-nowrap text-[0.875rem] bg-gray-50 border border-gray-100 px-2 py-0.5 rounded-md">
                                         {b.uom || 'Pcs'}
                                       </span>
                                     )}
                                   </td>
                                   <td className="py-2 px-3 text-center text-gray-600 font-mono whitespace-nowrap w-20">{b.inStock ?? 0}</td>
-                                  <td className="py-2 px-3 text-center font-bold text-gray-900 whitespace-nowrap w-20">
+                                  <td className="py-2 px-3 text-center font-semibold text-gray-900 whitespace-nowrap w-20">
                                     {runs !== null ? runs.toLocaleString() : '—'}
                                   </td>
                                   {isEditingItemBom && (
@@ -6239,7 +6212,7 @@ const SkuMasterV2: React.FC = () => {
                                       <button
                                         type="button"
                                         onClick={() => handleDeleteBomItem(b.id)}
-                                        className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-all cursor-pointer"
+                                        className="icon-btn-danger"
                                         title="Remove material"
                                       >
                                         <Trash2 className="w-3.5 h-3.5" />
@@ -6255,14 +6228,14 @@ const SkuMasterV2: React.FC = () => {
 
                       {/* Bottom Summary Bar */}
                       <div className="p-3 bg-white border-t border-gray-100 flex items-center justify-between">
-                        <div className="flex items-center gap-10 text-xs">
+                        <div className="flex items-center gap-10 text-[0.875rem]">
                           <div>
-                            <div className="text-[11px] text-gray-400 font-medium">Items</div>
-                            <div className="text-sm font-bold text-gray-900">{bomRecipeItems.length} items</div>
+                            <div className="text-xs text-gray-400 font-medium">Items</div>
+                            <div className="text-[0.875rem] font-semibold text-gray-900">{bomRecipeItems.length} items</div>
                           </div>
                           <div>
-                            <div className="text-[11px] text-gray-400 font-medium">Can make</div>
-                            <div className="text-sm font-bold text-gray-900">
+                            <div className="text-xs text-gray-400 font-medium">Can make</div>
+                            <div className="text-[0.875rem] font-semibold text-gray-900">
                               {(() => {
                                 const validRuns = bomRecipeItems
                                   .map(b => (b.qty && Number(b.qty) > 0) ? Math.floor((Number(b.inStock) || 0) / Number(b.qty)) : null)
@@ -6287,7 +6260,7 @@ const SkuMasterV2: React.FC = () => {
                                   }
                                   setIsEditingItemBom(false);
                                 }}
-                                className="px-3.5 py-1.5 border border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold rounded-xl text-xs cursor-pointer transition-all"
+                                className="px-3.5 py-1.5 border border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold rounded-md text-[0.875rem] cursor-pointer"
                               >
                                 Cancel
                               </button>
@@ -6295,7 +6268,7 @@ const SkuMasterV2: React.FC = () => {
                                 type="button"
                                 onClick={handleSaveBomRecipe}
                                 disabled={isSavingBom}
-                                className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all disabled:opacity-50"
+                                className="btn-success disabled:opacity-50"
                               >
                                 {isSavingBom ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                                 <span>Save recipe</span>
@@ -6305,7 +6278,7 @@ const SkuMasterV2: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => setIsEditingItemBom(true)}
-                              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all"
+                              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md text-[0.875rem] flex items-center gap-1.5 cursor-pointer"
                             >
                               <Edit className="w-3.5 h-3.5" />
                               <span>Edit BOM</span>
@@ -6330,17 +6303,17 @@ const SkuMasterV2: React.FC = () => {
                   return (
                     <div className="space-y-3 border-t border-gray-100 pt-4">
                       {/* Card: Additional Costs */}
-                      <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs space-y-3">
+                      <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center">
                               <Settings className="w-4 h-4 text-orange-500" />
                             </div>
                             <div>
-                              <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+                              <span className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wide">
                                 Additional Costs / Overheads ({bomAdditionalCosts.length})
                               </span>
-                              <p className="text-[10px] text-gray-500 font-medium">
+                              <p className="text-xs text-gray-500 font-medium">
                                 Direct labour, electricity, packaging, or machine charges.
                               </p>
                             </div>
@@ -6356,16 +6329,16 @@ const SkuMasterV2: React.FC = () => {
                                 appliedAs: 'Per Unit (PCS)'
                               }]);
                             }}
-                            className="px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-all border border-gray-200 shadow-3xs"
+                            className="px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700 font-semibold rounded-lg text-[0.875rem] flex items-center gap-1 cursor-pointer border border-gray-200 shadow-3xs"
                           >
                             <Plus className="w-3.5 h-3.5" />
                             <span>Add Cost</span>
                           </button>
                         </div>
 
-                        <div className="overflow-x-auto border border-gray-200 rounded-xl">
-                          <table className="w-full text-left border-collapse text-xs">
-                            <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                        <div className="overflow-x-auto border border-gray-200 rounded-md">
+                          <table className="w-full text-left border-collapse text-[0.875rem]">
+                            <thead className="bg-gray-50/80 text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
                               <tr>
                                 <th className="py-2 px-3 w-8 text-center">#</th>
                                 <th className="py-2 px-3">COST TYPE</th>
@@ -6377,7 +6350,7 @@ const SkuMasterV2: React.FC = () => {
                             <tbody className="divide-y divide-gray-100 bg-white">
                               {bomAdditionalCosts.map((cost, cIdx) => (
                                 <tr key={cost.id} className="hover:bg-gray-50/60">
-                                  <td className="py-2 px-3 text-center font-bold text-gray-400">{cIdx + 1}</td>
+                                  <td className="py-2 px-3 text-center font-semibold text-gray-400">{cIdx + 1}</td>
                                   <td className="py-2 px-3">
                                     <input
                                       type="text"
@@ -6399,7 +6372,7 @@ const SkuMasterV2: React.FC = () => {
                                         }
                                       }}
                                       placeholder="e.g. Labour, Electricity"
-                                      className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                      className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                                     />
                                   </td>
                                   <td className="py-2 px-3 text-center">
@@ -6409,7 +6382,7 @@ const SkuMasterV2: React.FC = () => {
                                         const val = e.target.value;
                                         setBomAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, basis: val, appliedAs: val } : c));
                                       }}
-                                      className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer"
+                                      className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-800 cursor-pointer"
                                     >
                                       <option value="Per BOM">Per BOM</option>
                                       <option value="Per Piece">Per Piece</option>
@@ -6422,14 +6395,14 @@ const SkuMasterV2: React.FC = () => {
                                       step="0.01"
                                       value={cost.amount}
                                       onChange={e => setBomAdditionalCosts(prev => prev.map(c => c.id === cost.id ? { ...c, amount: e.target.value } : c))}
-                                      className="w-20 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-xs font-bold"
+                                      className="w-20 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-[0.875rem] font-semibold"
                                     />
                                   </td>
                                   <td className="py-2 px-3 text-center">
                                     <button
                                       type="button"
                                       onClick={() => setBomAdditionalCosts(prev => prev.filter(c => c.id !== cost.id))}
-                                      className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                                      className="icon-btn-danger"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
@@ -6438,7 +6411,7 @@ const SkuMasterV2: React.FC = () => {
                               ))}
                               {bomAdditionalCosts.length === 0 && (
                                 <tr>
-                                  <td colSpan={5} className="py-4 text-center text-xs text-gray-400 italic bg-gray-50/30">
+                                  <td colSpan={5} className="py-4 text-center text-[0.875rem] text-gray-400 italic bg-gray-50/30">
                                     No additional costs added. Click <strong className="text-orange-600 cursor-pointer" onClick={() => setBomAdditionalCosts(prev => [...prev, { id: `cost-${Date.now()}`, costType: '', basis: 'Per Piece', amount: 0, appliedAs: 'Per Piece' }])}>"+ Add Cost"</strong> above to record direct labour, machine charges, or printing.
                                   </td>
                                 </tr>
@@ -6456,31 +6429,31 @@ const SkuMasterV2: React.FC = () => {
                       </div>
 
                       {/* Card: Profit & Pricing */}
-                      <div className="bg-white rounded-2xl border border-emerald-200/80 p-4 shadow-3xs space-y-3">
+                      <div className="bg-white rounded-lg border border-emerald-200/80 p-4 shadow-3xs space-y-3">
                         <div className="flex items-center gap-2">
                           <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
                             <Tag className="w-4 h-4 text-emerald-600" />
                           </div>
                           <div>
-                            <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+                            <span className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wide">
                               Profit &amp; Pricing (Optional)
                             </span>
-                            <p className="text-[10px] text-gray-500 font-medium">
+                            <p className="text-xs text-gray-500 font-medium">
                               Calculate suggested selling price based on manufacturing cost.
                             </p>
                           </div>
                         </div>
 
-                        <div className="bg-emerald-50/20 border border-emerald-100 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                        <div className="bg-emerald-50/20 border border-emerald-100 rounded-md p-3 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                           <div>
-                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Pricing Method</label>
-                            <div className="w-full px-2.5 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs font-bold text-emerald-800 flex items-center justify-between shadow-3xs">
+                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">Pricing Method</label>
+                            <div className="w-full px-2.5 py-1.5 bg-white border border-emerald-200 rounded-lg text-[0.875rem] font-semibold text-emerald-800 flex items-center justify-between shadow-3xs">
                               <span>Margin %</span>
-                              <span className="text-[9px] px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded font-semibold border border-emerald-200">Profit Margin</span>
+                              <span className="text-xs px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded font-semibold border border-emerald-200">Profit Margin</span>
                             </div>
                           </div>
                           <div>
-                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                               Margin Percentage
                             </label>
                             <div className="relative">
@@ -6490,26 +6463,26 @@ const SkuMasterV2: React.FC = () => {
                                 value={bomProfitPricing.markupPercentage}
                                 onChange={e => setBomProfitPricing(prev => ({ ...prev, pricingMethod: 'Margin %', markupPercentage: e.target.value }))}
                                 placeholder="0"
-                                className="w-full pl-3 pr-7 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                className="w-full pl-3 pr-7 py-1.5 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                               />
-                              <span className="absolute right-2.5 top-1.5 text-xs font-bold text-gray-400 select-none">%</span>
+                              <span className="absolute right-2.5 top-1.5 text-[0.875rem] font-semibold text-gray-400 select-none">%</span>
                             </div>
                           </div>
                           <div>
-                            <label className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">Suggested Price / PCS</label>
-                            <div className="px-3 py-1.5 bg-white border border-emerald-300 text-emerald-900 rounded-lg font-mono font-black text-sm text-center shadow-3xs">
+                            <label className="text-xs font-medium text-emerald-800 uppercase tracking-wider block mb-1">Suggested Price / PCS</label>
+                            <div className="px-3 py-1.5 bg-white border border-emerald-300 text-emerald-900 rounded-lg font-mono font-semibold text-[0.875rem] text-center shadow-3xs">
                               ₹0.00
                             </div>
                           </div>
                           <div>
-                            <label className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">Suggested Price / GBL</label>
-                            <div className="px-3 py-1.5 bg-white border border-emerald-300 text-emerald-900 rounded-lg font-mono font-black text-sm text-center shadow-3xs">
+                            <label className="text-xs font-medium text-emerald-800 uppercase tracking-wider block mb-1">Suggested Price / GBL</label>
+                            <div className="px-3 py-1.5 bg-white border border-emerald-300 text-emerald-900 rounded-lg font-mono font-semibold text-[0.875rem] text-center shadow-3xs">
                               ₹0.00
                             </div>
                           </div>
                         </div>
 
-                        <p className="text-[10px] text-gray-400 text-center">
+                        <p className="text-xs text-gray-400 text-center">
                           Live pricing calculations are shown in the <strong>Production Order Wizard</strong> when this SKU is selected.
                         </p>
                       </div>
@@ -6520,7 +6493,7 @@ const SkuMasterV2: React.FC = () => {
                           type="button"
                           onClick={handleSaveBomRecipe}
                           disabled={isSavingBom}
-                          className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all disabled:opacity-50"
+                          className="btn-success disabled:opacity-50"
                         >
                           {isSavingBom ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                           <span>Save BOM &amp; Costing</span>
@@ -6545,24 +6518,24 @@ const SkuMasterV2: React.FC = () => {
                     <div className="space-y-3 border-t border-gray-100 pt-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
+                          <div className="p-2 bg-blue-100 text-blue-700 rounded-md">
                             <SlidersHorizontal className="w-4 h-4" />
                           </div>
                           <div>
-                            <h4 className="font-bold text-gray-900 text-xs">Book Manufacturing Process Steps</h4>
-                            <p className="text-[11px] text-gray-400">Reel Slitting &rarr; Paper Ruling &rarr; Folding &rarr; Wire Stitching &rarr; Cover Lamination &rarr; Trimming</p>
+                            <h4 className="font-semibold text-gray-900 text-[0.875rem]">Book Manufacturing Process Steps</h4>
+                            <p className="text-xs text-gray-400">Reel Slitting &rarr; Paper Ruling &rarr; Folding &rarr; Wire Stitching &rarr; Cover Lamination &rarr; Trimming</p>
                           </div>
                         </div>
 
                         <button 
                           onClick={() => showToast('Process step added', 'success')}
-                          className="px-3 py-1.5 border border-blue-300 text-blue-600 bg-white hover:bg-blue-50 rounded-lg font-semibold text-xs shadow-2xs flex items-center gap-1 cursor-pointer"
+                          className="px-3 py-1.5 border border-blue-300 text-blue-600 bg-white hover:bg-blue-50 rounded-lg font-semibold text-[0.875rem] flex items-center gap-1 cursor-pointer"
                         >
                           <Plus className="w-3.5 h-3.5" /> Add Step
                         </button>
                       </div>
 
-                      <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center text-gray-400 text-xs font-medium bg-gray-50/50">
+                      <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center text-gray-400 text-[0.875rem] font-medium bg-gray-50/50">
                         No custom steps yet — click "Add Step" to define book production routing
                       </div>
                     </div>
@@ -6572,7 +6545,7 @@ const SkuMasterV2: React.FC = () => {
                 {/* 5. Custom Fields (Rendered dynamically ONLY if custom columns exist!) */}
                 {customColumns.length > 0 && (
                   <div className="space-y-3 border-t border-gray-100 pt-4">
-                    <h4 className="font-bold text-gray-900 text-xs">Custom Fields</h4>
+                    <h4 className="font-semibold text-gray-900 text-[0.875rem]">Custom Fields</h4>
                     <div className="grid grid-cols-2 gap-3">
                       {customColumns.map((col) => {
                         const colType = customColumnTypes[col] || 'text';
@@ -6588,7 +6561,7 @@ const SkuMasterV2: React.FC = () => {
                                 onChange={(e) => setCustomColumnValues(prev => ({ ...prev, [valKey]: e.target.checked }))}
                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                               />
-                              <label className="text-xs font-semibold text-gray-700">{col}</label>
+                              <label className="text-[0.875rem] font-semibold text-gray-700">{col}</label>
                             </div>
                           );
                         }
@@ -6603,12 +6576,12 @@ const SkuMasterV2: React.FC = () => {
                           const activeOpt = options.find(o => o.label === activeVal) || options[0];
                           return (
                             <div key={col}>
-                              <label className="block text-[11px] font-semibold text-gray-600 mb-1">{col.toLowerCase()}</label>
+                              <label className="block text-xs font-semibold text-gray-600 mb-1">{col.toLowerCase()}</label>
                               <select
                                 value={activeVal}
                                 onChange={(e) => setCustomColumnValues(prev => ({ ...prev, [valKey]: e.target.value }))}
                                 style={{ backgroundColor: activeOpt?.color || '#e0f2fe' }}
-                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 focus:outline-none cursor-pointer shadow-2xs"
+                                className="w-full border border-gray-200 rounded-md px-3 py-2 text-[0.875rem] font-semibold text-gray-800 focus:outline-none cursor-pointer"
                               >
                                 {options.map(opt => (
                                   <option key={opt.label} value={opt.label}>{opt.label}</option>
@@ -6623,8 +6596,8 @@ const SkuMasterV2: React.FC = () => {
                           const calculatedVal = evaluateFormula(expression, selectedSkuDetails);
                           return (
                             <div key={col}>
-                              <label className="block text-[11px] font-semibold text-gray-600 mb-1">{col.toLowerCase()}</label>
-                              <div className="w-full bg-blue-50/50 border border-blue-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-blue-700">
+                              <label className="block text-xs font-semibold text-gray-600 mb-1">{col.toLowerCase()}</label>
+                              <div className="w-full bg-blue-50/50 border border-blue-200 rounded-md px-3 py-2 text-[0.875rem] font-mono font-semibold text-blue-700">
                                 {calculatedVal}
                               </div>
                             </div>
@@ -6633,13 +6606,13 @@ const SkuMasterV2: React.FC = () => {
 
                         return (
                           <div key={col}>
-                            <label className="block text-[11px] font-semibold text-gray-600 mb-1">{col.toLowerCase()}</label>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">{col.toLowerCase()}</label>
                             <input
                               type={colType === 'number' ? 'number' : colType === 'date' ? 'date' : 'text'}
                               value={cellVal ?? ''}
                               placeholder={`Enter ${col.toLowerCase()}...`}
                               onChange={(e) => setCustomColumnValues(prev => ({ ...prev, [valKey]: e.target.value }))}
-                              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-medium text-gray-800 focus:outline-none focus:border-blue-500 shadow-2xs"
+                              className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-[0.875rem] font-medium text-gray-800 focus:outline-none focus:border-blue-500"
                             />
                           </div>
                         );
@@ -6655,38 +6628,38 @@ const SkuMasterV2: React.FC = () => {
             {detailsSubTab === 'locations' && (
               <div className="space-y-4">
                 {/* Summary Header - Live Total Stock Across All Locations */}
-                <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-xs font-medium text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
                       <Package className="w-3.5 h-3.5 text-emerald-600" />
                       LIVE TOTAL ON-HAND
                     </span>
-                    <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                       Live Consolidated
                     </span>
                   </div>
-                  <div className="font-mono font-extrabold text-emerald-600 text-base">
+                  <div className="font-mono font-semibold text-emerald-600 text-base">
                     {(modalDynamicLiveStock !== null ? modalDynamicLiveStock : (Number((selectedSkuDetails as any).presentStock) || 0)).toLocaleString('en-IN')} {selectedSkuDetails.unit || 'Pcs'}
                   </div>
-                  <p className="text-[10.5px] text-gray-400">Consolidated quantity currently held across all warehouse locations</p>
+                  <p className="text-xs text-gray-400">Consolidated quantity currently held across all warehouse locations</p>
                 </div>
 
                 {/* Multi-Location Live Breakdown Table / Card List */}
-                <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs overflow-hidden">
+                <div className="bg-white rounded-lg border border-gray-200/90 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
                     <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                      <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
                         <Layers className="w-3.5 h-3.5" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-gray-900 text-xs">Live Multi-Location Inventory Breakdown</h4>
-                        <p className="text-[10.5px] text-gray-500">Same item distributed across warehouse bins, bays, and racks</p>
+                        <h4 className="font-semibold text-gray-900 text-[0.875rem]">Live Multi-Location Inventory Breakdown</h4>
+                        <p className="text-xs text-gray-500">Same item distributed across warehouse bins, bays, and racks</p>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={handleOpenMiniStockOverview}
-                      className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200 transition-all cursor-pointer shadow-2xs"
+                      className="btn-ghost"
                       title="Open miniature stock overview popup"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -6697,25 +6670,25 @@ const SkuMasterV2: React.FC = () => {
                   {isLoadingLocations ? (
                     <div className="py-12 flex items-center justify-center gap-2 text-gray-400">
                       <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
-                      <span className="text-xs font-medium">Resolving live storage locations...</span>
+                      <span className="text-[0.875rem] font-medium">Resolving live storage locations...</span>
                     </div>
                   ) : modalLocationsBreakdown.length === 0 ? (
                     <div className="p-6 text-center space-y-3">
-                      <div className="w-12 h-12 mx-auto rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400">
+                      <div className="w-12 h-12 mx-auto rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400">
                         <MapPin className="w-6 h-6 text-slate-400" />
                       </div>
                       <div className="space-y-1 max-w-md mx-auto">
-                        <p className="font-bold text-gray-800 text-xs">Warehouse Storage Breakdown</p>
-                        <p className="text-[11px] text-gray-500 leading-relaxed">
+                        <p className="font-semibold text-gray-800 text-[0.875rem]">Warehouse Storage Breakdown</p>
+                        <p className="text-xs text-gray-500 leading-relaxed">
                           When stock is transferred or received across warehouse locations, each location and on-hand balance will be listed here automatically.
                         </p>
                       </div>
                     </div>
                   ) : (
                     <div className="divide-y divide-gray-100 overflow-x-auto">
-                      <table className="w-full text-left text-xs">
+                      <table className="w-full text-left text-[0.875rem]">
                         <thead>
-                          <tr className="bg-slate-50/80 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                          <tr className="bg-slate-50/80 text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-100">
                             <th className="py-2.5 px-4">Location Name & Code</th>
                             <th className="py-2.5 px-4">Full Hierarchy Path</th>
                             <th className="py-2.5 px-4 text-right">On-Hand Stock</th>
@@ -6725,35 +6698,35 @@ const SkuMasterV2: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                           {modalLocationsBreakdown.map((loc, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                            <tr key={idx} className="hover:bg-slate-50/60">
                               <td className="py-3 px-4">
                                 <div className="flex items-center gap-2">
                                   <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></div>
-                                  <span className="font-bold text-gray-900">{loc.locationName || 'Warehouse Storage'}</span>
+                                  <span className="font-semibold text-gray-900">{loc.locationName || 'Warehouse Storage'}</span>
                                   {loc.locationCode && (
-                                    <span className="font-mono text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
+                                    <span className="font-mono text-xs bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
                                       {loc.locationCode}
                                     </span>
                                   )}
                                 </div>
                               </td>
                               <td className="py-3 px-4">
-                                <span className="text-[11px] text-gray-600 font-medium">
+                                <span className="text-xs text-gray-600 font-medium">
                                   {loc.hierarchyPath || `${loc.warehouseName || 'Warehouse'} ➔ ${loc.zoneName || loc.floorName || 'General Zone'}`}
                                 </span>
                               </td>
                               <td className="py-3 px-4 text-right">
-                                <span className="font-mono font-bold text-emerald-700 text-xs">
+                                <span className="font-mono font-semibold text-emerald-700 text-[0.875rem]">
                                   {Number(loc.onHand || 0).toLocaleString('en-IN')} {selectedSkuDetails.unit || 'Pcs'}
                                 </span>
                               </td>
                               <td className="py-3 px-4 text-right">
-                                <span className="font-mono font-bold text-blue-700 text-xs">
+                                <span className="font-mono font-semibold text-blue-700 text-[0.875rem]">
                                   {Number(loc.available !== undefined ? loc.available : loc.onHand || 0).toLocaleString('en-IN')} {selectedSkuDetails.unit || 'Pcs'}
                                 </span>
                               </td>
                               <td className="py-3 px-4 text-right">
-                                <span className="font-mono font-bold text-gray-800 text-xs">
+                                <span className="font-mono font-semibold text-gray-800 text-[0.875rem]">
                                   ₹{Number(loc.stockValue || (Number(loc.onHand || 0) * Number((selectedSkuDetails as any).purchasePrice || (selectedSkuDetails as any).ratePerKg || (selectedSkuDetails as any).rate || 0))).toLocaleString('en-IN')}
                                 </span>
                               </td>
@@ -6769,26 +6742,26 @@ const SkuMasterV2: React.FC = () => {
 
             {/* TAB CONTENT: Work Orders */}
             {detailsSubTab === 'work-orders' && (
-              <div className="flex-1 flex flex-col items-center justify-center py-12 text-center text-gray-400 space-y-3 bg-slate-50/60 rounded-2xl border border-dashed border-gray-200 my-auto min-h-[380px]">
-                <div className="w-14 h-14 rounded-2xl bg-white shadow-2xs border border-gray-200/80 flex items-center justify-center text-gray-400">
+              <div className="flex-1 flex flex-col items-center justify-center py-12 text-center text-gray-400 space-y-3 bg-slate-50/60 rounded-lg border border-dashed border-gray-200 my-auto min-h-[23.75rem]">
+                <div className="w-14 h-14 rounded-lg bg-white border border-gray-200/80 flex items-center justify-center text-gray-400">
                   <ClipboardList className="w-7 h-7 text-gray-400" />
                 </div>
                 <div className="space-y-1 max-w-sm">
-                  <p className="font-bold text-gray-800 text-sm">Active Production Work Orders for {selectedSkuDetails.skuCode}</p>
-                  <p className="text-xs text-gray-500">No active work orders currently scheduled for this SKU on factory floor.</p>
+                  <p className="font-semibold text-gray-800 text-[0.875rem]">Active Production Work Orders for {selectedSkuDetails.skuCode}</p>
+                  <p className="text-[0.875rem] text-gray-500">No active work orders currently scheduled for this SKU on factory floor.</p>
                 </div>
               </div>
             )}
 
             {/* TAB CONTENT: Dispatches */}
             {detailsSubTab === 'dispatches' && (
-              <div className="flex-1 flex flex-col items-center justify-center py-12 text-center text-gray-400 space-y-3 bg-slate-50/60 rounded-2xl border border-dashed border-gray-200 my-auto min-h-[380px]">
-                <div className="w-14 h-14 rounded-2xl bg-white shadow-2xs border border-gray-200/80 flex items-center justify-center text-gray-400">
+              <div className="flex-1 flex flex-col items-center justify-center py-12 text-center text-gray-400 space-y-3 bg-slate-50/60 rounded-lg border border-dashed border-gray-200 my-auto min-h-[23.75rem]">
+                <div className="w-14 h-14 rounded-lg bg-white border border-gray-200/80 flex items-center justify-center text-gray-400">
                   <Package className="w-7 h-7 text-gray-400" />
                 </div>
                 <div className="space-y-1 max-w-sm">
-                  <p className="font-bold text-gray-800 text-sm">Fulfillment & Dispatches for {selectedSkuDetails.skuCode}</p>
-                  <p className="text-xs text-gray-500">No pending dispatches or delivery challans recorded for this item.</p>
+                  <p className="font-semibold text-gray-800 text-[0.875rem]">Fulfillment & Dispatches for {selectedSkuDetails.skuCode}</p>
+                  <p className="text-[0.875rem] text-gray-500">No pending dispatches or delivery challans recorded for this item.</p>
                 </div>
               </div>
             )}
@@ -6808,49 +6781,49 @@ const SkuMasterV2: React.FC = () => {
                 <RotateCcw className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <div className="font-bold text-sm text-gray-900 flex items-center gap-2">
+                <div className="font-semibold text-[0.875rem] text-gray-900 flex items-center gap-2">
                   <span>Stock Overview & Activity Logs</span>
-                  <span className="font-mono text-[10.5px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200 shrink-0">
+                  <span className="font-mono text-xs font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200 shrink-0">
                     {selectedSkuDetails.skuCode}
                   </span>
                 </div>
-                <div className="text-[11px] font-medium text-gray-500 truncate max-w-md">
+                <div className="text-xs font-medium text-gray-500 truncate max-w-md">
                   {selectedSkuDetails.name}
                 </div>
               </div>
             </div>
           }
         >
-          <div className="space-y-4 text-xs max-h-[75vh] overflow-y-auto pr-1">
+          <div className="space-y-4 text-[0.875rem] max-h-[calc(75*var(--vh,1vh))] overflow-y-auto pr-1">
             {/* 4 Clean Mini KPI Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-3 text-center space-y-0.5">
-                <div className="text-[9.5px] font-bold text-emerald-800 uppercase tracking-wider">Live On-Hand</div>
-                <div className="text-base font-extrabold text-emerald-950 font-mono">
+                <div className="text-xs font-medium text-emerald-800 uppercase tracking-wider">Live On-Hand</div>
+                <div className="text-base font-semibold text-emerald-950 font-mono">
                   {Number(miniStockData?.summary?.onHand ?? modalDynamicLiveStock ?? (Number((selectedSkuDetails as any).presentStock) || 0)).toLocaleString('en-IN')}
-                  <span className="text-[10px] font-semibold text-emerald-700 ml-1">{selectedSkuDetails.unit || 'Pcs'}</span>
+                  <span className="text-xs font-semibold text-emerald-700 ml-1">{selectedSkuDetails.unit || 'Pcs'}</span>
                 </div>
               </div>
 
               <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-3 text-center space-y-0.5">
-                <div className="text-[9.5px] font-bold text-blue-800 uppercase tracking-wider">Available</div>
-                <div className="text-base font-extrabold text-blue-950 font-mono">
+                <div className="text-xs font-medium text-blue-800 uppercase tracking-wider">Available</div>
+                <div className="text-base font-semibold text-blue-950 font-mono">
                   {Number(miniStockData?.summary?.available ?? (modalDynamicLiveStock ?? (Number((selectedSkuDetails as any).presentStock) || 0))).toLocaleString('en-IN')}
-                  <span className="text-[10px] font-semibold text-blue-700 ml-1">{selectedSkuDetails.unit || 'Pcs'}</span>
+                  <span className="text-xs font-semibold text-blue-700 ml-1">{selectedSkuDetails.unit || 'Pcs'}</span>
                 </div>
               </div>
 
               <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3 text-center space-y-0.5">
-                <div className="text-[9.5px] font-bold text-amber-800 uppercase tracking-wider">Reserved / Pending</div>
-                <div className="text-base font-extrabold text-amber-950 font-mono">
+                <div className="text-xs font-medium text-amber-800 uppercase tracking-wider">Reserved / Pending</div>
+                <div className="text-base font-semibold text-amber-950 font-mono">
                   {Number(miniStockData?.summary?.reserved ?? 0).toLocaleString('en-IN')}
-                  <span className="text-[10px] font-semibold text-amber-700 ml-1">{selectedSkuDetails.unit || 'Pcs'}</span>
+                  <span className="text-xs font-semibold text-amber-700 ml-1">{selectedSkuDetails.unit || 'Pcs'}</span>
                 </div>
               </div>
 
               <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-center space-y-0.5">
-                <div className="text-[9.5px] font-bold text-slate-600 uppercase tracking-wider">Est. Stock Value</div>
-                <div className="text-base font-extrabold text-slate-900 font-mono truncate">
+                <div className="text-xs font-medium text-slate-600 uppercase tracking-wider">Est. Stock Value</div>
+                <div className="text-base font-semibold text-slate-900 font-mono truncate">
                   ₹{Number(miniStockData?.summary?.stockValue ?? ((modalDynamicLiveStock ?? (Number((selectedSkuDetails as any).presentStock) || 0)) * Number((selectedSkuDetails as any).purchasePrice || (selectedSkuDetails as any).ratePerKg || (selectedSkuDetails as any).rate || (selectedSkuDetails as any).avgRate || 0))).toLocaleString('en-IN')}
                 </div>
               </div>
@@ -6861,7 +6834,7 @@ const SkuMasterV2: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setMiniStockTab('movements')}
-                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                className={`flex-1 py-1.5 px-3 rounded-lg text-[0.875rem] font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${
                   miniStockTab === 'movements'
                     ? 'bg-white text-blue-700 shadow-2xs border border-gray-200/80'
                     : 'text-gray-500 hover:text-gray-800'
@@ -6869,14 +6842,14 @@ const SkuMasterV2: React.FC = () => {
               >
                 <History className="w-3.5 h-3.5" />
                 <span>Transfers & Logs</span>
-                <span className="bg-gray-100 text-gray-700 font-extrabold px-1.5 py-0.2 rounded-full text-[10px]">
+                <span className="bg-gray-100 text-gray-700 font-semibold px-1.5 py-0.2 rounded-full text-xs">
                   {miniStockData?.movements?.length ?? 0}
                 </span>
               </button>
               <button
                 type="button"
                 onClick={() => setMiniStockTab('locations')}
-                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                className={`flex-1 py-1.5 px-3 rounded-lg text-[0.875rem] font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${
                   miniStockTab === 'locations'
                     ? 'bg-white text-blue-700 shadow-2xs border border-gray-200/80'
                     : 'text-gray-500 hover:text-gray-800'
@@ -6884,14 +6857,14 @@ const SkuMasterV2: React.FC = () => {
               >
                 <MapPin className="w-3.5 h-3.5" />
                 <span>Locations</span>
-                <span className="bg-gray-100 text-gray-700 font-extrabold px-1.5 py-0.2 rounded-full text-[10px]">
+                <span className="bg-gray-100 text-gray-700 font-semibold px-1.5 py-0.2 rounded-full text-xs">
                   {miniStockData?.locations?.length ?? modalLocationsBreakdown.length ?? 0}
                 </span>
               </button>
               <button
                 type="button"
                 onClick={() => setMiniStockTab('batches')}
-                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                className={`flex-1 py-1.5 px-3 rounded-lg text-[0.875rem] font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${
                   miniStockTab === 'batches'
                     ? 'bg-white text-blue-700 shadow-2xs border border-gray-200/80'
                     : 'text-gray-500 hover:text-gray-800'
@@ -6899,7 +6872,7 @@ const SkuMasterV2: React.FC = () => {
               >
                 <Layers className="w-3.5 h-3.5" />
                 <span>Batches</span>
-                <span className="bg-gray-100 text-gray-700 font-extrabold px-1.5 py-0.2 rounded-full text-[10px]">
+                <span className="bg-gray-100 text-gray-700 font-semibold px-1.5 py-0.2 rounded-full text-xs">
                   {miniStockData?.batches?.length ?? 0}
                 </span>
               </button>
@@ -6909,7 +6882,7 @@ const SkuMasterV2: React.FC = () => {
             {miniStockLoading ? (
               <div className="py-12 flex flex-col items-center justify-center gap-2 text-gray-400">
                 <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />
-                <span className="text-xs font-semibold">Loading live stock transactions...</span>
+                <span className="text-[0.875rem] font-semibold">Loading live stock transactions...</span>
               </div>
             ) : (
               <>
@@ -6919,18 +6892,18 @@ const SkuMasterV2: React.FC = () => {
                     {(!miniStockData?.movements || miniStockData.movements.length === 0) ? (
                       <div className="text-center py-10 bg-slate-50/70 rounded-2xl border border-dashed border-gray-200 text-gray-400 space-y-1.5">
                         <History className="w-6 h-6 mx-auto text-gray-300" />
-                        <p className="font-bold text-gray-700 text-xs">No Stock Movement Logs Recorded</p>
-                        <p className="text-[11px] text-gray-400 max-w-xs mx-auto">
+                        <p className="font-semibold text-gray-700 text-[0.875rem]">No Stock Movement Logs Recorded</p>
+                        <p className="text-xs text-gray-400 max-w-xs mx-auto">
                           Stock movements, warehouse transfers, purchase receipts, and production issues for this SKU will appear here in chronological order.
                         </p>
                       </div>
                     ) : (
-                      <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-2xs divide-y divide-gray-100 max-h-[340px] overflow-y-auto">
+                      <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-2xs divide-y divide-gray-100 max-h-[21.25rem] overflow-y-auto">
                         {miniStockData.movements.map((m: any, idx: number) => {
                           const isIncoming = m.direction === 'IN' || (m.qtyIn || 0) > 0 || (m.quantity || 0) > 0;
                           const isTransfer = (m.transactionType || '').toLowerCase().includes('transfer');
                           return (
-                            <div key={m.id || idx} className="p-3 bg-white hover:bg-slate-50/80 flex items-center justify-between transition-colors gap-3">
+                            <div key={m.id || idx} className="p-3 bg-white hover:bg-slate-50/80 flex items-center justify-between gap-3">
                               <div className="flex items-start gap-2.5 min-w-0">
                                 <div className={`p-2 rounded-xl shrink-0 ${
                                   isTransfer
@@ -6949,21 +6922,21 @@ const SkuMasterV2: React.FC = () => {
                                 </div>
                                 <div className="space-y-0.5 min-w-0">
                                   <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-bold text-gray-900 text-xs">{m.transactionType || 'Stock Movement'}</span>
+                                    <span className="font-semibold text-gray-900 text-[0.875rem]">{m.transactionType || 'Stock Movement'}</span>
                                     {m.referenceId && (
-                                      <span className="font-mono text-[9.5px] bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded border border-slate-200">
+                                      <span className="font-mono text-xs bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded border border-slate-200">
                                         #{m.referenceId}
                                       </span>
                                     )}
                                   </div>
-                                  <div className="text-[10.5px] text-gray-400 flex items-center gap-1.5 flex-wrap">
+                                  <div className="text-xs text-gray-400 flex items-center gap-1.5 flex-wrap">
                                     <span>{m.locationName || 'Warehouse'}</span>
                                     <span>•</span>
                                     <span>{m.timestamp ? new Date(m.timestamp).toLocaleString('en-IN') : 'Recent'}</span>
                                     {m.userName && <span>• by {m.userName}</span>}
                                   </div>
                                   {m.remarks && (
-                                    <div className="text-[10.5px] text-gray-500 italic truncate">
+                                    <div className="text-xs text-gray-500 italic truncate">
                                       "{m.remarks}"
                                     </div>
                                   )}
@@ -6971,13 +6944,13 @@ const SkuMasterV2: React.FC = () => {
                               </div>
 
                               <div className="text-right shrink-0">
-                                <div className={`font-mono font-extrabold text-xs ${
+                                <div className={`font-mono font-semibold text-[0.875rem] ${
                                   isIncoming ? 'text-emerald-600' : 'text-rose-600'
                                 }`}>
                                   {isIncoming ? '+' : '-'}{Math.abs(Number(m.quantity || m.qtyIn || m.qtyOut || 0)).toLocaleString('en-IN')} {selectedSkuDetails.unit || 'Pcs'}
                                 </div>
                                 {m.balanceAfter !== undefined && (
-                                  <div className="text-[10px] text-gray-400 font-mono">
+                                  <div className="text-xs text-gray-400 font-mono">
                                     Bal: {Number(m.balanceAfter).toLocaleString('en-IN')}
                                   </div>
                                 )}
@@ -6996,33 +6969,33 @@ const SkuMasterV2: React.FC = () => {
                     {((miniStockData?.locations || modalLocationsBreakdown).length === 0) ? (
                       <div className="text-center py-10 bg-slate-50/70 rounded-2xl border border-dashed border-gray-200 text-gray-400 space-y-1">
                         <MapPin className="w-6 h-6 mx-auto text-gray-300" />
-                        <p className="font-bold text-gray-700 text-xs">Warehouse Storage</p>
-                        <p className="text-[11px] text-gray-400">No multi-bay partitions recorded yet.</p>
+                        <p className="font-semibold text-gray-700 text-[0.875rem]">Warehouse Storage</p>
+                        <p className="text-xs text-gray-400">No multi-bay partitions recorded yet.</p>
                       </div>
                     ) : (
-                      <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-2xs divide-y divide-gray-100 max-h-[340px] overflow-y-auto">
+                      <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-2xs divide-y divide-gray-100 max-h-[21.25rem] overflow-y-auto">
                         {(miniStockData?.locations || modalLocationsBreakdown).map((loc: any, idx: number) => (
-                          <div key={idx} className="p-3 bg-white hover:bg-slate-50/80 flex items-center justify-between transition-colors">
+                          <div key={idx} className="p-3 bg-white hover:bg-slate-50/80 flex items-center justify-between">
                             <div className="space-y-0.5 min-w-0">
-                              <div className="font-bold text-xs text-gray-900 flex items-center gap-1.5">
+                              <div className="font-semibold text-[0.875rem] text-gray-900 flex items-center gap-1.5">
                                 <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                                 <span className="truncate">{loc.locationName || 'Warehouse Storage'}</span>
                                 {loc.locationCode && (
-                                  <span className="text-[10px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded">
+                                  <span className="text-xs font-mono text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded">
                                     {loc.locationCode}
                                   </span>
                                 )}
                               </div>
-                              <div className="text-[10.5px] text-gray-400 font-medium">
+                              <div className="text-xs text-gray-400 font-medium">
                                 {loc.hierarchyPath || `${loc.warehouseName || 'Warehouse'} ➔ ${loc.floorName || 'Floor'} ➔ ${loc.zoneName || 'Zone'}`}
                               </div>
                             </div>
 
                             <div className="text-right shrink-0">
-                              <div className="text-xs font-bold text-emerald-700 font-mono">
+                              <div className="text-[0.875rem] font-semibold text-emerald-700 font-mono">
                                 {Number(loc.onHand || 0).toLocaleString('en-IN')} {selectedSkuDetails.unit || 'Pcs'}
                               </div>
-                              <div className="text-[10px] text-gray-400 font-medium">
+                              <div className="text-xs text-gray-400 font-medium">
                                 ₹{Number(loc.stockValue || 0).toLocaleString('en-IN')}
                               </div>
                             </div>
@@ -7039,29 +7012,29 @@ const SkuMasterV2: React.FC = () => {
                     {(!miniStockData?.batches || miniStockData.batches.length === 0) ? (
                       <div className="text-center py-10 bg-slate-50/70 rounded-2xl border border-dashed border-gray-200 text-gray-400 space-y-1">
                         <Layers className="w-6 h-6 mx-auto text-gray-300" />
-                        <p className="font-bold text-gray-700 text-xs">No Batch Numbers Tagged</p>
-                        <p className="text-[11px] text-gray-400">Stock is tracked under general consolidated inventory.</p>
+                        <p className="font-semibold text-gray-700 text-[0.875rem]">No Batch Numbers Tagged</p>
+                        <p className="text-xs text-gray-400">Stock is tracked under general consolidated inventory.</p>
                       </div>
                     ) : (
-                      <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-2xs divide-y divide-gray-100 max-h-[340px] overflow-y-auto">
+                      <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-2xs divide-y divide-gray-100 max-h-[21.25rem] overflow-y-auto">
                         {miniStockData.batches.map((b: any, idx: number) => (
-                          <div key={idx} className="p-3 bg-white hover:bg-slate-50/80 flex items-center justify-between transition-colors">
+                          <div key={idx} className="p-3 bg-white hover:bg-slate-50/80 flex items-center justify-between">
                             <div className="space-y-0.5 min-w-0">
-                              <div className="font-bold text-xs text-gray-900 flex items-center gap-1.5 font-mono">
+                              <div className="font-semibold text-[0.875rem] text-gray-900 flex items-center gap-1.5 font-mono">
                                 <span className="w-2 h-2 rounded-full bg-blue-500"></span>
                                 <span>Batch #{b.batchNumber || `B-${idx + 1}`}</span>
-                                {b.supplier && <span className="text-[10px] font-sans text-gray-500">({b.supplier})</span>}
+                                {b.supplier && <span className="text-xs font-sans text-gray-500">({b.supplier})</span>}
                               </div>
-                              <div className="text-[10.5px] text-gray-400">
+                              <div className="text-xs text-gray-400">
                                 {b.locationName || 'Main Storage'} • {b.date ? new Date(b.date).toLocaleDateString('en-IN') : 'Recent'}
                               </div>
                             </div>
 
                             <div className="text-right shrink-0">
-                              <div className="text-xs font-bold text-gray-900 font-mono">
+                              <div className="text-[0.875rem] font-semibold text-gray-900 font-mono">
                                 {Number(b.remainingQty || 0).toLocaleString('en-IN')} {selectedSkuDetails.unit || 'Pcs'}
                               </div>
-                              <div className="text-[10.5px] text-emerald-700 font-bold font-mono">
+                              <div className="text-xs text-emerald-700 font-semibold font-mono">
                                 @ ₹{b.rate}/unit = ₹{Number(b.value || 0).toLocaleString('en-IN')}
                               </div>
                             </div>
@@ -7075,10 +7048,10 @@ const SkuMasterV2: React.FC = () => {
             )}
 
             {/* Modal Bottom Footer Actions */}
-            <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+            <div className="pt-2 border-t border-gray-100 flex items-center justify-between dlg-footer">
               <a
                 href={`/stock-inventory-v2?search=${encodeURIComponent(selectedSkuDetails.skuCode)}`}
-                className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors no-underline"
+                className="text-[0.875rem] font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 no-underline"
                 target="_blank"
                 rel="noreferrer"
               >
@@ -7088,7 +7061,7 @@ const SkuMasterV2: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowMiniStockModal(false)}
-                className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl text-[0.875rem] cursor-pointer"
               >
                 Close
               </button>
@@ -7108,7 +7081,7 @@ const SkuMasterV2: React.FC = () => {
           title="Items Activity History Log"
           maxWidth="max-w-2xl"
         >
-          <div className="space-y-3.5 text-xs text-left">
+          <div className="space-y-3.5 text-[0.875rem] text-left">
             {/* Header controls */}
             <div className="flex items-center justify-between gap-3">
               <div className="relative flex-1">
@@ -7118,23 +7091,23 @@ const SkuMasterV2: React.FC = () => {
                   placeholder="Search activity logs by action, SKU, details, user..."
                   value={activityLogSearch}
                   onChange={(e) => setActivityLogSearch(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:border-blue-500 font-medium"
+                  className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] focus:bg-white focus:outline-none focus:border-blue-500 font-medium"
                 />
               </div>
               <button
                 type="button"
                 onClick={fetchActivityLogs}
                 disabled={activityLogLoading}
-                className="px-3 py-1.5 bg-white hover:bg-blue-50 text-blue-700 border border-gray-200 rounded-xl font-bold flex items-center gap-1.5 shrink-0 transition-all cursor-pointer"
+                className="px-3 py-1.5 bg-white hover:bg-blue-50 text-blue-700 border border-gray-200 rounded-xl font-semibold flex items-center gap-1.5 shrink-0 cursor-pointer"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${activityLogLoading ? 'animate-spin' : ''}`} />
                 <span>Refresh</span>
               </button>
             </div>
 
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[calc(60*var(--vh,1vh))] overflow-y-auto pr-1">
               {activityLogLoading ? (
-                <div className="py-12 text-center text-gray-400 font-medium animate-pulse">
+                <div className="py-12 text-center text-gray-400 font-medium">
                   Loading activity history...
                 </div>
               ) : (() => {
@@ -7153,8 +7126,8 @@ const SkuMasterV2: React.FC = () => {
                   return (
                     <div className="py-12 text-center space-y-2 bg-gray-50/60 rounded-2xl border border-dashed border-gray-200">
                       <History className="w-8 h-8 text-gray-300 mx-auto" />
-                      <p className="font-bold text-gray-600">No Activity Logs Found</p>
-                      <p className="text-[11px] text-gray-400">
+                      <p className="font-semibold text-gray-600">No Activity Logs Found</p>
+                      <p className="text-xs text-gray-400">
                         {query ? 'No logs match your search term.' : 'No SKU history events recorded yet.'}
                       </p>
                     </div>
@@ -7176,21 +7149,21 @@ const SkuMasterV2: React.FC = () => {
                     : 'bg-amber-50 text-amber-700 border-amber-200';
 
                   return (
-                    <div key={log._id || idx} className="p-3 bg-white border border-gray-200 rounded-xl space-y-1.5 shadow-2xs hover:border-blue-200 transition-colors">
+                    <div key={log._id || idx} className="p-3 bg-white border border-gray-200 rounded-xl space-y-1.5 shadow-2xs hover:border-blue-200">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border ${badgeColor}`}>
+                          <span className={`px-2 py-0.5 rounded-md text-xs font-medium uppercase tracking-wider border ${badgeColor}`}>
                             {log.action}
                           </span>
-                          <span className="font-bold text-gray-900 font-mono text-xs">{log.entityName}</span>
+                          <span className="font-semibold text-gray-900 font-mono text-[0.875rem]">{log.entityName}</span>
                         </div>
-                        <span className="text-[10px] text-gray-400 font-medium">
+                        <span className="text-xs text-gray-400 font-medium">
                           {log.createdAt ? new Date(log.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : '—'}
                         </span>
                       </div>
-                      <p className="text-gray-600 text-xs leading-relaxed">{log.details}</p>
+                      <p className="text-gray-600 text-[0.875rem] leading-relaxed">{log.details}</p>
                       {log.performedBy && (
-                        <div className="text-[10px] text-gray-400 font-medium pt-0.5">
+                        <div className="text-xs text-gray-400 font-medium pt-0.5">
                           By: <span className="text-gray-700 font-semibold">{log.performedBy}</span>
                         </div>
                       )}
@@ -7210,7 +7183,7 @@ const SkuMasterV2: React.FC = () => {
           onClose={() => setShowHelpModal(false)}
           title="Book Manufacturing Items Module Overview"
         >
-          <div className="space-y-3 text-xs text-gray-700">
+          <div className="space-y-3 text-[0.875rem] text-gray-700">
             <p>
               Welcome to the <strong>Book Manufacturing Items Module</strong>:
             </p>
@@ -7220,7 +7193,7 @@ const SkuMasterV2: React.FC = () => {
               <li><strong>Semi:</strong> Ruled cut sheets, inner signatures, folded book blocks.</li>
               <li><strong>Categories:</strong> Category structures and default UOM specifications.</li>
             </ul>
-            <div className="pt-3 flex justify-end">
+            <div className="pt-3 flex justify-end dlg-footer">
               <button
                 onClick={() => setShowHelpModal(false)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-xl font-semibold"
@@ -7246,21 +7219,21 @@ const SkuMasterV2: React.FC = () => {
                 <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3">
                   <Check className="w-6 h-6 stroke-[3]" />
                 </div>
-                <h3 className="font-bold text-base text-gray-900">No Duplicates Detected!</h3>
-                <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                <h3 className="font-semibold text-base text-gray-900">No Duplicates Detected!</h3>
+                <p className="text-[0.875rem] text-gray-500 mt-1 max-w-md mx-auto">
                   All entries in <span className="font-semibold">{getTabLabel(activeMainTab)}</span> have unique SKU codes and names.
                 </p>
               </div>
             ) : (
-              <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-                <p className="text-xs text-gray-500 font-medium">
+              <div className="space-y-4 max-h-[calc(60*var(--vh,1vh))] overflow-y-auto pr-1">
+                <p className="text-[0.875rem] text-gray-500 font-medium">
                   The following duplicate groups were identified. Check details and clean up if necessary:
                 </p>
                 
                 {duplicateGroups.map((group, gIdx) => (
                   <div 
                     key={gIdx}
-                    className={`border rounded-xl p-4 transition-all duration-150 ${
+                    className={`border rounded-xl p-4 ${
                       gIdx === highlightedDuplicateIdx
                         ? 'border-blue-500 bg-blue-50/20 ring-2 ring-blue-500/20 shadow-xs'
                         : 'border-red-200 bg-red-50/10'
@@ -7269,16 +7242,16 @@ const SkuMasterV2: React.FC = () => {
                   >
                     <div className="flex justify-between items-start md:items-center flex-col md:flex-row gap-2 mb-3 border-b pb-2 border-red-100/50">
                       <div>
-                        <span className="text-xs font-bold bg-red-100 text-red-800 px-2.5 py-0.5 rounded-lg border border-red-200">
+                        <span className="text-[0.875rem] font-semibold bg-red-100 text-red-800 px-2.5 py-0.5 rounded-lg border border-red-200">
                           Duplicate by {group.field}: {group.value}
                         </span>
-                        <span className="text-xs text-gray-500 font-mono ml-2">{group.items.length} records</span>
+                        <span className="text-[0.875rem] text-gray-500 font-mono ml-2">{group.items.length} records</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => setCompareGroup(group)}
                           title="View Both"
-                          className="px-2.5 py-1 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1 transition-all cursor-pointer"
+                          className="px-2.5 py-1 text-[0.875rem] font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1 cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>View Both</span>
@@ -7289,7 +7262,7 @@ const SkuMasterV2: React.FC = () => {
                             setHighlightedDuplicateIdx(prev => (prev > 0 ? prev - 1 : 0));
                           }}
                           title="Keep Both"
-                          className="px-2.5 py-1 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 flex items-center gap-1 transition-all cursor-pointer"
+                          className="px-2.5 py-1 text-[0.875rem] font-semibold text-gray-600 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 flex items-center gap-1 cursor-pointer"
                         >
                           <X className="w-3.5 h-3.5" />
                           <span>Keep Both</span>
@@ -7299,17 +7272,17 @@ const SkuMasterV2: React.FC = () => {
 
                     <div className="space-y-2">
                       {group.items.map((item) => (
-                        <div key={item._id} className="flex justify-between items-center bg-white p-3 border border-gray-200 rounded-xl text-xs">
+                        <div key={item._id} className="flex justify-between items-center bg-white p-3 border border-gray-200 rounded-xl text-[0.875rem]">
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                              <span className="font-mono font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
                                 {item.skuCode}
                               </span>
-                              <p className="font-bold text-gray-900 text-sm">
+                              <p className="font-semibold text-gray-900 text-[0.875rem]">
                                 {item.name}
                               </p>
                             </div>
-                            <div className="text-xs text-gray-500 mt-1 flex items-center space-x-2 flex-wrap">
+                            <div className="text-[0.875rem] text-gray-500 mt-1 flex items-center space-x-2 flex-wrap">
                               <span>Category: {item.category || item.group || '—'}</span>
                               <span className="text-gray-300">|</span>
                               <span>UOM: {item.unit || '—'}</span>
@@ -7330,14 +7303,14 @@ const SkuMasterV2: React.FC = () => {
                                 setShowAddDrawer(true);
                                 setShowDuplicatesModal(false);
                               }}
-                              className="px-2.5 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-bold transition-all flex items-center gap-1 cursor-pointer"
+                              className="px-2.5 py-1 text-[0.875rem] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-semibold flex items-center gap-1 cursor-pointer"
                             >
                               <Edit className="w-3.5 h-3.5" />
                               Edit
                             </button>
                             <button
                               onClick={() => handleDeleteDuplicateItem(item)}
-                              className="px-2.5 py-1 text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg font-bold transition-all flex items-center gap-1 cursor-pointer"
+                              className="px-2.5 py-1 text-[0.875rem] bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg font-semibold flex items-center gap-1 cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                               Delete
@@ -7351,10 +7324,10 @@ const SkuMasterV2: React.FC = () => {
               </div>
             )}
 
-            <div className="pt-3 border-t border-gray-100 flex justify-end">
+            <div className="pt-3 border-t border-gray-100 flex justify-end dlg-footer">
               <button
                 onClick={() => setShowDuplicatesModal(false)}
-                className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-100 font-bold text-xs cursor-pointer text-gray-700"
+                className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-100 font-semibold text-[0.875rem] cursor-pointer text-gray-700"
               >
                 Close Window
               </button>
@@ -7365,16 +7338,16 @@ const SkuMasterV2: React.FC = () => {
 
       {/* ── COMPARE DUPLICATES MODAL (Side by side) ── */}
       {compareGroup && (
-        <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-4 bg-gray-950/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative bg-white rounded-2xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-4 bg-gray-900/40">
+          <div className="relative bg-white max-w-4xl w-full flex flex-col max-h-[calc(90*var(--vh,1vh))] overflow-hidden dlg-panel">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-              <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+              <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
                 <Copy className="w-5 h-5 text-blue-600" />
                 <span>Compare Duplicates — {compareGroup.field}: {compareGroup.value}</span>
               </h3>
               <button
                 onClick={() => setCompareGroup(null)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-200 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -7384,43 +7357,43 @@ const SkuMasterV2: React.FC = () => {
               {compareGroup.items.slice(0, 2).map((item, idx) => (
                 <div key={item._id || idx} className="border border-gray-200 rounded-xl p-4 bg-white shadow-2xs space-y-3">
                   <div className="flex justify-between items-center border-b pb-2 border-gray-100">
-                    <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full">
+                    <span className="text-[0.875rem] font-semibold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full">
                       Item #{idx + 1}
                     </span>
-                    <span className="text-xs font-mono text-gray-400">ID: {item._id?.slice(-6) || '—'}</span>
+                    <span className="text-[0.875rem] font-mono text-gray-400">ID: {item._id?.slice(-6) || '—'}</span>
                   </div>
-                  <div className="space-y-2 text-xs">
+                  <div className="space-y-2 text-[0.875rem]">
                     <div>
-                      <span className="text-gray-400 text-[10px] uppercase font-bold">SKU Code:</span>
-                      <p className="font-mono font-bold text-gray-900 text-sm">{item.skuCode}</p>
+                      <span className="text-gray-400 text-xs uppercase font-semibold">SKU Code:</span>
+                      <p className="font-mono font-semibold text-gray-900 text-[0.875rem]">{item.skuCode}</p>
                     </div>
                     <div>
-                      <span className="text-gray-400 text-[10px] uppercase font-bold">Item Name:</span>
-                      <p className="font-bold text-gray-900">{item.name}</p>
+                      <span className="text-gray-400 text-xs uppercase font-semibold">Item Name:</span>
+                      <p className="font-semibold text-gray-900">{item.name}</p>
                     </div>
                     <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-100">
                       <div>
-                        <span className="text-gray-400 text-[10px] uppercase font-bold">Category:</span>
+                        <span className="text-gray-400 text-xs uppercase font-semibold">Category:</span>
                         <p className="font-medium text-gray-800">{item.category || item.group || '—'}</p>
                       </div>
                       <div>
-                        <span className="text-gray-400 text-[10px] uppercase font-bold">UOM:</span>
+                        <span className="text-gray-400 text-xs uppercase font-semibold">UOM:</span>
                         <p className="font-medium text-gray-800">{item.unit || '—'}</p>
                       </div>
                       <div>
-                        <span className="text-gray-400 text-[10px] uppercase font-bold">GSM:</span>
+                        <span className="text-gray-400 text-xs uppercase font-semibold">GSM:</span>
                         <p className="font-medium text-gray-800">{item.gsm || '—'}</p>
                       </div>
                       <div>
-                        <span className="text-gray-400 text-[10px] uppercase font-bold">Pages:</span>
+                        <span className="text-gray-400 text-xs uppercase font-semibold">Pages:</span>
                         <p className="font-medium text-gray-800">{(item as any).pages ?? (item as any).sheetsPerReam ?? (item as any).standardSheets ?? '—'}</p>
                       </div>
                       <div>
-                        <span className="text-gray-400 text-[10px] uppercase font-bold">Opening Stock:</span>
-                        <p className="font-bold text-emerald-700">{item.openingStock ?? 0}</p>
+                        <span className="text-gray-400 text-xs uppercase font-semibold">Opening Stock:</span>
+                        <p className="font-semibold text-emerald-700">{item.openingStock ?? 0}</p>
                       </div>
                       <div>
-                        <span className="text-gray-400 text-[10px] uppercase font-bold">Status:</span>
+                        <span className="text-gray-400 text-xs uppercase font-semibold">Status:</span>
                         <p className="font-medium text-gray-800">{item.status || 'Active'}</p>
                       </div>
                     </div>
@@ -7433,7 +7406,7 @@ const SkuMasterV2: React.FC = () => {
                         setCompareGroup(null);
                         setShowDuplicatesModal(false);
                       }}
-                      className="flex-1 py-1.5 bg-blue-50 text-blue-700 font-bold rounded-lg hover:bg-blue-100 text-xs flex items-center justify-center gap-1 cursor-pointer"
+                      className="flex-1 py-1.5 bg-blue-50 text-blue-700 font-semibold rounded-lg hover:bg-blue-100 text-[0.875rem] flex items-center justify-center gap-1 cursor-pointer"
                     >
                       <Edit className="w-3.5 h-3.5" />
                       Edit
@@ -7443,7 +7416,7 @@ const SkuMasterV2: React.FC = () => {
                         handleDeleteDuplicateItem(item);
                         setCompareGroup(null);
                       }}
-                      className="flex-1 py-1.5 bg-red-50 text-red-700 font-bold rounded-lg hover:bg-red-100 text-xs flex items-center justify-center gap-1 cursor-pointer"
+                      className="flex-1 py-1.5 bg-red-50 text-red-700 font-semibold rounded-lg hover:bg-red-100 text-[0.875rem] flex items-center justify-center gap-1 cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       Delete
@@ -7453,10 +7426,10 @@ const SkuMasterV2: React.FC = () => {
               ))}
             </div>
 
-            <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 flex justify-end">
+            <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 flex justify-end dlg-footer">
               <button
                 onClick={() => setCompareGroup(null)}
-                className="px-4 py-2 bg-gray-800 text-white rounded-xl text-xs font-bold hover:bg-gray-900 cursor-pointer"
+                className="px-4 py-2 bg-gray-800 text-white rounded-xl text-[0.875rem] font-semibold hover:bg-gray-900 cursor-pointer"
               >
                 Close Comparison
               </button>
@@ -7473,14 +7446,14 @@ const SkuMasterV2: React.FC = () => {
           size="max-w-md"
           title={
             <div className="flex items-center justify-between text-left w-full">
-              <h3 className="text-base font-bold text-gray-900">Add Custom Column</h3>
+              <h3 className="text-base font-semibold text-gray-900">Add Custom Column</h3>
             </div>
           }
         >
-          <div className="space-y-5 text-left text-xs">
+          <div className="space-y-5 text-left text-[0.875rem]">
             {/* Field 1: Column Name */}
             <div>
-              <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1.5">
                 COLUMN NAME
               </label>
               <input
@@ -7488,14 +7461,14 @@ const SkuMasterV2: React.FC = () => {
                 placeholder="e.g. Remarks, Priority, Tracking URL"
                 value={newCustomColName}
                 onChange={(e) => setNewCustomColName(e.target.value)}
-                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 autoFocus
               />
             </div>
 
             {/* Field 2: Field Type Cards Grid */}
             <div>
-              <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">
                 FIELD TYPE
               </label>
               <div className="grid grid-cols-2 gap-2.5">
@@ -7503,7 +7476,7 @@ const SkuMasterV2: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setSelectedFieldType('text')}
-                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative ${
+                  className={`p-3 rounded-2xl border text-left cursor-pointer relative ${
                     selectedFieldType === 'text'
                       ? 'bg-emerald-50/50 border-emerald-600 ring-1 ring-emerald-600'
                       : 'bg-white border-gray-200 hover:border-gray-300'
@@ -7512,15 +7485,15 @@ const SkuMasterV2: React.FC = () => {
                   {selectedFieldType === 'text' && (
                     <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-emerald-600"></span>
                   )}
-                  <span className="block font-bold text-gray-900 text-xs">Text</span>
-                  <span className="block text-[10px] text-gray-400 mt-0.5 font-medium">Short or long text</span>
+                  <span className="block font-semibold text-gray-900 text-[0.875rem]">Text</span>
+                  <span className="block text-xs text-gray-400 mt-0.5 font-medium">Short or long text</span>
                 </button>
 
                 {/* Card 2: Number */}
                 <button
                   type="button"
                   onClick={() => setSelectedFieldType('number')}
-                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative ${
+                  className={`p-3 rounded-2xl border text-left cursor-pointer relative ${
                     selectedFieldType === 'number'
                       ? 'bg-emerald-50/50 border-emerald-600 ring-1 ring-emerald-600'
                       : 'bg-white border-gray-200 hover:border-gray-300'
@@ -7529,15 +7502,15 @@ const SkuMasterV2: React.FC = () => {
                   {selectedFieldType === 'number' && (
                     <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-emerald-600"></span>
                   )}
-                  <span className="block font-bold text-gray-900 text-xs">Number</span>
-                  <span className="block text-[10px] text-gray-400 mt-0.5 font-medium">Numeric value</span>
+                  <span className="block font-semibold text-gray-900 text-[0.875rem]">Number</span>
+                  <span className="block text-xs text-gray-400 mt-0.5 font-medium">Numeric value</span>
                 </button>
 
                 {/* Card 3: Date */}
                 <button
                   type="button"
                   onClick={() => setSelectedFieldType('date')}
-                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative ${
+                  className={`p-3 rounded-2xl border text-left cursor-pointer relative ${
                     selectedFieldType === 'date'
                       ? 'bg-emerald-50/50 border-emerald-600 ring-1 ring-emerald-600'
                       : 'bg-white border-gray-200 hover:border-gray-300'
@@ -7546,15 +7519,15 @@ const SkuMasterV2: React.FC = () => {
                   {selectedFieldType === 'date' && (
                     <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-emerald-600"></span>
                   )}
-                  <span className="block font-bold text-gray-900 text-xs">Date</span>
-                  <span className="block text-[10px] text-gray-400 mt-0.5 font-medium">Date picker</span>
+                  <span className="block font-semibold text-gray-900 text-[0.875rem]">Date</span>
+                  <span className="block text-xs text-gray-400 mt-0.5 font-medium">Date picker</span>
                 </button>
 
                 {/* Card 4: Checkbox */}
                 <button
                   type="button"
                   onClick={() => setSelectedFieldType('checkbox')}
-                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative ${
+                  className={`p-3 rounded-2xl border text-left cursor-pointer relative ${
                     selectedFieldType === 'checkbox'
                       ? 'bg-emerald-50/50 border-emerald-600 ring-1 ring-emerald-600'
                       : 'bg-white border-gray-200 hover:border-gray-300'
@@ -7563,15 +7536,15 @@ const SkuMasterV2: React.FC = () => {
                   {selectedFieldType === 'checkbox' && (
                     <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-emerald-600"></span>
                   )}
-                  <span className="block font-bold text-gray-900 text-xs">Checkbox</span>
-                  <span className="block text-[10px] text-gray-400 mt-0.5 font-medium">Yes / No toggle</span>
+                  <span className="block font-semibold text-gray-900 text-[0.875rem]">Checkbox</span>
+                  <span className="block text-xs text-gray-400 mt-0.5 font-medium">Yes / No toggle</span>
                 </button>
 
                 {/* Card 5: Dropdown */}
                 <button
                   type="button"
                   onClick={() => setSelectedFieldType('dropdown')}
-                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative ${
+                  className={`p-3 rounded-2xl border text-left cursor-pointer relative ${
                     selectedFieldType === 'dropdown'
                       ? 'bg-emerald-50/50 border-emerald-600 ring-1 ring-emerald-600'
                       : 'bg-white border-gray-200 hover:border-gray-300'
@@ -7580,15 +7553,15 @@ const SkuMasterV2: React.FC = () => {
                   {selectedFieldType === 'dropdown' && (
                     <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-emerald-600"></span>
                   )}
-                  <span className="block font-bold text-gray-900 text-xs">Dropdown</span>
-                  <span className="block text-[10px] text-gray-400 mt-0.5 font-medium">Single-select options</span>
+                  <span className="block font-semibold text-gray-900 text-[0.875rem]">Dropdown</span>
+                  <span className="block text-xs text-gray-400 mt-0.5 font-medium">Single-select options</span>
                 </button>
 
                 {/* Card 6: File / Link */}
                 <button
                   type="button"
                   onClick={() => setSelectedFieldType('file')}
-                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative ${
+                  className={`p-3 rounded-2xl border text-left cursor-pointer relative ${
                     selectedFieldType === 'file'
                       ? 'bg-emerald-50/50 border-emerald-600 ring-1 ring-emerald-600'
                       : 'bg-white border-gray-200 hover:border-gray-300'
@@ -7597,15 +7570,15 @@ const SkuMasterV2: React.FC = () => {
                   {selectedFieldType === 'file' && (
                     <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-emerald-600"></span>
                   )}
-                  <span className="block font-bold text-gray-900 text-xs">File / Link</span>
-                  <span className="block text-[10px] text-gray-400 mt-0.5 font-medium">URL or file link</span>
+                  <span className="block font-semibold text-gray-900 text-[0.875rem]">File / Link</span>
+                  <span className="block text-xs text-gray-400 mt-0.5 font-medium">URL or file link</span>
                 </button>
 
                 {/* Card 7: Formula */}
                 <button
                   type="button"
                   onClick={() => setSelectedFieldType('formula')}
-                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative col-span-1 ${
+                  className={`p-3 rounded-2xl border text-left cursor-pointer relative col-span-1 ${
                     selectedFieldType === 'formula'
                       ? 'bg-emerald-50/50 border-emerald-600 ring-1 ring-emerald-600'
                       : 'bg-white border-gray-200 hover:border-gray-300'
@@ -7614,8 +7587,8 @@ const SkuMasterV2: React.FC = () => {
                   {selectedFieldType === 'formula' && (
                     <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-emerald-600"></span>
                   )}
-                  <span className="block font-bold text-gray-900 text-xs">Formula</span>
-                  <span className="block text-[10px] text-gray-400 mt-0.5 font-medium">Computed expression</span>
+                  <span className="block font-semibold text-gray-900 text-[0.875rem]">Formula</span>
+                  <span className="block text-xs text-gray-400 mt-0.5 font-medium">Computed expression</span>
                 </button>
               </div>
             </div>
@@ -7624,7 +7597,7 @@ const SkuMasterV2: React.FC = () => {
             {selectedFieldType === 'dropdown' && (
               <div className="space-y-3 pt-2 border-t border-gray-100">
                 <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                  <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider">
                     DROPDOWN OPTIONS
                   </label>
                   <button
@@ -7638,7 +7611,7 @@ const SkuMasterV2: React.FC = () => {
                         { id: 'opt_' + Date.now(), label: `Option ${nextNum}`, color }
                       ]);
                     }}
-                    className="text-[11px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
                   >
                     + ADD OPTION
                   </button>
@@ -7647,7 +7620,7 @@ const SkuMasterV2: React.FC = () => {
                 <div className="space-y-2">
                   {dropdownOptionsList.map((opt) => (
                     <div key={opt.id} className="flex items-center gap-2">
-                      <span className="text-gray-300 select-none font-bold text-xs cursor-grab">⋮⋮</span>
+                      <span className="text-gray-300 select-none font-semibold text-[0.875rem] cursor-grab">⋮⋮</span>
                       <input
                         type="text"
                         value={opt.label}
@@ -7655,7 +7628,7 @@ const SkuMasterV2: React.FC = () => {
                           const val = e.target.value;
                           setDropdownOptionsList(prev => prev.map(o => o.id === opt.id ? { ...o, label: val } : o));
                         }}
-                        className="flex-1 px-3 py-1.5 border border-gray-200 rounded-xl text-xs font-medium text-gray-800 focus:ring-1 focus:ring-blue-400 bg-white"
+                        className="flex-1 px-3 py-1.5 border border-gray-200 rounded-xl text-[0.875rem] font-medium text-gray-800 focus:ring-1 focus:ring-blue-400 bg-white"
                         placeholder="Option name"
                       />
 
@@ -7669,7 +7642,7 @@ const SkuMasterV2: React.FC = () => {
                               setDropdownOptionsList(prev => prev.map(o => o.id === opt.id ? { ...o, color: c } : o));
                             }}
                             style={{ backgroundColor: c }}
-                            className={`w-3.5 h-3.5 rounded-full transition-transform cursor-pointer border border-gray-300/40 ${
+                            className={`w-3.5 h-3.5 rounded-full cursor-pointer border border-gray-300/40 ${
                               opt.color === c ? 'scale-125 ring-2 ring-blue-500' : 'hover:scale-110'
                             }`}
                           />
@@ -7680,7 +7653,7 @@ const SkuMasterV2: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setDropdownOptionsList(prev => prev.filter(o => o.id !== opt.id))}
-                          className="p-1 text-gray-400 hover:text-rose-500 transition-colors cursor-pointer text-xs font-bold"
+                          className="p-1 text-gray-400 hover:text-rose-500 cursor-pointer text-[0.875rem] font-semibold"
                         >
                           ×
                         </button>
@@ -7688,14 +7661,14 @@ const SkuMasterV2: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                <p className="text-[10px] text-gray-400 italic">Options will appear in this order in the dropdown.</p>
+                <p className="text-xs text-gray-400 italic">Options will appear in this order in the dropdown.</p>
               </div>
             )}
 
             {/* FORMULA EXPRESSION Section (when selectedFieldType === 'formula', matching Screenshot 2!) */}
             {selectedFieldType === 'formula' && (
               <div className="space-y-2 pt-2 border-t border-gray-100">
-                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                <label className="block text-xs font-medium text-gray-400 uppercase tracking-wider">
                   EXPRESSION
                 </label>
                 <textarea
@@ -7703,20 +7676,20 @@ const SkuMasterV2: React.FC = () => {
                   placeholder="e.g. {Stock} * {Pages}"
                   value={formulaExpression}
                   onChange={(e) => setFormulaExpression(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs font-mono text-gray-800 bg-white focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-[0.875rem] font-mono text-gray-800 bg-white focus:ring-2 focus:ring-blue-500"
                 />
-                <p className="text-[10px] text-gray-400 leading-normal">
+                <p className="text-xs text-gray-400 leading-normal">
                   Click a column above to insert it, or type <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-700 font-mono">{"{Column Name}"}</code> manually. Supports + - * / ( ). Division by zero shows —.
                 </p>
               </div>
             )}
 
             {/* Modal Footer Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100 dlg-footer">
               <button
                 type="button"
                 onClick={() => setShowAddCustomColumnModal(false)}
-                className="px-4 py-2 border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold rounded-xl text-xs transition-all cursor-pointer"
+                className="px-4 py-2 border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold rounded-xl text-[0.875rem] cursor-pointer"
               >
                 Cancel
               </button>
@@ -7740,7 +7713,7 @@ const SkuMasterV2: React.FC = () => {
                   setDropdownOptionsList([{ id: 'opt_1', label: 'Option 1', color: '#e0f2fe' }]);
                   setShowAddCustomColumnModal(false);
                 }}
-                className="px-5 py-2 bg-slate-900 hover:bg-black text-white font-semibold rounded-xl text-xs transition-all shadow-sm cursor-pointer"
+                className="px-5 py-2 bg-slate-900 hover:bg-black text-white font-semibold rounded-xl text-[0.875rem] shadow-sm cursor-pointer"
               >
                 Add Column
               </button>
@@ -7780,13 +7753,13 @@ const SkuMasterV2: React.FC = () => {
           maxWidth="max-w-xl"
         >
           <div className="space-y-4 text-left">
-            <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-700 font-medium leading-relaxed">
+            <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl text-[0.875rem] text-gray-700 font-medium leading-relaxed">
               Check the boxes next to the fields you want to update. Any unchecked fields will remain unchanged across the <strong>{selectedIds.length}</strong> selected items.
             </div>
 
             <div className="space-y-3">
               {/* Status */}
-              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80">
                 <input
                   type="checkbox"
                   id="sku_bulk_status_check"
@@ -7795,14 +7768,14 @@ const SkuMasterV2: React.FC = () => {
                   className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                 />
                 <div className="flex-1">
-                  <label htmlFor="sku_bulk_status_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                  <label htmlFor="sku_bulk_status_check" className="block text-[0.875rem] font-semibold text-gray-700 cursor-pointer">
                     Status
                   </label>
                   <select
                     disabled={!bulkEditFields.status}
                     value={bulkEditValues.status}
                     onChange={e => setBulkEditValues(prev => ({ ...prev, status: e.target.value }))}
-                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                    className="mt-1 w-full px-3 py-2 text-[0.875rem] border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
                   >
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
@@ -7811,7 +7784,7 @@ const SkuMasterV2: React.FC = () => {
               </div>
 
               {/* Category */}
-              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80">
                 <input
                   type="checkbox"
                   id="sku_bulk_category_check"
@@ -7820,7 +7793,7 @@ const SkuMasterV2: React.FC = () => {
                   className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                 />
                 <div className="flex-1">
-                  <label htmlFor="sku_bulk_category_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                  <label htmlFor="sku_bulk_category_check" className="block text-[0.875rem] font-semibold text-gray-700 cursor-pointer">
                     Category
                   </label>
                   <input
@@ -7830,7 +7803,7 @@ const SkuMasterV2: React.FC = () => {
                     placeholder="Select or enter category"
                     value={bulkEditValues.category}
                     onChange={e => setBulkEditValues(prev => ({ ...prev, category: e.target.value }))}
-                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                    className="mt-1 w-full px-3 py-2 text-[0.875rem] border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
                   />
                   <datalist id="sku_bulk_cat_list">
                     {categoriesData.map(c => (
@@ -7841,7 +7814,7 @@ const SkuMasterV2: React.FC = () => {
               </div>
 
               {/* AUOM (altUnit) */}
-              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80">
                 <input
                   type="checkbox"
                   id="sku_bulk_altunit_check"
@@ -7850,7 +7823,7 @@ const SkuMasterV2: React.FC = () => {
                   className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                 />
                 <div className="flex-1">
-                  <label htmlFor="sku_bulk_altunit_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                  <label htmlFor="sku_bulk_altunit_check" className="block text-[0.875rem] font-semibold text-gray-700 cursor-pointer">
                     AUOM (Packaging / Sales Unit)
                   </label>
                   <input
@@ -7859,13 +7832,13 @@ const SkuMasterV2: React.FC = () => {
                     placeholder="e.g. GBL, BOX, CTN, PKT, BDL, REAM"
                     value={bulkEditValues.altUnit}
                     onChange={e => setBulkEditValues(prev => ({ ...prev, altUnit: e.target.value }))}
-                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                    className="mt-1 w-full px-3 py-2 text-[0.875rem] border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
                   />
                 </div>
               </div>
 
               {/* UOM (unit) */}
-              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80">
                 <input
                   type="checkbox"
                   id="sku_bulk_unit_check"
@@ -7874,7 +7847,7 @@ const SkuMasterV2: React.FC = () => {
                   className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                 />
                 <div className="flex-1">
-                  <label htmlFor="sku_bulk_unit_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                  <label htmlFor="sku_bulk_unit_check" className="block text-[0.875rem] font-semibold text-gray-700 cursor-pointer">
                     UOM (Base Inventory Unit)
                   </label>
                   <input
@@ -7883,13 +7856,13 @@ const SkuMasterV2: React.FC = () => {
                     placeholder="e.g. Pcs, Kg, Sheets"
                     value={bulkEditValues.unit}
                     onChange={e => setBulkEditValues(prev => ({ ...prev, unit: e.target.value }))}
-                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                    className="mt-1 w-full px-3 py-2 text-[0.875rem] border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
                   />
                 </div>
               </div>
 
               {/* GSM */}
-              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80 transition-colors">
+              <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/80">
                 <input
                   type="checkbox"
                   id="sku_bulk_gsm_check"
@@ -7898,7 +7871,7 @@ const SkuMasterV2: React.FC = () => {
                   className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
                 />
                 <div className="flex-1">
-                  <label htmlFor="sku_bulk_gsm_check" className="block text-xs font-bold text-gray-700 cursor-pointer">
+                  <label htmlFor="sku_bulk_gsm_check" className="block text-[0.875rem] font-semibold text-gray-700 cursor-pointer">
                     GSM (Paper Weight)
                   </label>
                   <input
@@ -7907,17 +7880,17 @@ const SkuMasterV2: React.FC = () => {
                     placeholder="e.g. 52, 54, 58, 60, 70"
                     value={bulkEditValues.gsm}
                     onChange={e => setBulkEditValues(prev => ({ ...prev, gsm: e.target.value }))}
-                    className="mt-1 w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
+                    className="mt-1 w-full px-3 py-2 text-[0.875rem] border border-gray-200 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-400 font-semibold"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 dlg-footer">
               <button
                 type="button"
                 onClick={() => setShowBulkEditModal(false)}
-                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+                className="px-4 py-2 text-[0.875rem] font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
               >
                 Cancel
               </button>
@@ -7925,7 +7898,7 @@ const SkuMasterV2: React.FC = () => {
                 type="button"
                 onClick={handleBulkEditSkus}
                 disabled={isBulkOperating || !Object.values(bulkEditFields).some(Boolean)}
-                className="px-4 py-2 text-xs font-bold bg-[#785b3a] hover:bg-[#634a2d] text-white rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 text-[0.875rem] font-semibold bg-[#785b3a] hover:bg-[#634a2d] text-white rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-2"
               >
                 {isBulkOperating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
                 <span>Apply to {selectedIds.length} Items</span>
@@ -7948,22 +7921,22 @@ const SkuMasterV2: React.FC = () => {
               <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
                 <Trash2 className="w-5 h-5" />
               </div>
-              <div className="text-xs">
-                <h4 className="font-bold text-rose-900 text-sm">Confirm Bulk Deletion</h4>
+              <div className="text-[0.875rem]">
+                <h4 className="font-semibold text-rose-900 text-[0.875rem]">Confirm Bulk Deletion</h4>
                 <p className="text-rose-700 mt-1 leading-relaxed">
                   Are you sure you want to move <strong>{selectedIds.length}</strong> selected {getTabLabel(activeMainTab).toLowerCase()} items to the Recycle Bin?
                 </p>
-                <p className="text-gray-500 mt-1.5 text-[11px]">
+                <p className="text-gray-500 mt-1.5 text-xs">
                   You can restore these items anytime from the Recycle Bin.
                 </p>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-2 dlg-footer">
               <button
                 type="button"
                 onClick={() => setShowBulkDeleteModal(false)}
-                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
+                className="px-4 py-2 text-[0.875rem] font-semibold text-gray-600 hover:bg-gray-100 rounded-xl cursor-pointer"
               >
                 Cancel
               </button>
@@ -7971,7 +7944,7 @@ const SkuMasterV2: React.FC = () => {
                 type="button"
                 onClick={handleBulkDeleteSkus}
                 disabled={isBulkOperating}
-                className="px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 text-[0.875rem] font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-2"
               >
                 {isBulkOperating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
                 <span>Move to Recycle Bin</span>
@@ -7992,12 +7965,12 @@ const SkuMasterV2: React.FC = () => {
           <div className="space-y-4 text-left">
             <div className="flex items-center justify-between p-3.5 bg-rose-50 border border-rose-100 rounded-2xl">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold">
+                <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-semibold">
                   <Trash2 className="w-4 h-4" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-rose-900 text-sm">Recycle Bin Repository</h4>
-                  <p className="text-[11px] text-rose-700">
+                  <h4 className="font-semibold text-rose-900 text-[0.875rem]">Recycle Bin Repository</h4>
+                  <p className="text-xs text-rose-700">
                     Deleted items stay safely stored in the Recycle Bin. You can restore them anytime or permanently remove them.
                   </p>
                 </div>
@@ -8008,7 +7981,7 @@ const SkuMasterV2: React.FC = () => {
                     type="button"
                     onClick={handleClearRecycleBin}
                     disabled={clearingRecycleBin || loadingRecycleBin}
-                    className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                    className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[0.875rem] font-semibold cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
                     title="Permanently empty all deleted items from recycle bin"
                   >
                     <Trash2 className={`w-3.5 h-3.5 ${clearingRecycleBin ? 'animate-spin' : ''}`} />
@@ -8019,7 +7992,7 @@ const SkuMasterV2: React.FC = () => {
                   type="button"
                   onClick={fetchRecycleBinSkus}
                   disabled={loadingRecycleBin}
-                  className="px-3 py-1.5 bg-white hover:bg-rose-100/60 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                  className="px-3 py-1.5 bg-white hover:bg-rose-100/60 text-rose-700 border border-rose-200 rounded-xl text-[0.875rem] font-semibold cursor-pointer flex items-center gap-1.5"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${loadingRecycleBin ? 'animate-spin' : ''}`} />
                   <span>Refresh</span>
@@ -8028,19 +8001,19 @@ const SkuMasterV2: React.FC = () => {
             </div>
 
             {loadingRecycleBin ? (
-              <div className="py-12 text-center text-xs font-bold text-gray-400 animate-pulse">
+              <div className="py-12 text-center text-[0.875rem] font-semibold text-gray-400">
                 Loading deleted items...
               </div>
             ) : recycledSkus.length === 0 ? (
               <div className="py-12 text-center space-y-2 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
                 <Trash2 className="w-8 h-8 text-gray-300 mx-auto" />
-                <p className="text-xs font-bold text-gray-600">Recycle Bin is Empty</p>
-                <p className="text-[11px] text-gray-400">No deleted items in this company.</p>
+                <p className="text-[0.875rem] font-semibold text-gray-600">Recycle Bin is Empty</p>
+                <p className="text-xs text-gray-400">No deleted items in this company.</p>
               </div>
             ) : (
-              <div className="max-h-[60vh] overflow-y-auto border border-gray-200 rounded-2xl divide-y divide-gray-100 bg-white">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-gray-50/80 text-gray-500 font-bold text-[11px] sticky top-0 bg-white z-10 border-b border-gray-200">
+              <div className="max-h-[calc(60*var(--vh,1vh))] overflow-y-auto border border-gray-200 rounded-2xl divide-y divide-gray-100 bg-white">
+                <table className="w-full text-left text-[0.875rem] border-collapse">
+                  <thead className="bg-gray-50/80 text-gray-500 font-semibold text-xs sticky top-0 bg-white z-10 border-b border-gray-200">
                     <tr>
                       <th className="py-2.5 px-3">SKU CODE</th>
                       <th className="py-2.5 px-3">ITEM NAME</th>
@@ -8051,9 +8024,9 @@ const SkuMasterV2: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-gray-100 font-medium text-gray-800">
                     {recycledSkus.map(sku => (
-                      <tr key={sku._id} className="hover:bg-rose-50/30 transition-colors">
-                        <td className="py-2.5 px-3 font-mono font-bold text-rose-600">{sku.skuCode}</td>
-                        <td className="py-2.5 px-3 font-bold text-gray-900">{sku.name}</td>
+                      <tr key={sku._id} className="hover:bg-rose-50/30">
+                        <td className="py-2.5 px-3 font-mono font-semibold text-rose-600">{sku.skuCode}</td>
+                        <td className="py-2.5 px-3 font-semibold text-gray-900">{sku.name}</td>
                         <td className="py-2.5 px-3 text-gray-600">{sku.category || '—'}</td>
                         <td className="py-2.5 px-3 text-gray-600">{sku.unit}</td>
                         <td className="py-2.5 px-3 text-right">
@@ -8061,7 +8034,7 @@ const SkuMasterV2: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleRestoreSku(sku)}
-                              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+                              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[0.875rem] font-semibold cursor-pointer flex items-center gap-1"
                               title="Restore to active inventory"
                             >
                               <RotateCcw className="w-3.5 h-3.5" />
@@ -8070,7 +8043,7 @@ const SkuMasterV2: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handlePermanentDeleteSku(sku)}
-                              className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+                              className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[0.875rem] font-semibold cursor-pointer flex items-center gap-1"
                               title="Delete permanently from database"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -8085,11 +8058,11 @@ const SkuMasterV2: React.FC = () => {
               </div>
             )}
 
-            <div className="flex justify-end pt-2">
+            <div className="flex justify-end pt-2 dlg-footer">
               <button
                 type="button"
                 onClick={() => setShowRecycleBinModal(false)}
-                className="px-4 py-2 text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl cursor-pointer"
+                className="px-4 py-2 text-[0.875rem] font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl cursor-pointer"
               >
                 Close
               </button>
@@ -8097,20 +8070,6 @@ const SkuMasterV2: React.FC = () => {
           </div>
         </Modal>
       )}
-
-      {/* Row Entrance Keyframe Animation */}
-      <style>{`
-        @keyframes slideDownFade {
-          from {
-            opacity: 0;
-            transform: translateY(-12px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
 
     </div>
   );

@@ -161,19 +161,19 @@ const TestingTransactionsV2: React.FC = () => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in duration-200">
+    <div className="max-w-2xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200 shadow-3xs">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+          <h1 className="text-xl font-semibold text-gray-900 tracking-tight flex items-center gap-2">
             <ArrowRightLeft className="w-5 h-5 text-blue-600" />
             Inventory Transactions (Testing)
           </h1>
-          <p className="text-xs text-gray-500 mt-0.5">Admin Sandbox testing panel to post transaction ledger events directly</p>
+          <p className="text-[0.875rem] text-gray-500 mt-0.5">Admin Sandbox testing panel to post transaction ledger events directly</p>
         </div>
         <button
           onClick={loadFormData}
-          className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 border border-gray-200 rounded-xl transition-colors bg-white shadow-3xs"
+          className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 border border-gray-200 rounded-xl bg-white shadow-3xs"
           title="Reload Form References"
         >
           <RefreshCw className="w-4 h-4" />
@@ -184,12 +184,12 @@ const TestingTransactionsV2: React.FC = () => {
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="px-6 py-4 bg-gray-50/50 border-b border-gray-200 flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping" />
-          <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">Test Ingestion Engine</span>
+          <span className="text-[0.875rem] font-medium text-amber-700 uppercase tracking-wider">Test Ingestion Engine</span>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {error && (
-            <div className="p-3.5 bg-red-50 border border-red-150 rounded-xl text-xs font-semibold text-red-700 flex items-center gap-2">
+            <div className="p-3.5 bg-red-50 border border-red-150 rounded-xl text-[0.875rem] font-semibold text-red-700 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
@@ -197,11 +197,11 @@ const TestingTransactionsV2: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Transaction Type *</label>
+              <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1.5 uppercase">Transaction Type *</label>
               <select
                 value={form.txType}
                 onChange={e => setForm({ ...form, txType: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[0.875rem] focus:ring-2 focus:ring-blue-500 bg-white"
                 required
               >
                 <option value="Purchase">Purchase (IN)</option>
@@ -213,13 +213,13 @@ const TestingTransactionsV2: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Reference Number *</label>
+              <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1.5 uppercase">Reference Number *</label>
               <input
                 type="text"
                 placeholder="e.g. PO-7890, ADJ-1002, TR-998"
                 value={form.referenceId}
                 onChange={e => setForm({ ...form, referenceId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[0.875rem] focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                 required
               />
             </div>
@@ -227,11 +227,11 @@ const TestingTransactionsV2: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Select SKU *</label>
+              <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1.5 uppercase">Select SKU *</label>
               <select
                 value={form.skuId}
                 onChange={e => setForm({ ...form, skuId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[0.875rem] focus:ring-2 focus:ring-blue-500 bg-white"
                 required
               >
                 <option value="">-- Choose SKU --</option>
@@ -242,11 +242,11 @@ const TestingTransactionsV2: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Select Storage Location *</label>
+              <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1.5 uppercase">Select Storage Location *</label>
               <select
                 value={form.locationId}
                 onChange={e => setForm({ ...form, locationId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[0.875rem] focus:ring-2 focus:ring-blue-500 bg-white"
                 required
               >
                 <option value="">-- Choose Location --</option>
@@ -259,24 +259,24 @@ const TestingTransactionsV2: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Quantity *</label>
+              <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1.5 uppercase">Quantity *</label>
               <input
                 type="number"
                 step="any"
                 placeholder="e.g. 500"
                 value={form.quantity}
                 onChange={e => setForm({ ...form, quantity: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[0.875rem] focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Unit (Auto-populated)</label>
+              <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1.5 uppercase">Unit (Auto-populated)</label>
               <input
                 type="text"
                 value={selectedSku?.unit || '—'}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs bg-gray-100/80 font-mono text-gray-500 select-none"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[0.875rem] bg-gray-100/80 font-mono text-gray-500 select-none"
                 readOnly
               />
             </div>
@@ -284,36 +284,36 @@ const TestingTransactionsV2: React.FC = () => {
 
           {/* Current Stock Indicator details */}
           {form.skuId && form.locationId && (
-            <div className="p-3 bg-blue-50 border border-blue-150 rounded-xl flex items-center justify-between text-xs">
+            <div className="p-3 bg-blue-50 border border-blue-150 rounded-xl flex items-center justify-between text-[0.875rem]">
               <span className="font-semibold text-blue-700">Active Stock at Selected Location:</span>
-              <span className="font-bold text-blue-900">
+              <span className="font-semibold text-blue-900">
                 {currentStock} {selectedSku?.unit || ''}
               </span>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase">Transaction Notes / Remarks</label>
+            <label className="block text-[0.875rem] font-semibold text-gray-600 mb-1.5 uppercase">Transaction Notes / Remarks</label>
             <textarea
               placeholder="Provide validation comments, reasons, or additional documentation notes..."
               value={form.remarks}
               onChange={e => setForm({ ...form, remarks: e.target.value })}
-              className="w-full h-24 px-3 py-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
+              className="w-full h-24 px-3 py-2 border border-gray-200 rounded-lg text-[0.875rem] focus:ring-2 focus:ring-blue-500 bg-white"
             />
           </div>
 
-          <div className="pt-4 border-t border-gray-200 flex justify-end gap-3">
+          <div className="pt-4 border-t border-gray-200 flex justify-end gap-3 dlg-footer">
             <button
               type="button"
               onClick={handleReset}
-              className="px-4 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-50 bg-white"
+              className="btn-secondary"
             >
               Reset Form
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5 transition-colors"
+              className="btn-primary"
             >
               {submitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               Save Transaction

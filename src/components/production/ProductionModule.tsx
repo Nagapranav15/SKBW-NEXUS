@@ -1090,7 +1090,7 @@ export const ProductionModule: React.FC = () => {
   };
 
   const renderTabNavigation = () => (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-4 rounded-2xl shadow-2xs relative">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-1 relative">
       <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full">
         {TAB_ITEMS.map(tab => {
           const Icon = tab.icon;
@@ -1100,17 +1100,17 @@ export const ProductionModule: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-3 text-xs md:text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[1px] ${
+              className={`px-4 py-3 text-[0.875rem] md:text-[0.875rem] font-semibold border-b-2 flex items-center gap-2 cursor-pointer whitespace-nowrap -mb-[0.0625rem] ${
                 active 
-                  ? 'border-teal-700 text-teal-700 bg-transparent'
+                  ? 'border-blue-700 text-blue-700 bg-transparent'
                   : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 bg-transparent'
               }`}
             >
-              <Icon className={`w-4 h-4 ${active ? 'text-teal-700' : 'text-slate-400'}`} />
+              <Icon className={`w-4 h-4 ${active ? 'text-blue-700' : 'text-slate-400'}`} />
               <span>{tab.label}</span>
               {count !== undefined && (
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  active ? 'bg-teal-50 text-teal-800' : 'bg-slate-100 text-slate-700'
+                <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
+                  active ? 'bg-blue-50 text-blue-800' : 'bg-slate-100 text-slate-700'
                 }`}>
                   {count}
                 </span>
@@ -1129,21 +1129,18 @@ export const ProductionModule: React.FC = () => {
     // -------------------------------------------------------------
     if (activeTab === 'entries') {
     return (
-      <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+      <div className="min-h-[calc(100*var(--vh,1vh))] bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
         {/* 1. Header Banner (Matching Sales Orders Header Banner) */}
-        <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
+        <div className="flex flex-row items-center justify-between gap-4 px-1 relative">
           <div className="flex items-center gap-3.5">
-            <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
-              <Activity className="w-6 h-6 stroke-[2.2]" />
-            </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+              <h1 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <span>Production Entries</span>
-                <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold transition-all">
+                <span className="text-xs font-medium text-gray-500">
                   {allEntries.length} Total
                 </span>
               </h1>
-              <p className="text-xs text-gray-500 font-medium">Record and manage actual production output into finished goods inventory.</p>
+              <p className="text-[0.875rem] text-gray-500 font-medium">Record and manage actual production output into finished goods inventory.</p>
             </div>
           </div>
 
@@ -1157,7 +1154,7 @@ export const ProductionModule: React.FC = () => {
                   setShowNewEntryModal(true);
                 }
               }}
-              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-[0.875rem] flex items-center gap-1.5 shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Production Entry</span>
@@ -1171,106 +1168,106 @@ export const ProductionModule: React.FC = () => {
         {/* 3. Top 6 KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
           {/* Card 1: Total Entries */}
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                 <Package className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Entries</p>
-                <h3 className="text-lg font-bold text-gray-900 font-mono">{totalEntriesCount}</h3>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Total Entries</p>
+                <h3 className="text-lg font-semibold text-gray-900 font-mono">{totalEntriesCount}</h3>
               </div>
             </div>
-            <div className="mt-2 text-[10px] font-semibold text-emerald-600 flex items-center space-x-0.5">
+            <div className="mt-2 text-xs font-semibold text-emerald-600 flex items-center space-x-0.5">
               <span>↑ 12%</span>
               <span className="text-gray-400 font-normal">vs last month</span>
             </div>
           </div>
 
           {/* Card 2: Total Good Qty */}
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                 <Boxes className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Good Qty</p>
-                <h3 className="text-lg font-bold text-gray-900 font-mono">{totalGoodQty.toLocaleString()} PCS</h3>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Total Good Qty</p>
+                <h3 className="text-lg font-semibold text-gray-900 font-mono">{totalGoodQty.toLocaleString()} PCS</h3>
               </div>
             </div>
-            <div className="mt-2 text-[10px] font-semibold text-emerald-600 flex items-center space-x-0.5">
+            <div className="mt-2 text-xs font-semibold text-emerald-600 flex items-center space-x-0.5">
               <span>↑ 18%</span>
               <span className="text-gray-400 font-normal">vs last month</span>
             </div>
           </div>
 
           {/* Card 3: Total Wastage */}
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
                   <AlertTriangle className="w-4 h-4" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Wastage</p>
-                  <h3 className="text-lg font-bold text-gray-900 font-mono">{totalWastage.toLocaleString()} PCS</h3>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Total Wastage</p>
+                  <h3 className="text-lg font-semibold text-gray-900 font-mono">{totalWastage.toLocaleString()} PCS</h3>
                 </div>
               </div>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+              <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                 {wastagePercent}%
               </span>
             </div>
           </div>
 
           {/* Card 4: Completed Orders */}
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                   <CheckCircle className="w-4 h-4" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Completed Orders</p>
-                  <h3 className="text-lg font-bold text-gray-900 font-mono">{completedOrdersCount}</h3>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Completed Orders</p>
+                  <h3 className="text-lg font-semibold text-gray-900 font-mono">{completedOrdersCount}</h3>
                 </div>
               </div>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+              <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                 {completedPercent}%
               </span>
             </div>
           </div>
 
           {/* Card 5: In Progress */}
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                   <Clock className="w-4 h-4" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">In Progress</p>
-                  <h3 className="text-lg font-bold text-gray-900 font-mono">{inProgressCount}</h3>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">In Progress</p>
+                  <h3 className="text-lg font-semibold text-gray-900 font-mono">{inProgressCount}</h3>
                 </div>
               </div>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                 {inProgressPercent}%
               </span>
             </div>
           </div>
 
           {/* Card 6: Draft Entries */}
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 rounded-xl bg-gray-100 text-gray-600 flex items-center justify-center shrink-0">
                   <FileText className="w-4 h-4" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Draft Entries</p>
-                  <h3 className="text-lg font-bold text-gray-900 font-mono">{draftEntriesCount}</h3>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Draft Entries</p>
+                  <h3 className="text-lg font-semibold text-gray-900 font-mono">{draftEntriesCount}</h3>
                 </div>
               </div>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">
+              <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
                 {draftPercent}%
               </span>
             </div>
@@ -1278,11 +1275,11 @@ export const ProductionModule: React.FC = () => {
         </div>
 
         {/* 4. Filter Toolbar Card */}
-        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden space-y-0">
-          <div className="bg-gray-50/50 border-b border-gray-200 px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 text-xs font-semibold text-gray-600">
+        <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2 space-y-0">
+          <div className="bg-gray-50/50 border-b border-gray-200 px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 text-[0.875rem] font-semibold text-gray-600">
             <div className="flex flex-wrap items-center gap-2.5 flex-1">
               {/* Search */}
-              <div className="relative min-w-[240px] flex-1 max-w-sm">
+              <div className="relative min-w-[15rem] flex-1 max-w-sm">
                 <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
@@ -1292,7 +1289,7 @@ export const ProductionModule: React.FC = () => {
                     setCurrentPage(1);
                   }}
                   placeholder="Search by Entry No., order, product..."
-                  className="w-full pl-8 pr-8 py-1.5 text-xs text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-2xs font-medium"
+                  className="w-full pl-8 pr-8 py-1.5 text-[0.875rem] text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-2xs font-medium"
                 />
                 {entriesSearch && (
                   <button 
@@ -1311,7 +1308,7 @@ export const ProductionModule: React.FC = () => {
                   setEntriesStatusFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
                 <option value="ALL">All Status</option>
                 <option value="Posted">Posted</option>
@@ -1326,7 +1323,7 @@ export const ProductionModule: React.FC = () => {
                   setEntriesDeptFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
                 <option value="ALL">All Departments ({distinctEntriesDepartments.length})</option>
                 {distinctEntriesDepartments.map(d => (
@@ -1341,7 +1338,7 @@ export const ProductionModule: React.FC = () => {
                   setEntriesProductFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer max-w-[200px] truncate"
+                className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer max-w-[12.5rem] truncate"
               >
                 <option value="ALL">All Products ({distinctProducts.length})</option>
                 {distinctProducts.map(p => (
@@ -1354,7 +1351,7 @@ export const ProductionModule: React.FC = () => {
             <div className="flex items-center space-x-2 shrink-0">
               <button
                 onClick={handleResetFilters}
-                className="text-blue-600 hover:text-blue-800 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                className="text-blue-600 hover:text-blue-800 text-[0.875rem] font-semibold px-2 py-1 hover:bg-blue-50 rounded-lg cursor-pointer"
               >
                 Clear Filters
               </button>
@@ -1363,7 +1360,7 @@ export const ProductionModule: React.FC = () => {
         </div>
 
         {/* 5. Sub-toolbar: count & Export/Print tools */}
-        <div className="flex items-center justify-between pt-1 text-xs">
+        <div className="flex items-center justify-between pt-1 text-[0.875rem]">
           <div className="font-semibold text-gray-600">
             Showing all {filteredEntries.length} production entries
           </div>
@@ -1371,7 +1368,7 @@ export const ProductionModule: React.FC = () => {
           <div className="flex items-center space-x-2">
             <button 
               onClick={handleExportExcel}
-              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-semibold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
               title="Export to Excel Spreadsheet"
             >
               <Download className="w-3.5 h-3.5 text-gray-500" />
@@ -1379,7 +1376,7 @@ export const ProductionModule: React.FC = () => {
             </button>
             <button 
               onClick={() => window.print()}
-              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-semibold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
               title="Print Report"
             >
               <Printer className="w-3.5 h-3.5 text-gray-500" />
@@ -1390,11 +1387,11 @@ export const ProductionModule: React.FC = () => {
 
         {/* 6. Production Entries Main Table */}
         <div className="bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs">
-          <div className="overflow-x-auto min-h-[380px]">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider select-none">
+          <div className="overflow-x-auto min-h-[23.75rem]">
+            <table className="w-full text-left border-collapse text-[0.875rem]">
+              <thead className="border-b border-gray-200 text-xs font-medium text-gray-600 uppercase tracking-wider select-none">
                 <tr>
-                  <th className="py-3 px-3 w-8 text-center font-bold">
+                  <th className="py-3 px-3 w-8 text-center font-semibold">
                     <input 
                       type="checkbox" 
                       checked={paginatedEntries.length > 0 && paginatedEntries.every(e => selectedEntryIds.has(e.id))}
@@ -1402,54 +1399,54 @@ export const ProductionModule: React.FC = () => {
                       className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" 
                     />
                   </th>
-                  <th className="py-3 px-3 font-bold cursor-pointer select-none" onClick={() => handleSort('entryNo')}>
+                  <th className="py-3 px-3 font-semibold cursor-pointer select-none" onClick={() => handleSort('entryNo')}>
                     <div className="flex items-center space-x-1">
                       <span>ENTRY NO.</span>
                       <ArrowUpDown className="w-3 h-3 text-gray-400" />
                     </div>
                   </th>
-                  <th className="py-3 px-3 font-bold cursor-pointer select-none" onClick={() => handleSort('date')}>
+                  <th className="py-3 px-3 font-semibold cursor-pointer select-none" onClick={() => handleSort('date')}>
                     <div className="flex items-center space-x-1">
                       <span>DATE</span>
                       <ArrowUpDown className="w-3 h-3 text-gray-400" />
                     </div>
                   </th>
-                  <th className="py-3 px-3 font-bold cursor-pointer select-none" onClick={() => handleSort('orderNumber')}>
+                  <th className="py-3 px-3 font-semibold cursor-pointer select-none" onClick={() => handleSort('orderNumber')}>
                     <div className="flex items-center space-x-1">
                       <span>PRODUCTION ORDER</span>
                       <ArrowUpDown className="w-3 h-3 text-gray-400" />
                     </div>
                   </th>
-                  <th className="py-3 px-3 font-bold cursor-pointer select-none min-w-[180px]" onClick={() => handleSort('itemName')}>
+                  <th className="py-3 px-3 font-semibold cursor-pointer select-none min-w-[11.25rem]" onClick={() => handleSort('itemName')}>
                     <div className="flex items-center space-x-1">
                       <span>ITEM / PRODUCT</span>
                       <ArrowUpDown className="w-3 h-3 text-gray-400" />
                     </div>
                   </th>
-                  <th className="py-3 px-3 text-right font-bold">PRODUCED QTY</th>
-                  <th className="py-3 px-3 text-right font-bold">GOOD QTY</th>
-                  <th className="py-3 px-3 text-right font-bold">WASTAGE</th>
-                  <th className="py-3 px-3 font-bold">UOM</th>
-                  <th className="py-3 px-3 font-bold cursor-pointer select-none" onClick={() => handleSort('locationFloor')}>
+                  <th className="py-3 px-3 text-right font-semibold">PRODUCED QTY</th>
+                  <th className="py-3 px-3 text-right font-semibold">GOOD QTY</th>
+                  <th className="py-3 px-3 text-right font-semibold">WASTAGE</th>
+                  <th className="py-3 px-3 font-semibold">UOM</th>
+                  <th className="py-3 px-3 font-semibold cursor-pointer select-none" onClick={() => handleSort('locationFloor')}>
                     <div className="flex items-center space-x-1">
                       <span>OUTPUT LOCATION</span>
                       <ArrowUpDown className="w-3 h-3 text-gray-400" />
                     </div>
                   </th>
-                  <th className="py-3 px-3 font-bold cursor-pointer select-none" onClick={() => handleSort('department')}>
+                  <th className="py-3 px-3 font-semibold cursor-pointer select-none" onClick={() => handleSort('department')}>
                     <div className="flex items-center space-x-1">
                       <span>DEPARTMENT</span>
                       <ArrowUpDown className="w-3 h-3 text-gray-400" />
                     </div>
                   </th>
-                  <th className="py-3 px-3 font-bold">STATUS</th>
-                  <th className="py-3 px-3 text-center font-bold">ACTIONS</th>
+                  <th className="py-3 px-3 font-semibold">STATUS</th>
+                  <th className="py-3 px-3 text-center font-semibold">ACTIONS</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 text-xs">
+              <tbody className="bg-white divide-y divide-gray-100 text-[0.875rem]">
                 {paginatedEntries.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="py-12 text-center text-gray-400 text-xs">
+                    <td colSpan={13} className="py-12 text-center text-gray-400 text-[0.875rem]">
                       {entriesSearch ? 'No production entries matching your search criteria.' : 'No production entries recorded in backend yet. Click "+ New Production Entry" to record.'}
                     </td>
                   </tr>
@@ -1459,7 +1456,7 @@ export const ProductionModule: React.FC = () => {
                     return (
                       <tr 
                         key={e.id} 
-                        className={`hover:bg-blue-50/40 transition-colors group cursor-pointer ${isSelected ? 'bg-blue-50/60' : ''}`}
+                        className={`hover:bg-blue-50/40 group cursor-pointer ${isSelected ? 'bg-blue-50/60' : ''}`}
                       >
                         {/* Checkbox */}
                         <td className="py-3.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
@@ -1472,17 +1469,17 @@ export const ProductionModule: React.FC = () => {
                         </td>
 
                         {/* Entry No */}
-                        <td className="py-3.5 px-3 font-bold font-mono text-blue-600 whitespace-nowrap text-xs">
+                        <td className="py-3.5 px-3 font-semibold font-mono text-blue-600 whitespace-nowrap text-[0.875rem]">
                           {e.entryNo}
                         </td>
 
                         {/* Date */}
-                        <td className="py-3.5 px-3 text-gray-700 whitespace-nowrap text-xs">
+                        <td className="py-3.5 px-3 text-gray-700 whitespace-nowrap text-[0.875rem]">
                           {e.date}
                         </td>
 
                         {/* Production Order */}
-                        <td className="py-3.5 px-3 font-bold font-mono text-blue-600 whitespace-nowrap text-xs">
+                        <td className="py-3.5 px-3 font-semibold font-mono text-blue-600 whitespace-nowrap text-[0.875rem]">
                           <button 
                             onClick={() => handleOpenRecordEntries(e.parentOrder)} 
                             className="hover:underline cursor-pointer"
@@ -1492,95 +1489,95 @@ export const ProductionModule: React.FC = () => {
                         </td>
 
                         {/* Item / Product */}
-                        <td className="py-3.5 px-3 text-xs">
-                          <div className="font-bold text-gray-900 leading-snug text-xs">
+                        <td className="py-3.5 px-3 text-[0.875rem]">
+                          <div className="font-semibold text-gray-900 leading-snug text-[0.875rem]">
                             {e.itemName}
                           </div>
-                          <div className="text-[11px] text-gray-400 font-mono font-medium">
+                          <div className="text-xs text-gray-400 font-mono font-medium">
                             {e.itemCode}
                           </div>
                         </td>
 
                         {/* Produced Qty */}
-                        <td className="py-3.5 px-3 text-right font-medium text-gray-800 text-xs whitespace-nowrap">
+                        <td className="py-3.5 px-3 text-right font-medium text-gray-800 text-[0.875rem] whitespace-nowrap">
                           {e.producedQty.toLocaleString()}
                         </td>
 
                         {/* Good Qty */}
-                        <td className="py-3.5 px-3 text-right font-bold text-gray-900 text-xs whitespace-nowrap">
+                        <td className="py-3.5 px-3 text-right font-semibold text-gray-900 text-[0.875rem] whitespace-nowrap">
                           {e.goodQty.toLocaleString()}
                         </td>
 
                         {/* Wastage */}
-                        <td className="py-3.5 px-3 text-right font-medium text-gray-600 text-xs whitespace-nowrap">
+                        <td className="py-3.5 px-3 text-right font-medium text-gray-600 text-[0.875rem] whitespace-nowrap">
                           {e.wastageQty.toLocaleString()}
                         </td>
 
                         {/* UOM */}
-                        <td className="py-3.5 px-3 text-gray-600 font-medium text-xs whitespace-nowrap">
+                        <td className="py-3.5 px-3 text-gray-600 font-medium text-[0.875rem] whitespace-nowrap">
                           {e.producedUom || 'PCS'}
                         </td>
 
                         {/* Output Location */}
-                        <td className="py-3.5 px-3 text-xs">
-                          <div className="font-medium text-gray-800 text-xs">
+                        <td className="py-3.5 px-3 text-[0.875rem]">
+                          <div className="font-medium text-gray-800 text-[0.875rem]">
                             {e.locationFloor}
                           </div>
-                          <div className="text-[11px] text-gray-400 font-medium">
+                          <div className="text-xs text-gray-400 font-medium">
                             {e.locationZone}
                           </div>
                         </td>
 
                         {/* Department */}
-                        <td className="py-3.5 px-3 text-gray-700 font-medium whitespace-nowrap text-xs">
+                        <td className="py-3.5 px-3 text-gray-700 font-medium whitespace-nowrap text-[0.875rem]">
                           {e.department}
                         </td>
 
                         {/* Status */}
-                        <td className="py-3.5 px-3 whitespace-nowrap text-xs">
+                        <td className="py-3.5 px-3 whitespace-nowrap text-[0.875rem]">
                           {e.status === 'Posted' ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
                               Posted
                             </span>
                           ) : e.status === 'Cancelled' ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/60">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200/60">
                               Cancelled
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-700 border border-gray-200/60">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200/60">
                               Draft
                             </span>
                           )}
                         </td>
 
                         {/* Actions (View / Edit / Print / More) */}
-                        <td className="py-3.5 px-3 text-center whitespace-nowrap text-xs">
+                        <td className="py-3.5 px-3 text-center whitespace-nowrap text-[0.875rem]">
                           <div className="flex items-center justify-center space-x-1.5 text-gray-400">
                             <button
                               onClick={() => setSelectedVoucherEntry(e)}
                               title="View Journal Voucher"
-                              className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
+                              className="icon-btn"
                             >
                               <Eye className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleOpenRecordEntries(e.parentOrder)}
                               title="Edit / Record Entries"
-                              className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
+                              className="icon-btn"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => setPrintOrder(e.parentOrder)}
                               title="Print Order"
-                              className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
+                              className="icon-btn"
                             >
                               <Printer className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleOpenOrderDetail(e.parentOrder)}
                               title="View Order Overview"
-                              className="p-1 hover:text-gray-700 transition-colors cursor-pointer"
+                              className="p-1 hover:text-gray-700 cursor-pointer"
                             >
                               <MoreVertical className="w-3.5 h-3.5" />
                             </button>
@@ -1595,7 +1592,7 @@ export const ProductionModule: React.FC = () => {
             </div>
 
             {/* Pagination Footer */}
-            <div className="bg-white px-4 py-3 border-t border-gray-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 rounded-b-2xl">
+            <div className="bg-white px-4 py-3 border-t border-gray-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-[0.875rem] text-gray-500 rounded-b-2xl">
               <div className="flex items-center space-x-2">
                 <span>Show</span>
                 <select
@@ -1604,7 +1601,7 @@ export const ProductionModule: React.FC = () => {
                     setRowsPerPage(Number(e.target.value));
                     setCurrentPage(1);
                   }}
-                  className="px-2 py-1 bg-white border border-gray-200 rounded-md text-xs font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                  className="px-2 py-1 bg-white border border-gray-200 rounded-md text-[0.875rem] font-medium text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                 >
                   <option value={10}>10</option>
                   <option value={25}>25</option>
@@ -1627,7 +1624,7 @@ export const ProductionModule: React.FC = () => {
                     <button
                       key={pIdx}
                       onClick={() => setCurrentPage(page)}
-                      className={`w-7 h-7 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                      className={`w-7 h-7 rounded-lg text-[0.875rem] font-semibold cursor-pointer ${
                         currentPage === page
                           ? 'bg-blue-600 text-white shadow-2xs'
                           : 'hover:bg-gray-100 text-gray-700'
@@ -1652,10 +1649,10 @@ export const ProductionModule: React.FC = () => {
 
         {/* Modal: New Production Entry Order Selector */}
         {showNewEntryModal && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-xl border border-gray-200 max-w-md w-full p-5 space-y-4">
+          <div className="fixed inset-0 z-50 bg-gray-900/40 flex items-center justify-center p-4">
+            <div className="bg-white max-w-md w-full p-5 space-y-4 dlg-panel">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <h3 className="font-bold text-gray-900 text-sm">Select Production Order</h3>
+                <h3 className="font-semibold text-gray-900 text-[0.875rem]">Select Production Order</h3>
                 <button 
                   onClick={() => setShowNewEntryModal(false)}
                   className="text-gray-400 hover:text-gray-600 cursor-pointer"
@@ -1664,19 +1661,19 @@ export const ProductionModule: React.FC = () => {
                 </button>
               </div>
 
-              <p className="text-xs text-gray-500">
+              <p className="text-[0.875rem] text-gray-500">
                 Choose an active production batch to record shift output into inventory:
               </p>
 
               {orders.filter(o => o.status !== 'Completed' && o.status !== 'Cancelled').length === 0 ? (
-                <div className="p-4 bg-gray-50 rounded-lg text-center text-xs text-gray-500 space-y-2">
+                <div className="p-4 bg-gray-50 rounded-lg text-center text-[0.875rem] text-gray-500 space-y-2">
                   <p>No active production orders currently in progress.</p>
                   <button
                     onClick={() => {
                       setShowNewEntryModal(false);
                       handleOpenNewOrder();
                     }}
-                    className="px-3 py-1.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 text-xs cursor-pointer"
+                    className="px-3 py-1.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 text-[0.875rem] cursor-pointer"
                   >
                     + Create New Production Order First
                   </button>
@@ -1686,7 +1683,7 @@ export const ProductionModule: React.FC = () => {
                   <select
                     value={selectedOrderForEntry}
                     onChange={e => setSelectedOrderForEntry(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-semibold text-gray-800 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                    className="w-full px-3 py-2 text-[0.875rem] font-semibold text-gray-800 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
                   >
                     <option value="">-- Select Production Order --</option>
                     {orders
@@ -1698,10 +1695,10 @@ export const ProductionModule: React.FC = () => {
                       ))}
                   </select>
 
-                  <div className="flex items-center justify-end space-x-2 pt-2">
+                  <div className="flex items-center justify-end space-x-2 pt-2 dlg-footer">
                     <button
                       onClick={() => setShowNewEntryModal(false)}
-                      className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer"
+                      className="px-3 py-1.5 text-[0.875rem] font-medium text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer"
                     >
                       Cancel
                     </button>
@@ -1714,7 +1711,7 @@ export const ProductionModule: React.FC = () => {
                           handleOpenRecordEntries(target);
                         }
                       }}
-                      className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-2xs transition-colors cursor-pointer"
+                      className="px-4 py-1.5 text-[0.875rem] font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-2xs cursor-pointer"
                     >
                       Continue to Record Entry
                     </button>
@@ -1727,45 +1724,45 @@ export const ProductionModule: React.FC = () => {
 
         {/* Dynamic Manufacturing Journal Voucher Modal (Tally Voucher View) */}
         {selectedVoucherEntry && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-xl border border-gray-200 max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
+          <div className="fixed inset-0 z-50 bg-gray-900/40 flex items-center justify-center p-4">
+            <div className="bg-white max-w-2xl w-full max-h-[calc(90*var(--vh,1vh))] flex flex-col overflow-hidden dlg-panel">
               {/* Voucher Header */}
               <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-slate-900 text-white shrink-0">
                 <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold">
+                  <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-semibold">
                     MJ
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm tracking-wide">Manufacturing Journal Voucher</h3>
-                    <p className="text-[11px] text-slate-400">Entry: {selectedVoucherEntry.entryNo} • Order: {selectedVoucherEntry.orderNumber}</p>
+                    <h3 className="font-semibold text-[0.875rem] tracking-wide">Manufacturing Journal Voucher</h3>
+                    <p className="text-xs text-slate-400">Entry: {selectedVoucherEntry.entryNo} • Order: {selectedVoucherEntry.orderNumber}</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setSelectedVoucherEntry(null)}
-                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Voucher Body */}
-              <div className="p-6 overflow-y-auto custom-scrollbar space-y-5 text-xs">
+              <div className="p-6 overflow-y-auto custom-scrollbar space-y-5 text-[0.875rem]">
                 {/* Meta details */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 p-3.5 rounded-lg border border-gray-200">
                   <div>
-                    <span className="text-[10px] text-gray-500 uppercase font-bold block">Production Date</span>
+                    <span className="text-xs text-gray-500 uppercase font-semibold block">Production Date</span>
                     <span className="font-semibold text-gray-900">{selectedVoucherEntry.date}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-gray-500 uppercase font-bold block">Shift</span>
+                    <span className="text-xs text-gray-500 uppercase font-semibold block">Shift</span>
                     <span className="font-semibold text-gray-900">{selectedVoucherEntry.shift || 'Day Shift'}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-gray-500 uppercase font-bold block">Department</span>
+                    <span className="text-xs text-gray-500 uppercase font-semibold block">Department</span>
                     <span className="font-semibold text-gray-900">{selectedVoucherEntry.department}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-gray-500 uppercase font-bold block">Status</span>
+                    <span className="text-xs text-gray-500 uppercase font-semibold block">Status</span>
                     <span className="font-semibold text-emerald-700">{selectedVoucherEntry.status}</span>
                   </div>
                 </div>
@@ -1773,22 +1770,22 @@ export const ProductionModule: React.FC = () => {
                 {/* Destination: Finished Product Produced */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between border-b border-gray-200 pb-1">
-                    <h4 className="font-bold text-gray-900 uppercase text-[11px] tracking-wider flex items-center space-x-1.5">
+                    <h4 className="font-medium text-gray-900 uppercase text-xs tracking-wider flex items-center space-x-1.5">
                       <span className="w-2 h-2 rounded-full bg-emerald-500" />
                       <span>Destination (Output / Finished Goods Produced)</span>
                     </h4>
                   </div>
                   <div className="bg-emerald-50/50 border border-emerald-200 rounded-lg p-3.5 flex items-center justify-between">
                     <div>
-                      <h5 className="font-bold text-gray-900 text-sm">{selectedVoucherEntry.itemName}</h5>
-                      <p className="text-[11px] text-gray-500">{selectedVoucherEntry.itemCode} • Location: {selectedVoucherEntry.locationFloor}, {selectedVoucherEntry.locationZone}</p>
+                      <h5 className="font-semibold text-gray-900 text-[0.875rem]">{selectedVoucherEntry.itemName}</h5>
+                      <p className="text-xs text-gray-500">{selectedVoucherEntry.itemCode} • Location: {selectedVoucherEntry.locationFloor}, {selectedVoucherEntry.locationZone}</p>
                     </div>
                     <div className="text-right">
-                      <div className="text-base font-bold text-emerald-700">
+                      <div className="text-base font-semibold text-emerald-700">
                         +{selectedVoucherEntry.goodQty} {selectedVoucherEntry.producedUom} (Good)
                       </div>
                       {selectedVoucherEntry.wastageQty > 0 && (
-                        <div className="text-[11px] font-semibold text-rose-600">
+                        <div className="text-xs font-semibold text-rose-600">
                           Wastage: {selectedVoucherEntry.wastageQty} {selectedVoucherEntry.producedUom}
                         </div>
                       )}
@@ -1799,11 +1796,11 @@ export const ProductionModule: React.FC = () => {
                 {/* Source: Raw Materials Consumed Dynamically Calculated from BOM */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between border-b border-gray-200 pb-1">
-                    <h4 className="font-bold text-gray-900 uppercase text-[11px] tracking-wider flex items-center space-x-1.5">
+                    <h4 className="font-medium text-gray-900 uppercase text-xs tracking-wider flex items-center space-x-1.5">
                       <span className="w-2 h-2 rounded-full bg-amber-500" />
                       <span>Source (Components & Raw Materials Consumed)</span>
                     </h4>
-                    <span className="text-[10px] text-gray-500">Calculated dynamically from BOM formulation</span>
+                    <span className="text-xs text-gray-500">Calculated dynamically from BOM formulation</span>
                   </div>
 
                   {(!selectedVoucherEntry.parentOrder.bomItems || selectedVoucherEntry.parentOrder.bomItems.length === 0) ? (
@@ -1812,8 +1809,8 @@ export const ProductionModule: React.FC = () => {
                     </div>
                   ) : (
                     <div className="border border-gray-200 rounded-lg overflow-hidden">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase">
+                      <table className="w-full text-left text-[0.875rem]">
+                        <thead className="border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase">
                           <tr>
                             <th className="py-2 px-3">Component / Material</th>
                             <th className="py-2 px-3">Type</th>
@@ -1822,7 +1819,7 @@ export const ProductionModule: React.FC = () => {
                             <th className="py-2 px-3 text-right">Current Stock</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="bg-white divide-y divide-gray-100">
                           {selectedVoucherEntry.parentOrder.bomItems.map((b: any, bIdx: number) => {
                             const plannedTotal = Number(selectedVoucherEntry.parentOrder.plannedQty) || 1;
                             const runProduced = Number(selectedVoucherEntry.producedQty) || 0;
@@ -1833,11 +1830,11 @@ export const ProductionModule: React.FC = () => {
                               <tr key={bIdx} className="hover:bg-gray-50/50">
                                 <td className="py-2.5 px-3 font-semibold text-gray-900">{b.component}</td>
                                 <td className="py-2.5 px-3">
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-600">
+                                  <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-600">
                                     {b.type || 'Raw Material'}
                                   </span>
                                 </td>
-                                <td className="py-2.5 px-3 font-bold text-amber-700 text-right">
+                                <td className="py-2.5 px-3 font-semibold text-amber-700 text-right">
                                   {estimatedConsumption ? estimatedConsumption.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'}
                                 </td>
                                 <td className="py-2.5 px-3 text-gray-600">{b.uom}</td>
@@ -1856,7 +1853,7 @@ export const ProductionModule: React.FC = () => {
                 {/* Remarks & QC Notes */}
                 {selectedVoucherEntry.remarks && (
                   <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                    <span className="text-[10px] text-gray-500 uppercase font-bold block mb-1">Remarks & QC Observations</span>
+                    <span className="text-xs text-gray-500 uppercase font-semibold block mb-1">Remarks & QC Observations</span>
                     <p className="text-gray-700">{selectedVoucherEntry.remarks}</p>
                   </div>
                 )}
@@ -1870,14 +1867,14 @@ export const ProductionModule: React.FC = () => {
                     setSelectedVoucherEntry(null);
                     handleOpenRecordEntries(parent);
                   }}
-                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
+                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-[0.875rem] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 cursor-pointer"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                   <span>Open Full Order Entries View</span>
                 </button>
                 <button
                   onClick={() => setSelectedVoucherEntry(null)}
-                  className="px-4 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                  className="px-4 py-1.5 text-[0.875rem] font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer"
                 >
                   Close Voucher
                 </button>
@@ -1894,21 +1891,18 @@ export const ProductionModule: React.FC = () => {
   // -------------------------------------------------------------
   if (activeTab === 'materials') {
     return (
-      <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+      <div className="min-h-[calc(100*var(--vh,1vh))] bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
         {/* 1. Header Banner (Matching Sales Orders Header Banner) */}
-        <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
+        <div className="flex flex-row items-center justify-between gap-4 px-1 relative">
           <div className="flex items-center gap-3.5">
-            <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
-              <Layers className="w-6 h-6 stroke-[2.2]" />
-            </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+              <h1 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <span>Material Requirements</span>
-                <span className="text-xs bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold transition-all">
+                <span className="text-xs font-medium text-gray-500">
                   {matViewMode === 'product' ? `${productRequirementsList.length} Products` : `${orderRequirementsList.length} Orders`} ({orderRequirementsList.length} Active Orders)
                 </span>
               </h1>
-              <p className="text-xs text-gray-500 font-medium">Check material requirements by product and track raw material availability across production orders.</p>
+              <p className="text-[0.875rem] text-gray-500 font-medium">Check material requirements by product and track raw material availability across production orders.</p>
             </div>
           </div>
 
@@ -1922,7 +1916,7 @@ export const ProductionModule: React.FC = () => {
                   setShowNewRequirementModal(true);
                 }
               }}
-              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-[0.875rem] flex items-center gap-1.5 shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Material Requirement</span>
@@ -1936,72 +1930,72 @@ export const ProductionModule: React.FC = () => {
         {/* 3. Top 4 KPI Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           {/* Card 1: Total Products / Requirements */}
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                 <Layers className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">
                   {matViewMode === 'product' ? 'Total Products' : 'Total Requirements'}
                 </p>
-                <h3 className="text-lg font-bold text-gray-900 font-mono">
+                <h3 className="text-lg font-semibold text-gray-900 font-mono">
                   {matViewMode === 'product' ? totalProductsCount : totalRequirementsCount}
                 </h3>
                 <div className="flex items-center space-x-1 mt-0.5">
-                  <span className="text-[10px] font-semibold text-emerald-600">↑ 12%</span>
-                  <span className="text-[10px] text-gray-400 font-medium">vs last month</span>
+                  <span className="text-xs font-semibold text-emerald-600">↑ 12%</span>
+                  <span className="text-xs text-gray-400 font-medium">vs last month</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Card 2: Ready for Production */}
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                 <CheckCircle className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Ready for Production</p>
-                <h3 className="text-lg font-bold text-gray-900 font-mono">{readyRequirementsCount}</h3>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Ready for Production</p>
+                <h3 className="text-lg font-semibold text-gray-900 font-mono">{readyRequirementsCount}</h3>
                 <div className="flex items-center space-x-1 mt-0.5">
-                  <span className="text-[10px] font-semibold text-emerald-600">↑ 20%</span>
-                  <span className="text-[10px] text-gray-400 font-medium">vs last month</span>
+                  <span className="text-xs font-semibold text-emerald-600">↑ 20%</span>
+                  <span className="text-xs text-gray-400 font-medium">vs last month</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Card 3: Partial Materials */}
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
                 <Clock className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Partial Materials</p>
-                <h3 className="text-lg font-bold text-gray-900 font-mono">{partialRequirementsCount}</h3>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Partial Materials</p>
+                <h3 className="text-lg font-semibold text-gray-900 font-mono">{partialRequirementsCount}</h3>
                 <div className="flex items-center space-x-1 mt-0.5">
-                  <span className="text-[10px] font-semibold text-emerald-600">↑ 8%</span>
-                  <span className="text-[10px] text-gray-400 font-medium">vs last month</span>
+                  <span className="text-xs font-semibold text-emerald-600">↑ 8%</span>
+                  <span className="text-xs text-gray-400 font-medium">vs last month</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Card 4: Material Shortages */}
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
                 <AlertTriangle className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Material Shortages</p>
-                <h3 className="text-lg font-bold text-gray-900 font-mono">{shortageRequirementsCount}</h3>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Material Shortages</p>
+                <h3 className="text-lg font-semibold text-gray-900 font-mono">{shortageRequirementsCount}</h3>
                 <div className="flex items-center space-x-1 mt-0.5">
-                  <span className="text-[10px] font-semibold text-rose-600">↑ 25%</span>
-                  <span className="text-[10px] text-gray-400 font-medium">vs last month</span>
+                  <span className="text-xs font-semibold text-rose-600">↑ 25%</span>
+                  <span className="text-xs text-gray-400 font-medium">vs last month</span>
                 </div>
               </div>
             </div>
@@ -2009,11 +2003,11 @@ export const ProductionModule: React.FC = () => {
         </div>
 
         {/* 4. Filter Toolbar Card */}
-        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden space-y-0">
-          <div className="bg-gray-50/50 border-b border-gray-200 px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 text-xs font-semibold text-gray-600">
+        <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2 space-y-0">
+          <div className="bg-gray-50/50 border-b border-gray-200 px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 text-[0.875rem] font-semibold text-gray-600">
             <div className="flex flex-wrap items-center gap-2.5 flex-1">
               {/* Search */}
-              <div className="relative min-w-[240px] flex-1 max-w-sm">
+              <div className="relative min-w-[15rem] flex-1 max-w-sm">
                 <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
@@ -2023,7 +2017,7 @@ export const ProductionModule: React.FC = () => {
                     setMatCurrentPage(1);
                   }}
                   placeholder="Search PR No., product, material..."
-                  className="w-full pl-8 pr-8 py-1.5 text-xs text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-2xs font-medium"
+                  className="w-full pl-8 pr-8 py-1.5 text-[0.875rem] text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-2xs font-medium"
                 />
                 {materialsSearch && (
                   <button 
@@ -2042,7 +2036,7 @@ export const ProductionModule: React.FC = () => {
                   setMaterialsStatusFilter(e.target.value);
                   setMatCurrentPage(1);
                 }}
-                className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
                 <option value="ALL">All Status</option>
                 <option value="Ready">Ready</option>
@@ -2057,7 +2051,7 @@ export const ProductionModule: React.FC = () => {
                   setMaterialsTypeFilter(e.target.value);
                   setMatCurrentPage(1);
                 }}
-                className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
                 <option value="ALL">All Material Types</option>
                 {distinctReqMaterialTypes.map(t => (
@@ -2072,7 +2066,7 @@ export const ProductionModule: React.FC = () => {
                   setMaterialsDeptFilter(e.target.value);
                   setMatCurrentPage(1);
                 }}
-                className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
                 <option value="ALL">All Departments ({distinctReqDepartments.length})</option>
                 {distinctReqDepartments.map(d => (
@@ -2085,7 +2079,7 @@ export const ProductionModule: React.FC = () => {
             <div className="flex items-center space-x-2 shrink-0">
               <button
                 onClick={handleResetMatFilters}
-                className="text-blue-600 hover:text-blue-800 text-xs font-bold px-2 py-1 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                className="text-blue-600 hover:text-blue-800 text-[0.875rem] font-semibold px-2 py-1 hover:bg-blue-50 rounded-lg cursor-pointer"
               >
                 Clear Filters
               </button>
@@ -2094,10 +2088,10 @@ export const ProductionModule: React.FC = () => {
         </div>
 
         {/* 5. Sub-toolbar: View Switcher, count & Export/Print tools */}
-        <div className="flex items-center justify-between flex-wrap gap-2 pt-1 text-xs">
+        <div className="flex items-center justify-between flex-wrap gap-2 pt-1 text-[0.875rem]">
           <div className="flex items-center flex-wrap gap-3">
             {/* View Mode Switcher: By Products (Items) vs By Production Orders */}
-            <div className="inline-flex p-0.5 bg-gray-100 rounded-xl border border-gray-200 text-xs">
+            <div className="inline-flex p-0.5 bg-gray-100 rounded-xl border border-gray-200 text-[0.875rem]">
               <button
                 type="button"
                 onClick={() => {
@@ -2105,7 +2099,7 @@ export const ProductionModule: React.FC = () => {
                   setMatSortField('productName');
                   setMatCurrentPage(1);
                 }}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer ${
                   matViewMode === 'product'
                     ? 'bg-white text-blue-700 shadow-2xs'
                     : 'text-gray-600 hover:text-gray-900'
@@ -2113,7 +2107,7 @@ export const ProductionModule: React.FC = () => {
               >
                 <Package className="w-3.5 h-3.5" />
                 <span>By Products (Items)</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-700 font-mono font-bold">
+                <span className="px-1.5 py-0.2 rounded-full text-xs bg-blue-100 text-blue-700 font-mono font-semibold">
                   {productRequirementsList.length}
                 </span>
               </button>
@@ -2124,7 +2118,7 @@ export const ProductionModule: React.FC = () => {
                   setMatSortField('orderNumber');
                   setMatCurrentPage(1);
                 }}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer ${
                   matViewMode === 'order'
                     ? 'bg-white text-blue-700 shadow-2xs'
                     : 'text-gray-600 hover:text-gray-900'
@@ -2132,7 +2126,7 @@ export const ProductionModule: React.FC = () => {
               >
                 <Layers className="w-3.5 h-3.5" />
                 <span>By Production Orders</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-gray-200 text-gray-700 font-mono font-bold">
+                <span className="px-1.5 py-0.2 rounded-full text-xs bg-gray-200 text-gray-700 font-mono font-semibold">
                   {orderRequirementsList.length}
                 </span>
               </button>
@@ -2146,7 +2140,7 @@ export const ProductionModule: React.FC = () => {
           <div className="flex items-center space-x-2">
             <button 
               onClick={() => showToast('Requirements exported to Excel', 'success')}
-              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-semibold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
               title="Export Requirements"
             >
               <Download className="w-3.5 h-3.5 text-gray-500" />
@@ -2154,7 +2148,7 @@ export const ProductionModule: React.FC = () => {
             </button>
             <button 
               onClick={() => window.print()}
-              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-semibold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer"
               title="Print Requirements"
             >
               <Printer className="w-3.5 h-3.5 text-gray-500" />
@@ -2165,9 +2159,9 @@ export const ProductionModule: React.FC = () => {
 
         {/* 6. Main Table: Material Requirements */}
         <div className="bg-white border border-gray-200/90 rounded-2xl overflow-hidden shadow-2xs">
-          <div className="overflow-x-auto min-h-[380px]">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider select-none">
+          <div className="overflow-x-auto min-h-[23.75rem]">
+            <table className="w-full text-left border-collapse text-[0.875rem]">
+              <thead className="border-b border-gray-200 text-xs font-medium text-gray-600 uppercase tracking-wider select-none">
                 {matViewMode === 'product' ? (
                   <tr>
                     <th className="py-3 px-3 w-8 text-center">
@@ -2292,7 +2286,7 @@ export const ProductionModule: React.FC = () => {
                   </tr>
                 )}
               </thead>
-              <tbody className="divide-y divide-gray-100 text-xs">
+              <tbody className="bg-white divide-y divide-gray-100 text-[0.875rem]">
                 {paginatedRequirements.length === 0 ? (
                   <tr>
                     <td colSpan={12} className="py-12 text-center text-gray-400">
@@ -2308,7 +2302,7 @@ export const ProductionModule: React.FC = () => {
                         {/* Parent Product Row */}
                         <tr
                           onClick={() => handleToggleExpandOrder(prod.id)}
-                          className={`hover:bg-blue-50/20 transition-colors cursor-pointer select-none ${isSelected ? 'bg-blue-50/40' : ''} ${isExpanded ? 'bg-blue-50/30' : ''}`}
+                          className={`hover:bg-blue-50/20 cursor-pointer select-none ${isSelected ? 'bg-blue-50/40' : ''} ${isExpanded ? 'bg-blue-50/30' : ''}`}
                         >
                           {/* Checkbox */}
                           <td className="py-3 px-3 text-center">
@@ -2329,7 +2323,7 @@ export const ProductionModule: React.FC = () => {
                                   e.stopPropagation();
                                   handleToggleExpandOrder(prod.id);
                                 }}
-                                className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                                className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded cursor-pointer"
                                 title={isExpanded ? 'Collapse Orders & Materials' : 'Expand Orders & Materials'}
                               >
                                 {isExpanded ? (
@@ -2344,17 +2338,17 @@ export const ProductionModule: React.FC = () => {
 
                           {/* Product / Item */}
                           <td className="py-3 px-3">
-                            <div className="font-bold text-gray-900 uppercase text-xs flex items-center gap-1.5">
+                            <div className="font-semibold text-gray-900 uppercase text-[0.875rem] flex items-center gap-1.5">
                               <span>{prod.productName}</span>
                             </div>
-                            <div className="text-[11px] text-gray-400 font-mono">
+                            <div className="text-xs text-gray-400 font-mono">
                               {prod.productCode}
                             </div>
                           </td>
 
                           {/* Category */}
                           <td className="py-3 px-3 text-gray-600 font-medium whitespace-nowrap">
-                            <span className="px-2 py-0.5 bg-gray-100 rounded-md text-[11px] font-semibold text-gray-700">
+                            <span className="px-2 py-0.5 bg-gray-100 rounded-md text-xs font-semibold text-gray-700">
                               {prod.category}
                             </span>
                           </td>
@@ -2366,7 +2360,7 @@ export const ProductionModule: React.FC = () => {
                                 e.stopPropagation();
                                 handleToggleExpandOrder(prod.id);
                               }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg text-xs transition-colors cursor-pointer border border-blue-200/60"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold rounded-lg text-[0.875rem] cursor-pointer border border-blue-200/60"
                               title="Click to view production orders info"
                             >
                               <span>{prod.ordersCount} {prod.ordersCount === 1 ? 'Order' : 'Orders'}</span>
@@ -2380,20 +2374,20 @@ export const ProductionModule: React.FC = () => {
 
                           {/* Total Planned Output */}
                           <td className="py-3 px-3 whitespace-nowrap">
-                            <div className="font-bold text-gray-900 text-xs">
+                            <div className="font-semibold text-gray-900 text-[0.875rem]">
                               {prod.totalPlannedQty.toLocaleString()} {prod.plannedUom}
                             </div>
-                            <div className="text-[11px] text-gray-400">
+                            <div className="text-xs text-gray-400">
                               {prod.totalPlannedPcs.toLocaleString()} PCS
                             </div>
                           </td>
 
                           {/* Stock On Hand */}
                           <td className="py-3 px-3 text-right whitespace-nowrap">
-                            <span className="font-mono font-bold text-emerald-700">
+                            <span className="font-mono font-semibold text-emerald-700">
                               {Number(prod.stockOnHand || 0).toLocaleString()}
                             </span>
-                            <span className="text-[10px] text-gray-400 ml-1">PCS</span>
+                            <span className="text-xs text-gray-400 ml-1">PCS</span>
                           </td>
 
                           {/* Material Items Count */}
@@ -2402,8 +2396,8 @@ export const ProductionModule: React.FC = () => {
                           </td>
 
                           {/* Shortage Items Count */}
-                          <td className="py-3 px-3 text-center font-bold">
-                            <span className={prod.shortageItemsCount > 0 ? 'text-rose-600 font-bold' : 'text-gray-700'}>
+                          <td className="py-3 px-3 text-center font-semibold">
+                            <span className={prod.shortageItemsCount > 0 ? 'text-rose-600 font-semibold' : 'text-gray-700'}>
                               {prod.shortageItemsCount}
                             </span>
                           </td>
@@ -2411,15 +2405,15 @@ export const ProductionModule: React.FC = () => {
                           {/* Overall Readiness Status */}
                           <td className="py-3 px-3 whitespace-nowrap">
                             {prod.overallStatus === 'Ready' ? (
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 Ready
                               </span>
                             ) : prod.overallStatus === 'Partial' ? (
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                                 Partial
                               </span>
                             ) : (
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
                                 Shortage
                               </span>
                             )}
@@ -2439,7 +2433,7 @@ export const ProductionModule: React.FC = () => {
                                   handleToggleExpandOrder(prod.id);
                                 }}
                                 title="Expand Details"
-                                className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
+                                className="icon-btn"
                               >
                                 <Eye className="w-3.5 h-3.5 text-blue-600" />
                               </button>
@@ -2449,7 +2443,7 @@ export const ProductionModule: React.FC = () => {
                                   handleShareWhatsApp(prod);
                                 }}
                                 title="Share via WhatsApp"
-                                className="p-1 hover:text-emerald-600 transition-colors cursor-pointer"
+                                className="icon-btn"
                               >
                                 <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
                               </button>
@@ -2466,22 +2460,22 @@ export const ProductionModule: React.FC = () => {
                                 <div className="bg-white rounded-xl border border-blue-200/70 p-4 shadow-2xs space-y-3">
                                   <div className="flex items-center justify-between flex-wrap gap-2 border-b border-gray-100 pb-2.5">
                                     <div className="flex items-center space-x-2">
-                                      <div className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                                      <div className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-semibold text-[0.875rem]">
                                         <Layers className="w-3.5 h-3.5" />
                                       </div>
-                                      <h4 className="text-xs font-bold text-gray-900">
+                                      <h4 className="text-[0.875rem] font-semibold text-gray-900">
                                         Production Orders Info ({prod.orders.length} {prod.orders.length === 1 ? 'Order' : 'Orders'})
                                       </h4>
                                     </div>
-                                    <span className="text-[11px] text-gray-500 font-medium">
-                                      Total Planned: <span className="font-bold text-gray-800">{prod.totalPlannedQty} {prod.plannedUom} ({prod.totalPlannedPcs.toLocaleString()} PCS)</span>
+                                    <span className="text-xs text-gray-500 font-medium">
+                                      Total Planned: <span className="font-semibold text-gray-800">{prod.totalPlannedQty} {prod.plannedUom} ({prod.totalPlannedPcs.toLocaleString()} PCS)</span>
                                     </span>
                                   </div>
 
                                   <div className="overflow-x-auto custom-scrollbar">
-                                    <table className="w-full text-left text-xs border-collapse">
+                                    <table className="w-full text-left text-[0.875rem] border-collapse">
                                       <thead>
-                                        <tr className="border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-50/80">
+                                        <tr className="border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50/80">
                                           <th className="py-2.5 px-3">Order Number</th>
                                           <th className="py-2.5 px-3">Order Date</th>
                                           <th className="py-2.5 px-3">Department</th>
@@ -2493,10 +2487,10 @@ export const ProductionModule: React.FC = () => {
                                           <th className="py-2.5 px-3 text-center">Actions</th>
                                         </tr>
                                       </thead>
-                                      <tbody className="divide-y divide-gray-100">
+                                      <tbody className="bg-white divide-y divide-gray-100">
                                         {prod.orders.map((ord: any) => (
-                                          <tr key={ord.id} className="hover:bg-blue-50/30 transition-colors">
-                                            <td className="py-2.5 px-3 font-mono font-bold text-blue-600 whitespace-nowrap">
+                                          <tr key={ord.id} className="hover:bg-blue-50/30">
+                                            <td className="py-2.5 px-3 font-mono font-semibold text-blue-600 whitespace-nowrap">
                                               <button
                                                 onClick={(e) => {
                                                   e.stopPropagation();
@@ -2509,19 +2503,19 @@ export const ProductionModule: React.FC = () => {
                                             </td>
                                             <td className="py-2.5 px-3 text-gray-600">{ord.orderDate || '—'}</td>
                                             <td className="py-2.5 px-3 text-gray-700 font-medium">{ord.department || '—'}</td>
-                                            <td className="py-2.5 px-3 text-right font-bold text-gray-900 whitespace-nowrap">
+                                            <td className="py-2.5 px-3 text-right font-semibold text-gray-900 whitespace-nowrap">
                                               {ord.plannedQty} {ord.plannedUom}
-                                              <span className="text-[10px] text-gray-400 font-normal ml-1">
+                                              <span className="text-xs text-gray-400 font-normal ml-1">
                                                 ({Number(ord.plannedPcs).toLocaleString()} PCS)
                                               </span>
                                             </td>
                                             <td className="py-2.5 px-3 text-right text-gray-700 font-medium whitespace-nowrap">
-                                              <span className="text-emerald-700 font-bold">{Number(ord.rawOrder?.producedPcs || 0).toLocaleString()}</span>
+                                              <span className="text-emerald-700 font-semibold">{Number(ord.rawOrder?.producedPcs || 0).toLocaleString()}</span>
                                               {' / '}
                                               <span className="text-gray-500">{Number(ord.rawOrder?.balancePcs ?? ord.plannedPcs).toLocaleString()} PCS</span>
                                             </td>
                                             <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                                                 ord.priority === 'High' || ord.priority === 'Urgent'
                                                   ? 'bg-rose-50 text-rose-700 border border-rose-200'
                                                   : ord.priority === 'Medium'
@@ -2532,7 +2526,7 @@ export const ProductionModule: React.FC = () => {
                                               </span>
                                             </td>
                                             <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                                                 ord.rawOrder?.status === 'Completed'
                                                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                                   : ord.rawOrder?.status === 'In Production' || ord.rawOrder?.status === 'In Progress'
@@ -2551,7 +2545,7 @@ export const ProductionModule: React.FC = () => {
                                                     handleOpenOrderDetail(ord.rawOrder);
                                                   }}
                                                   title="View Order Details"
-                                                  className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
+                                                  className="icon-btn"
                                                 >
                                                   <Eye className="w-3.5 h-3.5 text-blue-600" />
                                                 </button>
@@ -2561,7 +2555,7 @@ export const ProductionModule: React.FC = () => {
                                                     handleOpenRecordEntries(ord.rawOrder);
                                                   }}
                                                   title="Record Entries"
-                                                  className="p-1 hover:text-emerald-600 transition-colors cursor-pointer"
+                                                  className="p-1 hover:text-emerald-600 cursor-pointer"
                                                 >
                                                   <Package className="w-3.5 h-3.5 text-emerald-600" />
                                                 </button>
@@ -2571,7 +2565,7 @@ export const ProductionModule: React.FC = () => {
                                                     setPrintOrder(ord.rawOrder);
                                                   }}
                                                   title="Print Order"
-                                                  className="p-1 hover:text-gray-700 transition-colors cursor-pointer"
+                                                  className="icon-btn"
                                                 >
                                                   <Printer className="w-3.5 h-3.5 text-gray-600" />
                                                 </button>
@@ -2588,22 +2582,22 @@ export const ProductionModule: React.FC = () => {
                                 <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs space-y-3">
                                   <div className="flex items-center justify-between flex-wrap gap-2 border-b border-gray-100 pb-2.5">
                                     <div className="flex items-center space-x-2">
-                                      <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">
+                                      <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-semibold text-[0.875rem]">
                                         <Boxes className="w-3.5 h-3.5" />
                                       </div>
-                                      <h4 className="text-xs font-bold text-gray-900">
+                                      <h4 className="text-[0.875rem] font-semibold text-gray-900">
                                         Consolidated Material Requirements ({prod.materialDetails.length} items)
                                       </h4>
                                     </div>
-                                    <span className="text-[11px] text-gray-500 font-medium">
+                                    <span className="text-xs text-gray-500 font-medium">
                                       Aggregated raw materials needed across all {prod.orders.length} orders
                                     </span>
                                   </div>
 
                                   <div className="overflow-x-auto custom-scrollbar">
-                                    <table className="w-full text-left text-xs border-collapse">
+                                    <table className="w-full text-left text-[0.875rem] border-collapse">
                                       <thead>
-                                        <tr className="border-b border-gray-150 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-50/80">
+                                        <tr className="border-b border-gray-150 text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50/80">
                                           <th className="py-2.5 px-3 w-8 text-center">#</th>
                                           <th className="py-2.5 px-3">Material</th>
                                           <th className="py-2.5 px-3">Material Code</th>
@@ -2616,7 +2610,7 @@ export const ProductionModule: React.FC = () => {
                                           <th className="py-2.5 px-3 text-center">Actions</th>
                                         </tr>
                                       </thead>
-                                      <tbody className="divide-y divide-gray-100">
+                                      <tbody className="bg-white divide-y divide-gray-100">
                                         {prod.materialDetails.length === 0 ? (
                                           <tr>
                                             <td colSpan={10} className="py-4 text-center text-gray-400">
@@ -2625,30 +2619,30 @@ export const ProductionModule: React.FC = () => {
                                           </tr>
                                         ) : (
                                           prod.materialDetails.map((m: any) => (
-                                            <tr key={m.id} className="hover:bg-gray-50/80 transition-colors">
+                                            <tr key={m.id} className="hover:bg-gray-50/80">
                                               <td className="py-2.5 px-3 text-center text-gray-400 font-semibold">{m.index}</td>
                                               <td className="py-2.5 px-3 font-semibold text-gray-900">{m.materialName}</td>
-                                              <td className="py-2.5 px-3 font-mono text-[11px] text-gray-500">{m.materialCode}</td>
+                                              <td className="py-2.5 px-3 font-mono text-xs text-gray-500">{m.materialCode}</td>
                                               <td className="py-2.5 px-3 text-gray-600 font-medium">{m.type || 'Raw Material'}</td>
-                                              <td className="py-2.5 px-3 text-right font-bold text-gray-900">{m.totalRequired.toLocaleString()}</td>
+                                              <td className="py-2.5 px-3 text-right font-semibold text-gray-900">{m.totalRequired.toLocaleString()}</td>
                                               <td className="py-2.5 px-3 text-right font-medium text-gray-700">{m.availableQty.toLocaleString()}</td>
-                                              <td className="py-2.5 px-3 text-right font-bold">
-                                                <span className={m.shortageQty > 0 ? 'text-rose-600 font-bold' : 'text-emerald-700'}>
+                                              <td className="py-2.5 px-3 text-right font-semibold">
+                                                <span className={m.shortageQty > 0 ? 'text-rose-600 font-semibold' : 'text-emerald-700'}>
                                                   {m.shortageQty.toLocaleString()}
                                                 </span>
                                               </td>
                                               <td className="py-2.5 px-3 text-gray-600 font-medium">{m.uom}</td>
                                               <td className="py-2.5 px-3">
                                                 {m.status === 'Ready' ? (
-                                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                  <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                     Ready
                                                   </span>
                                                 ) : m.status === 'Partial' ? (
-                                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                                  <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                                                     Partial
                                                   </span>
                                                 ) : (
-                                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                                  <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
                                                     Shortage
                                                   </span>
                                                 )}
@@ -2658,14 +2652,14 @@ export const ProductionModule: React.FC = () => {
                                                   <button 
                                                     onClick={() => showToast(`Stock ledger preview for ${m.materialName}`, 'info')}
                                                     title="View Material Stock" 
-                                                    className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
+                                                    className="icon-btn"
                                                   >
                                                     <Eye className="w-3.5 h-3.5 text-blue-600" />
                                                   </button>
                                                   <button 
                                                     onClick={() => showToast(`Material allocation recorded for ${m.materialName}`, 'success')}
                                                     title="Issue Material / PO" 
-                                                    className="p-1 hover:text-emerald-600 transition-colors cursor-pointer"
+                                                    className="p-1 hover:text-emerald-600 cursor-pointer"
                                                   >
                                                     <Package className="w-3.5 h-3.5 text-blue-600" />
                                                   </button>
@@ -2695,7 +2689,7 @@ export const ProductionModule: React.FC = () => {
                         {/* Parent Row - Click anywhere on row to open/close */}
                         <tr 
                           onClick={() => handleToggleExpandOrder(req.id)}
-                          className={`hover:bg-blue-50/20 transition-colors cursor-pointer select-none ${isSelected ? 'bg-blue-50/40' : ''} ${isExpanded ? 'bg-blue-50/30' : ''}`}
+                          className={`hover:bg-blue-50/20 cursor-pointer select-none ${isSelected ? 'bg-blue-50/40' : ''} ${isExpanded ? 'bg-blue-50/30' : ''}`}
                         >
                           {/* Checkbox */}
                           <td className="py-3 px-3 text-center">
@@ -2716,7 +2710,7 @@ export const ProductionModule: React.FC = () => {
                                   e.stopPropagation();
                                   handleToggleExpandOrder(req.id);
                                 }}
-                                className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                                className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded cursor-pointer"
                                 title={isExpanded ? 'Collapse Materials' : 'Expand Materials'}
                               >
                                 {isExpanded ? (
@@ -2730,7 +2724,7 @@ export const ProductionModule: React.FC = () => {
                           </td>
 
                           {/* Production Order No */}
-                          <td className="py-3 px-3 font-bold font-mono text-blue-600 whitespace-nowrap">
+                          <td className="py-3 px-3 font-semibold font-mono text-blue-600 whitespace-nowrap">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -2744,20 +2738,20 @@ export const ProductionModule: React.FC = () => {
 
                           {/* Product */}
                           <td className="py-3 px-3">
-                            <div className="font-bold text-gray-900 uppercase text-xs">
+                            <div className="font-semibold text-gray-900 uppercase text-[0.875rem]">
                               {req.itemName}
                             </div>
-                            <div className="text-[11px] text-gray-400 font-mono">
+                            <div className="text-xs text-gray-400 font-mono">
                               {req.itemCode}
                             </div>
                           </td>
 
                           {/* Planned Qty */}
                           <td className="py-3 px-3">
-                            <div className="font-bold text-gray-900 text-xs">
+                            <div className="font-semibold text-gray-900 text-[0.875rem]">
                               {req.plannedQty} {req.plannedUom}
                             </div>
-                            <div className="text-[11px] text-gray-400">
+                            <div className="text-xs text-gray-400">
                               {req.plannedPcs.toLocaleString()} PCS
                             </div>
                           </td>
@@ -2768,8 +2762,8 @@ export const ProductionModule: React.FC = () => {
                           </td>
 
                           {/* Shortage Items Count */}
-                          <td className="py-3 px-3 text-center font-bold">
-                            <span className={req.shortageItemsCount > 0 ? 'text-rose-600 font-bold' : 'text-gray-700'}>
+                          <td className="py-3 px-3 text-center font-semibold">
+                            <span className={req.shortageItemsCount > 0 ? 'text-rose-600 font-semibold' : 'text-gray-700'}>
                               {req.shortageItemsCount}
                             </span>
                           </td>
@@ -2777,15 +2771,15 @@ export const ProductionModule: React.FC = () => {
                           {/* Overall Status */}
                           <td className="py-3 px-3 whitespace-nowrap">
                             {req.overallStatus === 'Ready' ? (
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 Ready
                               </span>
                             ) : req.overallStatus === 'Partial' ? (
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                                 Partial
                               </span>
                             ) : (
-                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
                                 Shortage
                               </span>
                             )}
@@ -2805,7 +2799,7 @@ export const ProductionModule: React.FC = () => {
                                   handleOpenOrderDetail(req.rawOrder);
                                 }}
                                 title="View Order Details"
-                                className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
+                                className="icon-btn"
                               >
                                 <Eye className="w-3.5 h-3.5" />
                               </button>
@@ -2815,7 +2809,7 @@ export const ProductionModule: React.FC = () => {
                                   setPrintOrder(req.rawOrder);
                                 }}
                                 title="Print / View BOM Document"
-                                className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
+                                className="icon-btn"
                               >
                                 <FileText className="w-3.5 h-3.5" />
                               </button>
@@ -2825,7 +2819,7 @@ export const ProductionModule: React.FC = () => {
                                   handleShareWhatsApp(req);
                                 }}
                                 title="Share Requirements via WhatsApp"
-                                className="p-1 hover:text-emerald-600 transition-colors cursor-pointer"
+                                className="icon-btn"
                               >
                                 <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
                               </button>
@@ -2835,7 +2829,7 @@ export const ProductionModule: React.FC = () => {
                                   handleOpenRecordEntries(req.rawOrder);
                                 }}
                                 title="More Actions"
-                                className="p-1 hover:text-gray-600 transition-colors cursor-pointer"
+                                className="p-1 hover:text-gray-600 cursor-pointer"
                               >
                                 <MoreVertical className="w-3.5 h-3.5" />
                               </button>
@@ -2849,15 +2843,15 @@ export const ProductionModule: React.FC = () => {
                             <td colSpan={10} className="p-4 pl-12 border-b border-gray-200">
                               <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-2xs space-y-3">
                                 <div className="flex items-center justify-between">
-                                  <h4 className="text-xs font-bold text-gray-900">
+                                  <h4 className="text-[0.875rem] font-semibold text-gray-900">
                                     Material Details ({req.materialDetails.length} items)
                                   </h4>
                                 </div>
 
                                 <div className="overflow-x-auto custom-scrollbar">
-                                  <table className="w-full text-left text-xs border-collapse">
+                                  <table className="w-full text-left text-[0.875rem] border-collapse">
                                     <thead>
-                                      <tr className="border-b border-gray-150 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-50/80">
+                                      <tr className="border-b border-gray-150 text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50/80">
                                         <th className="py-2.5 px-3 w-8 text-center">#</th>
                                         <th className="py-2.5 px-3">
                                           <div className="flex items-center space-x-1">
@@ -2875,32 +2869,32 @@ export const ProductionModule: React.FC = () => {
                                         <th className="py-2.5 px-3 text-center">Actions</th>
                                       </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100">
+                                    <tbody className="bg-white divide-y divide-gray-100">
                                       {req.materialDetails.map((m: any) => (
-                                        <tr key={m.id} className="hover:bg-gray-50/80 transition-colors">
+                                        <tr key={m.id} className="hover:bg-gray-50/80">
                                           <td className="py-2.5 px-3 text-center text-gray-400 font-semibold">{m.index}</td>
                                           <td className="py-2.5 px-3 font-semibold text-gray-900">{m.materialName}</td>
-                                          <td className="py-2.5 px-3 font-mono text-[11px] text-gray-500">{m.materialCode}</td>
+                                          <td className="py-2.5 px-3 font-mono text-xs text-gray-500">{m.materialCode}</td>
                                           <td className="py-2.5 px-3 text-right font-medium text-gray-900">{m.requiredQty.toLocaleString()}</td>
                                           <td className="py-2.5 px-3 text-right font-medium text-gray-700">{m.availableQty.toLocaleString()}</td>
                                           <td className="py-2.5 px-3 text-right font-medium text-gray-700">{m.reservedQty.toLocaleString()}</td>
-                                          <td className="py-2.5 px-3 text-right font-bold">
-                                            <span className={m.shortageQty > 0 ? 'text-rose-600 font-bold' : 'text-emerald-700'}>
+                                          <td className="py-2.5 px-3 text-right font-semibold">
+                                            <span className={m.shortageQty > 0 ? 'text-rose-600 font-semibold' : 'text-emerald-700'}>
                                               {m.shortageQty.toLocaleString()}
                                             </span>
                                           </td>
                                           <td className="py-2.5 px-3 text-gray-600 font-medium">{m.uom}</td>
                                           <td className="py-2.5 px-3">
                                             {m.status === 'Ready' ? (
-                                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                 Ready
                                               </span>
                                             ) : m.status === 'Partial' ? (
-                                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                                                 Partial
                                               </span>
                                             ) : (
-                                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
                                                 Shortage
                                               </span>
                                             )}
@@ -2910,14 +2904,14 @@ export const ProductionModule: React.FC = () => {
                                               <button 
                                                 onClick={() => showToast(`Stock ledger preview for ${m.materialName}`, 'info')}
                                                 title="View Material Stock" 
-                                                className="p-1 hover:text-blue-600 transition-colors cursor-pointer"
+                                                className="icon-btn"
                                               >
                                                 <Eye className="w-3.5 h-3.5 text-blue-600" />
                                               </button>
                                               <button 
                                                 onClick={() => showToast(`Material allocation recorded for ${m.materialName}`, 'success')}
                                                 title="Issue Material / PO" 
-                                                className="p-1 hover:text-emerald-600 transition-colors cursor-pointer"
+                                                className="p-1 hover:text-emerald-600 cursor-pointer"
                                               >
                                                 <Package className="w-3.5 h-3.5 text-blue-600" />
                                               </button>
@@ -2941,7 +2935,7 @@ export const ProductionModule: React.FC = () => {
             </div>
 
             {/* Pagination Controls */}
-            <div className="px-4 py-3 border-t border-gray-200/80 flex flex-wrap items-center justify-between gap-3 text-xs bg-white rounded-b-2xl text-gray-500">
+            <div className="px-4 py-3 border-t border-gray-200/80 flex flex-wrap items-center justify-between gap-3 text-[0.875rem] bg-white rounded-b-2xl text-gray-500">
               <div className="flex items-center space-x-2">
                 <span className="text-gray-500">Show</span>
                 <select
@@ -2965,7 +2959,7 @@ export const ProductionModule: React.FC = () => {
                 <button
                   disabled={matCurrentPage === 1}
                   onClick={() => setMatCurrentPage(prev => Math.max(1, prev - 1))}
-                  className="px-2.5 py-1 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-2xs"
+                  className="px-2.5 py-1 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
@@ -2983,9 +2977,9 @@ export const ProductionModule: React.FC = () => {
                     <button
                       key={page}
                       onClick={() => setMatCurrentPage(Number(page))}
-                      className={`min-w-[28px] h-7 px-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                      className={`min-w-[1.75rem] h-7 px-2 text-[0.875rem] font-semibold rounded-lg cursor-pointer ${
                         isCurrent
-                          ? 'bg-blue-600 text-white font-bold shadow-2xs'
+                          ? 'bg-blue-600 text-white font-semibold shadow-2xs'
                           : 'border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-2xs'
                       }`}
                     >
@@ -2997,7 +2991,7 @@ export const ProductionModule: React.FC = () => {
                 <button
                   disabled={matCurrentPage === matTotalPages || matTotalPages === 0}
                   onClick={() => setMatCurrentPage(prev => Math.min(matTotalPages, prev + 1))}
-                  className="px-2.5 py-1 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shadow-2xs"
+                  className="px-2.5 py-1 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs"
                 >
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
@@ -3007,16 +3001,16 @@ export const ProductionModule: React.FC = () => {
 
         {/* Modal: New Material Requirement Order Selector */}
         {showNewRequirementModal && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md overflow-hidden animate-in fade-in duration-150">
+          <div className="fixed inset-0 z-50 bg-gray-900/40 flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-md overflow-hidden dlg-panel">
               <div className="px-5 py-4 border-b border-gray-150 flex items-center justify-between bg-gray-50/50">
                 <div className="flex items-center space-x-2.5">
                   <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
                     <Layers className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-gray-900">New Material Requirement</h3>
-                    <p className="text-[11px] text-gray-500">Select order to calculate raw material availability & shortages</p>
+                    <h3 className="text-[0.875rem] font-semibold text-gray-900">New Material Requirement</h3>
+                    <p className="text-xs text-gray-500">Select order to calculate raw material availability & shortages</p>
                   </div>
                 </div>
                 <button
@@ -3029,13 +3023,13 @@ export const ProductionModule: React.FC = () => {
 
               <div className="p-5 space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  <label className="block text-[0.875rem] font-semibold text-gray-700 mb-1.5">
                     Select Production Order
                   </label>
                   <select
                     value={selectedOrderForReq}
                     onChange={e => setSelectedOrderForReq(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                    className="w-full px-3 py-2 text-[0.875rem] border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                   >
                     <option value="">-- Choose Order to Check Requirements --</option>
                     {orders.map(o => (
@@ -3046,16 +3040,16 @@ export const ProductionModule: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="text-[11px] text-gray-500 bg-blue-50/50 border border-blue-100 p-2.5 rounded-lg flex items-start space-x-2">
+                <div className="text-xs text-gray-500 bg-blue-50/50 border border-blue-100 p-2.5 rounded-lg flex items-start space-x-2">
                   <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                   <span>Checking requirements calculates bill of materials, compares real-time warehouse inventory, and highlights critical shortage quantities.</span>
                 </div>
               </div>
 
-              <div className="px-5 py-3 border-t border-gray-150 bg-gray-50 flex items-center justify-end space-x-2">
+              <div className="px-5 py-3 border-t border-gray-150 bg-gray-50 flex items-center justify-end space-x-2 dlg-footer">
                 <button
                   onClick={() => setShowNewRequirementModal(false)}
-                  className="px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                  className="px-3 py-1.5 text-[0.875rem] font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -3068,7 +3062,7 @@ export const ProductionModule: React.FC = () => {
                       handleOpenOrderDetail(match);
                     }
                   }}
-                  className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-2xs transition-colors cursor-pointer"
+                  className="px-4 py-1.5 text-[0.875rem] font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-2xs cursor-pointer"
                 >
                   View Order MRP Details →
                 </button>
@@ -3087,21 +3081,18 @@ export const ProductionModule: React.FC = () => {
   // -------------------------------------------------------------
   if (activeTab === 'cutting') {
     return (
-      <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+      <div className="min-h-[calc(100*var(--vh,1vh))] bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
         {/* 1. Header Banner */}
-        <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
+        <div className="flex flex-row items-center justify-between gap-4 px-1 relative">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
-              <Scissors className="w-5 h-5 stroke-[2.2]" />
-            </div>
-            <div>
+                        <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-gray-900 tracking-tight">Paper-&gt;Reel</h1>
-                <span className="text-[11px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
+                <h1 className="text-lg font-semibold text-gray-900">Paper-&gt;Reel</h1>
+                <span className="text-xs font-medium text-gray-500">
                   Stock Journal Voucher
                 </span>
               </div>
-              <p className="text-xs text-gray-500 font-medium">
+              <p className="text-[0.875rem] text-gray-500 font-medium">
                 Tally-style Reel-to-Sheet conversion vouchers with dual-unit (Sheets ↔ Reams) & zero-discrepancy inventory reconciliation.
               </p>
             </div>
@@ -3110,14 +3101,14 @@ export const ProductionModule: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowCuttingSlipModal(true)}
-              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 cursor-pointer"
+              className="btn-primary"
             >
               <Plus className="w-3.5 h-3.5 text-white" />
               <span>New Cutting Slip (Alt + C)</span>
             </button>
             <button
               onClick={() => setActiveTab('orders')}
-              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer text-xs"
+              className="btn-secondary"
             >
               ← Back to Orders
             </button>
@@ -3142,35 +3133,35 @@ export const ProductionModule: React.FC = () => {
   // -------------------------------------------------------------
   if (activeTab === 'history') {
     return (
-      <div className="min-h-screen bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
+      <div className="min-h-[calc(100*var(--vh,1vh))] bg-white p-4 md:p-6 space-y-4 font-sans text-gray-800">
         {/* 1. Header Banner */}
-        <div className="flex flex-row items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-2xs relative">
+        <div className="flex flex-row items-center justify-between gap-4 px-1 relative">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-blue-100/80 text-blue-700 rounded-2xl shadow-2xs">
               <History className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-gray-900 tracking-tight">Production Audit Log</h1>
-                <span className="text-[11px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
+                <h1 className="text-lg font-semibold text-gray-900">Production Audit Log</h1>
+                <span className="text-xs font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
                   {orders.length} Logged
                 </span>
               </div>
-              <p className="text-xs text-gray-500 font-medium">Activity timeline of manufacturing orders in backend database.</p>
+              <p className="text-[0.875rem] text-gray-500 font-medium">Activity timeline of manufacturing orders in backend database.</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={handleOpenNewOrder}
-              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-[0.875rem] flex items-center gap-1.5 shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Order</span>
             </button>
             <button
               onClick={() => setActiveTab('orders')}
-              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer text-xs"
+              className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-semibold text-gray-700 flex items-center gap-1.5 shadow-2xs cursor-pointer text-[0.875rem]"
             >
               ← Back to Orders
             </button>
@@ -3182,43 +3173,43 @@ export const ProductionModule: React.FC = () => {
 
         {/* 3. Dynamic KPI Summary Header */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3.5">
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all flex items-center space-x-3.5">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 flex items-center space-x-3.5">
             <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
               <History className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Orders Logged</p>
-              <h3 className="text-xl font-bold text-gray-900 font-mono">{orders.length}</h3>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Orders Logged</p>
+              <h3 className="text-xl font-semibold text-gray-900 font-mono">{orders.length}</h3>
             </div>
           </div>
 
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all flex items-center space-x-3.5">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 flex items-center space-x-3.5">
             <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
               <Clock className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">In Progress</p>
-              <h3 className="text-xl font-bold text-amber-700 font-mono">{historyInProgressCount}</h3>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">In Progress</p>
+              <h3 className="text-xl font-semibold text-amber-700 font-mono">{historyInProgressCount}</h3>
             </div>
           </div>
 
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all flex items-center space-x-3.5">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 flex items-center space-x-3.5">
             <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
               <CheckCircle className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Completed Orders</p>
-              <h3 className="text-xl font-bold text-emerald-700 font-mono">{historyCompletedCount}</h3>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Completed Orders</p>
+              <h3 className="text-xl font-semibold text-emerald-700 font-mono">{historyCompletedCount}</h3>
             </div>
           </div>
 
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 transition-all flex items-center space-x-3.5">
-            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/80 shadow-2xs hover:border-gray-300 flex items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
               <TrendingUp className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Active Departments</p>
-              <h3 className="text-xl font-bold text-gray-900 font-mono">{distinctHistoryDepts.length || 1}</h3>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Active Departments</p>
+              <h3 className="text-xl font-semibold text-gray-900 font-mono">{distinctHistoryDepts.length || 1}</h3>
             </div>
           </div>
         </div>
@@ -3226,7 +3217,7 @@ export const ProductionModule: React.FC = () => {
         {/* 4. Filter & Search Toolbar */}
         <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold text-gray-700 flex items-center space-x-1 mr-1">
+            <span className="text-[0.875rem] font-semibold text-gray-700 flex items-center space-x-1 mr-1">
               <Filter className="w-3.5 h-3.5 text-gray-400" />
               <span>Filters:</span>
             </span>
@@ -3235,7 +3226,7 @@ export const ProductionModule: React.FC = () => {
             <select
               value={historyStatusFilter}
               onChange={e => setHistoryStatusFilter(e.target.value)}
-              className="text-xs font-semibold text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+              className="text-[0.875rem] font-semibold text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
             >
               <option value="ALL">All Statuses</option>
               <option value="In Progress">In Progress</option>
@@ -3248,7 +3239,7 @@ export const ProductionModule: React.FC = () => {
             <select
               value={historyDeptFilter}
               onChange={e => setHistoryDeptFilter(e.target.value)}
-              className="text-xs font-semibold text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+              className="text-[0.875rem] font-semibold text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
             >
               <option value="ALL">All Departments</option>
               {distinctHistoryDepts.map(d => (
@@ -3265,7 +3256,7 @@ export const ProductionModule: React.FC = () => {
               value={historySearch}
               onChange={e => setHistorySearch(e.target.value)}
               placeholder="Search activity log by order or product..."
-              className="w-full sm:w-72 pl-8 pr-8 py-1.5 text-xs text-gray-900 placeholder-gray-400 bg-gray-50/70 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-2xs"
+              className="w-full sm:w-72 pl-8 pr-8 py-1.5 text-[0.875rem] text-gray-900 placeholder-gray-400 bg-gray-50/70 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-2xs"
             />
             {historySearch && (
               <button 
@@ -3281,7 +3272,7 @@ export const ProductionModule: React.FC = () => {
         {/* 5. Activity Timeline List */}
         <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs p-5 space-y-3">
           {filteredHistoryOrders.length === 0 ? (
-            <div className="py-12 text-center text-gray-400 text-xs">
+            <div className="py-12 text-center text-gray-400 text-[0.875rem]">
               {historySearch ? 'No activities matching your search.' : 'No production activity recorded in backend database yet.'}
             </div>
           ) : (
@@ -3297,22 +3288,22 @@ export const ProductionModule: React.FC = () => {
                 return (
                   <div 
                     key={o._id} 
-                    className="p-4 rounded-xl border border-gray-200/80 bg-gray-50/40 hover:bg-gray-50/80 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4"
+                    className="p-4 rounded-xl border border-gray-200/80 bg-gray-50/40 hover:bg-gray-50/80 flex flex-col md:flex-row md:items-center justify-between gap-4"
                   >
                     <div className="flex-1 space-y-1.5">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono font-bold text-blue-600 text-sm">{o.orderNumber}</span>
+                        <span className="font-mono font-semibold text-blue-600 text-[0.875rem]">{o.orderNumber}</span>
                         <span className="text-gray-300">•</span>
-                        <span className="font-bold text-gray-900 text-sm">{o.itemName}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusColors[o.status] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                        <span className="font-semibold text-gray-900 text-[0.875rem]">{o.itemName}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${statusColors[o.status] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
                           {o.status}
                         </span>
-                        <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full font-semibold">
+                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full font-semibold">
                           Dept: {o.department || 'General'}
                         </span>
                       </div>
 
-                      <div className="flex items-center space-x-3 text-xs text-gray-600">
+                      <div className="flex items-center space-x-3 text-[0.875rem] text-gray-600">
                         <span>Target: <strong>{o.plannedQty.toLocaleString()} {o.plannedUom}</strong></span>
                         <span>•</span>
                         <span>Produced: <strong className="text-gray-900">{o.producedQty.toLocaleString()} {o.plannedUom}</strong> ({o.producedPcs.toLocaleString()} PCS)</span>
@@ -3324,13 +3315,13 @@ export const ProductionModule: React.FC = () => {
                       <div className="w-full max-w-md flex items-center space-x-2 pt-1">
                         <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                           <div 
-                            className={`h-full rounded-full transition-all ${
+                            className={`h-full rounded-full ${
                               o.status === 'Completed' ? 'bg-emerald-500' : 'bg-blue-600'
                             }`}
                             style={{ width: `${Math.min(100, o.progress || 0)}%` }}
                           />
                         </div>
-                        <span className="text-[11px] font-bold text-gray-700">{o.progress || 0}%</span>
+                        <span className="text-xs font-semibold text-gray-700">{o.progress || 0}%</span>
                       </div>
                     </div>
 
@@ -3338,13 +3329,13 @@ export const ProductionModule: React.FC = () => {
                     <div className="flex items-center space-x-2 shrink-0">
                       <button
                         onClick={() => handleOpenRecordEntries(o)}
-                        className="px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors cursor-pointer"
+                        className="px-3 py-1.5 text-[0.875rem] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl cursor-pointer"
                       >
                         Entries ({o.productionEntries?.length || 0})
                       </button>
                       <button
                         onClick={() => handleOpenOrderDetail(o)}
-                        className="px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white hover:bg-gray-100 border border-gray-300 rounded-xl transition-colors cursor-pointer shadow-2xs"
+                        className="px-3 py-1.5 text-[0.875rem] font-semibold text-gray-700 bg-white hover:bg-gray-100 border border-gray-300 rounded-xl cursor-pointer shadow-2xs"
                       >
                         View Details
                       </button>
@@ -3385,7 +3376,7 @@ export const ProductionModule: React.FC = () => {
       {(currentView === 'new' || (currentView === 'edit' && editingOrder)) && typeof document !== 'undefined' && (
         createPortal(
           <div
-            className="fixed inset-0 z-[9000] flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden animate-in fade-in duration-200"
+            className="fixed inset-0 z-[9000] flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden"
             style={{
               backgroundColor: 'rgba(15, 23, 42, 0.65)',
               backdropFilter: 'blur(6px)',
@@ -3398,7 +3389,7 @@ export const ProductionModule: React.FC = () => {
             onClick={handleBackToList}
           >
             <div
-              className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 animate-in zoom-in-95 duration-200 overflow-hidden relative"
+              className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 overflow-hidden relative"
               style={{ maxWidth: 1260, height: '94vh', maxHeight: '94vh' }}
               onClick={e => e.stopPropagation()}
             >
@@ -3423,7 +3414,7 @@ export const ProductionModule: React.FC = () => {
       {currentView === 'detail' && selectedOrder && typeof document !== 'undefined' && (
         createPortal(
           <div
-            className="fixed inset-0 z-[9000] flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden animate-in fade-in duration-200"
+            className="fixed inset-0 z-[9000] flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden"
             style={{
               backgroundColor: 'rgba(15, 23, 42, 0.65)',
               backdropFilter: 'blur(6px)',
@@ -3436,7 +3427,7 @@ export const ProductionModule: React.FC = () => {
             onClick={handleBackToList}
           >
             <div
-              className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 animate-in zoom-in-95 duration-200 overflow-hidden relative"
+              className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 overflow-hidden relative"
               style={{ maxWidth: 1080, height: '85vh', maxHeight: '85vh' }}
               onClick={e => e.stopPropagation()}
             >
@@ -3460,7 +3451,7 @@ export const ProductionModule: React.FC = () => {
       {currentView === 'entries' && selectedOrder && typeof document !== 'undefined' && (
         createPortal(
           <div
-            className="fixed inset-0 z-[9000] flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden animate-in fade-in duration-200"
+            className="fixed inset-0 z-[9000] flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden"
             style={{
               backgroundColor: 'rgba(15, 23, 42, 0.65)',
               backdropFilter: 'blur(6px)',
@@ -3473,7 +3464,7 @@ export const ProductionModule: React.FC = () => {
             onClick={handleBackToList}
           >
             <div
-              className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 animate-in zoom-in-95 duration-200 overflow-hidden relative"
+              className="bg-white rounded-2xl shadow-2xl w-full flex flex-col my-auto border border-gray-150 overflow-hidden relative"
               style={{ maxWidth: 1080, height: '85vh', maxHeight: '85vh' }}
               onClick={e => e.stopPropagation()}
             >

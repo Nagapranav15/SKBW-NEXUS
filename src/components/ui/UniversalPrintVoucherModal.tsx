@@ -213,7 +213,7 @@ export const UniversalPrintVoucherModal: React.FC<UniversalPrintVoucherModalProp
 
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-3 sm:p-5 overflow-y-auto animate-fadeIn">
-      <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-modalPop font-sans">
+      <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-4xl max-h-[calc(92*var(--vh,1vh))] flex flex-col overflow-hidden animate-modalPop font-sans">
         {/* Modal Top Header (Hidden on actual print document) */}
         <div className="px-6 py-3.5 border-b border-gray-200 bg-gray-50/90 flex items-center justify-between shrink-0">
           <div className="flex items-center space-x-2.5 min-w-0">
@@ -227,7 +227,7 @@ export const UniversalPrintVoucherModal: React.FC<UniversalPrintVoucherModalProp
                   {voucherNumber}
                 </span>
               </h2>
-              <p className="text-[10.5px] text-gray-500 truncate">
+              <p className="text-[0.65625rem] text-gray-500 truncate">
                 {modalSubtitle}
               </p>
             </div>
@@ -272,7 +272,7 @@ export const UniversalPrintVoucherModal: React.FC<UniversalPrintVoucherModalProp
                 <h1 className="company-title text-xl font-black uppercase tracking-wider text-slate-900">
                   {companyName}
                 </h1>
-                <p className="company-sub text-[10px] font-bold text-slate-500 tracking-wider">
+                <p className="company-sub text-[0.625rem] font-bold text-slate-500 tracking-wider">
                   {voucherSubtitle}
                 </p>
               </div>
@@ -282,7 +282,7 @@ export const UniversalPrintVoucherModal: React.FC<UniversalPrintVoucherModalProp
                   {voucherNumber}
                 </div>
                 <div className="mt-1">
-                  <span className={`status-pill inline-block text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded ${getStatusClasses()}`}>
+                  <span className={`status-pill inline-block text-[0.625rem] font-extrabold uppercase px-2.5 py-0.5 rounded ${getStatusClasses()}`}>
                     {status.label}
                   </span>
                 </div>
@@ -290,15 +290,15 @@ export const UniversalPrintVoucherModal: React.FC<UniversalPrintVoucherModalProp
             </div>
 
             {/* Metadata Grid */}
-            <div className="meta-grid grid grid-cols-2 gap-4 bg-slate-50 border border-slate-200 rounded-lg p-3.5 mb-4 text-[11px]">
+            <div className="meta-grid grid grid-cols-2 gap-4 bg-slate-50 border border-slate-200 rounded-lg p-3.5 mb-4 text-[0.6875rem]">
               {/* Left Column */}
               <div className="meta-box space-y-1">
-                <h4 className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">
+                <h4 className="text-[0.625rem] text-slate-500 font-bold uppercase tracking-wide">
                   {metaLeft.title}
                 </h4>
                 <p className="font-bold text-slate-900 text-xs">{metaLeft.primaryTitle}</p>
                 {metaLeft.rows?.map((row, rIdx) => (
-                  <p key={rIdx} className="sub text-[10px] text-slate-600">
+                  <p key={rIdx} className="sub text-[0.625rem] text-slate-600">
                     {row.label && <span className="text-slate-400 font-medium">{row.label}: </span>}
                     <span>{row.value}</span>
                   </p>
@@ -307,13 +307,13 @@ export const UniversalPrintVoucherModal: React.FC<UniversalPrintVoucherModalProp
 
               {/* Right Column */}
               <div className="meta-box space-y-1">
-                <h4 className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">
+                <h4 className="text-[0.625rem] text-slate-500 font-bold uppercase tracking-wide">
                   {metaRight.title}
                 </h4>
-                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="grid grid-cols-2 gap-2 text-[0.6875rem]">
                   {metaRight.fields.map((f, fIdx) => (
                     <div key={fIdx}>
-                      <span className="text-[10px] text-slate-400 block font-medium">{f.label}:</span>
+                      <span className="text-[0.625rem] text-slate-400 block font-medium">{f.label}:</span>
                       <span className="font-bold text-slate-800">{f.value || '—'}</span>
                     </div>
                   ))}
@@ -322,7 +322,7 @@ export const UniversalPrintVoucherModal: React.FC<UniversalPrintVoucherModalProp
             </div>
 
             {/* Dynamic Items Table */}
-            <table className="items-table w-full border-collapse border border-slate-300 text-left text-[11px] mb-4">
+            <table className="doc-table items-table w-full border-collapse border border-slate-300 text-left text-[0.6875rem] mb-4">
               <thead>
                 <tr className="bg-slate-100 text-slate-700">
                   {columns.map((col, cIdx) => (
@@ -368,7 +368,7 @@ export const UniversalPrintVoucherModal: React.FC<UniversalPrintVoucherModalProp
               <div className="totals-wrapper flex justify-between items-start gap-4 mb-6">
                 {/* Left: Summary */}
                 {summaryLeft && (
-                  <div className="totals-summary flex-1 bg-slate-50 border border-slate-200 rounded-lg p-3 text-[11px] space-y-1.5">
+                  <div className="totals-summary flex-1 bg-slate-50 border border-slate-200 rounded-lg p-3 text-[0.6875rem] space-y-1.5">
                     <div className="flex justify-between border-b border-slate-200 pb-1 font-bold text-slate-700">
                       <span>{summaryLeft.title}</span>
                     </div>
@@ -379,7 +379,7 @@ export const UniversalPrintVoucherModal: React.FC<UniversalPrintVoucherModalProp
                       </div>
                     ))}
                     {summaryLeft.remarks && (
-                      <div className="pt-1.5 border-t border-slate-200 text-[10px] text-slate-500">
+                      <div className="pt-1.5 border-t border-slate-200 text-[0.625rem] text-slate-500">
                         <span className="font-bold">Remarks: </span>
                         <span>{summaryLeft.remarks}</span>
                       </div>
@@ -389,8 +389,8 @@ export const UniversalPrintVoucherModal: React.FC<UniversalPrintVoucherModalProp
 
                 {/* Right: Financial / Totals */}
                 {summaryRight && (
-                  <div className="totals-financial w-64 border border-slate-300 rounded-lg overflow-hidden text-[11px]">
-                    <table className="w-full border-collapse">
+                  <div className="totals-financial w-64 border border-slate-300 rounded-lg overflow-hidden text-[0.6875rem]">
+                    <table className="doc-table w-full border-collapse">
                       <tbody>
                         {summaryRight.rows.map((row, fIdx) => (
                           <tr
@@ -419,7 +419,7 @@ export const UniversalPrintVoucherModal: React.FC<UniversalPrintVoucherModalProp
             {/* Authorizations / Signatures */}
             {signatures && signatures.length > 0 && (
               <div
-                className={`signatures grid grid-cols-${signatures.length} gap-6 pt-8 border-t border-slate-300 text-center text-[10px] text-slate-600 mt-6`}
+                className={`signatures grid grid-cols-${signatures.length} gap-6 pt-8 border-t border-slate-300 text-center text-[0.625rem] text-slate-600 mt-6`}
                 style={{ gridTemplateColumns: `repeat(${signatures.length}, minmax(0, 1fr))` }}
               >
                 {signatures.map((sig, sIdx) => (
@@ -427,7 +427,7 @@ export const UniversalPrintVoucherModal: React.FC<UniversalPrintVoucherModalProp
                     <div className="sig-line border-t border-slate-400 pt-1 font-bold">
                       {sig.title}
                     </div>
-                    <div className="text-[9px] text-slate-400 mt-0.5">{sig.subtitle}</div>
+                    <div className="text-[0.5625rem] text-slate-400 mt-0.5">{sig.subtitle}</div>
                   </div>
                 ))}
               </div>

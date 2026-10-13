@@ -2308,7 +2308,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
   }, [manufacturableSkus, productSearch, productTypeFilter, productCategoryFilter]);
 
   return (
-    <div className="flex flex-col h-full bg-slate-50/70 text-gray-800 font-sans select-none overflow-hidden text-xs">
+    <div className="flex flex-col h-full bg-slate-50/70 text-gray-800 font-sans select-none overflow-hidden text-[0.875rem]">
       
       {/* ── MODAL HEADER (1:1 with Sales Order Drawer) ── */}
       <div className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between shrink-0 shadow-2xs">
@@ -2318,16 +2318,16 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-black text-gray-900 tracking-tight">
+              <h2 className="text-lg font-semibold text-gray-900 tracking-tight">
                 {editOrder ? `Edit Production Order (${editOrder.orderNumber})` : 'Create Production Order'}
               </h2>
               {editOrder && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                   Editing Mode
                 </span>
               )}
             </div>
-            <p className="text-xs text-gray-500 font-medium mt-0.5">
+            <p className="text-[0.875rem] text-gray-500 font-medium mt-0.5">
               {editOrder ? 'Update planned quantities, schedule, components & costing' : 'Manufacturing execution with bill of materials & cost ledger'}
             </p>
           </div>
@@ -2337,7 +2337,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           <button
             type="button"
             onClick={onCancel}
-            className="px-3.5 py-2 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold rounded-xl text-xs transition-all cursor-pointer shadow-3xs"
+            className="btn-secondary"
           >
             Cancel
           </button>
@@ -2345,7 +2345,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             type="button"
             onClick={() => handleCreateOrder('Draft')}
             disabled={submitting}
-            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 active:scale-98 text-slate-800 font-bold rounded-xl text-xs shadow-3xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 font-semibold rounded-xl text-[0.875rem] shadow-3xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             title="Save order as Draft"
           >
             <FileText className="w-3.5 h-3.5 text-slate-600" />
@@ -2355,7 +2355,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             type="button"
             onClick={() => handleCreateOrder('Planned')}
             disabled={submitting}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white font-bold rounded-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="btn-primary disabled:opacity-50"
           >
             {submitting ? (
               <>
@@ -2379,8 +2379,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
           {/* CARD 1: Order Information (Fixed Height) */}
-          <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[305px] min-h-[305px] max-h-[305px] flex flex-col justify-between">
-            <div className="flex items-center gap-2 text-xs font-bold text-gray-900 pb-1 border-b border-gray-100">
+          <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[19.0625rem] min-h-[19.0625rem] max-h-[19.0625rem] flex flex-col justify-between">
+            <div className="flex items-center gap-2 text-[0.875rem] font-semibold text-gray-900 pb-1 border-b border-gray-100">
               <Calendar className="w-4 h-4 text-blue-600" />
               <span>Order Information</span>
             </div>
@@ -2388,7 +2388,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             {/* Production Order No & Order Date */}
             <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label className="block text-[10.5px] font-bold text-gray-600 mb-1">
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
                   Order No. <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
@@ -2397,22 +2397,22 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     value={orderNumber}
                     onChange={e => setOrderNumber(e.target.value)}
                     placeholder="PO-001"
-                    className="w-full pl-2.5 pr-12 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
+                    className="w-full pl-2.5 pr-12 py-1.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
                   />
-                  <span className="absolute right-1.5 top-1 px-1.5 py-0.5 text-[9px] font-bold text-blue-600 bg-blue-50 border border-blue-200/60 rounded">
+                  <span className="absolute right-1.5 top-1 px-1.5 py-0.5 text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200/60 rounded">
                     Auto
                   </span>
                 </div>
               </div>
               <div>
-                <label className="block text-[10.5px] font-bold text-gray-600 mb-1">
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
                   Order Date <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
                   value={orderDate}
                   onChange={e => setOrderDate(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
+                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
                 />
               </div>
             </div>
@@ -2420,13 +2420,13 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             {/* Department (Custom Preset Selector matching Sales Order 1:1) */}
             <div className="relative" ref={departmentRef}>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-[10.5px] font-bold text-gray-600">
+                <label className="text-xs font-semibold text-gray-600">
                   Department / Line
                 </label>
                 <button
                   type="button"
                   onClick={() => setShowManageDeptModal(true)}
-                  className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
                   title="Manage Department Presets"
                 >
                   <Settings className="w-3 h-3" />
@@ -2440,13 +2440,13 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   setShowDepartmentDropdown(!showDepartmentDropdown);
                   setHighlightedDeptIdx(0);
                 }}
-                className={`w-full px-3 py-1.5 bg-white border rounded-xl text-xs font-bold flex items-center justify-between cursor-pointer transition-all shadow-3xs ${
+                className={`w-full px-3 py-1.5 bg-white border rounded-xl text-[0.875rem] font-semibold flex items-center justify-between cursor-pointer shadow-3xs ${
                   showDepartmentDropdown ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
                 <div className="flex items-center gap-1.5 truncate">
                   <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  <span className={department ? 'text-gray-900 font-bold truncate' : 'text-gray-400 font-medium'}>
+                  <span className={department ? 'text-gray-900 font-semibold truncate' : 'text-gray-400 font-medium'}>
                     {department || 'Select Department...'}
                   </span>
                 </div>
@@ -2464,21 +2464,21 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                       <X className="w-3 h-3" />
                     </button>
                   )}
-                  <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showDepartmentDropdown ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-3.5 h-3.5 text-gray-400 ${showDepartmentDropdown ? 'rotate-180' : ''}`} />
                 </div>
               </div>
 
               {/* Department Presets Dropdown Popover (Exact 1:1 with Screenshot 2) */}
               {showDepartmentDropdown && (
                 <div 
-                  className="absolute left-0 right-0 top-full mt-1 w-full min-w-[280px] bg-white border border-gray-200 rounded-xl shadow-2xl z-[9999] py-1 text-xs divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100"
+                  className="absolute left-0 right-0 top-full mt-1 w-full min-w-[17.5rem] bg-white border border-gray-200 rounded-xl shadow-2xl z-[9999] py-1 text-[0.875rem] divide-y divide-gray-100"
                   role="menu"
                 >
                   {/* Popover Header */}
-                  <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between bg-gray-50/50">
+                  <div className="px-3 py-1.5 text-xs font-medium text-gray-400 uppercase tracking-wider flex items-center justify-between bg-gray-50/50">
                     <span className="flex items-center gap-1.5">
                       <span>Predefined Departments</span>
-                      <kbd className="font-mono text-[9px] bg-gray-100 text-gray-600 px-1 py-0.5 rounded border border-gray-200">Alt+D</kbd>
+                      <kbd className="font-mono text-xs bg-gray-100 text-gray-600 px-1 py-0.5 rounded border border-gray-200">Alt+D</kbd>
                     </span>
                     <button
                       type="button"
@@ -2487,7 +2487,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         setShowDepartmentDropdown(false);
                         setShowManageDeptModal(true);
                       }}
-                      className="text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer font-bold"
+                      className="text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer font-semibold"
                     >
                       <Settings className="w-3 h-3" />
                       <span>Manage</span>
@@ -2507,18 +2507,18 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             setShowDepartmentDropdown(false);
                           }}
                           onMouseEnter={() => setHighlightedDeptIdx(pIdx)}
-                          className={`w-full px-3 py-2 text-left flex items-center justify-between transition-colors cursor-pointer ${
+                          className={`w-full px-3 py-2 text-left flex items-center justify-between cursor-pointer ${
                             isHighlighted
-                              ? 'bg-blue-100/90 text-blue-900 font-bold ring-1 ring-inset ring-blue-400'
+                              ? 'bg-blue-100/90 text-blue-900 font-semibold ring-1 ring-inset ring-blue-400'
                               : isCurrent
-                              ? 'bg-blue-50/70 text-blue-900 font-bold'
+                              ? 'bg-blue-50/70 text-blue-900 font-semibold'
                               : 'hover:bg-blue-50/70 text-gray-800'
                           }`}
                           role="menuitem"
                         >
                           <span className="font-semibold truncate">{preset.name}</span>
                           {preset.locationName && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ml-2 bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="px-1.5 py-0.5 rounded text-xs font-mono font-semibold shrink-0 ml-2 bg-emerald-50 text-emerald-700 border border-emerald-200">
                               {preset.locationName}
                             </span>
                           )}
@@ -2528,9 +2528,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   </div>
 
                   {/* Popover Footer */}
-                  <div className="px-3 py-1 bg-gray-50 text-[10px] text-gray-500 flex items-center justify-between">
-                    <span>Use <kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold">↑</kbd><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold ml-0.5">↓</kbd></span>
-                    <span><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold">Enter</kbd> to select</span>
+                  <div className="px-3 py-1 bg-gray-50 text-xs text-gray-500 flex items-center justify-between">
+                    <span>Use <kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-semibold">↑</kbd><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-semibold ml-0.5">↓</kbd></span>
+                    <span><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-semibold">Enter</kbd> to select</span>
                   </div>
                 </div>
               )}
@@ -2538,13 +2538,13 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
             {/* Order Status */}
             <div className="flex items-center justify-between gap-2 pt-1 border-t border-gray-100">
-              <label className="text-[11px] font-bold text-gray-600 shrink-0">
+              <label className="text-xs font-semibold text-gray-600 shrink-0">
                 Order Status
               </label>
               <select
                 value={orderStatus}
                 onChange={e => setOrderStatus(e.target.value as 'Planned' | 'Draft')}
-                className="flex-1 px-3 py-1 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className="flex-1 px-3 py-1 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               >
                 <option value="Planned">Planned (Active Demand)</option>
                 <option value="Draft">Draft</option>
@@ -2553,20 +2553,20 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           </div>
 
           {/* CARD 2: Product to Manufacture (Expanded Width with Category Shifting) */}
-          <div className="lg:col-span-6 bg-white rounded-2xl border border-gray-200/80 p-3.5 shadow-3xs h-[305px] min-h-[305px] max-h-[305px] flex flex-col justify-between">
+          <div className="lg:col-span-6 bg-white rounded-2xl border border-gray-200/80 p-3.5 shadow-3xs h-[19.0625rem] min-h-[19.0625rem] max-h-[19.0625rem] flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between pb-1">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900">
+                <div className="flex items-center gap-1.5 text-[0.875rem] font-semibold text-gray-900">
                   <Package className="w-4 h-4 text-blue-600" />
                   <span>Product to Manufacture</span>
                 </div>
                 {productName ? (
-                  <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                  <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
                     <Check className="w-3 h-3 stroke-[3]" />
                     <span>Selected</span>
                   </span>
                 ) : (
-                  <span className="text-[10px] text-gray-400 font-mono">
+                  <span className="text-xs text-gray-400 font-mono">
                     {filteredProducts.length} of {categoryBreakdown.total} available
                   </span>
                 )}
@@ -2579,7 +2579,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   <button
                     type="button"
                     onClick={() => setProductTypeFilter('ALL')}
-                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                    className={`px-2 py-0.5 rounded-lg text-xs font-semibold cursor-pointer ${
                       productTypeFilter === 'ALL'
                         ? 'bg-white text-blue-700 shadow-3xs border border-blue-200'
                         : 'text-gray-500 hover:text-gray-800 hover:bg-white/60'
@@ -2590,7 +2590,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   <button
                     type="button"
                     onClick={() => setProductTypeFilter('products')}
-                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                    className={`px-2 py-0.5 rounded-lg text-xs font-semibold cursor-pointer ${
                       productTypeFilter === 'products'
                         ? 'bg-white text-blue-700 shadow-3xs border border-blue-200'
                         : 'text-gray-500 hover:text-gray-800 hover:bg-white/60'
@@ -2601,9 +2601,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   <button
                     type="button"
                     onClick={() => setProductTypeFilter('semi')}
-                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                    className={`px-2 py-0.5 rounded-lg text-xs font-semibold cursor-pointer ${
                       productTypeFilter === 'semi'
-                        ? 'bg-white text-purple-700 shadow-3xs border border-purple-200'
+                        ? 'bg-white text-blue-700 shadow-3xs border border-blue-200'
                         : 'text-gray-500 hover:text-gray-800 hover:bg-white/60'
                     }`}
                   >
@@ -2614,11 +2614,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                 {/* Active Category Badge (if selected in popover) */}
                 {productCategoryFilter !== 'ALL' && (
                   <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-gray-500 font-medium">Category:</span>
+                    <span className="text-xs text-gray-500 font-medium">Category:</span>
                     <button
                       type="button"
                       onClick={() => setProductCategoryFilter('ALL')}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-bold hover:bg-blue-100 cursor-pointer transition-colors"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold hover:bg-blue-100 cursor-pointer"
                       title="Clear category filter"
                     >
                       <span>{productCategoryFilter}</span>
@@ -2652,7 +2652,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         : "Search finished product or semi good to manufacture..."
                     }
                     title={productSearch || productName}
-                    className="w-full pl-8 pr-10 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
+                    className="w-full pl-8 pr-10 py-1.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
                   />
                   <div className="absolute right-2 top-2 flex items-center gap-1 text-gray-400">
                     {productName ? (
@@ -2681,10 +2681,10 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
                 {/* Product Dropdown Popover with Category Shift Filter Header */}
                 {showProductDropdown && (
-                  <div className="absolute left-0 top-full mt-1 w-full min-w-[360px] sm:min-w-[500px] bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-80 overflow-y-auto divide-y divide-gray-100 p-1">
+                  <div className="absolute left-0 top-full mt-1 w-full min-w-[22.5rem] sm:min-w-[31.25rem] bg-white border border-gray-200 rounded-xl shadow-2xl z-[999] max-h-80 overflow-y-auto divide-y divide-gray-100 p-1">
                     {/* Popover Category Chips Header */}
-                    <div className="sticky top-0 bg-white/95 backdrop-blur-xs p-2 border-b border-gray-100 z-10 space-y-1.5 shadow-3xs">
-                      <div className="flex items-center justify-between text-[10px] font-bold text-gray-500">
+                    <div className="sticky top-0 bg-white/95 p-2 border-b border-gray-100 z-10 space-y-1.5 shadow-3xs">
+                      <div className="flex items-center justify-between text-xs font-semibold text-gray-500">
                         <span className="flex items-center gap-1">
                           <Tag className="w-3 h-3 text-blue-600" />
                           <span>Shift Category:</span>
@@ -2695,7 +2695,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         <button
                           type="button"
                           onClick={() => setProductCategoryFilter('ALL')}
-                          className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                          className={`px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 cursor-pointer ${
                             productCategoryFilter === 'ALL'
                               ? 'bg-blue-600 text-white shadow-3xs'
                               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -2708,7 +2708,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             key={cat}
                             type="button"
                             onClick={() => setProductCategoryFilter(cat)}
-                            className={`px-2 py-0.5 rounded-full text-[9.5px] font-bold shrink-0 transition-all cursor-pointer ${
+                            className={`px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 cursor-pointer ${
                               productCategoryFilter === cat
                                 ? 'bg-blue-600 text-white shadow-3xs'
                                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -2730,35 +2730,35 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             handleSelectProduct(p);
                             setShowProductDropdown(false);
                           }}
-                          className={`p-2.5 cursor-pointer rounded-lg transition-colors flex items-center justify-between text-xs ${
-                            isSelected ? 'bg-blue-100/90 font-bold border border-blue-200' : 'hover:bg-blue-50/80'
+                          className={`p-2.5 cursor-pointer rounded-lg flex items-center justify-between text-[0.875rem] ${
+                            isSelected ? 'bg-blue-100/90 font-semibold border border-blue-200' : 'hover:bg-blue-50/80'
                           }`}
                         >
                           <div className="flex-1 min-w-0 pr-3">
-                            <div className="font-bold text-gray-900 break-words leading-snug text-xs sm:text-[13px]">{p.name}</div>
+                            <div className="font-semibold text-gray-900 break-words leading-snug text-[0.875rem] sm:text-[0.875rem]">{p.name}</div>
                             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                              <span className="text-[10px] text-gray-400 font-mono">{p.skuCode}</span>
-                              <span className="text-[10px] text-gray-300">•</span>
-                              <span className="text-[10px] font-semibold text-gray-700 bg-gray-100 px-1.5 py-0.2 rounded border border-gray-200/60">
+                              <span className="text-xs text-gray-400 font-mono">{p.skuCode}</span>
+                              <span className="text-xs text-gray-300">•</span>
+                              <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-1.5 py-0.2 rounded border border-gray-200/60">
                                 {p.category || 'General'}
                               </span>
                               {specBadge && (
                                 <>
-                                  <span className="text-[10px] text-gray-300">•</span>
-                                  <span className="text-[10px] font-semibold text-indigo-600">{specBadge}</span>
+                                  <span className="text-xs text-gray-300">•</span>
+                                  <span className="text-xs font-semibold text-blue-600">{specBadge}</span>
                                 </>
                               )}
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-full border ${
+                            <span className={`px-2 py-0.5 text-xs font-semibold uppercase rounded-full border ${
                               getItemClassification(p) === 'semi'
-                                ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                ? 'bg-blue-50 text-blue-700 border-blue-200'
                                 : 'bg-blue-50 text-blue-700 border-blue-200'
                             }`}>
                               {getItemClassification(p) === 'semi' ? 'Semi Finished' : 'Finished Good'}
                             </span>
-                            <span className="px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                            <span className="px-2 py-0.5 text-xs font-semibold uppercase rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
                               {p.status || 'Active'}
                             </span>
                           </div>
@@ -2775,21 +2775,21 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
               </div>
             </div>
 
-            {/* Product Detail Info Box (Fixed h-[142px]) */}
+            {/* Product Detail Info Box (Fixed h-[8.875rem]) */}
             {productName ? (
-              <div className="h-[142px] p-3 bg-blue-50/30 rounded-xl border border-blue-100/80 flex flex-col justify-between text-[11px] text-gray-600">
+              <div className="h-[8.875rem] p-3 bg-blue-50/30 rounded-xl border border-blue-100/80 flex flex-col justify-between text-xs text-gray-600">
                 <div className="space-y-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold text-gray-900 text-xs leading-snug break-words line-clamp-2" title={productName}>{productName}</span>
-                    <span className={`px-2 py-0.5 text-[9.5px] font-extrabold uppercase rounded-full border shrink-0 ${
+                    <span className="font-semibold text-gray-900 text-[0.875rem] leading-snug break-words line-clamp-2" title={productName}>{productName}</span>
+                    <span className={`px-2 py-0.5 text-xs font-semibold uppercase rounded-full border shrink-0 ${
                       getItemClassification(currentSku) === 'semi'
-                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                        ? 'bg-blue-50 text-blue-700 border-blue-200'
                         : 'bg-blue-50 text-blue-700 border-blue-200'
                     }`}>
                       {getItemClassification(currentSku) === 'semi' ? 'Semi Finished' : 'Finished Good'}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 pt-0.5 text-[10.5px]">
+                  <div className="flex items-center gap-2 pt-0.5 text-xs">
                     <span className="font-mono text-gray-500 bg-white px-1.5 py-0.5 rounded border border-gray-200/60 font-medium">
                       {productCode || 'FG-001'}
                     </span>
@@ -2810,24 +2810,24 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
                 <div className="pt-2 border-t border-blue-100/70 grid grid-cols-2 gap-2 text-center">
                   <div className="bg-white/90 p-1.5 rounded-lg border border-gray-100 shadow-3xs">
-                    <div className="text-[9px] text-gray-500 font-bold uppercase">BOM Status</div>
-                    <div className="font-bold text-emerald-700 text-[11px] mt-0.5">
+                    <div className="text-xs text-gray-500 font-semibold uppercase">BOM Status</div>
+                    <div className="font-semibold text-emerald-700 text-xs mt-0.5">
                       {materials.length > 0 ? `Defined (${materials.length} Items)` : 'No BOM'}
                     </div>
                   </div>
                   <div className="bg-white/90 p-1.5 rounded-lg border border-gray-100 shadow-3xs">
-                    <div className="text-[9px] text-gray-500 font-bold uppercase">Packing / Unit</div>
-                    <div className="font-bold text-blue-900 text-[11px] mt-0.5">
+                    <div className="text-xs text-gray-500 font-semibold uppercase">Packing / Unit</div>
+                    <div className="font-semibold text-blue-900 text-xs mt-0.5">
                       {conversionFactor > 0 ? `${conversionFactor} Pcs/GBL` : (currentSku?.unit || 'PCS')}
                     </div>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="h-[142px] p-4 bg-gray-50/80 rounded-xl border border-dashed border-gray-200 flex flex-col items-center justify-center text-center text-gray-400">
+              <div className="h-[8.875rem] p-4 bg-gray-50/80 rounded-xl border border-dashed border-gray-200 flex flex-col items-center justify-center text-center text-gray-400">
                 <Package className="w-7 h-7 text-gray-300 mb-1 stroke-[1.5]" />
-                <p className="text-xs font-semibold text-gray-500">No Product Selected</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">
+                <p className="text-[0.875rem] font-semibold text-gray-500">No Product Selected</p>
+                <p className="text-xs text-gray-400 mt-0.5">
                   Search or shift categories above to load BOM and begin batch planning.
                 </p>
               </div>
@@ -2835,15 +2835,15 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           </div>
 
           {/* CARD 3: Output Location & Targets (Decreased Size: lg:col-span-3) */}
-          <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[305px] min-h-[305px] max-h-[305px] flex flex-col justify-between">
-            <div className="flex items-center gap-2 text-xs font-bold text-gray-900 pb-1 border-b border-gray-100">
+          <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs h-[19.0625rem] min-h-[19.0625rem] max-h-[19.0625rem] flex flex-col justify-between">
+            <div className="flex items-center gap-2 text-[0.875rem] font-semibold text-gray-900 pb-1 border-b border-gray-100">
               <MapPin className="w-4 h-4 text-blue-600" />
               <span>Output Location & Targets</span>
             </div>
 
             {/* Output Location with Mini Factory Warehouse Modal */}
             <div>
-              <label className="block text-[10.5px] font-bold text-gray-600 mb-1">
+              <label className="block text-xs font-semibold text-gray-600 mb-1">
                 Output Location (Finished Goods) <span className="text-red-500">*</span>
               </label>
               <LocationSelectPopup
@@ -2864,7 +2864,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
             {/* Planned Qty & UOM */}
             <div>
-              <label className="block text-[10.5px] font-bold text-gray-600 mb-1">
+              <label className="block text-xs font-semibold text-gray-600 mb-1">
                 Planned Quantity to Produce <span className="text-red-500">*</span>
               </label>
               <div className="flex items-center gap-2">
@@ -2875,12 +2875,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   value={plannedQty}
                   onChange={e => setPlannedQty(e.target.value)}
                   placeholder="e.g. 5000"
-                  className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
+                  className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-3xs"
                 />
                 <select
                   value={uom}
                   onChange={e => setUom(e.target.value)}
-                  className="w-24 px-2 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer shadow-3xs"
+                  className="w-24 px-2 py-1.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer shadow-3xs"
                 >
                   {availableUnits.map(unit => (
                     <option key={unit} value={unit}>{unit}</option>
@@ -2889,11 +2889,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
               </div>
             </div>
 
-            {/* Batch Target Stats (Fixed h-[64px]) */}
-            <div className="p-2 bg-blue-50/40 rounded-xl border border-blue-100/70 flex items-center justify-between text-xs">
+            {/* Batch Target Stats (Fixed h-[4rem]) */}
+            <div className="p-2 bg-blue-50/40 rounded-xl border border-blue-100/70 flex items-center justify-between text-[0.875rem]">
               <div>
-                <span className="text-[10px] text-gray-500 font-bold uppercase block">Target Output</span>
-                <span className="font-extrabold text-blue-900 text-xs font-mono">
+                <span className="text-xs text-gray-500 font-semibold uppercase block">Target Output</span>
+                <span className="font-semibold text-blue-900 text-[0.875rem] font-mono">
                   {numPlannedQty > 0 ? (
                     uom === 'GBL' 
                       ? `${plannedPcs.toLocaleString('en-IN')} PCS (${plannedQty} GBL)`
@@ -2903,7 +2903,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
               </div>
               {conversionFactor > 0 && (
                 <div className="text-right">
-                  <span className="px-2 py-0.5 rounded-md text-[9.5px] font-bold bg-blue-100 text-blue-800 font-mono">
+                  <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-100 text-blue-800 font-mono">
                     1 GBL = {conversionFactor} PCS
                   </span>
                 </div>
@@ -2917,33 +2917,33 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
         {/* ── MIDDLE SECTION: MATERIALS TO BE CONSUMED TABLE (1:1 with Sales Order Drawer) ── */}
         <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs space-y-3 relative z-30">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
+            <div className="flex items-center gap-2 text-[0.875rem] font-semibold text-gray-900">
               <Layers className="w-4 h-4 text-blue-600" />
               <span>Materials to be Consumed (From BOM)</span>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               {/* 3-Mode Global Rate Selector Pill Switcher */}
-              <div className="flex items-center gap-1 bg-slate-100/90 p-0.5 rounded-xl border border-slate-200/80 text-[11px]">
-                <span className="text-gray-500 pl-2 pr-1 font-bold text-[10px] uppercase tracking-wider select-none">
+              <div className="flex items-center gap-1 bg-slate-100/90 p-0.5 rounded-xl border border-slate-200/80 text-xs">
+                <span className="text-gray-500 pl-2 pr-1 font-medium text-xs uppercase tracking-wider select-none">
                   Rate Mode:
                 </span>
                 <button
                   type="button"
                   onClick={() => applyGlobalRateMode('avg_purchase')}
-                  className={`px-2 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer font-bold ${
+                  className={`px-2 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer font-semibold ${
                     globalRateMode === 'avg_purchase'
-                      ? 'bg-white text-indigo-700 shadow-2xs border border-indigo-200/60'
+                      ? 'bg-white text-blue-700 shadow-2xs border border-blue-200/60'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
                   }`}
                   title="Apply weighted average purchase rate across active batches"
                 >
-                  <BarChart3 className="w-3.5 h-3.5 text-indigo-600" />
+                  <BarChart3 className="w-3.5 h-3.5 text-blue-600" />
                   <span>Avg Purchases</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => applyGlobalRateMode('fifo')}
-                  className={`px-2 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer font-bold ${
+                  className={`px-2 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer font-semibold ${
                     globalRateMode === 'fifo'
                       ? 'bg-white text-emerald-700 shadow-2xs border border-emerald-200/60'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
@@ -2956,7 +2956,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                 <button
                   type="button"
                   onClick={() => applyGlobalRateMode('custom')}
-                  className={`px-2 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer font-bold ${
+                  className={`px-2 py-1 rounded-lg flex items-center gap-1.5 cursor-pointer font-semibold ${
                     globalRateMode === 'custom'
                       ? 'bg-white text-amber-700 shadow-2xs border border-amber-200/60'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
@@ -2974,7 +2974,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   if (currentSku) handleSelectProduct(currentSku);
                   else showToast('Please select a product first', 'info');
                 }}
-                className="px-3 py-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-3xs"
+                className="px-3 py-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 font-semibold rounded-xl text-[0.875rem] flex items-center gap-1.5 cursor-pointer shadow-3xs"
               >
                 <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>Load from BOM</span>
@@ -2983,10 +2983,10 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
               <button
                 type="button"
                 onClick={() => setShowCuttingSlipModal(true)}
-                className="px-3 py-1.5 border border-teal-200 text-teal-700 bg-teal-50/70 hover:bg-teal-100 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-3xs"
+                className="px-3 py-1.5 border border-blue-200 text-blue-700 bg-blue-50/70 hover:bg-blue-100 font-semibold rounded-xl text-[0.875rem] flex items-center gap-1.5 cursor-pointer shadow-3xs"
                 title="Convert raw reels into sheets via Cutting Slip voucher"
               >
-                <Scissors className="w-3.5 h-3.5 text-teal-600" />
+                <Scissors className="w-3.5 h-3.5 text-blue-600" />
                 <span>Cut Reels to Sheets</span>
               </button>
 
@@ -3104,7 +3104,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
               <button
                 type="button"
                 onClick={handleAddMaterial}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-3xs"
+                className="btn-primary"
               >
                 <Plus className="w-3.5 h-3.5 stroke-[3]" />
                 <span>Add Material</span>
@@ -3114,25 +3114,25 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
           {/* Table matching Order Items in Sales Drawer with horizontal scrolling and no overflow */}
           <div className="overflow-x-auto border border-gray-200 rounded-xl custom-scrollbar">
-            <table className="w-full text-left border-collapse text-xs min-w-[920px]">
-              <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
+            <table className="w-full text-left border-collapse text-[0.875rem] min-w-[57.5rem]">
+              <thead className="bg-gray-50/80 text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
                 <tr>
-                  <th className="py-2 px-2 text-center w-8 whitespace-nowrap text-[10px]">#</th>
-                  <th className="py-2 px-3 min-w-[290px] whitespace-nowrap text-[10px]">MATERIAL / COMPONENT <span className="text-red-500">*</span></th>
-                  <th className="py-2 px-2 text-center w-20 whitespace-nowrap text-[10px]">ITEM CODE</th>
-                  <th className="py-2 px-2 text-center w-14 whitespace-nowrap text-[10px]">UOM</th>
-                  <th className="py-2 px-2.5 text-right w-24 whitespace-nowrap text-[10px]">REQUIRED QTY <span className="text-red-500">*</span></th>
-                  <th className="py-2 px-2.5 min-w-[160px] whitespace-nowrap text-[10px]">SOURCE LOCATION</th>
-                  <th className="py-2 px-2.5 text-right w-32 whitespace-nowrap text-[10px]">RATE (₹)</th>
-                  <th className="py-2 px-2.5 text-right w-28 whitespace-nowrap text-[10px]">MATERIAL COST (₹)</th>
-                  <th className="py-2 px-2 text-center w-20 whitespace-nowrap text-[10px]">ACTIONS</th>
+                  <th className="py-2 px-2 text-center w-8 whitespace-nowrap text-xs">#</th>
+                  <th className="py-2 px-3 min-w-[18.125rem] whitespace-nowrap text-xs">MATERIAL / COMPONENT <span className="text-red-500">*</span></th>
+                  <th className="py-2 px-2 text-center w-20 whitespace-nowrap text-xs">ITEM CODE</th>
+                  <th className="py-2 px-2 text-center w-14 whitespace-nowrap text-xs">UOM</th>
+                  <th className="py-2 px-2.5 text-right w-24 whitespace-nowrap text-xs">REQUIRED QTY <span className="text-red-500">*</span></th>
+                  <th className="py-2 px-2.5 min-w-[10rem] whitespace-nowrap text-xs">SOURCE LOCATION</th>
+                  <th className="py-2 px-2.5 text-right w-32 whitespace-nowrap text-xs">RATE (₹)</th>
+                  <th className="py-2 px-2.5 text-right w-28 whitespace-nowrap text-xs">MATERIAL COST (₹)</th>
+                  <th className="py-2 px-2 text-center w-20 whitespace-nowrap text-xs">ACTIONS</th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-gray-100 bg-white text-xs">
+              <tbody className="divide-y divide-gray-100 bg-white text-[0.875rem]">
                 {materials.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-6 text-center text-xs text-gray-400 italic">
+                    <td colSpan={9} className="py-6 text-center text-[0.875rem] text-gray-400 italic">
                       No materials added yet. Select a product above or click <strong className="text-blue-600 font-semibold cursor-pointer" onClick={handleAddMaterial}>"+ Add Material"</strong> to add components.
                     </td>
                   </tr>
@@ -3143,15 +3143,15 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     return (
                       <tr 
                         key={row.id} 
-                        className="hover:bg-blue-50/30 transition-colors"
+                        className="hover:bg-blue-50/30"
                       >
                         {/* # */}
-                        <td className="py-1.5 px-2 text-center font-bold text-gray-400 text-[10.5px]">
+                        <td className="py-1.5 px-2 text-center font-semibold text-gray-400 text-xs">
                           {idx + 1}
                         </td>
 
                         {/* Material / Component Dropdown (Expanded, compact height, all title in one line) */}
-                        <td className="py-1.5 px-3 relative material-dropdown-container min-w-[290px]">
+                        <td className="py-1.5 px-3 relative material-dropdown-container min-w-[18.125rem]">
                           <div className="relative w-full">
                             <input
                               type="text"
@@ -3165,7 +3165,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                               onFocus={(e) => handleOpenMaterialDropdown(row.id, e.currentTarget)}
                               placeholder="Select material / semi good..."
                               title={row.component || 'Select material / semi good...'}
-                              className="w-full pl-2.5 pr-6 py-1 bg-white border border-gray-200 rounded-md text-[11px] font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none cursor-pointer h-7"
+                              className="w-full pl-2.5 pr-6 py-1 bg-white border border-gray-200 rounded-md text-xs font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none cursor-pointer h-7"
                             />
                             <div className="absolute right-2 top-2 flex items-center">
                               {(row.component || componentSearchMap[row.id]) ? (
@@ -3214,18 +3214,18 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                               }
 
                               return (
-                                <div className="flex items-center gap-1 mt-0.5 px-0.5 text-[9.5px]">
+                                <div className="flex items-center gap-1 mt-0.5 px-0.5 text-xs">
                                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                                     isAvailable && !isZero ? 'bg-emerald-500' : !isZero ? 'bg-amber-500' : 'bg-rose-500'
                                   }`} />
                                   <span className="text-gray-400">Stock:</span>
-                                  <span className={`font-mono font-bold ${
+                                  <span className={`font-mono font-semibold ${
                                     isAvailable && !isZero ? 'text-emerald-700' : !isZero ? 'text-amber-700' : 'text-rose-700'
                                   }`}>
                                     {formatStockQty(stockQty)} {normUom}
                                   </span>
                                   {altStockStr && (
-                                    <span className="text-gray-400 font-mono text-[9px] font-medium">
+                                    <span className="text-gray-400 font-mono text-xs font-medium">
                                       {altStockStr}
                                     </span>
                                   )}
@@ -3237,13 +3237,13 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
                         {/* Item Code */}
                         <td className="py-1.5 px-2 text-center">
-                          <span className="font-mono text-[10px] font-medium text-gray-600 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200/60 inline-block w-full text-center">
+                          <span className="font-mono text-xs font-medium text-gray-600 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200/60 inline-block w-full text-center">
                             {row.code || '—'}
                           </span>
                         </td>
 
                         {/* UOM */}
-                        <td className="py-1.5 px-2 text-center min-w-[75px]">
+                        <td className="py-1.5 px-2 text-center min-w-[4.6875rem]">
                           {(() => {
                             const matched = backendSkus.find(s => 
                               (row.skuId && s._id === row.skuId) ||
@@ -3267,7 +3267,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                 <select
                                   value={currentVal}
                                   onChange={(e) => handleMaterialUomChange(row.id, e.target.value)}
-                                  className="w-full h-7 border border-gray-200 rounded-md text-[10.5px] font-bold text-gray-800 bg-white text-center cursor-pointer focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                  className="w-full h-7 border border-gray-200 rounded-md text-xs font-semibold text-gray-800 bg-white text-center cursor-pointer focus:ring-1 focus:ring-blue-500 focus:outline-none"
                                   title="Unit of Measurement (UOM / AUOM)"
                                 >
                                   {opts.map(o => (
@@ -3278,7 +3278,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             }
 
                             return (
-                              <span className="font-bold text-[10px] text-gray-700 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200/60 inline-block w-full text-center">
+                              <span className="font-semibold text-xs text-gray-700 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200/60 inline-block w-full text-center">
                                 {row.uom || 'PCS'}
                               </span>
                             );
@@ -3293,7 +3293,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             min="0"
                             value={row.requiredQty}
                             onChange={e => handleUpdateMaterial(row.id, 'requiredQty', e.target.value)}
-                            className="w-full text-right font-bold text-gray-900 bg-white border border-gray-200 rounded-md px-2 py-0.5 text-[11px] h-7 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                            className="w-full text-right font-semibold text-gray-900 bg-white border border-gray-200 rounded-md px-2 py-0.5 text-xs h-7 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                           />
                           {(() => {
                             const matched = backendSkus.find(s => 
@@ -3308,14 +3308,14 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             if (curUom === 'GBL') {
                               const pcsVal = numReq * conv;
                               return (
-                                <span className="text-[9px] text-indigo-700 font-mono font-semibold block text-right mt-0.5" title={`${numReq} GBL = ${pcsVal} PCS`}>
+                                <span className="text-xs text-blue-700 font-mono font-semibold block text-right mt-0.5" title={`${numReq} GBL = ${pcsVal} PCS`}>
                                   ≈ {pcsVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })} PCS
                                 </span>
                               );
                             } else if (curUom === 'PCS' || curUom === 'SHEETS') {
                               const gblVal = numReq / conv;
                               return (
-                                <span className="text-[9px] text-gray-500 font-mono font-medium block text-right mt-0.5" title={`${numReq} PCS = ${gblVal.toFixed(4)} GBL`}>
+                                <span className="text-xs text-gray-500 font-mono font-medium block text-right mt-0.5" title={`${numReq} PCS = ${gblVal.toFixed(4)} GBL`}>
                                   ≈ {gblVal < 1 ? gblVal.toFixed(4) : gblVal.toLocaleString('en-IN', { maximumFractionDigits: 3 })} GBL
                                 </span>
                               );
@@ -3325,7 +3325,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         </td>
 
                         {/* Source Location (Mini Factory Location Modal) */}
-                        <td className="py-1.5 px-2.5 min-w-[160px]">
+                        <td className="py-1.5 px-2.5 min-w-[10rem]">
                           <LocationSelectPopup
                             locations={warehouseLocations}
                             locationId={row.locationId || ''}
@@ -3333,7 +3333,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             onChange={(wh, fl, zn, loc) => handleMaterialLocationChange(row.id, wh, fl, zn, loc)}
                             variant="compact"
                             hideLabel
-                            className="w-full min-w-[160px]"
+                            className="w-full min-w-[10rem]"
                             skuId={row.skuId}
                             unit={row.uom || ''}
                           />
@@ -3347,12 +3347,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                               <select
                                 value={row.rateMode || 'avg_purchase'}
                                 onChange={(e) => handleSetRowRateMode(row.id, e.target.value as BomRateMode)}
-                                className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border cursor-pointer focus:outline-none transition-all h-7 ${
+                                className={`px-1.5 py-0.5 rounded text-xs font-medium uppercase tracking-wider border cursor-pointer focus:outline-none h-7 ${
                                   row.rateMode === 'fifo'
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
                                     : row.rateMode === 'custom'
                                     ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
-                                    : 'bg-indigo-50 text-indigo-700 border-indigo-300 hover:bg-indigo-100'
+                                    : 'bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100'
                                 }`}
                                 title="Select valuation method for this material"
                               >
@@ -3369,7 +3369,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                 disabled={row.rateMode !== 'custom'}
                                 value={row.rate}
                                 onChange={e => handleUpdateMaterial(row.id, 'rate', e.target.value)}
-                                className={`w-20 text-right font-bold bg-white border rounded-md px-2 py-0.5 text-[11px] h-7 focus:ring-1 focus:ring-blue-500 focus:outline-none ${
+                                className={`w-20 text-right font-semibold bg-white border rounded-md px-2 py-0.5 text-xs h-7 focus:ring-1 focus:ring-blue-500 focus:outline-none ${
                                   row.rateMode === 'fifo'
                                     ? 'border-emerald-300 text-emerald-900 bg-emerald-50/20'
                                     : row.rateMode === 'custom'
@@ -3397,7 +3397,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                               const converted = convertRateToUom(row.rate, row.uom || primUom, targetAuom, matSku);
                               if (!converted || converted <= 0) return null;
                               return (
-                                <span className="text-[9.5px] text-indigo-700 font-bold font-mono text-right block mt-0.5" title={`Rate in ${targetAuom}: ₹${converted.toFixed(4)}`}>
+                                <span className="text-xs text-blue-700 font-semibold font-mono text-right block mt-0.5" title={`Rate in ${targetAuom}: ₹${converted.toFixed(4)}`}>
                                   ≈ ₹{converted < 1 ? converted.toFixed(4) : converted.toLocaleString('en-IN', { maximumFractionDigits: 2 })}/{targetAuom}
                                 </span>
                               );
@@ -3405,7 +3405,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             {/* FIFO Allocation & Majority Batch Badge */}
                             {row.rateMode === 'fifo' && row.fifoBatchInfo && (
                               <span
-                                className="text-[9px] text-emerald-700 font-semibold leading-tight text-right cursor-help max-w-[140px] truncate block"
+                                className="text-xs text-emerald-700 font-semibold leading-tight text-right cursor-help max-w-[8.75rem] truncate block"
                                 title={row.fifoBatchInfo.summary || `FIFO: ${row.fifoBatchInfo.batchNumber} (₹${row.rate}/${row.uom || 'Unit'})`}
                               >
                                 {row.fifoBatchInfo.majorityBatch ? `Majority: ${row.fifoBatchInfo.majorityBatch}` : `Lot: ${row.fifoBatchInfo.batchNumber}`}
@@ -3414,7 +3414,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             {/* Cost origin badges: shown to clarify where the rate came from */}
                             {row.productionRate != null && row.productionRate > 0 && (
                               <span
-                                className="text-[9px] text-blue-600 font-semibold leading-none"
+                                className="text-xs text-blue-600 font-semibold leading-none"
                                 title={`Dynamic production costing from Stock & Inventory: ₹${row.productionRate.toFixed(2)}/${row.uom || 'Unit'}`}
                               >
                                 🏭 prod. cost
@@ -3425,7 +3425,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                               row.rateMode !== 'custom' &&
                               row.computedAvgRate === 0 && row.computedFifoRate === 0 && (
                               <span
-                                className="text-[9px] text-purple-600 font-semibold leading-none"
+                                className="text-xs text-blue-600 font-semibold leading-none"
                                 title={`Rate carried forward from last production order (₹${row.lastProductionRate.toFixed(2)}).`}
                               >
                                 ↩ last prod.
@@ -3436,7 +3436,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
 
                         {/* Material Cost Amount */}
-                        <td className="py-1.5 px-2.5 text-right font-bold font-mono text-gray-900 text-[11px] w-28">
+                        <td className="py-1.5 px-2.5 text-right font-semibold font-mono text-gray-900 text-xs w-28">
                           ₹{formatCurrency(row.amount)}
                         </td>
 
@@ -3446,7 +3446,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             <button
                               type="button"
                               onClick={() => handleDuplicateMaterial(idx)}
-                              className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md cursor-pointer transition-colors"
+                              className="icon-btn"
                               title="Duplicate row"
                             >
                               <Copy className="w-3.5 h-3.5" />
@@ -3454,7 +3454,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             <button
                               type="button"
                               onClick={() => handleDeleteMaterial(row.id)}
-                              className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-md cursor-pointer transition-colors"
+                              className="icon-btn-danger"
                               title="Delete row"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -3490,7 +3490,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   maxHeight: '280px',
                   zIndex: 999999
                 }}
-                className="bg-white border border-gray-200 rounded-xl shadow-2xl overflow-y-auto divide-y divide-gray-100 p-1 material-dropdown-container animate-in fade-in zoom-in-95 duration-100"
+                className="bg-white border border-gray-200 rounded-xl shadow-2xl overflow-y-auto divide-y divide-gray-100 p-1 material-dropdown-container"
               >
                 {filteredComponents.map((s) => {
                   const itemType = getItemClassification(s);
@@ -3505,39 +3505,39 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         setComponentSearchMap(prev => ({ ...prev, [activeMaterialDropdownId]: s.name }));
                         setActiveMaterialDropdownId(null);
                       }}
-                      className={`p-2 cursor-pointer rounded-lg text-xs flex justify-between items-center transition-colors ${
-                        isSelected ? 'bg-blue-100/90 font-bold border border-blue-200' : 'hover:bg-blue-50/80'
+                      className={`p-2 cursor-pointer rounded-lg text-[0.875rem] flex justify-between items-center ${
+                        isSelected ? 'bg-blue-100/90 font-semibold border border-blue-200' : 'hover:bg-blue-50/80'
                       }`}
                     >
                       <div className="flex-1 min-w-0 pr-3">
-                        <div className="font-bold text-gray-900 break-words leading-snug text-xs sm:text-[12.5px]">{s.name}</div>
+                        <div className="font-semibold text-gray-900 break-words leading-snug text-[0.875rem] sm:text-xs">{s.name}</div>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                          <span className="text-[9.5px] text-gray-400 font-mono">{s.skuCode}</span>
+                          <span className="text-xs text-gray-400 font-mono">{s.skuCode}</span>
                           {s.category && (
                             <>
-                              <span className="text-[9.5px] text-gray-300">•</span>
-                              <span className="text-[9.5px] font-semibold text-gray-600 uppercase">{s.category}</span>
+                              <span className="text-xs text-gray-300">•</span>
+                              <span className="text-xs font-semibold text-gray-600 uppercase">{s.category}</span>
                             </>
                           )}
                           {s.unit && (
                             <>
-                              <span className="text-[9.5px] text-gray-300">•</span>
-                              <span className="text-[9.5px] font-bold text-blue-600">{s.unit}</span>
+                              <span className="text-xs text-gray-300">•</span>
+                              <span className="text-xs font-semibold text-blue-600">{s.unit}</span>
                             </>
                           )}
                           {specBadge && (
                             <>
-                              <span className="text-[9.5px] text-gray-300">•</span>
-                              <span className="text-[9.5px] font-semibold text-indigo-600">{specBadge}</span>
+                              <span className="text-xs text-gray-300">•</span>
+                              <span className="text-xs font-semibold text-blue-600">{specBadge}</span>
                             </>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="px-2 py-0.5 text-[9px] font-extrabold uppercase rounded-full border bg-purple-50 text-purple-700 border-purple-200">
+                        <span className="px-2 py-0.5 text-xs font-semibold uppercase rounded-full border bg-blue-50 text-blue-700 border-blue-200">
                           {itemType === 'semi' ? 'Semi Goods' : (s.category || 'Raw Material')}
                         </span>
-                        <span className={`px-2 py-0.5 text-[9px] font-extrabold uppercase rounded-full border ${
+                        <span className={`px-2 py-0.5 text-xs font-semibold uppercase rounded-full border ${
                           (s.status || '').toLowerCase() === 'inactive'
                             ? 'bg-amber-50 text-amber-700 border-amber-200'
                             : 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -3549,7 +3549,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   );
                 })}
                 {filteredComponents.length === 0 && (
-                  <div className="p-3 text-center text-gray-400 italic text-xs">No materials or semi goods found</div>
+                  <div className="p-3 text-center text-gray-400 italic text-[0.875rem]">No materials or semi goods found</div>
                 )}
               </div>,
               document.body
@@ -3560,13 +3560,13 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           <div className="pt-2 flex flex-wrap items-center justify-between gap-2.5">
             {/* Left: Cute, Compact Live Stock Pills */}
             <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 mr-0.5 select-none">
-                <Package className="w-3 h-3 text-indigo-500" />
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider flex items-center gap-1 mr-0.5 select-none">
+                <Package className="w-3 h-3 text-blue-500" />
                 <span>Stock:</span>
               </span>
 
               {materials.length === 0 ? (
-                <span className="text-[10.5px] text-gray-400 italic">No materials</span>
+                <span className="text-xs text-gray-400 italic">No materials</span>
               ) : (
                 materials.map((m, idx) => {
                   const { stockQty, uom, isAvailable, matchedSku } = getLiveStockForMaterial(m);
@@ -3589,7 +3589,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     <div
                       key={m.id || idx}
                       title={`${displayName} (${m.code || '—'}) • Live Stock: ${formatStockQty(stockQty)} ${uom}${altStockStr ? ` (${altStockStr})` : ''}`}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] border transition-all select-none ${
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs border select-none ${
                         isAvailable && !isZero
                           ? 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100/60'
                           : !isZero
@@ -3600,16 +3600,16 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                         isAvailable && !isZero ? 'bg-emerald-500' : !isZero ? 'bg-amber-500' : 'bg-rose-500'
                       }`} />
-                      <span className="font-semibold truncate max-w-[130px] sm:max-w-[170px] text-gray-800">
+                      <span className="font-semibold truncate max-w-[8.125rem] sm:max-w-[10.625rem] text-gray-800">
                         {displayName}
                       </span>
-                      <span className={`font-mono font-bold shrink-0 ${
+                      <span className={`font-mono font-semibold shrink-0 ${
                         isAvailable && !isZero ? 'text-emerald-700' : !isZero ? 'text-amber-700' : 'text-rose-700'
                       }`}>
                         {formatStockQty(stockQty)} {uom}
                       </span>
                       {altStockStr && (
-                        <span className="font-mono text-gray-400 text-[9px] font-medium shrink-0">
+                        <span className="font-mono text-gray-400 text-xs font-medium shrink-0">
                           ({altStockStr})
                         </span>
                       )}
@@ -3623,18 +3623,18 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   type="button"
                   onClick={handleRefreshStock}
                   disabled={isStockLoading}
-                  className="p-1 text-gray-400 hover:text-indigo-600 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                  className="p-1 text-gray-400 hover:text-blue-600 rounded-full hover:bg-gray-100 cursor-pointer"
                   title="Refresh live stock"
                 >
-                  <RotateCcw className={`w-3 h-3 ${isStockLoading ? 'animate-spin text-indigo-600' : ''}`} />
+                  <RotateCcw className={`w-3 h-3 ${isStockLoading ? 'animate-spin text-blue-600' : ''}`} />
                 </button>
               )}
             </div>
 
             {/* Right: Clean Materials Total */}
             <div className="text-right shrink-0">
-              <span className="text-xs text-gray-500 font-semibold mr-2">Materials Total:</span>
-              <span className="text-sm font-black font-mono text-gray-900">
+              <span className="text-[0.875rem] text-gray-500 font-semibold mr-2">Materials Total:</span>
+              <span className="text-[0.875rem] font-semibold font-mono text-gray-900">
                 ₹{formatCurrency(totalMaterialCost)}
               </span>
             </div>
@@ -3655,10 +3655,10 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     <Receipt className="w-4 h-4 text-blue-600" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+                    <span className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wide">
                       Additional Costs / Overheads (Optional)
                     </span>
-                    <p className="text-[10px] text-gray-500 font-medium">
+                    <p className="text-xs text-gray-500 font-medium">
                       Direct labour, electricity, packaging, or machine charges
                     </p>
                   </div>
@@ -3676,7 +3676,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                         setShowQuickCostPresetMenu(!showQuickCostPresetMenu);
                         setHighlightedCostPresetIdx(0);
                       }}
-                      className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100/80 text-blue-700 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-blue-200 shadow-3xs"
+                      className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100/80 text-blue-700 font-semibold rounded-lg text-[0.875rem] flex items-center gap-1.5 cursor-pointer border border-blue-200 shadow-3xs"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-blue-600" />
                       <span>Add Preset Overhead</span>
@@ -3685,13 +3685,13 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
                     {showQuickCostPresetMenu && (
                       <div 
-                        className={`absolute right-0 ${quickCostOpenUpwards ? 'bottom-full mb-1' : 'top-full mt-1'} w-80 max-h-[80vh] bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 text-xs divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-100`}
+                        className={`absolute right-0 ${quickCostOpenUpwards ? 'bottom-full mb-1' : 'top-full mt-1'} w-80 max-h-[calc(80*var(--vh,1vh))] bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 text-[0.875rem] divide-y divide-gray-100`}
                         role="menu"
                       >
-                        <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between">
+                        <div className="px-3 py-1.5 text-xs font-medium text-gray-400 uppercase tracking-wider flex items-center justify-between">
                           <span className="flex items-center gap-1.5">
                             <span>Predefined Overheads</span>
-                            <kbd className="font-mono text-[9px] bg-gray-100 text-gray-600 px-1 py-0.5 rounded border border-gray-200">Alt+P</kbd>
+                            <kbd className="font-mono text-xs bg-gray-100 text-gray-600 px-1 py-0.5 rounded border border-gray-200">Alt+P</kbd>
                           </span>
                           <button
                             type="button"
@@ -3699,7 +3699,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                               setShowQuickCostPresetMenu(false);
                               setShowManageCostModal(true);
                             }}
-                            className="text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer font-bold"
+                            className="text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer font-semibold"
                           >
                             <Settings className="w-3 h-3" />
                             <span>Manage</span>
@@ -3717,15 +3717,15 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                   setShowQuickCostPresetMenu(false);
                                 }}
                                 onMouseEnter={() => setHighlightedCostPresetIdx(pIdx)}
-                                className={`w-full px-3 py-1.5 text-left flex items-center justify-between group transition-colors cursor-pointer ${
+                                className={`w-full px-3 py-1.5 text-left flex items-center justify-between group cursor-pointer ${
                                   isSelected
-                                    ? 'bg-blue-100/90 text-blue-900 font-bold ring-1 ring-inset ring-blue-400'
+                                    ? 'bg-blue-100/90 text-blue-900 font-semibold ring-1 ring-inset ring-blue-400'
                                     : 'hover:bg-blue-50/70 text-gray-800'
                                 }`}
                                 role="menuitem"
                               >
                                 <span className="font-semibold truncate">{p.name}</span>
-                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 ml-2 ${
+                                <span className={`px-1.5 py-0.5 rounded text-xs font-mono font-semibold shrink-0 ml-2 ${
                                   p.basis === 'Per GBL' || p.basis === 'Per Piece' || p.basis === 'Per BOM' || p.basis === 'Per Ream'
                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
                                     : 'bg-gray-100 text-gray-600'
@@ -3736,9 +3736,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             );
                           })}
                         </div>
-                        <div className="px-3 py-1 bg-gray-50 text-[10px] text-gray-500 flex items-center justify-between">
-                          <span>Use <kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold">↑</kbd><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold ml-0.5">↓</kbd></span>
-                          <span><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-bold">Enter</kbd> to add</span>
+                        <div className="px-3 py-1 bg-gray-50 text-xs text-gray-500 flex items-center justify-between">
+                          <span>Use <kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-semibold">↑</kbd><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-semibold ml-0.5">↓</kbd></span>
+                          <span><kbd className="font-mono bg-white border border-gray-200 px-1 py-0.2 rounded font-semibold">Enter</kbd> to add</span>
                         </div>
                       </div>
                     )}
@@ -3747,7 +3747,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   <button
                     type="button"
                     onClick={handleAddCost}
-                    className="px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700 font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-all border border-gray-200 shadow-3xs"
+                    className="btn-secondary"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Custom</span>
@@ -3756,8 +3756,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
               </div>
 
               <div className="overflow-x-auto border border-gray-200 rounded-xl custom-scrollbar">
-                <table className="w-full text-left border-collapse text-xs min-w-[560px]">
-                  <thead className="bg-gray-50/80 text-[10.5px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
+                <table className="w-full text-left border-collapse text-[0.875rem] min-w-[35rem]">
+                  <thead className="bg-gray-50/80 text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200 select-none">
                     <tr>
                       <th className="py-2 px-3 w-8 text-center">#</th>
                       <th className="py-2 px-3">COST TYPE</th>
@@ -3771,7 +3771,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                       const costCalc = calculateAdditionalCostRow(cost);
                       return (
                         <tr key={cost.id} className="hover:bg-gray-50/60">
-                          <td className="py-2 px-3 text-center font-bold text-gray-400">{cIdx + 1}</td>
+                          <td className="py-2 px-3 text-center font-semibold text-gray-400">{cIdx + 1}</td>
                           <td className="py-2 px-3">
                             <input
                               type="text"
@@ -3787,14 +3787,14 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                                 }
                               }}
                               placeholder="e.g. Labour, Electricity, Printing"
-                              className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                              className="w-full px-2 py-1 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
                             />
                           </td>
                           <td className="py-2 px-3 text-center">
                             <select
                               value={cost.basis}
                               onChange={e => handleUpdateCost(cost.id, 'basis', e.target.value as any)}
-                              className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-blue-500"
+                              className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-blue-500"
                             >
                               <option value="Per BOM">📦 Per BOM</option>
                               <option value="Per Piece">⚡ Per Piece</option>
@@ -3808,12 +3808,12 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                               step="0.01"
                               value={cost.amount}
                               onChange={e => handleUpdateCost(cost.id, 'amount', e.target.value)}
-                              className="w-24 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-xs font-bold focus:ring-1 focus:ring-blue-500"
+                              className="w-24 px-1.5 py-1 text-right bg-white border border-gray-200 rounded-lg font-mono text-gray-800 text-[0.875rem] font-semibold focus:ring-1 focus:ring-blue-500"
                             />
                             {Number(cost.amount) > 0 && (
-                              <div className="text-[10px] text-blue-600 font-mono font-bold text-right mt-0.5 whitespace-nowrap">
+                              <div className="text-xs text-blue-600 font-mono font-semibold text-right mt-0.5 whitespace-nowrap">
                                 = ₹{costCalc.total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                <span className="text-[9px] text-gray-400 font-sans font-normal ml-0.5">({costCalc.label})</span>
+                                <span className="text-xs text-gray-400 font-sans font-normal ml-0.5">({costCalc.label})</span>
                               </div>
                             )}
                           </td>
@@ -3821,7 +3821,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                             <button
                               type="button"
                               onClick={() => handleDeleteCost(cost.id)}
-                              className="p-1 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                              className="icon-btn-danger"
                               title="Delete overhead"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -3832,7 +3832,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     })}
                     {additionalCosts.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="py-4 text-center text-xs text-gray-400 italic bg-gray-50/30">
+                        <td colSpan={5} className="py-4 text-center text-[0.875rem] text-gray-400 italic bg-gray-50/30">
                           No additional costs added. Click <strong className="text-blue-600 font-semibold cursor-pointer" onClick={() => setShowQuickCostPresetMenu(true)}>"Add Preset Overhead"</strong> above to select or add overheads.
                         </td>
                       </tr>
@@ -3857,10 +3857,10 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     <TrendingUp className="w-4 h-4 text-emerald-600" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+                    <span className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wide">
                       Profit & Costing (Dynamic)
                     </span>
-                    <p className="text-[10px] text-gray-500 font-medium">
+                    <p className="text-xs text-gray-500 font-medium">
                       Calculate dynamic suggested selling prices and projected profit based on live manufacturing cost
                     </p>
                   </div>
@@ -3868,7 +3868,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
                 {numPlannedQty > 0 && (
                   <div className="flex items-center gap-1.5">
-                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-[11px] font-mono font-bold">
+                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-xs font-mono font-semibold">
                       Batch Cost: ₹{formatCurrency(totalProductionCost)}
                     </span>
                   </div>
@@ -3877,17 +3877,17 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
               <div className="bg-emerald-50/20 border border-emerald-100 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-4 gap-3 items-center">
                 <div>
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                     Pricing Method
                   </label>
-                  <div className="w-full px-2.5 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs font-bold text-emerald-800 flex items-center justify-between shadow-3xs">
+                  <div className="w-full px-2.5 py-1.5 bg-white border border-emerald-200 rounded-lg text-[0.875rem] font-semibold text-emerald-800 flex items-center justify-between shadow-3xs">
                     <span>Margin %</span>
-                    <span className="text-[9px] px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded font-semibold border border-emerald-200">Profit Margin</span>
+                    <span className="text-xs px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded font-semibold border border-emerald-200">Profit Margin</span>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
                     Margin Percentage
                   </label>
                   <div className="relative">
@@ -3897,57 +3897,57 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                       value={profitPricing.markupPercentage}
                       onChange={e => setProfitPricing(prev => ({ ...prev, pricingMethod: 'Margin %', markupPercentage: e.target.value }))}
                       placeholder="0"
-                      className="w-full pl-3 pr-7 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      className="w-full pl-3 pr-7 py-1.5 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold font-mono text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                     />
-                    <span className="absolute right-2.5 top-1.5 text-xs font-bold text-gray-400 select-none">%</span>
+                    <span className="absolute right-2.5 top-1.5 text-[0.875rem] font-semibold text-gray-400 select-none">%</span>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">
+                  <label className="text-xs font-medium text-emerald-800 uppercase tracking-wider block mb-1">
                     Suggested Price / PCS
                   </label>
-                  <div className="px-3 py-1.5 bg-white border border-emerald-300 text-emerald-900 rounded-lg font-mono font-black text-sm text-center shadow-3xs">
+                  <div className="px-3 py-1.5 bg-white border border-emerald-300 text-emerald-900 rounded-lg font-mono font-semibold text-[0.875rem] text-center shadow-3xs">
                     ₹{formatCurrency(profitCostingSummary.suggestedPricePcs)}
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">
+                  <label className="text-xs font-medium text-emerald-800 uppercase tracking-wider block mb-1">
                     Suggested Price / GBL
                   </label>
-                  <div className="px-3 py-1.5 bg-white border border-emerald-300 text-emerald-900 rounded-lg font-mono font-black text-sm text-center shadow-3xs">
+                  <div className="px-3 py-1.5 bg-white border border-emerald-300 text-emerald-900 rounded-lg font-mono font-semibold text-[0.875rem] text-center shadow-3xs">
                     ₹{formatCurrency(profitCostingSummary.suggestedPriceGbl)}
                   </div>
                 </div>
               </div>
 
               {/* Dynamic Live Profit & Revenue Insights */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[0.875rem]">
                 <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 flex flex-col justify-center">
-                  <span className="text-[10px] font-medium text-gray-400">Mfg Cost / Piece</span>
-                  <span className="font-mono font-bold text-gray-800 text-xs">
+                  <span className="text-xs font-medium text-gray-400">Mfg Cost / Piece</span>
+                  <span className="font-mono font-semibold text-gray-800 text-[0.875rem]">
                     ₹{formatCurrency(costPerPiece)}
                   </span>
                 </div>
 
                 <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 flex flex-col justify-center">
-                  <span className="text-[10px] font-medium text-gray-400">Margin / Piece</span>
-                  <span className="font-mono font-bold text-emerald-700 text-xs">
+                  <span className="text-xs font-medium text-gray-400">Margin / Piece</span>
+                  <span className="font-mono font-semibold text-emerald-700 text-[0.875rem]">
                     + ₹{formatCurrency(Math.max(0, profitCostingSummary.suggestedPricePcs - costPerPiece))}
                   </span>
                 </div>
 
                 <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 flex flex-col justify-center">
-                  <span className="text-[10px] font-medium text-gray-400">Est. Total Revenue</span>
-                  <span className="font-mono font-bold text-gray-900 text-xs">
+                  <span className="text-xs font-medium text-gray-400">Est. Total Revenue</span>
+                  <span className="font-mono font-semibold text-gray-900 text-[0.875rem]">
                     ₹{formatCurrency(profitCostingSummary.totalRevenue)}
                   </span>
                 </div>
 
                 <div className="p-2 bg-emerald-50/60 rounded-lg border border-emerald-200 flex flex-col justify-center">
-                  <span className="text-[10px] font-bold text-emerald-800">Est. Batch Profit</span>
-                  <span className="font-mono font-black text-emerald-800 text-xs">
+                  <span className="text-xs font-semibold text-emerald-800">Est. Batch Profit</span>
+                  <span className="font-mono font-semibold text-emerald-800 text-[0.875rem]">
                     {profitCostingSummary.projectedProfit >= 0 ? '+' : ''}₹{formatCurrency(profitCostingSummary.projectedProfit)}
                   </span>
                 </div>
@@ -3956,7 +3956,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
             {/* CARD 3: Notes / Instructions (Optional) */}
             <div className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-3xs space-y-2">
-              <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
+              <div className="flex items-center gap-2 text-[0.875rem] font-semibold text-gray-900">
                 <FileText className="w-4 h-4 text-blue-600" />
                 <span>Notes / Production Instructions (Optional)</span>
               </div>
@@ -3967,9 +3967,9 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   maxLength={500}
                   onChange={(e) => setRemarks(e.target.value)}
                   placeholder="Enter any specific batch execution, recipe, or quality remarks..."
-                  className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-[0.875rem] font-medium text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
-                <div className="text-[10px] text-gray-400 text-right mt-0.5">
+                <div className="text-xs text-gray-400 text-right mt-0.5">
                   {remarks.length}/500
                 </div>
               </div>
@@ -3980,28 +3980,28 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           {/* RIGHT 4 COLUMNS: Order Summary Card (1:1 with Sales Order Drawer) */}
           <div className="lg:col-span-4 bg-white rounded-2xl border border-gray-200/80 p-5 shadow-3xs flex flex-col justify-between space-y-4">
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm font-bold text-gray-900 pb-1">
+              <div className="flex items-center gap-2 text-[0.875rem] font-semibold text-gray-900 pb-1">
                 <Receipt className="w-4 h-4 text-blue-600" />
                 <span>Production Cost Summary</span>
               </div>
 
-              <div className="space-y-2 text-xs">
+              <div className="space-y-2 text-[0.875rem]">
                 <div className="flex justify-between text-gray-600 font-medium">
                   <span>Material Cost (A)</span>
-                  <span className="font-mono font-bold text-gray-900">
+                  <span className="font-mono font-semibold text-gray-900">
                     ₹{formatCurrency(totalMaterialCost)}
                   </span>
                 </div>
 
                 <div className="flex justify-between text-gray-600 font-medium">
                   <span>Additional Overheads (B)</span>
-                  <span className="font-mono font-bold text-gray-900">
+                  <span className="font-mono font-semibold text-gray-900">
                     ₹{formatCurrency(totalAdditionalCost)}
                   </span>
                 </div>
 
                 <div className="pt-2 border-t border-gray-200">
-                  <div className="flex justify-between items-center text-sm font-black text-gray-900">
+                  <div className="flex justify-between items-center text-[0.875rem] font-semibold text-gray-900">
                     <span>Total Production Cost (A + B)</span>
                     <span className="font-mono text-base text-blue-700">
                       ₹{formatCurrency(totalProductionCost)}
@@ -4012,7 +4012,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                 <div className="pt-3 border-t border-gray-100 space-y-2">
                   <div className="flex justify-between text-gray-600 font-medium">
                     <span>Planned Output Qty</span>
-                    <span className="font-bold text-gray-900">
+                    <span className="font-semibold text-gray-900">
                       {numPlannedQty > 0 ? (
                         uom === 'GBL' 
                           ? `${plannedQty} GBL (${plannedPcs} PCS)` 
@@ -4022,8 +4022,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   </div>
 
                   <div className="flex justify-between items-center bg-blue-50/60 p-2 rounded-xl border border-blue-100">
-                    <span className="font-bold text-blue-900 text-xs">Cost / Piece</span>
-                    <span className="font-mono font-black text-blue-900 text-sm">
+                    <span className="font-semibold text-blue-900 text-[0.875rem]">Cost / Piece</span>
+                    <span className="font-mono font-semibold text-blue-900 text-[0.875rem]">
                       ₹{formatCurrency(costPerPiece)}
                     </span>
                   </div>
@@ -4031,7 +4031,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   {plannedGbl > 0 && (
                     <div className="flex justify-between text-gray-600 font-medium px-1">
                       <span>Cost / GBL</span>
-                      <span className="font-mono font-bold text-gray-900">
+                      <span className="font-mono font-semibold text-gray-900">
                         ₹{formatCurrency(costPerGbl)}
                       </span>
                     </div>
@@ -4039,27 +4039,27 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
                   {Number(profitPricing.markupPercentage) > 0 && (
                     <div className="pt-2.5 border-t border-dashed border-gray-200 space-y-2">
-                      <div className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider flex items-center justify-between">
+                      <div className="text-xs font-medium text-emerald-800 uppercase tracking-wider flex items-center justify-between">
                         <span>Suggested Selling Price</span>
-                        <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                        <span className="font-mono font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                           {profitPricing.pricingMethod} {profitPricing.markupPercentage}%
                         </span>
                       </div>
                       <div className="flex justify-between items-center bg-emerald-50/80 p-2 rounded-xl border border-emerald-200">
-                        <span className="font-bold text-emerald-950 text-xs">Suggested / Piece</span>
-                        <span className="font-mono font-black text-emerald-900 text-sm">
+                        <span className="font-semibold text-emerald-950 text-[0.875rem]">Suggested / Piece</span>
+                        <span className="font-mono font-semibold text-emerald-900 text-[0.875rem]">
                           ₹{formatCurrency(profitCostingSummary.suggestedPricePcs)}
                         </span>
                       </div>
-                      <div className="flex justify-between text-gray-600 font-medium px-1 text-xs">
+                      <div className="flex justify-between text-gray-600 font-medium px-1 text-[0.875rem]">
                         <span>Suggested / GBL</span>
-                        <span className="font-mono font-bold text-gray-900">
+                        <span className="font-mono font-semibold text-gray-900">
                           ₹{formatCurrency(profitCostingSummary.suggestedPriceGbl)}
                         </span>
                       </div>
-                      <div className="flex justify-between text-gray-600 font-medium px-1 text-xs">
+                      <div className="flex justify-between text-gray-600 font-medium px-1 text-[0.875rem]">
                         <span>Est. Batch Profit</span>
-                        <span className="font-mono font-black text-emerald-700">
+                        <span className="font-mono font-semibold text-emerald-700">
                           + ₹{formatCurrency(profitCostingSummary.projectedProfit)}
                         </span>
                       </div>
@@ -4071,10 +4071,10 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
 
             {/* Quick Status Pill */}
             <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
-              <span className="text-[10px] text-gray-400 font-medium block">
+              <span className="text-xs text-gray-400 font-medium block">
                 Manufacturing Execution Engine
               </span>
-              <span className="text-[11px] font-bold text-gray-700 mt-0.5 inline-block">
+              <span className="text-xs font-semibold text-gray-700 mt-0.5 inline-block">
                 Ready to dispatch to factory floor
               </span>
             </div>
@@ -4092,8 +4092,8 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           title="Manage Department Presets"
           maxWidth="max-w-lg"
         >
-          <div className="space-y-4 p-2 text-xs">
-            <p className="text-gray-500 text-xs">
+          <div className="space-y-4 p-2 text-[0.875rem]">
+            <p className="text-gray-500 text-[0.875rem]">
               Predefined departments appear in the department selector dropdown. Selecting a department automatically assigns its standard factory location to the batch.
             </p>
 
@@ -4102,11 +4102,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
               {departmentPresets.map(preset => (
                 <div 
                   key={preset.id}
-                  className="p-2.5 flex items-center justify-between text-xs hover:bg-gray-50/80"
+                  className="p-2.5 flex items-center justify-between text-[0.875rem] hover:bg-gray-50/80"
                 >
                   <div className="truncate pr-2">
-                    <span className="font-bold text-gray-900 block truncate">{preset.name}</span>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold mt-1 bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="font-semibold text-gray-900 block truncate">{preset.name}</span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold mt-1 bg-emerald-50 text-emerald-700 border border-emerald-200">
                       <MapPin className="w-3 h-3 text-emerald-600 shrink-0" />
                       <span className="truncate">{preset.locationName || 'Main Factory'}</span>
                     </span>
@@ -4114,7 +4114,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                   <button
                     type="button"
                     onClick={() => handleDeleteDepartmentPreset(preset.id)}
-                    className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors shrink-0"
+                    className="icon-btn-danger shrink-0"
                     title="Delete preset"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -4131,17 +4131,17 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
               }}
               className="p-3.5 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2.5"
             >
-              <span className="text-[11px] font-bold text-blue-900 block uppercase tracking-wide">
+              <span className="text-xs font-medium text-blue-900 block uppercase tracking-wide">
                 + Add New Department Preset (Press Enter to Add)
               </span>
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-2 text-xs items-center">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-2 text-[0.875rem] items-center">
                 <div className="md:col-span-5">
                   <input
                     type="text"
                     placeholder="Department Name (e.g. Ruling Line 2)"
                     value={newDeptName}
                     onChange={(e) => setNewDeptName(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all placeholder:text-gray-400 shadow-3xs"
+                    className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none placeholder:text-gray-400 shadow-3xs"
                   />
                 </div>
                 <div className="md:col-span-5">
@@ -4174,7 +4174,7 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                 <div className="md:col-span-2">
                   <button
                     type="submit"
-                    className="w-full px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold rounded-lg text-xs cursor-pointer shadow-3xs transition-all"
+                    className="btn-primary w-full"
                   >
                     Add
                   </button>
@@ -4183,18 +4183,18 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             </form>
 
             {/* Modal Footer */}
-            <div className="flex justify-between items-center pt-2 border-t border-gray-100 text-xs">
+            <div className="flex justify-between items-center pt-2 border-t border-gray-100 text-[0.875rem] dlg-footer">
               <button
                 type="button"
                 onClick={handleResetDepartmentPresets}
-                className="text-[11px] font-bold text-gray-500 hover:text-gray-700 cursor-pointer"
+                className="text-xs font-semibold text-gray-500 hover:text-gray-700 cursor-pointer"
               >
                 Reset to Defaults
               </button>
               <button
                 type="button"
                 onClick={() => setShowManageDeptModal(false)}
-                className="px-4 py-1.5 bg-gray-900 text-white font-bold rounded-xl text-xs cursor-pointer hover:bg-gray-800 transition-colors"
+                className="px-4 py-1.5 bg-gray-900 text-white font-semibold rounded-xl text-[0.875rem] cursor-pointer hover:bg-gray-800"
               >
                 Done
               </button>
@@ -4211,29 +4211,29 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           title="Manage Predefined Production Overheads"
           maxWidth="max-w-xl"
         >
-          <div className="space-y-4 p-2 text-xs">
-            <p className="text-xs text-gray-500">
+          <div className="space-y-4 p-2 text-[0.875rem]">
+            <p className="text-[0.875rem] text-gray-500">
               Predefined overheads appear in the quick cost selector dropdown and auto-suggest when typing cost names. Changes sync dynamically across all users.
             </p>
 
             {/* List */}
             <div className="max-h-64 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-100">
               {predefinedCosts.map(p => (
-                <div key={p.id} className="p-2.5 flex items-center justify-between gap-2.5 text-xs hover:bg-gray-50/80 transition-colors">
+                <div key={p.id} className="p-2.5 flex items-center justify-between gap-2.5 text-[0.875rem] hover:bg-gray-50/80">
                   <div className="flex-1 min-w-0">
                     <input
                       type="text"
                       value={p.name}
                       onChange={e => handleUpdateCostPreset(p.id, { name: e.target.value })}
                       placeholder="Preset Name"
-                      className="w-full font-bold text-gray-800 bg-transparent border border-transparent hover:border-gray-200 focus:border-blue-400 focus:bg-white rounded-lg px-2 py-1 text-xs truncate transition-all"
+                      className="w-full font-semibold text-gray-800 bg-transparent border border-transparent hover:border-gray-200 focus:border-blue-400 focus:bg-white rounded-lg px-2 py-1 text-[0.875rem] truncate"
                     />
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <select
                       value={p.basis}
                       onChange={e => handleUpdateCostPreset(p.id, { basis: e.target.value as any })}
-                      className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-blue-500"
+                      className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-blue-500"
                     >
                       <option value="Per BOM">📦 Per BOM</option>
                       <option value="Per Piece">⚡ Per Piece</option>
@@ -4241,22 +4241,22 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                       <option value="Per Ream">📋 Per Ream</option>
                     </select>
                     <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-0.5">
-                      <span className="text-gray-400 text-xs font-bold">₹</span>
+                      <span className="text-gray-400 text-[0.875rem] font-semibold">₹</span>
                       <input
                         type="number"
                         step="0.01"
                         value={p.defaultRate}
                         onChange={e => handleUpdateCostPreset(p.id, { defaultRate: Number(e.target.value) || 0 })}
-                        className="w-16 text-right font-mono text-xs font-bold text-gray-800 bg-transparent focus:outline-none"
+                        className="w-16 text-right font-mono text-[0.875rem] font-semibold text-gray-800 bg-transparent focus:outline-none"
                       />
-                      <span className="text-[10px] text-gray-500 font-semibold font-mono">
+                      <span className="text-xs text-gray-500 font-semibold font-mono">
                         {p.basis === 'Per GBL' ? '/GBL' : p.basis === 'Per Piece' ? '/PCS' : '/BOM'}
                       </span>
                     </div>
                     <button
                       type="button"
                       onClick={() => handleDeleteCostPreset(p.id)}
-                      className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                      className="icon-btn-danger"
                       title="Delete preset"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -4279,21 +4279,21 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
               }}
               className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2"
             >
-              <span className="text-[11px] font-bold text-blue-900 block uppercase tracking-wide">
+              <span className="text-xs font-medium text-blue-900 block uppercase tracking-wide">
                 + Add New Overhead Master (Press Enter to Add)
               </span>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[0.875rem]">
                 <input
                   type="text"
                   placeholder="Cost Name (e.g. Electricity)"
                   value={newCostName}
                   onChange={(e) => setNewCostName(e.target.value)}
-                  className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500"
+                  className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold focus:ring-1 focus:ring-blue-500"
                 />
                 <select
                   value={newCostBasis}
                   onChange={(e) => setNewCostBasis(e.target.value as any)}
-                  className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                  className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold focus:ring-1 focus:ring-blue-500 cursor-pointer"
                 >
                   <option value="Per BOM">📦 Per BOM</option>
                   <option value="Per Piece">⚡ Per Piece</option>
@@ -4307,11 +4307,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     placeholder="Rate (₹)"
                     value={newCostRate}
                     onChange={(e) => setNewCostRate(e.target.value)}
-                    className="w-20 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-blue-500"
+                    className="w-20 px-2 py-1 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-mono focus:ring-1 focus:ring-blue-500"
                   />
                   <button
                     type="submit"
-                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer flex-1"
+                    className="btn-primary flex-1"
                   >
                     Add
                   </button>
@@ -4320,18 +4320,18 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             </form>
 
             {/* Modal Footer */}
-            <div className="flex justify-between items-center pt-2 border-t border-gray-100 text-xs">
+            <div className="flex justify-between items-center pt-2 border-t border-gray-100 text-[0.875rem] dlg-footer">
               <button
                 type="button"
                 onClick={handleResetCostPresets}
-                className="text-[11px] font-bold text-gray-500 hover:text-gray-700 cursor-pointer"
+                className="text-xs font-semibold text-gray-500 hover:text-gray-700 cursor-pointer"
               >
                 Reset to Defaults
               </button>
               <button
                 type="button"
                 onClick={() => setShowManageCostModal(false)}
-                className="px-4 py-1.5 bg-gray-900 text-white font-bold rounded-xl text-xs cursor-pointer"
+                className="px-4 py-1.5 bg-gray-900 text-white font-semibold rounded-xl text-[0.875rem] cursor-pointer"
               >
                 Done
               </button>
@@ -4348,29 +4348,29 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
           title="Manage Predefined Scrap & By-Products"
           maxWidth="max-w-xl"
         >
-          <div className="space-y-4 p-2 text-xs">
-            <p className="text-xs text-gray-500">
+          <div className="space-y-4 p-2 text-[0.875rem]">
+            <p className="text-[0.875rem] text-gray-500">
               Predefined scrap items appear in the quick scrap selector. Selecting an item automatically loads its name, unit of measurement, and recovery rate. Changes sync dynamically across all users.
             </p>
 
             {/* List */}
             <div className="max-h-60 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-100">
               {scrapPresets.map(p => (
-                <div key={p.id} className="p-2.5 flex items-center justify-between gap-2.5 text-xs hover:bg-gray-50/80 transition-colors">
+                <div key={p.id} className="p-2.5 flex items-center justify-between gap-2.5 text-[0.875rem] hover:bg-gray-50/80">
                   <div className="flex-1 min-w-0">
                     <input
                       type="text"
                       value={p.item}
                       onChange={e => handleUpdateScrapPreset(p.id, { item: e.target.value })}
                       placeholder="Scrap Item Name"
-                      className="w-full font-bold text-gray-800 bg-transparent border border-transparent hover:border-gray-200 focus:border-purple-400 focus:bg-white rounded-lg px-2 py-1 text-xs truncate transition-all"
+                      className="w-full font-semibold text-gray-800 bg-transparent border border-transparent hover:border-gray-200 focus:border-blue-400 focus:bg-white rounded-lg px-2 py-1 text-[0.875rem] truncate"
                     />
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <select
                       value={p.uom}
                       onChange={e => handleUpdateScrapPreset(p.id, { uom: e.target.value })}
-                      className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-purple-500"
+                      className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold text-gray-800 cursor-pointer focus:ring-1 focus:ring-blue-500"
                     >
                       <option value="KG">KG</option>
                       <option value="PCS">PCS</option>
@@ -4379,22 +4379,22 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                       <option value="SHEET">SHEET</option>
                     </select>
                     <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-0.5">
-                      <span className="text-gray-400 text-xs font-bold">₹</span>
+                      <span className="text-gray-400 text-[0.875rem] font-semibold">₹</span>
                       <input
                         type="number"
                         step="0.01"
                         value={p.defaultRate}
                         onChange={e => handleUpdateScrapPreset(p.id, { defaultRate: Number(e.target.value) || 0 })}
-                        className="w-16 text-right font-mono text-xs font-bold text-gray-800 bg-transparent focus:outline-none"
+                        className="w-16 text-right font-mono text-[0.875rem] font-semibold text-gray-800 bg-transparent focus:outline-none"
                       />
-                      <span className="text-[10px] text-gray-500 font-semibold font-mono">
+                      <span className="text-xs text-gray-500 font-semibold font-mono">
                         /{p.uom}
                       </span>
                     </div>
                     <button
                       type="button"
                       onClick={() => handleDeleteScrapPreset(p.id)}
-                      className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                      className="icon-btn-danger"
                       title="Delete preset"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -4413,23 +4413,23 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                 e.preventDefault();
                 handleAddNewScrapPreset();
               }}
-              className="p-3 bg-purple-50/50 rounded-xl border border-purple-100 space-y-2"
+              className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2"
             >
-              <span className="text-[11px] font-bold text-purple-900 block uppercase tracking-wide">
+              <span className="text-xs font-medium text-blue-900 block uppercase tracking-wide">
                 + Add New Scrap Preset (Press Enter to Add)
               </span>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[0.875rem]">
                 <input
                   type="text"
                   placeholder="Scrap Name (e.g. Paper Waste)"
                   value={newScrapItem}
                   onChange={(e) => setNewScrapItem(e.target.value)}
-                  className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-purple-500"
+                  className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold focus:ring-1 focus:ring-blue-500"
                 />
                 <select
                   value={newScrapUom}
                   onChange={(e) => setNewScrapUom(e.target.value)}
-                  className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-purple-500 cursor-pointer"
+                  className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-semibold focus:ring-1 focus:ring-blue-500 cursor-pointer"
                 >
                   <option value="KG">KG</option>
                   <option value="PCS">PCS</option>
@@ -4444,11 +4444,11 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
                     placeholder="Rate (₹)"
                     value={newScrapRate}
                     onChange={(e) => setNewScrapRate(e.target.value)}
-                    className="w-20 px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-purple-500"
+                    className="w-20 px-2 py-1 bg-white border border-gray-200 rounded-lg text-[0.875rem] font-mono focus:ring-1 focus:ring-blue-500"
                   />
                   <button
                     type="submit"
-                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-xs cursor-pointer flex-1"
+                    className="btn-primary flex-1"
                   >
                     Add
                   </button>
@@ -4457,18 +4457,18 @@ export const NewProductionOrderWizard: React.FC<NewProductionOrderWizardProps> =
             </form>
 
             {/* Modal Footer */}
-            <div className="flex justify-between items-center pt-2 border-t border-gray-100 text-xs">
+            <div className="flex justify-between items-center pt-2 border-t border-gray-100 text-[0.875rem] dlg-footer">
               <button
                 type="button"
                 onClick={handleResetScrapPresets}
-                className="text-[11px] font-bold text-gray-500 hover:text-gray-700 cursor-pointer"
+                className="text-xs font-semibold text-gray-500 hover:text-gray-700 cursor-pointer"
               >
                 Reset to Defaults
               </button>
               <button
                 type="button"
                 onClick={() => setShowManageScrapModal(false)}
-                className="px-4 py-1.5 bg-gray-900 text-white font-bold rounded-xl text-xs cursor-pointer hover:bg-gray-800 transition-colors"
+                className="px-4 py-1.5 bg-gray-900 text-white font-semibold rounded-xl text-[0.875rem] cursor-pointer hover:bg-gray-800"
               >
                 Done
               </button>

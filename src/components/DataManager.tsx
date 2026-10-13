@@ -158,9 +158,9 @@ const DataManager: React.FC<DataManagerProps> = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white p-6 w-full max-w-2xl max-h-[calc(90*var(--vh,1vh))] overflow-y-auto dlg-panel">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Data Management</h2>
+          <h2 className="text-2xl font-semibold text-gray-900">Data Management</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -184,27 +184,27 @@ const DataManager: React.FC<DataManagerProps> = ({ isOpen, onClose }) => {
             <>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">{dataSummary.companies}</div>
+                  <div className="text-2xl font-semibold text-blue-600">{dataSummary.companies}</div>
                   <div className="text-sm text-gray-600">Companies</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">{dataSummary.customers}</div>
+                  <div className="text-2xl font-semibold text-green-600">{dataSummary.customers}</div>
                   <div className="text-sm text-gray-600">Customers</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">{dataSummary.vendors}</div>
+                  <div className="text-2xl font-semibold text-purple-600">{dataSummary.vendors}</div>
                   <div className="text-sm text-gray-600">Vendors</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-600">{dataSummary.finishedGoods}</div>
+                  <div className="text-2xl font-semibold text-orange-600">{dataSummary.finishedGoods}</div>
                   <div className="text-sm text-gray-600">Finished Goods</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-red-600">{dataSummary.rawMaterials}</div>
+                  <div className="text-2xl font-semibold text-red-600">{dataSummary.rawMaterials}</div>
                   <div className="text-sm text-gray-600">Raw Materials</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-indigo-600">{dataSummary.orders}</div>
+                  <div className="text-2xl font-semibold text-indigo-600">{dataSummary.orders}</div>
                   <div className="text-sm text-gray-600">Sales Orders</div>
                 </div>
               </div>

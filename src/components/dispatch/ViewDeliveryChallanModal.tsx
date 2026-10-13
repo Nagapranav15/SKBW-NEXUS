@@ -117,16 +117,16 @@ export const ViewDeliveryChallanModal: React.FC<ViewDeliveryChallanModalProps> =
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 bg-gray-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 bg-gray-900/40 animate-in fade-in duration-200">
       <div 
-        className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden text-left"
+        className="bg-white w-full max-w-4xl max-h-[calc(92*var(--vh,1vh))] flex flex-col overflow-hidden text-left dlg-panel"
         onClick={e => e.stopPropagation()}
       >
         {/* Modal Action Bar */}
         <div className="px-6 py-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/80 shrink-0">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-black uppercase tracking-wider text-gray-500">Delivery Challan</span>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-blue-50 text-blue-700 border border-blue-200">
+            <span className="text-xs font-medium uppercase tracking-wider text-gray-500">Delivery Challan</span>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold font-mono bg-blue-50 text-blue-700 border border-blue-200">
               {challan.dcNumber || 'DC-001'}
             </span>
           </div>
@@ -134,7 +134,7 @@ export const ViewDeliveryChallanModal: React.FC<ViewDeliveryChallanModalProps> =
             {onRevert && (
               <button
                 onClick={() => onRevert(challan)}
-                className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95"
+                className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95"
                 title="Revert Delivery Challan & Restore Stock"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
@@ -143,7 +143,7 @@ export const ViewDeliveryChallanModal: React.FC<ViewDeliveryChallanModalProps> =
             )}
             <button
               onClick={handlePrint}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95"
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95"
               title="Print Delivery Challan"
             >
               <Printer className="w-3.5 h-3.5 stroke-[2.2]" />
@@ -160,32 +160,32 @@ export const ViewDeliveryChallanModal: React.FC<ViewDeliveryChallanModalProps> =
 
         {/* Printable Challan Sheet Preview (Exact template matching user reference) */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-100/60 flex justify-center">
-          <div className="bg-white border border-gray-200/90 shadow-sm rounded-lg w-full max-w-[760px] p-6 text-gray-900 font-sans">
+          <div className="bg-white border border-gray-200/90 shadow-sm rounded-lg w-full max-w-[47.5rem] p-6 text-gray-900 font-sans">
             
             {/* ── 1. HEADER ── */}
             <div className="flex justify-between items-start mb-2">
               <div>
-                <h1 className="text-xl font-black text-[#0b2545] uppercase tracking-tight leading-snug">
+                <h1 className="text-xl font-semibold text-[#0b2545] uppercase tracking-tight leading-snug">
                   {companyName}
                 </h1>
-                <p className="text-[11px] font-bold text-slate-800 uppercase mt-0.5 tracking-wide">
+                <p className="text-[0.6875rem] font-medium text-slate-800 uppercase mt-0.5 tracking-wide">
                   {companyAddress}
                 </p>
-                <p className="text-[11.5px] font-semibold text-slate-600 mt-0.5">
+                <p className="text-[0.71875rem] font-semibold text-slate-600 mt-0.5">
                   Contact : {companyPhone}
                 </p>
               </div>
               <div className="flex flex-col items-end">
-                <div className="w-[72px] h-[48px] bg-[#e0f2fe] rounded-md flex items-center justify-center text-3xl font-black text-[#0b2545] tracking-widest shadow-2xs">
+                <div className="w-[4.5rem] h-[3rem] bg-[#e0f2fe] rounded-md flex items-center justify-center text-3xl font-semibold text-[#0b2545] tracking-widest shadow-2xs">
                   DC
                 </div>
-                <span className="text-[10px] text-slate-400 mt-1">Page 1 of 1</span>
+                <span className="text-[0.625rem] text-slate-400 mt-1">Page 1 of 1</span>
               </div>
             </div>
 
             {/* ── 2. TITLE BANNER ── */}
             <div className="w-full bg-[#e8f1fc] border border-[#cbd5e1] rounded py-1.5 text-center my-2.5">
-              <h2 className="text-lg font-extrabold text-[#0b2545] tracking-wide">
+              <h2 className="text-lg font-semibold text-[#0b2545] tracking-wide">
                 Delivery Challan
               </h2>
             </div>
@@ -194,13 +194,13 @@ export const ViewDeliveryChallanModal: React.FC<ViewDeliveryChallanModalProps> =
             <div className="flex border border-[#cbd5e1] rounded mb-3 bg-white overflow-hidden">
               {/* Left Column: Consignee */}
               <div className="flex-[1.6] p-2.5 border-r border-[#cbd5e1] space-y-0.5 text-xs">
-                <div className="text-[10.5px] text-slate-500 font-medium">Consignee / Deliver To</div>
-                <div className="text-[12.5px] font-black text-slate-900 uppercase leading-snug">
+                <div className="text-[0.65625rem] text-slate-500 font-medium">Consignee / Deliver To</div>
+                <div className="text-[0.875rem] font-semibold text-slate-900 uppercase leading-snug">
                   {custName}
                 </div>
-                {addr1 && <div className="text-[11px] font-semibold text-slate-800 uppercase">{addr1}</div>}
-                {cityPinLine && <div className="text-[11px] font-semibold text-slate-800 uppercase">{cityPinLine}</div>}
-                {custPhone && <div className="text-[11px] font-semibold text-slate-800">Phone : {custPhone}</div>}
+                {addr1 && <div className="text-[0.6875rem] font-semibold text-slate-800 uppercase">{addr1}</div>}
+                {cityPinLine && <div className="text-[0.6875rem] font-semibold text-slate-800 uppercase">{cityPinLine}</div>}
+                {custPhone && <div className="text-[0.6875rem] font-semibold text-slate-800">Phone : {custPhone}</div>}
               </div>
 
               {/* Right Column: DC Metadata */}
@@ -208,29 +208,29 @@ export const ViewDeliveryChallanModal: React.FC<ViewDeliveryChallanModalProps> =
                 <div className="flex">
                   <span className="w-20 font-semibold text-slate-700">DC No.</span>
                   <span className="w-4 font-semibold text-slate-700 text-center">:</span>
-                  <span className="font-bold text-slate-900 flex-1">{dcNumber}</span>
+                  <span className="font-semibold text-slate-900 flex-1">{dcNumber}</span>
                 </div>
                 <div className="flex">
                   <span className="w-20 font-semibold text-slate-700">Date</span>
                   <span className="w-4 font-semibold text-slate-700 text-center">:</span>
-                  <span className="font-bold text-slate-900 flex-1">{dcDate}</span>
+                  <span className="font-semibold text-slate-900 flex-1">{dcDate}</span>
                 </div>
                 <div className="flex">
                   <span className="w-20 font-semibold text-slate-700">Order No.</span>
                   <span className="w-4 font-semibold text-slate-700 text-center">:</span>
-                  <span className="font-bold text-slate-900 flex-1">{orderNumber}</span>
+                  <span className="font-semibold text-slate-900 flex-1">{orderNumber}</span>
                 </div>
               </div>
             </div>
 
             {/* ── 4. ITEMS TABLE ── */}
             <div className="border border-[#cbd5e1] rounded overflow-hidden mb-3">
-              <table className="w-full text-xs border-collapse">
+              <table className="doc-table w-full text-xs border-collapse">
                 <thead>
                   <tr className="bg-[#e8f1fc] text-[#0b2545] border-b border-[#cbd5e1]">
-                    <th className="py-1.5 px-2 font-black border-r border-[#cbd5e1] text-center w-[7%]">S.No.</th>
-                    <th className="py-1.5 px-3 font-black border-r border-[#cbd5e1] text-center w-[78%]">Item Name</th>
-                    <th className="py-1.5 px-2 font-black text-center w-[15%]">Qty (GBL)</th>
+                    <th className="py-1.5 px-2 font-semibold border-r border-[#cbd5e1] text-center w-[7%]">S.No.</th>
+                    <th className="py-1.5 px-3 font-semibold border-r border-[#cbd5e1] text-center w-[78%]">Item Name</th>
+                    <th className="py-1.5 px-2 font-semibold text-center w-[15%]">Qty (GBL)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#cbd5e1]">
@@ -243,20 +243,20 @@ export const ViewDeliveryChallanModal: React.FC<ViewDeliveryChallanModalProps> =
                   ) : (
                     calculatedItems.map((it, idx) => (
                       <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
-                        <td className="py-1.5 px-2 text-center font-bold text-slate-700 border-r border-[#cbd5e1]">
+                        <td className="py-1.5 px-2 text-center font-semibold text-slate-700 border-r border-[#cbd5e1]">
                           {idx + 1}
                         </td>
                         <td className="py-1.5 px-3 border-r border-[#cbd5e1]">
-                          <div className="font-bold text-slate-900 uppercase">
+                          <div className="font-semibold text-slate-900 uppercase">
                             {it.itemName || it.skuCode || 'ITEM'}
                           </div>
                           {it.subText && (
-                            <div className="text-[10px] font-bold text-slate-500 uppercase mt-0.5">
+                            <div className="text-[0.625rem] font-semibold text-slate-500 uppercase mt-0.5">
                               {it.subText}
                             </div>
                           )}
                         </td>
-                        <td className="py-1.5 px-2 text-center font-black text-slate-900">
+                        <td className="py-1.5 px-2 text-center font-semibold text-slate-900">
                           {it.qtyGbl}
                         </td>
                       </tr>
@@ -267,13 +267,13 @@ export const ViewDeliveryChallanModal: React.FC<ViewDeliveryChallanModalProps> =
             </div>
 
             {/* ── 5. BOTTOM TOTAL BAR ── */}
-            <div className="bg-[#e8f1fc] border border-[#cbd5e1] rounded px-4 py-2 flex items-center justify-between text-xs font-black text-[#0b2545]">
+            <div className="bg-[#e8f1fc] border border-[#cbd5e1] rounded px-4 py-2 flex items-center justify-between text-xs font-semibold text-[#0b2545]">
               <div className="uppercase tracking-wide">
                 Transporter : &nbsp;{transporter}
               </div>
               <div className="flex items-center gap-8">
                 <span className="tracking-wider">TOTAL</span>
-                <span className="text-[13px]">{totalGblSum} GBL</span>
+                <span className="text-[0.875rem]">{totalGblSum} GBL</span>
               </div>
             </div>
 

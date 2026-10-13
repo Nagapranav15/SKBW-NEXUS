@@ -23,7 +23,7 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', duration = 3000, 
   }[type];
 
   return (
-    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-2xl ${config.bg} animate-slide-in backdrop-blur-md`}>
+    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-2xl ${config.bg} animate-slide-in`}>
       <config.Icon className={`w-5 h-5 ${config.iconColor} flex-shrink-0`} />
       <span className={`text-sm font-semibold ${config.text} flex-1 leading-snug`}>{message}</span>
       <button onClick={onClose} className="p-1 hover:bg-black/5 rounded-lg transition-colors cursor-pointer">

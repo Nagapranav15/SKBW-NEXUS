@@ -226,7 +226,7 @@ export const PresetField: React.FC<PresetFieldProps> = ({
       {/* Label and Presets Trigger */}
       {!hideLabel && (
         <div className="flex items-center justify-between mb-1.5">
-          <label className="block text-xs font-semibold text-gray-700">
+          <label className="block text-[0.875rem] font-semibold text-gray-700">
             {label} {required && <span className="text-rose-500">*</span>}
           </label>
 
@@ -237,12 +237,12 @@ export const PresetField: React.FC<PresetFieldProps> = ({
               setShowDropdown(!showDropdown);
               setHighlightedIdx(0);
             }}
-            className="text-[11px] font-bold text-blue-600 hover:text-blue-700 flex items-center space-x-1 cursor-pointer transition-colors"
+            className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center space-x-1 cursor-pointer"
             title="Presets"
           >
             <Sparkles className="w-3 h-3 text-blue-500" />
             <span>Presets ({presets.length})</span>
-            <ChevronDown className={`w-3 h-3 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-3 h-3 ${showDropdown ? 'rotate-180' : ''}`} />
           </button>
         </div>
       )}
@@ -262,7 +262,7 @@ export const PresetField: React.FC<PresetFieldProps> = ({
               setHighlightedIdx(0);
             }
           }}
-          className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-medium focus:outline-none focus:border-blue-500 transition-colors h-[38px]"
+          className="w-full text-[0.875rem] text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 font-medium focus:outline-none focus:border-blue-500 h-[2.375rem]"
         />
 
         <button
@@ -278,24 +278,24 @@ export const PresetField: React.FC<PresetFieldProps> = ({
       </div>
 
       {helperText && (
-        <p className="text-[11px] text-gray-400 mt-1">{helperText}</p>
+        <p className="text-xs text-gray-400 mt-1">{helperText}</p>
       )}
 
       {/* Presets Dropdown Menu */}
       {showDropdown && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 text-xs animate-modalPop max-h-72 flex flex-col">
+        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 text-[0.875rem] max-h-72 flex flex-col">
           {/* Header */}
-          <div className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center justify-between border-b border-gray-100 bg-gray-50/70 shrink-0">
+          <div className="px-3 py-2 text-xs font-medium text-gray-400 uppercase tracking-wider flex items-center justify-between border-b border-gray-100 bg-gray-50/70 shrink-0">
             <span>{label} Presets</span>
             <div className="flex items-center space-x-2">
-              <span className="text-[9px] text-gray-400 font-mono hidden sm:inline">[↑/↓ to navigate, Enter to select]</span>
+              <span className="text-xs text-gray-400 font-mono hidden sm:inline">[↑/↓ to navigate, Enter to select]</span>
               <button
                 type="button"
                 onClick={() => {
                   setShowDropdown(false);
                   setShowManageModal(true);
                 }}
-                className="text-blue-600 hover:underline flex items-center space-x-0.5 cursor-pointer font-bold"
+                className="text-blue-600 hover:underline flex items-center space-x-0.5 cursor-pointer font-semibold"
               >
                 <Settings className="w-3 h-3" />
                 <span>Manage</span>
@@ -316,7 +316,7 @@ export const PresetField: React.FC<PresetFieldProps> = ({
                     setHighlightedIdx(0);
                   }}
                   placeholder="Filter presets..."
-                  className="w-full pl-7 pr-2 py-1 text-[11px] bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:border-blue-500"
+                  className="w-full pl-7 pr-2 py-1 text-xs bg-gray-50 border border-gray-200 rounded-md focus:outline-none focus:border-blue-500"
                   autoFocus
                 />
               </div>
@@ -330,20 +330,20 @@ export const PresetField: React.FC<PresetFieldProps> = ({
               onClick={() => {
                 handleAddPreset(value);
               }}
-              className="w-full text-left px-3 py-2 bg-blue-50/60 hover:bg-blue-100/70 text-blue-700 text-xs font-bold border-b border-blue-100 flex items-center justify-between transition-colors shrink-0"
+              className="w-full text-left px-3 py-2 bg-blue-50/60 hover:bg-blue-100/70 text-blue-700 text-[0.875rem] font-semibold border-b border-blue-100 flex items-center justify-between shrink-0"
             >
               <div className="flex items-center space-x-1.5 truncate">
                 <Plus className="w-3.5 h-3.5 shrink-0" />
                 <span className="truncate">Save &quot;{value}&quot; as new preset</span>
               </div>
-              <span className="text-[10px] font-semibold bg-blue-200/60 px-1.5 py-0.5 rounded shrink-0">Save</span>
+              <span className="text-xs font-semibold bg-blue-200/60 px-1.5 py-0.5 rounded shrink-0">Save</span>
             </button>
           )}
 
           {/* List of Presets */}
           <div ref={listRef} className="overflow-y-auto flex-1 divide-y divide-gray-50 custom-scrollbar">
             {filteredPresets.length === 0 ? (
-              <div className="p-3 text-center text-xs text-gray-400 italic">
+              <div className="p-3 text-center text-[0.875rem] text-gray-400 italic">
                 No matching presets
               </div>
             ) : (
@@ -356,9 +356,9 @@ export const PresetField: React.FC<PresetFieldProps> = ({
                     type="button"
                     onClick={() => handleSelectPreset(presetItem)}
                     onMouseEnter={() => setHighlightedIdx(pIdx)}
-                    className={`w-full text-left px-3 py-2 text-xs font-medium flex items-center justify-between transition-colors cursor-pointer ${
+                    className={`w-full text-left px-3 py-2 text-[0.875rem] font-medium flex items-center justify-between cursor-pointer ${
                       isHighlighted 
-                        ? 'bg-blue-100/80 text-blue-900 font-bold border-l-2 border-blue-600'
+                        ? 'bg-blue-100/80 text-blue-900 font-semibold border-l-2 border-blue-600'
                         : isSelected 
                           ? 'bg-blue-50/60 text-blue-700 font-semibold' 
                           : 'text-gray-800 hover:bg-blue-50'
@@ -367,7 +367,7 @@ export const PresetField: React.FC<PresetFieldProps> = ({
                     <div className="min-w-0 pr-2">
                       <div className="truncate font-semibold">{presetItem.name}</div>
                       {presetItem.locationName && (
-                        <div className="text-[10px] text-blue-600 font-medium flex items-center gap-1 mt-0.5">
+                        <div className="text-xs text-blue-600 font-medium flex items-center gap-1 mt-0.5">
                           <MapPin className="w-2.5 h-2.5 shrink-0" />
                           <span className="truncate">{presetItem.locationName}</span>
                         </div>
@@ -384,13 +384,13 @@ export const PresetField: React.FC<PresetFieldProps> = ({
 
       {/* Manage Presets Modal */}
       {showManageModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-xs p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-lg overflow-hidden flex flex-col animate-modalPop">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4">
+          <div className="bg-white w-full max-w-lg overflow-hidden flex flex-col dlg-panel">
             {/* Header */}
             <div className="p-4 border-b border-gray-150 flex items-center justify-between bg-gray-50/50">
               <div>
-                <h3 className="text-sm font-bold text-gray-900">Manage {label} Presets</h3>
-                <p className="text-xs text-gray-500">Presets persist across sessions and page reloads</p>
+                <h3 className="text-[0.875rem] font-semibold text-gray-900">Manage {label} Presets</h3>
+                <p className="text-[0.875rem] text-gray-500">Presets persist across sessions and page reloads</p>
               </div>
               <button
                 type="button"
@@ -402,7 +402,7 @@ export const PresetField: React.FC<PresetFieldProps> = ({
             </div>
 
             {/* Modal Body */}
-            <div className="p-4 space-y-4 max-h-[65vh] overflow-y-auto custom-scrollbar">
+            <div className="p-4 space-y-4 max-h-[calc(65*var(--vh,1vh))] overflow-y-auto custom-scrollbar">
               {/* Add form */}
               <form 
                 onSubmit={e => {
@@ -411,7 +411,7 @@ export const PresetField: React.FC<PresetFieldProps> = ({
                 }} 
                 className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2.5"
               >
-                <span className="text-[11px] font-bold text-blue-900 block uppercase tracking-wide">
+                <span className="text-xs font-medium text-blue-900 block uppercase tracking-wide">
                   + Add New Preset
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-center">
@@ -420,7 +420,7 @@ export const PresetField: React.FC<PresetFieldProps> = ({
                     value={newPresetInput}
                     onChange={e => setNewPresetInput(e.target.value)}
                     placeholder={`Preset name (e.g. Binding Department)...`}
-                    className="w-full text-xs text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 h-[38px]"
+                    className="w-full text-[0.875rem] text-gray-900 bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 h-[2.375rem]"
                     required
                   />
 
@@ -443,7 +443,7 @@ export const PresetField: React.FC<PresetFieldProps> = ({
                   <button
                     type="submit"
                     disabled={!newPresetInput.trim()}
-                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-lg text-xs cursor-pointer shrink-0 transition-colors shadow-3xs"
+                    className="btn-primary disabled:opacity-50 shrink-0"
                   >
                     Add Preset
                   </button>
@@ -453,21 +453,21 @@ export const PresetField: React.FC<PresetFieldProps> = ({
               {/* Presets List */}
               <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
                 {presets.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-gray-400 italic">
+                  <div className="p-4 text-center text-[0.875rem] text-gray-400 italic">
                     No presets configured
                   </div>
                 ) : (
                   presets.map(item => (
-                    <div key={item.name} className="p-3 flex items-center justify-between hover:bg-gray-50 text-xs gap-3">
+                    <div key={item.name} className="p-3 flex items-center justify-between hover:bg-gray-50 text-[0.875rem] gap-3">
                       <div className="min-w-0 flex-1">
-                        <span className="font-semibold text-gray-800 block text-xs">{item.name}</span>
+                        <span className="font-semibold text-gray-800 block text-[0.875rem]">{item.name}</span>
                         {item.locationName ? (
-                          <div className="text-[10px] text-blue-600 font-medium flex items-center gap-1 mt-0.5 truncate">
+                          <div className="text-xs text-blue-600 font-medium flex items-center gap-1 mt-0.5 truncate">
                             <MapPin className="w-2.5 h-2.5 shrink-0" />
                             <span className="truncate">Default: {item.locationName}</span>
                           </div>
                         ) : (
-                          <span className="text-[10px] text-gray-400 italic">No default location assigned</span>
+                          <span className="text-xs text-gray-400 italic">No default location assigned</span>
                         )}
                       </div>
 
@@ -504,7 +504,7 @@ export const PresetField: React.FC<PresetFieldProps> = ({
                       <button
                         type="button"
                         onClick={() => handleRemovePreset(item)}
-                        className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors shrink-0"
+                        className="icon-btn-danger shrink-0"
                         title="Delete preset"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -519,7 +519,7 @@ export const PresetField: React.FC<PresetFieldProps> = ({
                 <button
                   type="button"
                   onClick={handleResetDefaults}
-                  className="text-xs text-gray-500 hover:text-gray-800 flex items-center gap-1.5 font-medium cursor-pointer"
+                  className="text-[0.875rem] text-gray-500 hover:text-gray-800 flex items-center gap-1.5 font-medium cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Reset to default presets</span>
@@ -532,7 +532,7 @@ export const PresetField: React.FC<PresetFieldProps> = ({
               <button
                 type="button"
                 onClick={() => setShowManageModal(false)}
-                className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-xl text-xs cursor-pointer transition-colors"
+                className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl text-[0.875rem] cursor-pointer"
               >
                 Done
               </button>

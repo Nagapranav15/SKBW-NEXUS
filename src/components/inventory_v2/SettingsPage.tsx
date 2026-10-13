@@ -368,9 +368,9 @@ const SettingsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="p-12 flex flex-col items-center justify-center min-h-[350px] gap-3">
-        <div className="w-8 h-8 border-3 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
-        <span className="text-xs text-slate-500 font-semibold">Loading settings...</span>
+      <div className="p-12 flex flex-col items-center justify-center min-h-[21.875rem] gap-3">
+        <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <span className="text-[0.875rem] text-slate-500 font-semibold">Loading settings...</span>
       </div>
     );
   }
@@ -391,30 +391,17 @@ const SettingsPage: React.FC = () => {
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 text-left">
-      <style>{`
-        @keyframes slideDownFade {
-          from {
-            opacity: 0;
-            transform: translateY(-8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
 
       {/* Main Settings Header & Navigation Tabs */}
       <div 
-        style={{ animation: 'slideDownFade 0.35s ease-out forwards', animationDelay: '0ms' }}
-        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-gray-200 pb-4 opacity-0"
+        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-gray-200 pb-4"
       >
         <div>
-          <h1 className="text-xl font-extrabold text-gray-900 flex items-center gap-2.5">
-            <Settings className="w-6 h-6 text-teal-700" />
+          <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2.5">
+            <Settings className="w-6 h-6 text-blue-700" />
             <span>ERP Settings & Configuration</span>
           </h1>
-          <p className="text-xs text-gray-500 mt-1 font-medium">
+          <p className="text-[0.875rem] text-gray-500 mt-1 font-medium">
             Manage Item Master Specifications, Stocking Units, Brands, and Custom Keyboard Key Allocations.
           </p>
         </div>
@@ -423,21 +410,21 @@ const SettingsPage: React.FC = () => {
         <div className="flex items-center gap-2 bg-gray-100/90 p-1.5 rounded-2xl border border-gray-200 shrink-0">
           <button
             onClick={() => setActiveTab('specs')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-4 py-2 rounded-xl text-[0.875rem] font-semibold flex items-center gap-2 cursor-pointer ${
               activeTab === 'specs'
                 ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <Scale className="w-4 h-4 text-teal-600" />
+            <Scale className="w-4 h-4 text-blue-600" />
             <span>Item Specifications</span>
           </button>
           
           <button
             onClick={() => setActiveTab('shortcuts')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-4 py-2 rounded-xl text-[0.875rem] font-semibold flex items-center gap-2 cursor-pointer ${
               activeTab === 'shortcuts'
-                ? 'bg-teal-700 text-white shadow-sm'
+                ? 'bg-blue-700 text-white shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
@@ -451,14 +438,14 @@ const SettingsPage: React.FC = () => {
       {activeTab === 'specs' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wider">
+            <h2 className="text-[0.875rem] font-medium text-gray-800 uppercase tracking-wider">
               Default Units, Ruling Specifications & Brands
             </h2>
             <button
               onClick={loadSettings}
-              className="px-3 py-1.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors border border-gray-200 bg-white shadow-2xs flex items-center gap-1.5 font-bold text-xs cursor-pointer"
+              className="btn-secondary"
             >
-              <RefreshCw className="w-3.5 h-3.5 text-teal-700" />
+              <RefreshCw className="w-3.5 h-3.5 text-blue-700" />
               <span>Refresh</span>
             </button>
           </div>
@@ -468,20 +455,19 @@ const SettingsPage: React.FC = () => {
             
             {/* Column 1: Default Stocking Units */}
             <div 
-              style={{ animation: 'slideDownFade 0.35s ease-out forwards', animationDelay: '60ms' }}
-              className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden flex flex-col h-[480px] opacity-0"
+              className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden flex flex-col h-[30rem]"
             >
               <div className="p-4 border-b border-gray-150 bg-slate-50/60 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center">
+                  <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
                     <Scale className="w-4 h-4" />
                   </div>
                   <div>
-                    <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Default Units</h2>
-                    <p className="text-[10px] text-gray-400 mt-0.5">Stocking units (kg, pcs, Sheets, Reels, bags).</p>
+                    <h2 className="text-[0.875rem] font-medium text-gray-800 uppercase tracking-wider">Default Units</h2>
+                    <p className="text-xs text-gray-400 mt-0.5">Stocking units (kg, pcs, Sheets, Reels, bags).</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                   {units.length} Units
                 </span>
               </div>
@@ -494,11 +480,11 @@ const SettingsPage: React.FC = () => {
                   value={newUnit}
                   onChange={e => setNewUnit(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleAddItem('unit')}
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-teal-500 bg-white text-gray-800 font-semibold"
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 font-semibold"
                 />
                 <button
                   onClick={() => handleAddItem('unit')}
-                  className="px-3 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-xl transition-colors font-bold text-xs flex items-center gap-1 cursor-pointer shadow-2xs"
+                  className="btn-primary"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add</span>
@@ -510,19 +496,15 @@ const SettingsPage: React.FC = () => {
                 {units.map((unit, index) => (
                   <div 
                     key={unit} 
-                    style={{ 
-                      animation: 'slideDownFade 0.35s ease-out forwards', 
-                      animationDelay: `${index * 30}ms` 
-                    }}
-                    className="py-2.5 px-2 flex items-center justify-between text-xs font-semibold text-gray-700 hover:bg-slate-50 rounded-xl transition-all opacity-0 group"
+                    className="py-2.5 px-2 flex items-center justify-between text-[0.875rem] font-semibold text-gray-700 hover:bg-slate-50 rounded-xl  group"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-teal-600"></span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
                       <span>{unit}</span>
                     </div>
                     <button
                       onClick={() => handleDeleteItem('unit', unit)}
-                      className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                      className="icon-btn-danger"
                       title={`Delete unit ${unit}`}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -530,27 +512,26 @@ const SettingsPage: React.FC = () => {
                   </div>
                 ))}
                 {units.length === 0 && (
-                  <div className="text-center py-16 text-gray-400 text-xs font-medium">No custom units configured yet</div>
+                  <div className="text-center py-16 text-gray-400 text-[0.875rem] font-medium">No custom units configured yet</div>
                 )}
               </div>
             </div>
 
             {/* Column 2: Ruling Types */}
             <div 
-              style={{ animation: 'slideDownFade 0.35s ease-out forwards', animationDelay: '120ms' }}
-              className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden flex flex-col h-[480px] opacity-0"
+              className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden flex flex-col h-[30rem]"
             >
               <div className="p-4 border-b border-gray-150 bg-slate-50/60 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center">
+                  <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
                     <AlignLeft className="w-4 h-4" />
                   </div>
                   <div>
-                    <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Rule Types</h2>
-                    <p className="text-[10px] text-gray-400 mt-0.5">Ruling specifications (Plain, Single, Four Line, Square).</p>
+                    <h2 className="text-[0.875rem] font-medium text-gray-800 uppercase tracking-wider">Rule Types</h2>
+                    <p className="text-xs text-gray-400 mt-0.5">Ruling specifications (Plain, Single, Four Line, Square).</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                   {ruleTypes.length} Types
                 </span>
               </div>
@@ -563,11 +544,11 @@ const SettingsPage: React.FC = () => {
                   value={newRuleType}
                   onChange={e => setNewRuleType(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleAddItem('ruleType')}
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 bg-white text-gray-800 font-semibold"
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 font-semibold"
                 />
                 <button
                   onClick={() => handleAddItem('ruleType')}
-                  className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors font-bold text-xs flex items-center gap-1 cursor-pointer shadow-2xs"
+                  className="btn-primary"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add</span>
@@ -579,19 +560,15 @@ const SettingsPage: React.FC = () => {
                 {ruleTypes.map((rule, index) => (
                   <div 
                     key={rule} 
-                    style={{ 
-                      animation: 'slideDownFade 0.35s ease-out forwards', 
-                      animationDelay: `${index * 30}ms` 
-                    }}
-                    className="py-2.5 px-2 flex items-center justify-between text-xs font-semibold text-gray-700 hover:bg-slate-50 rounded-xl transition-all opacity-0 group"
+                    className="py-2.5 px-2 flex items-center justify-between text-[0.875rem] font-semibold text-gray-700 hover:bg-slate-50 rounded-xl  group"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                       <span>{rule}</span>
                     </div>
                     <button
                       onClick={() => handleDeleteItem('ruleType', rule)}
-                      className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                      className="icon-btn-danger"
                       title={`Delete rule type ${rule}`}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -599,15 +576,14 @@ const SettingsPage: React.FC = () => {
                   </div>
                 ))}
                 {ruleTypes.length === 0 && (
-                  <div className="text-center py-16 text-gray-400 text-xs font-medium">No custom rule types configured yet</div>
+                  <div className="text-center py-16 text-gray-400 text-[0.875rem] font-medium">No custom rule types configured yet</div>
                 )}
               </div>
             </div>
 
             {/* Column 3: Brands */}
             <div 
-              style={{ animation: 'slideDownFade 0.35s ease-out forwards', animationDelay: '180ms' }}
-              className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden flex flex-col h-[480px] opacity-0"
+              className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden flex flex-col h-[30rem]"
             >
               <div className="p-4 border-b border-gray-150 bg-slate-50/60 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -615,11 +591,11 @@ const SettingsPage: React.FC = () => {
                     <Tag className="w-4 h-4" />
                   </div>
                   <div>
-                    <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Brands</h2>
-                    <p className="text-[10px] text-gray-400 mt-0.5">Product & notebook brands (Classmate, Navneet).</p>
+                    <h2 className="text-[0.875rem] font-medium text-gray-800 uppercase tracking-wider">Brands</h2>
+                    <p className="text-xs text-gray-400 mt-0.5">Product & notebook brands (Classmate, Navneet).</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                   {brands.length} Brands
                 </span>
               </div>
@@ -632,11 +608,11 @@ const SettingsPage: React.FC = () => {
                   value={newBrand}
                   onChange={e => setNewBrand(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleAddItem('brand')}
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 font-semibold"
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 bg-white text-gray-800 font-semibold"
                 />
                 <button
                   onClick={() => handleAddItem('brand')}
-                  className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors font-bold text-xs flex items-center gap-1 cursor-pointer shadow-2xs"
+                  className="btn-primary"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add</span>
@@ -648,11 +624,7 @@ const SettingsPage: React.FC = () => {
                 {brands.map((brand, index) => (
                   <div 
                     key={brand} 
-                    style={{ 
-                      animation: 'slideDownFade 0.35s ease-out forwards', 
-                      animationDelay: `${index * 30}ms` 
-                    }}
-                    className="py-2.5 px-2 flex items-center justify-between text-xs font-semibold text-gray-700 hover:bg-slate-50 rounded-xl transition-all opacity-0 group"
+                    className="py-2.5 px-2 flex items-center justify-between text-[0.875rem] font-semibold text-gray-700 hover:bg-slate-50 rounded-xl  group"
                   >
                     <div className="flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
@@ -660,7 +632,7 @@ const SettingsPage: React.FC = () => {
                     </div>
                     <button
                       onClick={() => handleDeleteItem('brand', brand)}
-                      className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                      className="icon-btn-danger"
                       title={`Delete brand ${brand}`}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -668,17 +640,17 @@ const SettingsPage: React.FC = () => {
                   </div>
                 ))}
                 {brands.length === 0 && (
-                  <div className="text-center py-16 text-gray-400 text-xs font-medium">No custom brands configured yet</div>
+                  <div className="text-center py-16 text-gray-400 text-[0.875rem] font-medium">No custom brands configured yet</div>
                 )}
               </div>
             </div>
 
           </div>
 
-          <div className="p-4 bg-teal-50/70 border border-teal-100 rounded-2xl flex gap-3 text-xs text-teal-900 font-medium">
-            <AlertCircle className="w-5 h-5 text-teal-700 shrink-0" />
+          <div className="p-4 bg-blue-50/70 border border-blue-100 rounded-2xl flex gap-3 text-[0.875rem] text-blue-900 font-medium">
+            <AlertCircle className="w-5 h-5 text-blue-700 shrink-0" />
             <div>
-              <span className="font-bold">Automatic Synchronization:</span> Units, Rule Types, and Brands added here are instantly available inside Item Master creation drawers, Finished Goods forms, and manufacturing batches.
+              <span className="font-semibold">Automatic Synchronization:</span> Units, Rule Types, and Brands added here are instantly available inside Item Master creation drawers, Finished Goods forms, and manufacturing batches.
             </div>
           </div>
         </div>
@@ -690,14 +662,14 @@ const SettingsPage: React.FC = () => {
           {/* Top Control Header */}
           <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-teal-50 text-teal-700 flex items-center justify-center border border-teal-200 shrink-0">
+              <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-200 shrink-0">
                 <Keyboard className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-sm font-extrabold text-gray-900">
+                <h2 className="text-[0.875rem] font-semibold text-gray-900">
                   Customizable Module & Tab Keyboard Allocations
                 </h2>
-                <p className="text-xs text-gray-500 font-medium mt-0.5">
+                <p className="text-[0.875rem] text-gray-500 font-medium mt-0.5">
                   Reassign shortcut key allocations for Module navigation, Tab switching, Exports, and Form actions.
                 </p>
               </div>
@@ -706,7 +678,7 @@ const SettingsPage: React.FC = () => {
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => setIsLegendOpen(true)}
-                className="px-3.5 py-2 bg-gray-900 text-white rounded-xl text-xs font-bold transition-all hover:bg-gray-800 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                className="px-3.5 py-2 bg-gray-900 text-white rounded-xl text-[0.875rem] font-semibold hover:bg-gray-800 flex items-center gap-1.5 cursor-pointer shadow-2xs"
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                 <span>Open Legend Modal</span>
@@ -714,7 +686,7 @@ const SettingsPage: React.FC = () => {
 
               <button
                 onClick={handleResetAllShortcuts}
-                className="px-3.5 py-2 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-xl text-xs font-bold transition-all border border-rose-200 flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 py-2 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-xl text-[0.875rem] font-semibold border border-rose-200 flex items-center gap-1.5 cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Reset to Factory Defaults</span>
@@ -730,9 +702,9 @@ const SettingsPage: React.FC = () => {
                 <button
                   key={mod}
                   onClick={() => setSelectedModule(mod)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-xl text-[0.875rem] font-semibold whitespace-nowrap cursor-pointer ${
                     selectedModule === mod
-                      ? 'bg-teal-700 text-white shadow-2xs'
+                      ? 'bg-blue-700 text-white shadow-2xs'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200/70 hover:text-gray-900'
                   }`}
                 >
@@ -749,7 +721,7 @@ const SettingsPage: React.FC = () => {
                 placeholder="Search action or key (e.g. Alt+N, Report)..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-teal-500 bg-white text-gray-900 font-semibold placeholder-gray-400"
+                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-[0.875rem] focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 font-semibold placeholder-gray-400"
               />
             </div>
           </div>
@@ -757,9 +729,9 @@ const SettingsPage: React.FC = () => {
           {/* Shortcuts Allocation Table */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-[0.875rem]">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-gray-150 text-gray-500 font-bold uppercase tracking-wider text-[10px]">
+                  <tr className="bg-slate-50 border-b border-gray-150 text-gray-500 font-medium uppercase tracking-wider text-xs">
                     <th className="py-3 px-4">Module & Category</th>
                     <th className="py-3 px-4">Action Name & Description</th>
                     <th className="py-3 px-4 text-center">Assigned Key Allocation</th>
@@ -774,14 +746,14 @@ const SettingsPage: React.FC = () => {
                     const keys = formatKeyDisplay(activeKey);
 
                     return (
-                      <tr key={sc.id} className="hover:bg-slate-50/70 transition-colors">
+                      <tr key={sc.id} className="hover:bg-slate-50/70">
                         <td className="py-3.5 px-4">
                           <div className="flex flex-col gap-1">
-                            <span className="w-max px-2.5 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-teal-50 text-teal-700 border border-teal-200">
+                            <span className="w-max px-2.5 py-0.5 rounded-lg text-xs font-medium uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
                               {sc.module}
                             </span>
                             {sc.subCategory && (
-                              <span className="text-[10px] text-gray-400 font-semibold">
+                              <span className="text-xs text-gray-400 font-semibold">
                                 {sc.subCategory}
                               </span>
                             )}
@@ -789,29 +761,29 @@ const SettingsPage: React.FC = () => {
                         </td>
 
                         <td className="py-3.5 px-4 max-w-md">
-                          <div className="font-bold text-gray-900 text-xs">{sc.actionName}</div>
-                          <div className="text-[11px] text-gray-500 mt-0.5">{sc.description}</div>
+                          <div className="font-semibold text-gray-900 text-[0.875rem]">{sc.actionName}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">{sc.description}</div>
                         </td>
 
                         <td className="py-3.5 px-4 text-center">
                           {isEditing ? (
-                            <div className="inline-flex items-center gap-2 bg-amber-50 p-2 rounded-xl border border-amber-300 animate-pulse">
-                              <span className="text-[10px] font-bold text-amber-800">Press Keys:</span>
+                            <div className="inline-flex items-center gap-2 bg-amber-50 p-2 rounded-xl border border-amber-300">
+                              <span className="text-xs font-semibold text-amber-800">Press Keys:</span>
                               <input
                                 type="text"
                                 autoFocus
                                 readOnly
                                 value={recordedKey || 'Press key combo...'}
                                 onKeyDown={handleKeyRecorderKeyDown}
-                                className="px-2.5 py-1 bg-white border border-amber-400 rounded-lg text-xs font-mono font-bold text-amber-900 text-center w-36 focus:outline-none"
+                                className="px-2.5 py-1 bg-white border border-amber-400 rounded-lg text-[0.875rem] font-mono font-semibold text-amber-900 text-center w-36 focus:outline-none"
                               />
                             </div>
                           ) : (
                             <div className="inline-flex items-center gap-1.5">
                               {keys.map((k, idx) => (
                                 <React.Fragment key={idx}>
-                                  {idx > 0 && <span className="text-xs font-bold text-gray-400">+</span>}
-                                  <kbd className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg border shadow-2xs ${
+                                  {idx > 0 && <span className="text-[0.875rem] font-semibold text-gray-400">+</span>}
+                                  <kbd className={`px-2.5 py-1 text-[0.875rem] font-mono font-semibold rounded-lg border shadow-2xs ${
                                     isCustomized
                                       ? 'bg-amber-50 text-amber-800 border-amber-300'
                                       : 'bg-slate-100 text-gray-800 border-gray-300'
@@ -821,7 +793,7 @@ const SettingsPage: React.FC = () => {
                                 </React.Fragment>
                               ))}
                               {isCustomized && (
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300 ml-1">
+                                <span className="text-xs font-semibold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300 ml-1">
                                   Custom
                                 </span>
                               )}
@@ -834,7 +806,7 @@ const SettingsPage: React.FC = () => {
                             <div className="flex items-center justify-end gap-1.5">
                               <button
                                 onClick={() => saveShortcutBinding(sc.id)}
-                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1 transition-all cursor-pointer"
+                                className="btn-success"
                               >
                                 <Check className="w-3.5 h-3.5" />
                                 <span>Save</span>
@@ -844,7 +816,7 @@ const SettingsPage: React.FC = () => {
                                   setEditingShortcutId(null);
                                   setRecordedKey('');
                                 }}
-                                className="px-2.5 py-1.5 bg-gray-200 text-gray-700 rounded-xl font-bold text-xs hover:bg-gray-300 transition-colors cursor-pointer"
+                                className="px-2.5 py-1.5 bg-gray-200 text-gray-700 rounded-xl font-semibold text-[0.875rem] hover:bg-gray-300 cursor-pointer"
                               >
                                 <X className="w-3.5 h-3.5" />
                               </button>
@@ -852,7 +824,7 @@ const SettingsPage: React.FC = () => {
                           ) : (
                             <div className="flex items-center justify-end gap-1.5">
                               {sc.isSystem ? (
-                                <span className="text-[11px] text-gray-400 italic font-semibold px-2 py-1">
+                                <span className="text-xs text-gray-400 italic font-semibold px-2 py-1">
                                   System Reserved
                                 </span>
                               ) : (
@@ -860,7 +832,7 @@ const SettingsPage: React.FC = () => {
                                   {isCustomized && (
                                     <button
                                       onClick={() => resetSingleShortcut(sc.id)}
-                                      className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-colors cursor-pointer"
+                                      className="icon-btn"
                                       title="Reset to default"
                                     >
                                       <RotateCcw className="w-3.5 h-3.5" />
@@ -868,9 +840,9 @@ const SettingsPage: React.FC = () => {
                                   )}
                                   <button
                                     onClick={() => startEditingKey(sc)}
-                                    className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                                    className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 rounded-xl font-semibold text-[0.875rem] flex items-center gap-1.5 cursor-pointer shadow-2xs"
                                   >
-                                    <Edit2 className="w-3.5 h-3.5 text-teal-600" />
+                                    <Edit2 className="w-3.5 h-3.5 text-blue-600" />
                                     <span>Edit Key</span>
                                   </button>
                                 </>
@@ -894,12 +866,12 @@ const SettingsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-4 bg-slate-50 border border-gray-200 rounded-2xl flex gap-3 text-xs text-gray-600 font-medium">
-            <Info className="w-5 h-5 text-teal-700 shrink-0" />
+          <div className="p-4 bg-slate-50 border border-gray-200 rounded-2xl flex gap-3 text-[0.875rem] text-gray-600 font-medium">
+            <Info className="w-5 h-5 text-blue-700 shrink-0" />
             <div>
-              <span className="font-bold text-gray-900">How Key Allocations Work:</span>
+              <span className="font-semibold text-gray-900">How Key Allocations Work:</span>
               <p className="mt-0.5">
-                Keyboard shortcuts marked with <span className="font-bold text-amber-700">Custom</span> will immediately take effect across all modules for your active company session. Pressing <kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded font-mono text-[10px] font-bold text-gray-800">Shift+?</kbd> anywhere in the application brings up the live Legend popup.
+                Keyboard shortcuts marked with <span className="font-semibold text-amber-700">Custom</span> will immediately take effect across all modules for your active company session. Pressing <kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded font-mono text-xs font-semibold text-gray-800">Shift+?</kbd> anywhere in the application brings up the live Legend popup.
               </p>
             </div>
           </div>
