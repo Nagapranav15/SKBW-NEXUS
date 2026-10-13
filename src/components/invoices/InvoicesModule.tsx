@@ -17,7 +17,7 @@ import { InvoiceSuccessModal } from './InvoiceSuccessModal';
 import { ConfirmActionModal } from '../common/ConfirmActionModal';
 import { showToast } from '../ui/Toast';
 
-export type InvoiceTabType = 'pending' | 'partial' | 'history' | 'all';
+export type InvoiceTabType = 'pending' | 'history' | 'all';
 export type SortField = 'dispatchNo' | 'dispatchDate' | 'customerName' | 'region' | 'itemCount' | 'totalGbl' | 'invoiceStatus' | 'days';
 export type InvoiceSortField = 'invoiceNumber' | 'invoiceDate' | 'dispatchNumber' | 'customerName' | 'region' | 'itemCount' | 'subtotal' | 'grandTotal' | 'status';
 
@@ -408,7 +408,6 @@ export const InvoicesModule: React.FC = () => {
     const res = deliveries.filter(d => {
       // Tab filter
       if (activeTab === 'pending' && d.invoiceStatus !== 'Not Invoiced') return false;
-      if (activeTab === 'partial' && d.invoiceStatus !== 'Partially Invoiced') return false;
 
       // Dropdown filters
       if (selectedCustomer !== 'ALL' && d.customerName !== selectedCustomer) return false;
@@ -728,7 +727,6 @@ export const InvoicesModule: React.FC = () => {
         <div className="flex items-center gap-1 overflow-x-auto py-1 max-w-full">
           {[
             { id: 'pending', label: 'Pending Invoices', count: metrics.readyToInvoice },
-            { id: 'partial', label: 'Partially Invoiced', count: metrics.partiallyInvoiced },
             { id: 'history', label: 'Invoices History', count: metrics.totalInvoices },
             { id: 'all', label: 'All Dispatches', count: deliveries.length }
           ].map(tab => {

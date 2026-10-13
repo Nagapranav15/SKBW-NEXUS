@@ -266,7 +266,7 @@ export const DispatchModule: React.FC = () => {
   const urlOrderIdHandled = useRef(false);
 
   // Top Tabs: 'all' | 'ready' | 'partial' | 'not_ready' | 'history'
-  const [activeTab, setActiveTab] = useState<'all' | 'ready' | 'partial' | 'not_ready' | 'history'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'ready' | 'history'>('all');
 
   // Accordion Expand Set for Orders
   const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string>>(new Set());
@@ -700,8 +700,6 @@ export const DispatchModule: React.FC = () => {
     const res = displayRows.filter(row => {
       // Tab filter
       if (activeTab === 'ready' && row.readyStatus !== 'Ready') return false;
-      if (activeTab === 'partial' && row.readyStatus !== 'Partially Ready') return false;
-      if (activeTab === 'not_ready' && row.readyStatus !== 'Not Ready') return false;
 
       // Dropdown filters
       if (selectedCustomer !== 'ALL' && row.customerName !== selectedCustomer) return false;
@@ -1215,8 +1213,6 @@ export const DispatchModule: React.FC = () => {
           {[
             { id: 'all', label: 'All Pending', count: metrics.pendingOrders },
             { id: 'ready', label: 'Ready to Dispatch', count: metrics.readyOrders },
-            { id: 'partial', label: 'Partially Ready', count: metrics.partiallyReadyOrders },
-            { id: 'not_ready', label: 'Not Ready', count: metrics.notReadyOrders },
             { id: 'history', label: 'Challans History', count: deliveryChallansList.length }
           ].map(tab => {
             const active = activeTab === tab.id;
