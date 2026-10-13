@@ -1857,7 +1857,7 @@ export const DispatchModule: React.FC = () => {
                     </div>
                   </th>
 
-                  <th className="py-3 px-3 text-center font-semibold whitespace-nowrap">ACTIONS</th>
+                  <th className="py-3 px-3 min-w-[9rem] text-center font-semibold whitespace-nowrap">ACTIONS</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100 text-[0.875rem]">
@@ -2009,20 +2009,20 @@ export const DispatchModule: React.FC = () => {
 
                           {/* Actions Column: Dispatch, Print, Dropdown */}
                           <td className="py-3 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                            <div className="inline-flex items-center gap-1.5">
+                            <div className="inline-flex items-center gap-1.5 shrink-0">
                               {/* 1. Dispatch Icon Button */}
                               <button
                                 onClick={() => handleOpenDispatch(row)}
-                                className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center shadow-2xs cursor-pointer"
+                                className="p-2 shrink-0 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center shadow-2xs cursor-pointer"
                                 title="Create Dispatch for this order"
                               >
-                                <Truck className="w-4 h-4" />
+                                <Truck className="w-4 h-4 shrink-0" />
                               </button>
 
                               {/* 2. Print Delivery Challan Icon Button */}
                               <button
                                 onClick={() => handlePrintOrderChallan(row)}
-                                className="icon-btn"
+                                className="icon-btn shrink-0"
                                 title="Print Delivery Challan"
                               >
                                 <Printer className="w-4 h-4 text-blue-600" />
@@ -2035,7 +2035,7 @@ export const DispatchModule: React.FC = () => {
                                     e.stopPropagation();
                                     setOpenActionDropdownId(isMenuOpen ? null : row._id);
                                   }}
-                                  className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg cursor-pointer"
+                                  className="p-2 shrink-0 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg cursor-pointer"
                                   title="More actions"
                                 >
                                   <ChevronDown className="w-4 h-4" />
