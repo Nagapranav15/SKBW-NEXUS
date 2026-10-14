@@ -4,6 +4,8 @@ import {
   ChevronLeft, ChevronRight, FileText, Settings, ShieldCheck, Check
 } from 'lucide-react';
 import { SalesInvoice } from '../../api/invoiceApi';
+import { useAuth } from '../../context/AuthContext';
+import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 
 // Number to words converter for Indian Rupees
 function numberToWordsINR(amount: number): string {
@@ -26,6 +28,38 @@ function numberToWordsINR(amount: number): string {
   return `Rupees ${words} Only`;
 }
 
+
+// Shared by the on-screen preview and the print window so they always match.
+const DOC_CSS = `
+  .est-doc { box-sizing: border-box; background: #fff; color: #0f172a; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; border: 1.5px solid #1e40af; padding: 6mm 7mm; display: flex; flex-direction: column; width: 100%; min-height: 1123px; margin: 0 auto; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .est-doc * { box-sizing: border-box; }
+  .est-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; padding-bottom: 8px; border-bottom: 2px solid #1e40af; }
+  .est-head-center { text-align: center; padding: 0 12px; }
+  .est-title { font-size: 19pt; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; line-height: 1.15; color: #1e40af; }
+  .est-company { font-size: 13pt; font-weight: 700; text-transform: uppercase; margin-top: 4px; color: #be123c; }
+  .est-addr { font-size: 9pt; margin-top: 2px; color: #334155; }
+  .est-serial { justify-self: end; font-size: 10pt; line-height: 1.7; white-space: nowrap; }
+  .est-serial span.k { display: inline-block; width: 62px; font-weight: 700; color: #1e40af; }
+  .est-cust { padding: 8px 10px 10px; background: #eff6ff; border-bottom: 1px solid #1e40af; margin: 0 -7mm; padding-left: 7mm; padding-right: 7mm; }
+  .est-cust-name { font-size: 12.5pt; font-weight: 700; text-transform: uppercase; color: #1e3a8a; }
+  .est-cust-line { font-size: 10pt; margin-top: 2px; text-transform: uppercase; }
+  .est-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .est-table th, .est-table td { border: 1px solid #1e40af; padding: 0 8px; height: 26px; font-size: 10.5pt; vertical-align: middle; }
+  .est-table thead th { background: #1e40af; color: #fff; text-align: center; height: 28px; font-weight: 700; }
+  .est-table .c-gbl { width: 54px; } .est-table .c-qty { width: 70px; } .est-table .c-rate { width: 84px; } .est-table .c-amt { width: 100px; }
+  .est-table td.num { text-align: center; }
+  .est-table td.right { text-align: right; font-variant-numeric: tabular-nums; }
+  .est-table td.left { text-align: left; }
+  .est-table tbody tr:nth-child(even) td { background: #f8fafc; }
+  .est-table tr.charge td { color: #be123c; }
+  .est-table tr.total td { font-weight: 700; background: #dbeafe !important; color: #1e3a8a; height: 30px; }
+  .est-foot { margin-top: auto; padding-top: 14px; }
+  .est-trans { display: flex; justify-content: space-between; align-items: flex-end; font-size: 10pt; line-height: 1.8; }
+  .est-words { font-size: 10pt; margin-top: 8px; }
+  .est-sigline { display: inline-block; width: 150px; border-bottom: 1px solid #0f172a; }
+  .est-note { text-align: center; font-size: 10pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; background: #1e40af; color: #fff; margin: 10px -7mm -6mm; padding: 8px 0; }
+`;
+
 export interface InvoiceSuccessModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -38,6 +72,7 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
   onClose,
   invoice
 }) => {
+  const { selectedCompany } = useAuth();
   const [zoomLevel, setZoomLevel] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
   const printAreaRef = useRef<HTMLDivElement>(null);
@@ -59,7 +94,17 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
   if (!isOpen || !invoice) return null;
 
   const handlePrint = () => {
-    window.print();
+    const content = printAreaRef.current;
+    if (!content) return;
+    const w = window.open('', '', 'width=900,height=1200');
+    if (!w) return;
+    w.document.write(`<!DOCTYPE html><html><head><title>Invoice - ${invoice.invoiceNumber}</title>
+<style>* { margin: 0; padding: 0; } body { background: #fff; } ${DOC_CSS}
+.est-doc { min-height: 281mm; } @media print { @page { size: A4; margin: 8mm; } .est-doc { break-inside: avoid; } }</style>
+</head><body>${content.innerHTML}</body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => { w.print(); w.close(); }, 400);
   };
 
   const handleSendWhatsApp = () => {
@@ -88,6 +133,121 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
   };
 
   const grandTotalWords = numberToWordsINR(invoice.grandTotal || 0);
+
+  const co = selectedCompany as any;
+  const companyName = (co?.name || 'SRI KRISHNA BINDING WORKS').toUpperCase();
+  const companyAddr = co?.address || '4TH CROSS ROAD, R R NAGAR, VIJAYAWADA';
+  const companyEmail = (co?.email || 'SKBW.VIJAYAWADA@GMAIL.COM').toUpperCase();
+
+  const bt = invoice.billTo;
+  const custLines = [
+    bt?.address,
+    [bt?.city || invoice.city, bt?.state || invoice.region].filter(Boolean).join(', '),
+    [bt?.pincode].filter(Boolean).join(''),
+  ].filter(Boolean) as string[];
+  const custPhone = invoice.customerPhone || bt?.phone || '';
+
+  const items = invoice.items || [];
+  const totalGbl = items.reduce((s, i) => s + (Number(i.invoiceQtyGbl ?? i.dispatchedGbl) || 0), 0);
+  const rows = [
+    ...items.map(it => {
+      const pcs = Number(it.invoiceQtyPcs ?? it.dispatchedPcs) || 0;
+      const amount = Number(it.amount) || 0;
+      return {
+        gbl: Number(it.invoiceQtyGbl ?? it.dispatchedGbl) || 0,
+        name: (it.itemName || '').toUpperCase(),
+        qty: pcs || '',
+        rate: pcs > 0 ? amount / pcs : Number(it.rate) || 0,
+        amount,
+        charge: false,
+      };
+    }),
+    ...(invoice.additionalCharges || []).map(c => ({
+      gbl: totalGbl || '',
+      name: (c.description || '').toUpperCase(),
+      qty: '' as number | string,
+      rate: totalGbl > 0 && c.type !== 'Percentage' ? (Number(c.amount) || 0) / totalGbl : 0,
+      amount: Number(c.amount) || 0,
+      charge: true,
+    })),
+  ];
+  const emptyCount = Math.max(0, 12 - rows.length);
+
+  const docJsx = (
+    <div className="est-doc">
+      {printOptions.companyHeader && (
+        <div className="est-head">
+          <div />
+          <div className="est-head-center">
+            <div className="est-title">{'Tax Invoice'}</div>
+            <div className="est-company">{companyName}</div>
+            <div className="est-addr">{companyAddr}</div>
+            <div className="est-addr">E-Mail : {companyEmail}</div>
+          </div>
+          <div className="est-serial">
+            <div><span className="k">Invoice No.</span>: {invoice.invoiceNumber}</div>
+            <div><span className="k">Date</span>: {formatDateDDMMYYYY(invoice.invoiceDate)}</div>
+          </div>
+        </div>
+      )}
+
+      <div className="est-cust">
+        <div className="est-cust-name">{invoice.customerName}</div>
+        {custLines.map((l, i) => <div key={i} className="est-cust-line">{l}</div>)}
+        {custPhone && <div className="est-cust-line">{custPhone}</div>}
+      </div>
+
+      {printOptions.itemWiseDetails && (
+        <table className="est-table">
+          <thead>
+            <tr>
+              <th className="c-gbl">GBL</th>
+              <th>Particulars</th>
+              <th className="c-qty">Qty</th>
+              <th className="c-rate">Rate</th>
+              <th className="c-amt">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} className={r.charge ? 'charge' : ''}>
+                <td className="num">{r.gbl || ''}</td>
+                <td className="left">{r.name}</td>
+                <td className="num">{typeof r.qty === 'number' ? r.qty.toLocaleString('en-IN') : r.qty}</td>
+                <td className="right">{r.rate ? r.rate.toFixed(2) : ''}</td>
+                <td className="right">{r.amount ? r.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}</td>
+              </tr>
+            ))}
+            {Array.from({ length: emptyCount }).map((_, i) => (
+              <tr key={`e${i}`}><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+            ))}
+            <tr className="total">
+              <td className="num">{totalGbl || ''}</td>
+              <td className="num">Thank You</td>
+              <td>&nbsp;</td>
+              <td className="right">Total</td>
+              <td className="right">{(invoice.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+
+      <div className="est-words"><b>Amount in words:</b> {grandTotalWords}</div>
+
+      <div className="est-foot">
+        <div className="est-trans">
+          {printOptions.transporterDetails ? (
+            <div>
+              <div>Transport : {invoice.transporterName || ''}</div>
+              <div>LR No. &nbsp;&nbsp;&nbsp;&nbsp;: {invoice.lrNumber || ''}</div>
+            </div>
+          ) : <div />}
+          <div>Signature : <span className="est-sigline">&nbsp;</span></div>
+        </div>
+        {printOptions.termsConditions && <div className="est-note">Goods once sold cannot be taken back</div>}
+      </div>
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-gray-900/40 overflow-y-auto">
@@ -354,228 +514,9 @@ export const InvoiceSuccessModal: React.FC<InvoiceSuccessModalProps> = ({
 
             {/* Document Canvas Container */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex justify-center items-start">
-              <div
-                ref={printAreaRef}
-                style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
-                className="bg-white text-gray-900 shadow-md border border-gray-300 w-full max-w-[47.5rem] p-6 text-xs font-sans print:m-0 print:border-none print:shadow-none print:w-full"
-              >
-                {/* Header (Company Logo & Title + TAX INVOICE Box) */}
-                {printOptions.companyHeader && (
-                  <div className="flex items-start justify-between border-b-2 border-gray-900 pb-3 mb-3">
-                    <div>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-2xl font-semibold text-rose-600 tracking-tight font-serif">SKBW</span>
-                        <span className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wide">
-                          SRI KRISHNA BINDING WORKS
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-600 font-medium">Vijayawada, Andhra Pradesh, India</p>
-                      <p className="text-xs text-rose-600 italic font-medium">Every Notebook A New Beginning.</p>
-                    </div>
-
-                    <div className="border-2 border-gray-900 px-4 py-1.5 text-center bg-gray-50 rounded">
-                      <span className="text-xs font-medium text-gray-700 uppercase tracking-widest block">
-                        TAX INVOICE
-                      </span>
-                      <span className="text-base font-semibold text-gray-900 font-mono block">
-                        {invoice.invoiceNumber}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Details Section (Bill To + Dispatch Details) */}
-                <div className="grid grid-cols-2 gap-4 pb-3 border-b border-gray-300 mb-3 text-xs">
-                  {/* Left: Bill To */}
-                  <div className="bg-slate-50/60 p-2.5 rounded border border-gray-200">
-                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
-                      Bill To
-                    </span>
-                    <p className="font-semibold text-gray-900 text-[0.875rem] mb-0.5">{invoice.customerName}</p>
-                    <p className="text-gray-700">{invoice.billTo?.address || 'Main Road, Nellore - 524001'}</p>
-                    <p className="text-gray-700">{invoice.billTo?.state || invoice.region || 'Andhra Pradesh'}, India</p>
-                    <p className="text-gray-700 font-mono mt-0.5">Phone: {invoice.customerPhone || '9988776655'}</p>
-                  </div>
-
-                  {/* Right: Dispatch Details */}
-                  {printOptions.transporterDetails && (
-                    <div className="bg-slate-50/60 p-2.5 rounded border border-gray-200">
-                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">
-                        Dispatch Details
-                      </span>
-                      <div className="space-y-0.5 text-gray-700">
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Dispatch No</span>
-                          <span className="font-semibold text-gray-900 font-mono">: {invoice.dispatchNumber || 'DSP-0003'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Dispatch Date</span>
-                          <span className="font-medium text-gray-900">: {invoice.dispatchDate || invoice.invoiceDate}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Transporter</span>
-                          <span className="font-medium text-gray-900">: {invoice.transporterName || 'Sri Sai Transport'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">LR/RR No.</span>
-                          <span className="font-mono text-gray-900">: {invoice.lrNumber || 'LR1234567'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">LR/RR Date</span>
-                          <span className="font-mono text-gray-900">: {invoice.lrDate || invoice.invoiceDate}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">No. of Packages</span>
-                          <span className="font-medium text-gray-900">: {invoice.numberOfPackages || 8}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Items Table */}
-                {printOptions.itemWiseDetails && (
-                  <div className="mb-3 border border-gray-300 rounded overflow-hidden">
-                    <table className="doc-table w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-gray-100 text-gray-800 border-b border-gray-300 font-semibold uppercase text-xs">
-                          <th className="py-1.5 px-2 text-center w-8">#</th>
-                          <th className="py-1.5 px-2">Item Code</th>
-                          <th className="py-1.5 px-2">Item Name</th>
-                          {printOptions.locationDetails && <th className="py-1.5 px-2">From Location</th>}
-                          <th className="py-1.5 px-2 text-right">Qty (GBL)</th>
-                          <th className="py-1.5 px-2 text-right">Qty (PCS)</th>
-                          <th className="py-1.5 px-2 text-right">Rate (₹/GBL)</th>
-                          <th className="py-1.5 px-2 text-right">Amount (₹)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {invoice.items && invoice.items.length > 0 ? (
-                          invoice.items.map((it, idx) => (
-                            <tr key={idx} className="hover:bg-gray-50">
-                              <td className="py-1.5 px-2 text-center text-gray-500">{idx + 1}</td>
-                              <td className="py-1.5 px-2 font-mono font-medium text-gray-900">{it.itemCode}</td>
-                              <td className="py-1.5 px-2 font-medium text-gray-900">{it.itemName}</td>
-                              {printOptions.locationDetails && (
-                                <td className="py-1.5 px-2 text-gray-600 font-mono text-xs">
-                                  {it.locationName || 'Factory-1 / A1'}
-                                </td>
-                              )}
-                              <td className="py-1.5 px-2 text-right font-medium text-gray-900">
-                                {it.invoiceQtyGbl || it.dispatchedGbl || 0}
-                              </td>
-                              <td className="py-1.5 px-2 text-right text-gray-700">
-                                {(it.invoiceQtyPcs || it.dispatchedPcs || 0).toLocaleString('en-IN')}
-                              </td>
-                              <td className="py-1.5 px-2 text-right font-mono text-gray-900">
-                                {(it.rate || 0).toLocaleString('en-IN')}
-                              </td>
-                              <td className="py-1.5 px-2 text-right font-mono font-semibold text-gray-900">
-                                {(it.amount || 0).toLocaleString('en-IN')}
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan={8} className="py-3 text-center text-gray-400">No items available</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {/* Summary & Totals Block (2 columns) */}
-                <div className="grid grid-cols-2 gap-4 pb-3 border-b border-gray-300 mb-3 text-xs">
-                  {/* Left Column: Shipment metadata */}
-                  <div className="space-y-1 text-gray-600">
-                    <div className="flex">
-                      <span className="w-24 text-gray-500">Total Packages</span>
-                      <span className="font-semibold text-gray-800">: {invoice.numberOfPackages || 8}</span>
-                    </div>
-                    <div className="flex">
-                      <span className="w-24 text-gray-500">Transporter</span>
-                      <span className="font-semibold text-gray-800">: {invoice.transporterName || 'Sri Sai Transport'}</span>
-                    </div>
-                    <div className="flex">
-                      <span className="w-24 text-gray-500">Vehicle No.</span>
-                      <span className="font-mono font-semibold text-gray-800">: {invoice.vehicleNumber || 'AP 39 AB 1234'}</span>
-                    </div>
-                    <div className="flex">
-                      <span className="w-24 text-gray-500">Freight</span>
-                      <span className="font-semibold text-gray-800">: To Pay</span>
-                    </div>
-                    <div className="flex">
-                      <span className="w-24 text-gray-500">Source Location</span>
-                      <span className="font-semibold text-gray-800">: Finished Goods</span>
-                    </div>
-                  </div>
-
-                  {/* Right Column: Numbers and Grand Total */}
-                  <div className="space-y-1.5 bg-gray-50 p-2 rounded border border-gray-200">
-                    <div className="flex justify-between text-gray-600">
-                      <span>Total Quantity (GBL)</span>
-                      <span className="font-semibold text-gray-900">{invoice.totalQtyGbl || 5}</span>
-                    </div>
-                    <div className="flex justify-between text-gray-600">
-                      <span>Total Quantity (PCS)</span>
-                      <span className="font-semibold text-gray-900">{(invoice.totalQtyPcs || 1230).toLocaleString('en-IN')}</span>
-                    </div>
-                    <div className="flex justify-between text-gray-600">
-                      <span>Total Amount</span>
-                      <span className="font-mono font-semibold text-gray-900">₹ {(invoice.subtotal || 32500).toLocaleString('en-IN')}</span>
-                    </div>
-                    {(invoice.totalAdditionalCharges > 0 || (invoice.additionalCharges && invoice.additionalCharges.length > 0)) && (
-                      <div className="flex justify-between text-gray-600">
-                        <span>Additional Charges</span>
-                        <span className="font-mono font-semibold text-gray-900">
-                          ₹ {(invoice.totalAdditionalCharges || 500).toLocaleString('en-IN')}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex justify-between items-baseline pt-1.5 border-t-2 border-gray-900 text-[0.875rem] font-semibold text-gray-900">
-                      <span>Grand Total (₹)</span>
-                      <span className="font-mono text-[0.875rem]">₹ {(invoice.grandTotal || 33000).toLocaleString('en-IN')}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Amount In Words */}
-                <div className="mb-3 pb-2 border-b border-gray-300">
-                  <span className="text-xs font-medium uppercase text-gray-500 tracking-wider block">
-                    Amount in Words:
-                  </span>
-                  <span className="font-semibold text-gray-900 text-xs">
-                    {grandTotalWords}
-                  </span>
-                </div>
-
-                {/* Footer (Terms & Conditions + Signatory) */}
-                <div className="grid grid-cols-2 gap-4 pt-1">
-                  {printOptions.termsConditions ? (
-                    <div className="text-xs text-gray-600 space-y-0.5">
-                      <span className="font-semibold text-gray-800 block text-xs">Terms & Conditions:</span>
-                      <p>1. Goods once sold cannot be returned.</p>
-                      <p>2. Payment to be made as per agreed terms.</p>
-                      <p>3. Subject to Vijayawada jurisdiction.</p>
-                    </div>
-                  ) : <div />}
-
-                  <div className="text-right flex flex-col justify-between h-16">
-                    <p className="font-serif italic font-semibold text-gray-800 text-xs">
-                      For Sri Krishna Binding Works
-                    </p>
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Authorized Signatory
-                    </p>
-                  </div>
-                </div>
-
-                {printOptions.pageNumbers && (
-                  <div className="mt-4 pt-2 border-t border-gray-200 text-center text-xs text-gray-400">
-                    Page 1 of 1
-                  </div>
-                )}
+              <div style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center', width: '794px', flexShrink: 0 }} className="shadow-md">
+                <style>{DOC_CSS}</style>
+                <div ref={printAreaRef}>{docJsx}</div>
               </div>
             </div>
           </div>

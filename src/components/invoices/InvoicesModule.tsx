@@ -625,6 +625,50 @@ export const InvoicesModule: React.FC = () => {
     setIsPreviewModalOpen(true);
   };
 
+  // Print a draft invoice for a dispatch that has not been invoiced yet
+  const handlePrintDraftInvoice = (row: DispatchDeliveryRecord) => {
+    const items = row.items.map(it => ({
+      skuCode: it.itemCode,
+      itemName: it.itemName,
+      uom: it.uom || 'GBL',
+      pcsPerGbl: it.dispatchedGbl > 0 ? it.dispatchedPcs / it.dispatchedGbl : 0,
+      dispatchedGbl: it.dispatchedGbl,
+      dispatchedPcs: it.dispatchedPcs,
+      invoiceQtyGbl: it.dispatchedGbl,
+      invoiceQtyPcs: it.dispatchedPcs,
+      rate: it.rate || 0,
+      amount: it.amount || 0,
+    }));
+    const subtotal = items.reduce((sum, it) => sum + it.amount, 0);
+    const bill = row.billToAddress || { name: row.customerName, phone: row.customerPhone, city: row.city, state: row.region };
+    setActiveInvoiceForPreview({
+      invoiceNumber: 'DRAFT',
+      invoiceDate: new Date().toISOString(),
+      dispatchNumber: row.dispatchNo,
+      dispatchDate: row.dispatchDate,
+      customerName: row.customerName,
+      customerPhone: row.customerPhone,
+      region: row.region,
+      city: row.city,
+      transporterName: row.transporterName,
+      lrNumber: row.lrNumber === '—' ? '' : row.lrNumber,
+      paymentTerms: '',
+      dueDate: '',
+      billTo: bill,
+      shipTo: row.shipToAddress || bill,
+      sameAsBillTo: !row.shipToAddress,
+      items,
+      additionalCharges: [],
+      subtotal,
+      totalAdditionalCharges: 0,
+      grandTotal: subtotal,
+      totalQtyGbl: row.totalGbl,
+      totalQtyPcs: row.totalPcs,
+      status: 'draft',
+    } as SalesInvoice);
+    setIsPreviewModalOpen(true);
+  };
+
   // Edit Invoice
   const handleEditInvoice = (inv: SalesInvoice) => {
     setEditingInvoice(inv);
@@ -1325,14 +1369,24 @@ export const InvoicesModule: React.FC = () => {
                           {/* Actions */}
                           <td className="py-3 px-3 text-center whitespace-nowrap" onClick={e => e.stopPropagation()}>
                             {row.invoiceStatus !== 'Invoiced' ? (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenCreateInvoice(row)}
-                                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[0.875rem] font-semibold flex items-center gap-1 mx-auto cursor-pointer shadow-2xs"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                                <span>+ Invoice</span>
-                              </button>
+                              <div className="inline-flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenCreateInvoice(row)}
+                                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[0.875rem] font-semibold flex items-center gap-1 cursor-pointer shadow-2xs"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>+ Invoice</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handlePrintDraftInvoice(row)}
+                                  className="icon-btn shrink-0"
+                                  title="Print Invoice"
+                                >
+                                  <Printer className="w-4 h-4 text-blue-600" />
+                                </button>
+                              </div>
                             ) : (
                               <button
                                 type="button"
@@ -1343,8 +1397,8 @@ export const InvoicesModule: React.FC = () => {
                                 }}
                                 className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-[0.875rem] font-semibold flex items-center gap-1 mx-auto cursor-pointer shadow-2xs"
                               >
-                                <Eye className="w-3.5 h-3.5" />
-                                <span>View</span>
+                                <Printer className="w-3.5 h-3.5" />
+                                <span>Print</span>
                               </button>
                             )}
                           </td>
