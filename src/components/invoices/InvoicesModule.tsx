@@ -16,6 +16,7 @@ import { CreateInvoiceModal } from './CreateInvoiceModal';
 import { InvoiceSuccessModal } from './InvoiceSuccessModal';
 import { ConfirmActionModal } from '../common/ConfirmActionModal';
 import { showToast } from '../ui/Toast';
+import { ColumnsToggleButton, ExportMenuButton, PrintListButton, ActivityHistoryButton, ICON_BTN, columnHideCss, printObjectList } from '../ui/ListToolbarIcons';
 
 export type InvoiceTabType = 'pending' | 'history' | 'all';
 export type SortField = 'dispatchNo' | 'dispatchDate' | 'customerName' | 'region' | 'itemCount' | 'totalGbl' | 'invoiceStatus' | 'days';
@@ -106,6 +107,13 @@ export const InvoicesModule: React.FC = () => {
 
   const [invSortField, setInvSortField] = useState<InvoiceSortField>('invoiceNumber');
   const [invSortAsc, setInvSortAsc] = useState(false);
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
+
+  // Column visibility per table (indexes into each table's header cells; '' = fixed column)
+  const HISTORY_COLS = ['', '', 'Invoice No.', 'Invoice Date', 'Dispatch No.', 'Customer / Firm', 'Destination', 'Items', 'Total Qty', 'Taxable (₹)', 'Grand Total (₹)', 'Status', ''];
+  const DISPATCH_COLS = ['', '', 'Dispatch No.', 'Dispatch Date', 'Customer / Firm', 'Destination', 'Items', 'Dispatch Qty', 'Transporter', 'Status', 'Age', 'Invoice Ref', ''];
+  const [hiddenCols, setHiddenCols] = useState<Record<string, number[]>>({});
 
   // Pagination & selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -123,6 +131,9 @@ export const InvoicesModule: React.FC = () => {
       }
       if (filterMenuRef.current && !filterMenuRef.current.contains(e.target as Node)) {
         setShowFilterMenu(false);
+      }
+      if (sortMenuRef.current && !sortMenuRef.current.contains(e.target as Node)) {
+        setShowSortMenu(false);
       }
     };
     document.addEventListener('mousedown', handleOutside);
@@ -549,7 +560,7 @@ export const InvoicesModule: React.FC = () => {
     (activeTab === 'history' ? paginatedInvoices.every(i => selectedIds.has(i.invoiceNumber)) : paginatedDeliveries.every(d => selectedIds.has(d.id)));
 
   // Excel Export Handler
-  const handleExportExcel = (asPdf = false) => {
+  const handleExportExcel = (asPdf: boolean | 'print' = false) => {
     try {
       let exportData: any[] = [];
       if (activeTab === 'history') {
@@ -582,6 +593,14 @@ export const InvoicesModule: React.FC = () => {
         }));
       }
 
+      if (asPdf === 'print') {
+        printObjectList({
+          companyName: selectedCompany?.name,
+          title: activeTab === 'history' ? 'Sales Invoices' : 'Pending Invoices',
+          rows: exportData,
+        });
+        return;
+      }
       if (asPdf) {
         generateObjectListPdf({
           companyName: selectedCompany?.name,
@@ -727,40 +746,6 @@ export const InvoicesModule: React.FC = () => {
           </div>
         </div>
 
-        {/* Action Buttons Top Right */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => handleExportExcel()}
-            className="px-3.5 py-2 rounded-xl text-[0.875rem] font-semibold flex items-center gap-1.5 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 shadow-2xs cursor-pointer"
-          >
-            <Download className="w-4 h-4 text-gray-500" />
-            <span>Export Excel</span>
-          </button>
-          <button
-            onClick={() => handleExportExcel(true)}
-            className="px-3.5 py-2 rounded-xl text-[0.875rem] font-semibold flex items-center gap-1.5 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 shadow-2xs cursor-pointer"
-          >
-            <Printer className="w-4 h-4 text-gray-500" />
-            <span>Print PDF</span>
-          </button>
-
-          <button
-            onClick={handleOpenDirectInvoice}
-            className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-[0.875rem] font-semibold flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            title="Create invoice directly without delivery challan"
-          >
-            <Plus className="w-4 h-4 text-blue-600 stroke-[2.5]" />
-            <span>+ Direct Invoice</span>
-          </button>
-
-          <button
-            onClick={() => handleOpenCreateInvoice()}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[0.875rem] font-semibold flex items-center gap-1.5 shadow-sm shadow-blue-500/25 cursor-pointer"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>+ Create Invoice</span>
-          </button>
-        </div>
       </div>
 
 
@@ -1000,14 +985,76 @@ export const InvoicesModule: React.FC = () => {
             )}
           </div>
 
+          {/* Sort Popover Icon Button */}
+          <div className="relative" ref={sortMenuRef}>
+            <button
+              type="button"
+              onClick={() => { setShowSortMenu(!showSortMenu); setShowFilterMenu(false); setShowDateFilter(false); }}
+              className={ICON_BTN}
+              title="Sort Records"
+            >
+              <ArrowUpDown className="w-4 h-4" />
+            </button>
+            {showSortMenu && (
+              <div className="absolute right-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-[0.875rem] text-left">
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block px-2 py-1">Sort By</span>
+                {(activeTab === 'history'
+                  ? ([['invoiceNumber', 'Invoice No.'], ['invoiceDate', 'Invoice Date'], ['customerName', 'Customer'], ['grandTotal', 'Grand Total']] as [InvoiceSortField, string][]).map(([f, label]) => (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => { if (invSortField === f) setInvSortAsc(!invSortAsc); else { setInvSortField(f); setInvSortAsc(true); } setShowSortMenu(false); }}
+                        className="w-full px-2.5 py-1.5 text-left rounded-xl hover:bg-gray-50 flex items-center justify-between font-semibold text-gray-700 cursor-pointer"
+                      >
+                        <span>{label}</span>
+                        {invSortField === f && (invSortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
+                      </button>
+                    ))
+                  : ([['dispatchNo', 'Dispatch No.'], ['dispatchDate', 'Dispatch Date'], ['customerName', 'Customer'], ['region', 'Region'], ['itemCount', 'Items'], ['totalGbl', 'Dispatch Qty'], ['invoiceStatus', 'Status'], ['days', 'Age']] as [SortField, string][]).map(([f, label]) => (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => { if (sortField === f) setSortAsc(!sortAsc); else { setSortField(f); setSortAsc(true); } setShowSortMenu(false); }}
+                        className="w-full px-2.5 py-1.5 text-left rounded-xl hover:bg-gray-50 flex items-center justify-between font-semibold text-gray-700 cursor-pointer"
+                      >
+                        <span>{label}</span>
+                        {sortField === f && (sortAsc ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600" />)}
+                      </button>
+                    ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Columns / Export / Print / Activity History */}
+          <ColumnsToggleButton
+            columns={activeTab === 'history' ? HISTORY_COLS : DISPATCH_COLS}
+            hidden={hiddenCols[activeTab === 'history' ? 'inv-history-tbl' : 'inv-dispatch-tbl'] || []}
+            onChange={h => setHiddenCols(prev => ({ ...prev, [activeTab === 'history' ? 'inv-history-tbl' : 'inv-dispatch-tbl']: h }))}
+          />
+          <ExportMenuButton onExcel={() => handleExportExcel()} onPdf={() => handleExportExcel(true)} />
+          <PrintListButton onClick={() => handleExportExcel('print')} />
+          <ActivityHistoryButton entityType="TaxInvoice" title="Invoices Activity History Log" />
+
           {/* Refresh Button */}
           <button
             type="button"
             onClick={() => { loadData(false); showToast('Invoices data refreshed', 'info'); }}
-            className="p-2 bg-white hover:bg-gray-50 text-gray-600 border border-gray-200 rounded-xl shadow-2xs cursor-pointer"
+            className={ICON_BTN}
             title="Refresh Invoices"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+
+          {/* Create Invoice */}
+          <button
+            type="button"
+            onClick={() => handleOpenCreateInvoice()}
+            className={ICON_BTN}
+            title="Create Invoice"
+            aria-label="Create Invoice"
+          >
+            <Plus className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -1015,9 +1062,10 @@ export const InvoicesModule: React.FC = () => {
       {/* ── 4. MAIN DATA TABLE (MATCHING DISPATCH MODULE) ── */}
       <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2">
         <div className="overflow-x-auto">
+          <style>{columnHideCss('inv-history-tbl', hiddenCols['inv-history-tbl'] || []) + columnHideCss('inv-dispatch-tbl', hiddenCols['inv-dispatch-tbl'] || [])}</style>
           {activeTab === 'history' ? (
             /* ── INVOICES HISTORY SUB-TABLE ── */
-            <table className="w-full text-left text-[0.875rem] border-collapse">
+            <table className="inv-history-tbl w-full text-left text-[0.875rem] border-collapse">
               <thead>
                 <tr className="bg-gray-50/80 text-gray-500 font-medium border-b border-gray-200 text-xs uppercase tracking-wider">
                   <th className="py-3 px-3 text-center w-9">
@@ -1230,7 +1278,7 @@ export const InvoicesModule: React.FC = () => {
             </table>
           ) : (
             /* ── PENDING / DISPATCH DELIVERIES TABLE (MATCHING DISPATCH MODULE) ── */
-            <table className="w-full text-left text-[0.875rem] border-collapse">
+            <table className="inv-dispatch-tbl w-full text-left text-[0.875rem] border-collapse">
               <thead>
                 <tr className="bg-gray-50/80 text-gray-500 font-medium border-b border-gray-200 text-xs uppercase tracking-wider">
                   <th className="py-3 px-3 text-center w-9">

@@ -7,6 +7,7 @@ import {
   Printer, X, ArrowUp, ArrowDown, Calendar, Edit3, Trash2, RotateCcw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { ColumnsToggleButton, ExportMenuButton, PrintListButton, ActivityHistoryButton, ICON_BTN, columnHideCss, printObjectList } from '../ui/ListToolbarIcons';
 import { generateObjectListPdf } from '../../utils/pdfReport';
 import { useAuth } from '../../context/AuthContext';
 import { getSalesOrdersV2, SalesOrderV2, updateSalesOrderV2 } from '../../api/salesOrderApiV2';
@@ -267,6 +268,13 @@ export const DispatchModule: React.FC = () => {
 
   // Top Tabs: 'all' | 'ready' | 'partial' | 'not_ready' | 'history'
   const [activeTab, setActiveTab] = useState<'all' | 'ready' | 'history'>('all');
+
+  // Column visibility per table (indexes into each table's header cells; '' = fixed column)
+  const PENDING_COLS = ['', '', 'SO No.', 'Date', 'Customer / Party', 'Region', 'Transporter', 'Items', 'Pending (GBL)', 'Pending (PCS)', 'Ready Status', ''];
+  const HISTORY_COLS = ['DC Number', 'Date', 'SO Ref', 'Customer', 'Transporter', 'Vehicle', 'Items', 'Status', ''];
+  const [hiddenCols, setHiddenCols] = useState<Record<string, number[]>>({});
+  const colScope = activeTab === 'history' ? 'dsp-history-tbl' : 'dsp-pending-tbl';
+  const hiddenForTab = hiddenCols[colScope] || [];
 
   // Accordion Expand Set for Orders
   const [expandedOrderIds, setExpandedOrderIds] = useState<Set<string>>(new Set());
@@ -1082,7 +1090,7 @@ export const DispatchModule: React.FC = () => {
   };
 
   // Export Excel
-  const handleExportExcel = (targetRows = filteredRows, asPdf = false) => {
+  const handleExportExcel = (targetRows = filteredRows, asPdf: boolean | 'print' = false) => {
     try {
       const exportData = targetRows.map(row => ({
         'SO Number': row.orderNumber,
@@ -1100,6 +1108,10 @@ export const DispatchModule: React.FC = () => {
         'Ready Status': row.readyStatus
       }));
 
+      if (asPdf === 'print') {
+        printObjectList({ companyName: selectedCompany?.name, title: 'Pending Dispatch Orders', rows: exportData });
+        return;
+      }
       if (asPdf) {
         generateObjectListPdf({
           companyName: selectedCompany?.name,
@@ -1168,42 +1180,6 @@ export const DispatchModule: React.FC = () => {
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <button
-            onClick={() => handleExportExcel()}
-            className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-xl border border-gray-200 text-[0.875rem] font-semibold flex items-center gap-2 shadow-2xs cursor-pointer"
-          >
-            <Download className="w-4 h-4 text-gray-500" />
-            <span className="hidden sm:inline">Export Excel</span>
-          </button>
-          <button
-            onClick={() => handleExportExcel(filteredRows, true)}
-            className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-xl border border-gray-200 text-[0.875rem] font-semibold flex items-center gap-2 shadow-2xs cursor-pointer"
-          >
-            <Printer className="w-4 h-4 text-gray-500" />
-            <span className="hidden sm:inline">Print PDF</span>
-          </button>
-
-          {/* Direct Dispatch without Sales Order */}
-          <button
-            onClick={handleOpenDirectDispatch}
-            className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-[0.875rem] font-semibold flex items-center gap-2 shadow-2xs cursor-pointer"
-            title="Create a new dispatch batch directly without any Sales Order"
-          >
-            <Plus className="w-4 h-4 text-blue-600 stroke-[2.5]" />
-            <span>+ Direct Dispatch</span>
-          </button>
-
-          {/* Standard Dispatch from Sales Order */}
-          <button
-            onClick={() => handleOpenDispatch()}
-            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[0.875rem] font-semibold flex items-center gap-2 shadow-sm shadow-blue-500/25 cursor-pointer"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>+ Create Dispatch</span>
-          </button>
-        </div>
       </div>
 
       {/* ── 2. TOP NAVIGATION TABS & ACTION BAR (Matching Production Module Style) ── */}
@@ -1519,14 +1495,38 @@ export const DispatchModule: React.FC = () => {
             )}
           </div>
 
+          {/* Columns / Export / Print / Activity History */}
+          <ColumnsToggleButton
+            columns={activeTab === 'history' ? HISTORY_COLS : PENDING_COLS}
+            hidden={hiddenForTab}
+            onChange={h => setHiddenCols(prev => ({ ...prev, [colScope]: h }))}
+          />
+          <ExportMenuButton
+            onExcel={() => handleExportExcel()}
+            onPdf={() => handleExportExcel(filteredRows, true)}
+          />
+          <PrintListButton onClick={() => handleExportExcel(filteredRows, 'print')} />
+          <ActivityHistoryButton entityType="Dispatch" title="Dispatch Activity History Log" />
+
           {/* Refresh Icon Button */}
           <button
             onClick={() => { fetchData(false); showToast('Refreshed dispatch data', 'info'); }}
             disabled={refreshing}
-            className="p-2 rounded-xl bg-white hover:bg-blue-50/60 border border-gray-200 hover:border-blue-200 text-blue-600 flex items-center justify-center cursor-pointer shadow-2xs disabled:opacity-50"
+            className={`${ICON_BTN} disabled:opacity-50`}
             title="Refresh"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+
+          {/* Create Dispatch */}
+          <button
+            type="button"
+            onClick={() => handleOpenDispatch()}
+            className={ICON_BTN}
+            title="Create Dispatch"
+            aria-label="Create Dispatch"
+          >
+            <Plus className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -1536,7 +1536,8 @@ export const DispatchModule: React.FC = () => {
         /* History View of Created Delivery Challans */
         <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-[0.875rem]">
+            <style>{columnHideCss('dsp-history-tbl', hiddenCols['dsp-history-tbl'] || [])}</style>
+            <table className="dsp-history-tbl w-full text-left border-collapse text-[0.875rem]">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50/80 text-xs font-medium uppercase tracking-wider text-gray-500 select-none">
                   <th 
@@ -1709,7 +1710,8 @@ export const DispatchModule: React.FC = () => {
         /* Orders Master Table with Clickable Column Header Sorting & Expandable Items Accordion Dropdown */
         <div className="bg-gray-50 rounded-xl overflow-hidden panel-table p-2">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-[0.875rem]">
+            <style>{columnHideCss('dsp-pending-tbl', hiddenCols['dsp-pending-tbl'] || [])}</style>
+            <table className="dsp-pending-tbl w-full text-left border-collapse text-[0.875rem]">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50/80 text-xs font-medium text-gray-500 uppercase tracking-wider select-none">
                   <th className="py-3 px-3 w-12 text-center">

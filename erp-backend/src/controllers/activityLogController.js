@@ -15,7 +15,11 @@ exports.getActivityLogs = async (req, res) => {
     
     if (req.query.entityType) {
       const et = String(req.query.entityType).trim();
-      if (/^(Sku|Item|Inventory)/i.test(et)) {
+      if (/^Dispatch/i.test(et)) {
+        conditions.push({ entityType: { $in: ['Dispatch', 'DeliveryChallan'] } });
+      } else if (/^TaxInvoice/i.test(et)) {
+        conditions.push({ entityType: 'TaxInvoice' });
+      } else if (/^(Sku|Item|Inventory)/i.test(et)) {
         conditions.push({
           $or: [
             { entityType: { $in: ['SkuV2', 'SKU', 'sku', 'Sku', 'Item', 'ITEM', 'item', 'ItemMaster', 'itemMaster', 'Inventory', 'inventory', 'InventoryLedger', 'InventoryLedgerV2', 'Material', 'Product', 'Semi'] } },
@@ -29,6 +33,8 @@ exports.getActivityLogs = async (req, res) => {
             { entityType: { $regex: /purchase|invoice|batch/i } }
           ]
         });
+        // Sales tax invoices share the word "invoice" but belong to the Invoices module
+        conditions.push({ entityType: { $ne: 'TaxInvoice' } });
       } else if (/^(Warehouse|Location|Floor|Zone)/i.test(et)) {
         conditions.push({
           $or: [

@@ -2,6 +2,18 @@ const mongoose = require("mongoose");
 const SalesInvoice = require("../models/salesInvoiceModel");
 const DeliveryChallan = require("../models/deliveryChallanModel");
 const { broadcast } = require("../utils/realtimeService");
+const ActivityLog = require("../models/activityLogModel");
+
+const logInvoiceActivity = (req, invoice, action, details) => {
+  ActivityLog.create({
+    action,
+    entityType: "TaxInvoice",
+    entityName: invoice.invoiceNumber,
+    details,
+    performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
+    company: invoice.company
+  }).catch(e => console.error("ActivityLog error:", e));
+};
 
 const toObjectId = (id) => {
   if (!id) return null;
@@ -153,6 +165,8 @@ exports.createInvoice = async (req, res) => {
       }
     }
 
+    logInvoiceActivity(req, invoice, "CREATE", `Tax Invoice '${invoice.invoiceNumber}' for ${invoice.customerName} (₹${invoice.grandTotal || 0}) was created${invoice.dispatchNumber ? ` from dispatch ${invoice.dispatchNumber}` : " (direct invoice)"}.`);
+
     try {
       broadcast("sales_invoice", { action: "create", invoiceId: invoice._id, invoiceNumber: invoice.invoiceNumber });
     } catch (_) {}
@@ -178,6 +192,8 @@ exports.updateInvoice = async (req, res) => {
     if (!invoice) {
       return res.status(404).json({ error: "Invoice not found" });
     }
+
+    logInvoiceActivity(req, invoice, "UPDATE", `Tax Invoice '${invoice.invoiceNumber}' for ${invoice.customerName} (₹${invoice.grandTotal || 0}) was updated.`);
 
     try {
       broadcast("sales_invoice", { action: "update", invoiceId: invoice._id, invoiceNumber: invoice.invoiceNumber });
@@ -218,6 +234,8 @@ exports.deleteInvoice = async (req, res) => {
         });
       } catch (_) {}
     }
+
+    logInvoiceActivity(req, invoice, "DELETE", `Tax Invoice '${invoice.invoiceNumber}' for ${invoice.customerName} was deleted.`);
 
     try {
       broadcast("sales_invoice", { action: "delete", invoiceId: id });

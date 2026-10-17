@@ -7,6 +7,18 @@ const WarehouseLocationV2 = require("../models/warehouseLocationV2Model");
 const SalesOrderV2 = require("../models/salesOrderV2Model");
 const { getNextSequenceNumber, peekNextSequenceNumber, syncSequenceNumber } = require("../utils/sequenceManager");
 const { broadcast } = require("../utils/realtimeService");
+const ActivityLog = require("../models/activityLogModel");
+
+const logDispatchActivity = (req, challan, action, details) => {
+  ActivityLog.create({
+    action,
+    entityType: "Dispatch",
+    entityName: challan.dcNumber,
+    details,
+    performedBy: req.user ? (req.user.fullName || req.user.email) : "System",
+    company: challan.company
+  }).catch(e => console.error("ActivityLog error:", e));
+};
 
 const toObjectId = (id) => {
   if (!id) return null;
@@ -517,6 +529,8 @@ exports.createDeliveryChallan = async (req, res) => {
       await postDispatchInventory(challan, req.user?._id || req.body.createdBy);
     }
 
+    logDispatchActivity(req, challan, "CREATE", `Dispatch '${challan.dcNumber}' for ${challan.customerName} was created${challan.orderNumber && challan.orderNumber !== "DIRECT" ? ` against ${challan.orderNumber}` : " (direct dispatch)"} with status ${challan.status || "draft"}.`);
+
     broadcast(challan.company, {
       entity: "delivery_challan",
       action: "create",
@@ -557,6 +571,10 @@ exports.updateDeliveryChallan = async (req, res) => {
       await reverseDispatchInventory(challan);
     }
 
+    logDispatchActivity(req, challan, "UPDATE", oldChallan.status !== challan.status
+      ? `Dispatch '${challan.dcNumber}' status changed from ${oldChallan.status} to ${challan.status}.`
+      : `Dispatch '${challan.dcNumber}' for ${challan.customerName} was updated.`);
+
     broadcast(challan.company, {
       entity: "delivery_challan",
       action: "update",
@@ -586,6 +604,8 @@ exports.deleteDeliveryChallan = async (req, res) => {
     await reverseDispatchInventory(challan);
 
     await DeliveryChallan.findByIdAndDelete(req.params.id);
+
+    logDispatchActivity(req, challan, "DELETE", `Dispatch '${challan.dcNumber}' for ${challan.customerName} was deleted and its stock movements reversed.`);
 
     broadcast(challan.company, {
       entity: "delivery_challan",
