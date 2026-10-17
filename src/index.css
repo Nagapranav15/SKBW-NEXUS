@@ -278,7 +278,7 @@ html, body { max-width: 100%; overflow-x: hidden; -webkit-text-size-adjust: 100%
 img, video, canvas, svg { max-width: 100%; }
 
 /* Wide tables scroll sideways inside their own container instead of breaking the page */
-div:has(> table:not(.doc-table)) { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+div:has(> table:not(.doc-table)):not(.overflow-visible) { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
 
 @media (max-width: 47.9375rem) {
   /* Page-level header rows (title + actions) wrap instead of overflowing */

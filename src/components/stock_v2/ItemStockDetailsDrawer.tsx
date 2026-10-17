@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   X, 
   Package, 
@@ -390,6 +391,8 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
   const [showNewTxMenu, setShowNewTxMenu] = useState(false);
 
   // Reservations Tab filters
+  const navigate = useNavigate();
+  const goToSalesOrders = () => { onClose(); navigate('/sales/orders'); };
   const [resSearch, setResSearch] = useState('');
   const [resStatusFilter, setResStatusFilter] = useState('ALL');
   const [resCustomerFilter, setResCustomerFilter] = useState('ALL');
@@ -836,9 +839,12 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
   }, [reservationsList, resSearch, resStatusFilter, resCustomerFilter]);
 
   const totalReservedQty = reservationsList.reduce((sum, r) => sum + (r.reservedQty || 0), 0);
-  const openSalesOrdersCount = reservationsList.length;
-  const oldestRequirement = reservationsList[0];
-  const latestRequirement = reservationsList[reservationsList.length - 1];
+  const openSalesOrdersCount = reservationsList.filter(r => r.status !== 'Reserved for Production').length;
+  const datedReservations = reservationsList
+    .filter(r => r.requiredDate)
+    .sort((a, b) => new Date(a.requiredDate).getTime() - new Date(b.requiredDate).getTime());
+  const oldestRequirement = datedReservations[0];
+  const latestRequirement = datedReservations[datedReservations.length - 1];
 
   const availableCustomers = useMemo(() => {
     const set = new Set<string>();
@@ -1032,7 +1038,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
             { id: 'batches', label: 'Batches & Costing', count: batchesList.length || 2, icon: Layers },
             { id: 'reels', label: 'Reels', count: reelsList.length, icon: Disc },
             { id: 'movements', label: 'Movements Ledger', count: movementsList.length || 12, icon: History },
-            { id: 'reservations', label: 'Reservations', count: reservationsList.length || 1, icon: Bookmark }
+            { id: 'reservations', label: 'Reservations', count: reservationsList.length, icon: Bookmark }
           ].map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -2119,11 +2125,12 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => showToast('Stock reservations are created automatically upon Sales Order confirmation', 'info')}
+                  onClick={goToSalesOrders}
+                  title="Stock is reserved automatically when a Sales Order is confirmed"
                   className="btn-primary"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Reserve Stock</span>
+                  <span>New Sales Order</span>
                 </button>
               </div>
 
@@ -2147,20 +2154,20 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-3.5 shadow-2xs">
                   <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">OLDEST REQUIREMENT</span>
                   <span className="text-[0.875rem] font-semibold text-gray-900 font-mono block">
-                    {oldestRequirement?.requiredDate ? new Date(oldestRequirement.requiredDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '25 Sep 2026'}
+                    {oldestRequirement?.requiredDate ? new Date(oldestRequirement.requiredDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                   </span>
-                  <span className="text-xs font-semibold text-rose-600">
-                    {oldestRequirement?.daysLeftText || '3 days left'}
+                  <span className={`text-xs font-semibold ${oldestRequirement?.isOverdue ? 'text-rose-600' : 'text-gray-500'}`}>
+                    {oldestRequirement?.daysLeftText || ''}
                   </span>
                 </div>
 
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-3.5 shadow-2xs">
                   <span className="text-xs font-medium text-gray-400 uppercase tracking-wider block mb-1">LATEST REQUIREMENT</span>
                   <span className="text-[0.875rem] font-semibold text-gray-900 font-mono block">
-                    {latestRequirement?.requiredDate ? new Date(latestRequirement.requiredDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '05 Oct 2026'}
+                    {latestRequirement?.requiredDate ? new Date(latestRequirement.requiredDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                   </span>
-                  <span className="text-xs font-medium text-gray-500">
-                    {latestRequirement?.daysLeftText || '13 days left'}
+                  <span className={`text-xs font-medium ${latestRequirement?.isOverdue ? 'text-rose-600' : 'text-gray-500'}`}>
+                    {latestRequirement?.daysLeftText || ''}
                   </span>
                 </div>
               </div>
@@ -2191,6 +2198,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                       <option value="Partially Reserved">Partially Reserved</option>
                       <option value="Reserved">Reserved</option>
                       <option value="Pending Allocation">Pending Allocation</option>
+                      <option value="Reserved for Production">Reserved for Production</option>
                     </select>
                   </div>
 
@@ -2282,10 +2290,10 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                             <td className="p-3 text-right font-mono font-semibold text-gray-500">{res.pendingQty || 0}</td>
                             <td className="p-3 text-gray-600">
                               <div className="font-semibold text-gray-900">
-                                {res.requiredDate ? new Date(res.requiredDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '25 Sep 2026'}
+                                {res.requiredDate ? new Date(res.requiredDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                               </div>
-                              <div className="text-xs font-semibold text-rose-600 font-sans">
-                                {res.daysLeftText || '3 days left'}
+                              <div className={`text-xs font-semibold font-sans ${res.isOverdue ? 'text-rose-600' : 'text-gray-500'}`}>
+                                {res.daysLeftText || ''}
                               </div>
                             </td>
                             <td className="p-3 text-center">
@@ -2294,7 +2302,9 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                                   ? 'bg-amber-50 text-amber-800 border-amber-200' 
                                   : res.status === 'Reserved'
                                     ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                    : 'bg-blue-50 text-blue-800 border-blue-200'
+                                    : res.status === 'Pending Allocation'
+                                      ? 'bg-rose-50 text-rose-800 border-rose-200'
+                                      : 'bg-blue-50 text-blue-800 border-blue-200'
                               }`}>
                                 {res.status}
                               </span>
@@ -2302,6 +2312,8 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
                             <td className="p-3 text-center">
                               <button
                                 type="button"
+                                onClick={goToSalesOrders}
+                                title={`Open ${res.orderNumber}`}
                                 className="p-1 text-gray-400 hover:text-gray-700 rounded hover:bg-gray-100 cursor-pointer"
                               >
                                 <MoreVertical className="w-3.5 h-3.5" />
@@ -2761,10 +2773,7 @@ export const ItemStockDetailsDrawer: React.FC<ItemStockDetailsDrawerProps> = ({
             {activeTab === 'reservations' && (
               <button
                 type="button"
-                onClick={() => {
-                  onClose();
-                  showToast('Navigating to Sales Orders', 'info');
-                }}
+                onClick={goToSalesOrders}
                 className="btn-primary"
               >
                 <span>View Sales Order</span>

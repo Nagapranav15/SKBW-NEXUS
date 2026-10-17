@@ -89,6 +89,7 @@ import { showToast } from '../ui/Toast';
 import * as XLSX from 'xlsx';
 import Modal from '../ui/Modal';
 import { formatSkuName } from '../../utils/skuUtils';
+import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 import { BomCopyPasteControls, MakoroPasteIcon } from './BomCopyPasteControls';
 import { copyBom, useCopiedBom } from '../../utils/bomClipboard';
 import { BulkEditBomModal } from '../production/BulkEditBomModal';
@@ -444,8 +445,10 @@ const SkuMasterV2: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Live work-order / dispatch-order counts per item, computed from real production and sales orders
-  const [orderCounts, setOrderCounts] = useState<{ work: Record<string, number>; dispatch: Record<string, number> }>({ work: {}, dispatch: {} });
+  // Live work-order / dispatch-order rows per item, computed from real production and sales orders
+  type ItemWorkOrderRow = { orderNumber: string; status: string; plannedQty: number; plannedUom: string; producedQty: number; balanceQty: number; requiredDate: string };
+  type ItemDispatchRow = { orderNumber: string; customerName: string; orderDate: string; uom: string; orderedQty: number; dispatchedQty: number; pendingQty: number };
+  const [orderRows, setOrderRows] = useState<{ work: Record<string, ItemWorkOrderRow[]>; dispatch: Record<string, ItemDispatchRow[]> }>({ work: {}, dispatch: {} });
 
   useEffect(() => {
     if (!currentCompanyId) return;
@@ -457,32 +460,45 @@ const SkuMasterV2: React.FC = () => {
           getSalesOrdersV2(currentCompanyId).catch(() => []),
         ]);
         if (cancelled) return;
-        const work: Record<string, number> = {};
+        const work: Record<string, ItemWorkOrderRow[]> = {};
         // Open work orders: anything not completed or cancelled
         (Array.isArray(prods) ? prods : []).forEach((o: any) => {
           const st = String(o.status || '').toLowerCase();
           if (st === 'completed' || st === 'cancelled') return;
           const key = String(o.itemCode || '').toLowerCase().trim();
-          if (key) work[key] = (work[key] || 0) + 1;
+          if (!key) return;
+          (work[key] = work[key] || []).push({
+            orderNumber: o.orderNumber,
+            status: o.status || '',
+            plannedQty: Number(o.plannedQty) || 0,
+            plannedUom: o.plannedUom || '',
+            producedQty: Number(o.producedQty) || 0,
+            balanceQty: Number(o.balanceQty) || 0,
+            requiredDate: o.requiredCompletionDate || '',
+          });
         });
-        const dispatch: Record<string, number> = {};
-        // Open dispatch orders: live sales orders that still have undelivered quantity for the item
+        const dispatch: Record<string, ItemDispatchRow[]> = {};
+        // Open dispatch orders: live sales orders that still have undelivered quantity for the item (one row per order per item)
         (Array.isArray(sos) ? sos : []).forEach((o: any) => {
           const st = String(o.status || '').toLowerCase();
           if (['cancelled', 'draft', 'delivered', 'invoiced'].includes(st) || o.fulfillmentStatus === 'Fulfilled') return;
-          const seen = new Set<string>();
+          const perItem = new Map<string, ItemDispatchRow>();
           (o.items || []).forEach((it: any) => {
-            if (!(Number(it.quantity) > Number(it.dispatchedQty || 0))) return;
+            const pending = Number(it.quantity) - Number(it.dispatchedQty || 0);
+            if (!(pending > 0)) return;
             const key = String(it.skuCode || '').toLowerCase().trim();
-            if (key && !seen.has(key)) {
-              seen.add(key);
-              dispatch[key] = (dispatch[key] || 0) + 1;
-            }
+            if (!key) return;
+            const row = perItem.get(key) || { orderNumber: o.orderNumber, customerName: o.customerName || '—', orderDate: o.orderDate, uom: it.uom || '', orderedQty: 0, dispatchedQty: 0, pendingQty: 0 };
+            row.orderedQty += Number(it.quantity) || 0;
+            row.dispatchedQty += Number(it.dispatchedQty) || 0;
+            row.pendingQty += pending;
+            perItem.set(key, row);
           });
+          perItem.forEach((row, key) => { dispatch[key] = [...(dispatch[key] || []), row]; });
         });
-        setOrderCounts({ work, dispatch });
+        setOrderRows({ work, dispatch });
       } catch (err) {
-        console.error('Failed to load order counts for Item Master', err);
+        console.error('Failed to load order rows for Item Master', err);
       }
     };
     load();
@@ -491,15 +507,18 @@ const SkuMasterV2: React.FC = () => {
     return () => { cancelled = true; window.removeEventListener('focus', onFocus); };
   }, [currentCompanyId]);
 
-  const getWorkOrderCount = (sku: SkuV2 | null) => {
-    if (!sku) return 0;
-    return orderCounts.work[String((sku as any).skuCode || '').toLowerCase().trim()] || 0;
+  const getWorkOrderRows = (sku: SkuV2 | null): ItemWorkOrderRow[] => {
+    if (!sku) return [];
+    return orderRows.work[String((sku as any).skuCode || '').toLowerCase().trim()] || [];
   };
 
-  const getDispatchOrderCount = (sku: SkuV2 | null) => {
-    if (!sku) return 0;
-    return orderCounts.dispatch[String((sku as any).skuCode || '').toLowerCase().trim()] || 0;
+  const getDispatchOrderRows = (sku: SkuV2 | null): ItemDispatchRow[] => {
+    if (!sku) return [];
+    return orderRows.dispatch[String((sku as any).skuCode || '').toLowerCase().trim()] || [];
   };
+
+  const getWorkOrderCount = (sku: SkuV2 | null) => getWorkOrderRows(sku).length;
+  const getDispatchOrderCount = (sku: SkuV2 | null) => getDispatchOrderRows(sku).length;
 
   // Add Custom Column Modal State (exact match to user screenshot!)
   const [showAddCustomColumnModal, setShowAddCustomColumnModal] = useState(false);
@@ -5836,6 +5855,10 @@ const SkuMasterV2: React.FC = () => {
                       ? modalDynamicLiveStock 
                       : (Number((selectedSkuDetails as any).presentStock) || 0);
                     const totalEstVal = liveStockQty * unitRate;
+                    // Rate is stored per stocking unit; convert to per piece using the alternate unit conversion
+                    const isPcsUnit = (u: string) => (u || '').toLowerCase().includes('pc');
+                    const pcsPerStockUnit = isPcsUnit(selectedSkuDetails.unit || '') ? 1 : (isPcsUnit(selectedSkuDetails.altUnit || '') ? Number(selectedSkuDetails.altUnitConversion) || 0 : 0);
+                    const unitRatePcs = pcsPerStockUnit > 0 ? unitRate / pcsPerStockUnit : 0;
 
                     return (
                       <div className="space-y-4">
@@ -5874,11 +5897,14 @@ const SkuMasterV2: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="bg-slate-50/80 border border-slate-200/70 rounded-md px-3.5 py-2.5 flex items-center justify-between text-[0.875rem]">
-                          <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">UNIT RATE / COST</span>
-                          <span className="font-mono font-semibold text-gray-700">
-                            {unitRate > 0 ? `₹${unitRate.toLocaleString('en-IN')} / ${selectedSkuDetails.unit || 'Pcs'}` : '—'}
-                          </span>
+                        <div className="bg-slate-50/80 border border-slate-200/70 rounded-md px-3.5 py-2.5 flex items-start justify-between text-[0.875rem]">
+                          <span className="text-xs font-medium text-gray-400 uppercase tracking-wider pt-0.5">UNIT RATE / COST</span>
+                          <div className="text-right font-mono font-semibold text-gray-700 space-y-0.5">
+                            <div>{unitRatePcs > 0 ? `₹${unitRatePcs.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / PCS` : '—'}</div>
+                            {unitRate > 0 && !isPcsUnit(selectedSkuDetails.unit || '') && (
+                              <div>{`₹${unitRate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${selectedSkuDetails.unit || 'GBL'}`}</div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -6741,30 +6767,92 @@ const SkuMasterV2: React.FC = () => {
             )}
 
             {/* TAB CONTENT: Work Orders */}
-            {detailsSubTab === 'work-orders' && (
-              <div className="flex-1 flex flex-col items-center justify-center py-12 text-center text-gray-400 space-y-3 bg-slate-50/60 rounded-lg border border-dashed border-gray-200 my-auto min-h-[23.75rem]">
-                <div className="w-14 h-14 rounded-lg bg-white border border-gray-200/80 flex items-center justify-center text-gray-400">
-                  <ClipboardList className="w-7 h-7 text-gray-400" />
+            {detailsSubTab === 'work-orders' && (() => {
+              const rows = getWorkOrderRows(selectedSkuDetails);
+              if (rows.length === 0) return (
+                <div className="flex-1 flex flex-col items-center justify-center py-12 text-center text-gray-400 space-y-3 bg-slate-50/60 rounded-lg border border-dashed border-gray-200 my-auto min-h-[23.75rem]">
+                  <div className="w-14 h-14 rounded-lg bg-white border border-gray-200/80 flex items-center justify-center text-gray-400">
+                    <ClipboardList className="w-7 h-7 text-gray-400" />
+                  </div>
+                  <div className="space-y-1 max-w-sm">
+                    <p className="font-semibold text-gray-800 text-[0.875rem]">Active Production Work Orders for {selectedSkuDetails.skuCode}</p>
+                    <p className="text-[0.875rem] text-gray-500">No active work orders currently scheduled for this SKU on factory floor.</p>
+                  </div>
                 </div>
-                <div className="space-y-1 max-w-sm">
-                  <p className="font-semibold text-gray-800 text-[0.875rem]">Active Production Work Orders for {selectedSkuDetails.skuCode}</p>
-                  <p className="text-[0.875rem] text-gray-500">No active work orders currently scheduled for this SKU on factory floor.</p>
+              );
+              return (
+                <div className="border border-gray-200 rounded-xl overflow-x-auto">
+                  <table className="w-full text-[0.875rem]">
+                    <thead className="bg-slate-50 text-xs text-gray-500 uppercase tracking-wide">
+                      <tr>
+                        <th className="text-left px-3 py-2 font-semibold">Work Order</th>
+                        <th className="text-left px-3 py-2 font-semibold">Status</th>
+                        <th className="text-right px-3 py-2 font-semibold">Planned</th>
+                        <th className="text-right px-3 py-2 font-semibold">Produced</th>
+                        <th className="text-right px-3 py-2 font-semibold">Balance</th>
+                        <th className="text-left px-3 py-2 font-semibold">Required By</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {rows.map(r => (
+                        <tr key={r.orderNumber} className="hover:bg-slate-50/60">
+                          <td className="px-3 py-2 font-mono font-semibold text-blue-700">{r.orderNumber}</td>
+                          <td className="px-3 py-2 text-gray-700">{r.status || '—'}</td>
+                          <td className="px-3 py-2 text-right font-mono text-gray-800">{r.plannedQty} {r.plannedUom}</td>
+                          <td className="px-3 py-2 text-right font-mono text-gray-800">{r.producedQty} {r.plannedUom}</td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-gray-900">{r.balanceQty} {r.plannedUom}</td>
+                          <td className="px-3 py-2 text-gray-700">{r.requiredDate ? formatDateDDMMYYYY(r.requiredDate) : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* TAB CONTENT: Dispatches */}
-            {detailsSubTab === 'dispatches' && (
-              <div className="flex-1 flex flex-col items-center justify-center py-12 text-center text-gray-400 space-y-3 bg-slate-50/60 rounded-lg border border-dashed border-gray-200 my-auto min-h-[23.75rem]">
-                <div className="w-14 h-14 rounded-lg bg-white border border-gray-200/80 flex items-center justify-center text-gray-400">
-                  <Package className="w-7 h-7 text-gray-400" />
+            {detailsSubTab === 'dispatches' && (() => {
+              const rows = getDispatchOrderRows(selectedSkuDetails);
+              if (rows.length === 0) return (
+                <div className="flex-1 flex flex-col items-center justify-center py-12 text-center text-gray-400 space-y-3 bg-slate-50/60 rounded-lg border border-dashed border-gray-200 my-auto min-h-[23.75rem]">
+                  <div className="w-14 h-14 rounded-lg bg-white border border-gray-200/80 flex items-center justify-center text-gray-400">
+                    <Package className="w-7 h-7 text-gray-400" />
+                  </div>
+                  <div className="space-y-1 max-w-sm">
+                    <p className="font-semibold text-gray-800 text-[0.875rem]">Fulfillment & Dispatches for {selectedSkuDetails.skuCode}</p>
+                    <p className="text-[0.875rem] text-gray-500">No pending dispatches or delivery challans recorded for this item.</p>
+                  </div>
                 </div>
-                <div className="space-y-1 max-w-sm">
-                  <p className="font-semibold text-gray-800 text-[0.875rem]">Fulfillment & Dispatches for {selectedSkuDetails.skuCode}</p>
-                  <p className="text-[0.875rem] text-gray-500">No pending dispatches or delivery challans recorded for this item.</p>
+              );
+              return (
+                <div className="border border-gray-200 rounded-xl overflow-x-auto">
+                  <table className="w-full text-[0.875rem]">
+                    <thead className="bg-slate-50 text-xs text-gray-500 uppercase tracking-wide">
+                      <tr>
+                        <th className="text-left px-3 py-2 font-semibold">Sales Order</th>
+                        <th className="text-left px-3 py-2 font-semibold">Customer</th>
+                        <th className="text-left px-3 py-2 font-semibold">Order Date</th>
+                        <th className="text-right px-3 py-2 font-semibold">Ordered</th>
+                        <th className="text-right px-3 py-2 font-semibold">Dispatched</th>
+                        <th className="text-right px-3 py-2 font-semibold">Pending</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {rows.map(r => (
+                        <tr key={r.orderNumber} className="hover:bg-slate-50/60">
+                          <td className="px-3 py-2 font-mono font-semibold text-blue-700">{r.orderNumber}</td>
+                          <td className="px-3 py-2 text-gray-800">{r.customerName}</td>
+                          <td className="px-3 py-2 text-gray-700">{r.orderDate ? formatDateDDMMYYYY(r.orderDate) : '—'}</td>
+                          <td className="px-3 py-2 text-right font-mono text-gray-800">{r.orderedQty} {r.uom}</td>
+                          <td className="px-3 py-2 text-right font-mono text-gray-800">{r.dispatchedQty} {r.uom}</td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-gray-900">{r.pendingQty} {r.uom}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
           </div>
         </Modal>

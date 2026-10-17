@@ -1072,6 +1072,11 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   };
   const handleAddItem = handleAddProduct;
 
+  // Insert an empty product row directly below the given row
+  const handleInsertRowBelow = (idx: number) => {
+    setItems(prev => [...prev.slice(0, idx + 1), getEmptyRow(), ...prev.slice(idx + 1)]);
+  };
+
   // Duplicate Item Row
   const handleDuplicateRow = (idx: number) => {
     setItems(prev => {
@@ -1405,11 +1410,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
       return;
     }
 
+    // Order charges are optional; drop any blank charge rows
     const validCharges = otherCharges.filter(c => c.name && c.name.trim() !== '');
-    if (!isDraft && validCharges.length === 0) {
-      showToast('Order Charges are mandatory. Please select at least one preset charge.', 'error');
-      return;
-    }
 
     setIsSaving(true);
     try {
@@ -1472,7 +1474,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
           ? (drawerPaidAmount >= totals.grandTotal && totals.grandTotal > 0 ? 'Paid' : (drawerPaidAmount > 0 ? 'Partially Paid' : 'Unpaid'))
           : ((editOrder as any)?.paymentStatus || 'Unpaid'),
         payments: drawerPaymentData ? [drawerPaymentData] : ((editOrder as any)?.payments || []),
-        otherCharges,
+        otherCharges: validCharges,
         internalNotes,
         billingAddress,
         shippingAddress: sameAddress ? billingAddress : shippingAddress,
@@ -2572,14 +2574,6 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleAddProduct}
-                  className="px-3 py-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 font-semibold rounded-xl text-[0.875rem] flex items-center gap-1 cursor-pointer shadow-3xs"
-                >
-                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                  <span>Add Product</span>
-                </button>
-                <button
-                  type="button"
                   className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg cursor-pointer"
                 >
                   <MoreVertical className="w-4 h-4" />
@@ -2879,6 +2873,14 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                           <div className="flex items-center justify-center gap-1">
                             <button
                               type="button"
+                              onClick={() => handleInsertRowBelow(idx)}
+                              className="icon-btn"
+                              title="Add product row below"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => handleDuplicateRow(idx)}
                               className="icon-btn"
                               title="Duplicate row"
@@ -2940,8 +2942,16 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
               </table>
             </div>
 
-            {/* Items Total Summary right corner */}
-            <div className="flex justify-end pt-1">
+            {/* Add Product (directly below the table) + Items Total summary */}
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={handleAddProduct}
+                className="px-3 py-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 font-semibold rounded-xl text-[0.875rem] flex items-center gap-1 cursor-pointer shadow-3xs"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <span>Add Product</span>
+              </button>
               <div className="flex items-center gap-3 text-[0.875rem]">
                 <span className="font-semibold text-gray-500">Items Total:</span>
                 <span className="text-[0.875rem] font-semibold text-gray-900 font-mono">
@@ -2967,7 +2977,7 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wide">Order Charges <span className="text-rose-600 font-semibold">*</span></span>
+                        <span className="text-[0.875rem] font-medium text-gray-900 uppercase tracking-wide">Order Charges <span className="text-gray-400 font-medium normal-case">(Optional)</span></span>
                         <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-mono text-xs font-semibold border border-blue-200 flex items-center gap-1">
                           <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
                           <span>Total Order: {totalOrderGbl} GBL</span>
@@ -3271,8 +3281,8 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
 
                       {otherCharges.length === 0 && (
                         <tr>
-                          <td colSpan={7} className="py-5 text-center text-[0.875rem] text-rose-500 font-medium italic bg-rose-50/20">
-                            No order charges added yet. Click <strong className="text-blue-600 font-semibold cursor-pointer" onClick={() => setShowQuickPresetMenu(true)}>"Add Preset Charge"</strong> above to select a charge.
+                          <td colSpan={7} className="py-5 text-center text-[0.875rem] text-gray-400 font-medium italic">
+                            No order charges added. Charges are optional — click <strong className="text-blue-600 font-semibold cursor-pointer" onClick={() => setShowQuickPresetMenu(true)}>"Add Preset Charge"</strong> above if needed.
                           </td>
                         </tr>
                       )}

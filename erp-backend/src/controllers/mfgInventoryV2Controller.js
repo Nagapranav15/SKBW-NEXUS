@@ -3518,52 +3518,71 @@ exports.getSkuStockDetails = async (req, res, next) => {
     }).reverse(); // Most recent first for display
 
     // 5. Active Sales Order Reservations
+    // Demand = undelivered quantity on open sales orders, expressed in the SKU's stocking unit.
+    // Stock is allocated to these orders oldest-first once on-hand is known (see allocation below).
     const activeOrders = await SalesOrderV2.find({
       company: companyObjId,
-      status: { $in: ["Confirmed", "Processing", "Partially Dispatched", "Pending Dispatch", "Open", "Pending Allocation"] },
-      "items.skuId": skuObjId
+      status: { $in: ["Confirmed", "In Production", "Partially Delivered"] },
+      isDeleted: { $ne: true },
+      $or: [{ "items.skuId": skuObjId }, { "items.skuCode": sku.skuCode }]
     }).lean();
 
+    const round3 = (n) => Math.round(n * 1000) / 1000;
+    const skuIsPcs = /pc/i.test(String(sku.unit || ""));
     const reservations = [];
+    const soReservations = [];
     let totalReserved = 0;
 
-    activeOrders.forEach((order, idx) => {
+    activeOrders.forEach((order) => {
+      if (order.fulfillmentStatus === "Fulfilled") return;
+      let orderedPcs = 0, dispatchedPcs = 0, convUsed = 1;
+      let matched = false;
+
       (order.items || []).forEach(item => {
-        if (String(item.skuId) === String(skuObjId) || item.skuCode === sku.skuCode) {
-          const orderedQty = item.quantity || 0;
-          const dispatchedQty = item.dispatchedQty || 0;
-          const remainingReserved = Math.max(0, orderedQty - dispatchedQty);
-          const pendingQty = Math.max(0, orderedQty - remainingReserved - dispatchedQty);
+        if (!((item.skuId && String(item.skuId) === String(skuObjId)) || item.skuCode === sku.skuCode)) return;
+        matched = true;
+        const raw = Number(item.quantity) || 0;
+        const itemGbl = Number(item.gbl) || 0;
+        const conv = Number(item.pcsPerGbl) > 1 ? Number(item.pcsPerGbl)
+          : Number(item.altUnitConversion) > 1 ? Number(item.altUnitConversion)
+          : Number(sku.altUnitConversion) > 1 ? Number(sku.altUnitConversion) : 1;
+        convUsed = conv;
 
-          if (remainingReserved > 0 || pendingQty > 0 || orderedQty > 0) {
-            totalReserved += remainingReserved;
-            
-            // Calculate days left from orderDate / requiredDate
-            const reqDate = order.deliveryDate || order.orderDate || new Date();
-            const daysDiff = Math.ceil((new Date(reqDate).getTime() - Date.now()) / (1000 * 3600 * 24));
-            const daysLeftText = daysDiff > 0 ? `${daysDiff} days left` : daysDiff === 0 ? 'Today' : `${Math.abs(daysDiff)} days overdue`;
+        // Order quantity is stored in pieces (same interpretation as the Dispatch module)
+        let pcs;
+        if (itemGbl > 0 && raw > itemGbl) pcs = raw;
+        else if (raw >= conv && conv > 1) pcs = raw;
+        else if (String(item.uom || "").toUpperCase() === "GBL") pcs = raw * conv;
+        else pcs = raw;
 
-            reservations.push({
-              id: `res-${order._id}-${idx}`,
-              orderId: order._id,
-              orderNumber: order.orderNumber || `SO-${1000 + idx}`,
-              orderDate: order.orderDate,
-              requiredDate: reqDate,
-              daysLeftText,
-              isOverdue: daysDiff < 0,
-              customerName: order.customerName || order.partyName || 'Customer',
-              orderedQty,
-              reservedQty: remainingReserved,
-              pendingQty: pendingQty > 0 ? pendingQty : Math.max(0, orderedQty - remainingReserved),
-              dispatchedQty,
-              status: remainingReserved > 0 && remainingReserved < orderedQty 
-                ? 'Partially Reserved' 
-                : remainingReserved >= orderedQty 
-                  ? 'Reserved' 
-                  : 'Pending Allocation'
-            });
-          }
-        }
+        orderedPcs += pcs;
+        dispatchedPcs += Number(item.dispatchedQty) || 0;
+      });
+
+      if (!matched) return;
+      const pendingPcs = Math.max(0, orderedPcs - dispatchedPcs);
+      if (pendingPcs <= 0) return;
+
+      const factor = skuIsPcs ? 1 : convUsed;
+      const reqDate = order.promisedDate || order.deliveryDate || order.orderDate || new Date();
+      const daysDiff = Math.ceil((new Date(reqDate).getTime() - Date.now()) / (1000 * 3600 * 24));
+      const daysLeftText = daysDiff > 0 ? `${daysDiff} days left` : daysDiff === 0 ? 'Today' : `${Math.abs(daysDiff)} days overdue`;
+
+      soReservations.push({
+        id: `res-${order._id}`,
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        orderDate: order.orderDate,
+        requiredDate: reqDate,
+        daysLeftText,
+        isOverdue: daysDiff < 0,
+        customerName: order.customerName || order.partyName || 'Customer',
+        orderedQty: round3(orderedPcs / factor),
+        dispatchedQty: round3(dispatchedPcs / factor),
+        demandQty: round3(pendingPcs / factor),
+        reservedQty: 0,
+        pendingQty: round3(pendingPcs / factor),
+        status: 'Pending Allocation'
       });
     });
 
@@ -3633,6 +3652,20 @@ exports.getSkuStockDetails = async (req, res, next) => {
     const onHandTotal = totalLedgerBalance.length > 0
       ? Math.round((totalLedgerBalance[0].qtyIn - totalLedgerBalance[0].qtyOut) * 1000) / 1000
       : populatedLocations.reduce((sum, l) => sum + (l.onHand || 0), 0);
+
+    // Allocate remaining on-hand (after production BOM reservations) to open sales orders, oldest order first
+    let allocatable = Math.max(0, onHandTotal - totalReserved);
+    soReservations
+      .sort((x, y) => new Date(x.orderDate || 0).getTime() - new Date(y.orderDate || 0).getTime())
+      .forEach(r => {
+        const alloc = Math.min(r.demandQty, allocatable);
+        allocatable -= alloc;
+        r.reservedQty = round3(alloc);
+        r.pendingQty = round3(r.demandQty - alloc);
+        r.status = alloc <= 0 ? 'Pending Allocation' : alloc < r.demandQty ? 'Partially Reserved' : 'Reserved';
+        totalReserved += alloc;
+      });
+    reservations.unshift(...soReservations);
     const availableTotal = onHandTotal - totalReserved;
     const totalBatchesVal = batchesWithCosting.reduce((sum, b) => sum + (b.value || 0), 0);
     const masterCost = Number(sku.avgCost || sku.costPrice || sku.standardCost || sku.avgRate || sku.rate || 0);
