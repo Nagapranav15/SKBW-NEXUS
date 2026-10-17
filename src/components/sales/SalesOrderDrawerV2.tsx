@@ -1075,6 +1075,18 @@ export const SalesOrderDrawerV2: React.FC<SalesOrderDrawerV2Props> = ({
   // Insert an empty product row directly below the given row
   const handleInsertRowBelow = (idx: number) => {
     setItems(prev => [...prev.slice(0, idx + 1), getEmptyRow(), ...prev.slice(idx + 1)]);
+    // Search terms are keyed by row index, so shift those below the insertion point
+    setRowSearchTerms(prev => {
+      const next: Record<number, string> = {};
+      Object.entries(prev).forEach(([k, v]) => { const i = Number(k); next[i > idx ? i + 1 : i] = v; });
+      return next;
+    });
+    // Jump straight into the new row's product dropdown
+    setActiveItemDropdownIdx(idx + 1);
+    setTimeout(() => {
+      const inputs = document.querySelectorAll<HTMLInputElement>('.item-product-cell input');
+      inputs[idx + 1]?.focus();
+    }, 50);
   };
 
   // Duplicate Item Row
