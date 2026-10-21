@@ -7,7 +7,10 @@
     "test": "node test_backend.js",
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "seed": "node seed.js"
+    "seed": "node seed.js",
+    "test:isolation": "node --test tests/companyIsolation.test.js",
+    "test:security": "node --test tests/security.test.js",
+    "test:all": "node --test tests/companyIsolation.test.js tests/conversions.test.js tests/costing.test.js tests/migration.test.js tests/recipes.test.js tests/reports.test.js tests/sales.test.js tests/security.test.js tests/sheeting.test.js tests/stock.test.js"
   },
   "keywords": [],
   "author": "",
@@ -20,7 +23,14 @@
     "dotenv": "^17.4.1",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.4.1"
+    "mongoose": "^9.4.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^11.3.0",
+    "supertest": "^7.3.1"
   }
 }

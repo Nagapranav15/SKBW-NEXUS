@@ -7,6 +7,11 @@ exports.register = async (req, res) => {
   try {
     const { username, fullName, email, password, roleName } = req.body;
 
+    // Only an admin may create another admin (prevents privilege escalation)
+    if ((roleName || "sales") === "admin" && req.user?.roleName !== "admin") {
+      return res.status(403).json({ msg: "Only an admin can create admin users" });
+    }
+
     const existing = await User.findOne({ $or: [{ email }, { username }] });
     if (existing) {
       return res.status(400).json({ msg: "User with this email or username already exists" });
@@ -81,6 +86,7 @@ exports.login = async (req, res) => {
         email: user.email,
         role: roleName,
         permissions: permissions,
+        companies: user.companies || [],
         status: user.status
       }
     });

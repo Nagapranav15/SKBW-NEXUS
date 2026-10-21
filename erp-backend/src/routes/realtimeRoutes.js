@@ -1,24 +1,38 @@
 const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
+const User = require("../models/userModel");
+require("../models/roleModel");
 const { handleSseConnection } = require("../utils/realtimeService");
 
-router.get("/stream", (req, res) => {
-  const token = req.query.token || req.headers.authorization?.replace(/^Bearer\s+/i, "");
-  let companyId = req.query.companyId;
+// EventSource cannot send headers, so the token may arrive as ?token=. It is verified and the user must
+// belong to the requested company (the super admin may subscribe to any company).
+router.get("/stream", async (req, res) => {
+  try {
+    const token = req.query.token || req.headers.authorization?.replace(/^Bearer\s+/i, "");
+    if (!token) return res.status(401).json({ msg: "No token" });
 
-  if (token) {
+    let decoded;
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || "supersecret");
-      if (!companyId && decoded.company) {
-        companyId = decoded.company;
-      }
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (_) {
-      // Allow connection with explicit companyId even if token expired momentarily
+      return res.status(401).json({ msg: "Invalid token" });
     }
-  }
 
-  handleSseConnection(companyId, req, res);
+    const user = await User.findById(decoded.id).select("role companies status").populate("role", "name").lean();
+    if (!user || user.status !== "active") return res.status(401).json({ msg: "Account not found or inactive" });
+
+    let companyId = req.query.companyId ? String(req.query.companyId) : undefined;
+    if (user.role?.name !== "admin") {
+      const allowed = (user.companies || []).map(String);
+      if (!companyId && allowed.length === 1) companyId = allowed[0];
+      if (!companyId || !allowed.includes(companyId)) return res.status(403).json({ msg: "You do not have access to this company" });
+    }
+
+    handleSseConnection(companyId, req, res);
+  } catch (err) {
+    res.status(500).json({ msg: "Failed to open event stream" });
+  }
 });
 
 router.get("/status", (req, res) => {

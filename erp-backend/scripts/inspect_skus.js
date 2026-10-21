@@ -1,5 +1,6 @@
 require('dotenv').config();
-process.env.MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://ERPsys:NPK15@cluster15.rgmwozv.mongodb.net/skbw_erp?retryWrites=true&w=majority';
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
+if (!process.env.MONGO_URI) { console.error('MONGO_URI is not set (see .env.example)'); process.exit(1); }
 const connectDB = require('../src/config/db');
 const SkuV2 = require('../src/models/skuV2Model');
 const Company = require('../src/models/companyModel');

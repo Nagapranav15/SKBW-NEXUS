@@ -30,4 +30,7 @@ const companySchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+// Company queries are restricted by _id (see core/companyScope.js)
+companySchema.set("scopeById", true);
+
 module.exports = mongoose.model("Company", companySchema);

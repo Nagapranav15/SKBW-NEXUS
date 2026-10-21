@@ -10,9 +10,21 @@ try {
   dns.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4"]);
 } catch (_) {}
 
-// Ensure process default environment fallbacks so server never crashes on missing env vars
-process.env.JWT_SECRET = process.env.JWT_SECRET || "supersecret";
-process.env.MONGO_URI = process.env.MONGO_URI || "mongodb+srv://ERPsys:NPK15@cluster15.rgmwozv.mongodb.net/skbw_erp?retryWrites=true&w=majority";
+// Required configuration: fail fast instead of falling back to a built-in secret or database
+const requireEnv = () => {
+  const problems = [];
+  if (!process.env.MONGO_URI) problems.push("MONGO_URI is not set");
+  const jwtSecret = process.env.JWT_SECRET || "";
+  if (jwtSecret.length < 32 || jwtSecret === "supersecret") problems.push("JWT_SECRET must be set to a random value of at least 32 characters");
+  if (problems.length > 0) {
+    console.error("Cannot start. Fix the environment configuration (see .env.example):\n - " + problems.join("\n - "));
+    process.exit(1);
+  }
+};
+requireEnv();
+
+// Company isolation plugin must be registered before any model is compiled
+require("./src/core/companyScope").registerPlugin();
 
 const app = require("./src/app");
 const connectDB = require("./src/config/db");

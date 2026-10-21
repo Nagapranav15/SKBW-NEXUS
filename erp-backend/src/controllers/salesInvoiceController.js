@@ -4,6 +4,10 @@ const DeliveryChallan = require("../models/deliveryChallanModel");
 const { broadcast } = require("../utils/realtimeService");
 const ActivityLog = require("../models/activityLogModel");
 
+// Keep the receivables ledger in step with invoices. Never allowed to block saving an invoice.
+const ledgerSync = (fn, label) => fn().catch((e) => console.warn(`Receivables ledger ${label} skipped: ${e.message}`));
+const sales = () => require("../core/sales/salesService");
+
 const logInvoiceActivity = (req, invoice, action, details) => {
   ActivityLog.create({
     action,
@@ -165,6 +169,7 @@ exports.createInvoice = async (req, res) => {
       }
     }
 
+    await ledgerSync(() => sales().postInvoice({ companyId: invoice.company, invoiceId: String(invoice._id), userId: req.user?.id }), "post");
     logInvoiceActivity(req, invoice, "CREATE", `Tax Invoice '${invoice.invoiceNumber}' for ${invoice.customerName} (₹${invoice.grandTotal || 0}) was created${invoice.dispatchNumber ? ` from dispatch ${invoice.dispatchNumber}` : " (direct invoice)"}.`);
 
     try {
@@ -193,6 +198,7 @@ exports.updateInvoice = async (req, res) => {
       return res.status(404).json({ error: "Invoice not found" });
     }
 
+    await ledgerSync(() => sales().adjustInvoiceTotal({ companyId: invoice.company, invoiceId: String(invoice._id), userId: req.user?.id }), "adjust");
     logInvoiceActivity(req, invoice, "UPDATE", `Tax Invoice '${invoice.invoiceNumber}' for ${invoice.customerName} (₹${invoice.grandTotal || 0}) was updated.`);
 
     try {
@@ -235,6 +241,7 @@ exports.deleteInvoice = async (req, res) => {
       } catch (_) {}
     }
 
+    await ledgerSync(() => sales().cancelInvoice({ companyId: invoice.company, invoiceId: String(invoice._id), reason: "Invoice deleted", userId: req.user?.id }), "cancel");
     logInvoiceActivity(req, invoice, "DELETE", `Tax Invoice '${invoice.invoiceNumber}' for ${invoice.customerName} was deleted.`);
 
     try {

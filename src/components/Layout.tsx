@@ -273,6 +273,7 @@ const Layout: React.FC = () => {
       items: [
         { label: 'Ledgers', path: '/ledgers', icon: BookOpen },
         { label: 'Reports', path: '/reports', icon: BarChart3 },
+        { label: 'Management', path: '/management', icon: BarChart3, permission: ['VIEW_REPORTS', 'MANAGE_REPORTS'] },
       ]
     }
   ];
@@ -429,6 +430,11 @@ const Layout: React.FC = () => {
                 label: 'Data Manager',
                 icon: Database,
                 action: () => setShowDataManager(true)
+              })}
+              {hasPermission('MANAGE_USERS') && renderNavItem({
+                label: 'Users & Access',
+                path: '/users',
+                icon: Users
               })}
               {renderNavItem({
                 label: 'Switch Company',

@@ -15,6 +15,7 @@ exports.getUsers = async (req, res) => {
       email: u.email,
       role: u.role?.name || "unknown",
       permissions: u.role?.permissions?.map(p => p.name) || [],
+      companies: u.companies || [],
       status: u.status,
       lastLogin: u.lastLogin,
       createdAt: u.createdAt
@@ -41,6 +42,7 @@ exports.getUserById = async (req, res) => {
       email: user.email,
       role: user.role?.name || "unknown",
       permissions: user.role?.permissions?.map(p => p.name) || [],
+      companies: user.companies || [],
       status: user.status,
       lastLogin: user.lastLogin,
       createdAt: user.createdAt
@@ -52,7 +54,16 @@ exports.getUserById = async (req, res) => {
 
 exports.createUser = async (req, res) => {
   try {
-    const { username, fullName, email, password, roleName } = req.body;
+    const { username, fullName, email, password, roleName, companies } = req.body;
+
+    if (companies !== undefined && req.user?.roleName !== "admin") {
+      return res.status(403).json({ msg: "Only an admin can assign companies to users" });
+    }
+
+    // Only an admin may create another admin (prevents privilege escalation)
+    if ((roleName || "sales") === "admin" && req.user?.roleName !== "admin") {
+      return res.status(403).json({ msg: "Only an admin can create admin users" });
+    }
 
     const existing = await User.findOne({ $or: [{ email }, { username }] });
     if (existing) {
@@ -69,7 +80,8 @@ exports.createUser = async (req, res) => {
       fullName,
       email,
       password: hashed,
-      role: role._id
+      role: role._id,
+      companies: Array.isArray(companies) ? companies : []
     });
 
     const populated = await User.findById(user._id)
@@ -91,11 +103,30 @@ exports.createUser = async (req, res) => {
 
 exports.updateUser = async (req, res) => {
   try {
-    const { fullName, email, roleName, status } = req.body;
+    const { fullName, email, roleName, status, companies, password } = req.body;
+
+    if (companies !== undefined && req.user?.roleName !== "admin") {
+      return res.status(403).json({ msg: "Only an admin can assign companies to users" });
+    }
+    // Non-admin managers may not modify admin accounts
+    if (req.user?.roleName !== "admin") {
+      const target = await User.findById(req.params.id).populate("role", "name").lean();
+      if (target?.role?.name === "admin") return res.status(403).json({ msg: "Only an admin can modify an admin user" });
+    }
+
+    if (roleName === "admin" && req.user?.roleName !== "admin") {
+      return res.status(403).json({ msg: "Only an admin can assign the admin role" });
+    }
     const update = {};
     if (fullName) update.fullName = fullName;
     if (email) update.email = email;
     if (status) update.status = status;
+    if (Array.isArray(companies)) update.companies = companies;
+    if (password) {
+      if (req.user?.roleName !== "admin") return res.status(403).json({ msg: "Only an admin can reset passwords" });
+      if (String(password).length < 8) return res.status(400).json({ msg: "Password must be at least 8 characters" });
+      update.password = await hashPassword(password);
+    }
 
     if (roleName) {
       const role = await Role.findOne({ name: roleName });
@@ -123,6 +154,10 @@ exports.updateUser = async (req, res) => {
 
 exports.deleteUser = async (req, res) => {
   try {
+    if (req.user?.roleName !== "admin") {
+      const target = await User.findById(req.params.id).populate("role", "name").lean();
+      if (target?.role?.name === "admin") return res.status(403).json({ msg: "Only an admin can delete an admin user" });
+    }
     const user = await User.findByIdAndDelete(req.params.id);
     if (!user) return res.status(404).json({ msg: "User not found" });
     res.json({ msg: "User deleted" });

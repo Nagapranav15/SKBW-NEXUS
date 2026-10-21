@@ -22,26 +22,27 @@ const productionOrderRoutes = require("./routes/productionOrderRoutes");
 const realtimeRoutes = require("./routes/realtimeRoutes");
 const salesInvoiceRoutes = require("./routes/salesInvoiceRoutes");
 
+const { attachCompanyScope } = require("./core/companyScope");
+const { applySecurity } = require("./core/security");
+
 const app = express();
 
 app.use(compression());
 
-// Open CORS configuration for all origins and preview domains
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow all incoming origins (https://www.skbw.in, https://skbw.in, *.vercel.app, etc.)
-    callback(null, true);
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"]
-}));
+// Security headers, restricted CORS and rate limiting (see core/security.js)
+applySecurity(app);
 
-// Enable pre-flight OPTIONS response for all routes (Express 5 compatible)
-app.options(/(.*)/, cors());
 app.use(express.json({ limit: "10mb" }));
 
+// Resolve the user and restrict every database call to the companies they may access
+app.use("/api", attachCompanyScope);
+
 // Routes
+app.use("/api/v3/stock", require("./core/stock/stockRoutes"));
+app.use("/api/v3/conversions", require("./core/conversions/conversionRoutes"));
+app.use("/api/v3/recipes", require("./core/recipes/recipeRoutes"));
+app.use("/api/v3/sales", require("./core/sales/salesRoutes"));
+app.use("/api/v3/reports", require("./core/reports/reportRoutes"));
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/companies", companyRoutes);

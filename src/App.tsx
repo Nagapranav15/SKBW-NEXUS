@@ -36,6 +36,8 @@ const TestingTransactionsV2 = lazyWithRetry(() => import('./components/inventory
 const PurchaseInvoicePage = lazyWithRetry(() => import('./components/inventory_v2/purchases/PurchaseInvoicePage'));
 const InventoryBalanceV2 = lazyWithRetry(() => import('./components/inventory_v2/InventoryBalanceV2'));
 const SettingsPage = lazyWithRetry(() => import('./components/inventory_v2/SettingsPage'));
+const UsersManagement = lazyWithRetry(() => import('./components/users/UsersManagement'));
+const ManagementDashboard = lazyWithRetry(() => import('./components/management/ManagementDashboard'));
 
 // Premium Micro-Loading Indicator
 const LoadingFallback = () => (
@@ -130,6 +132,8 @@ function App() {
                 <Route path="sales/digital-dispatch" element={<Navigate to="/sales/orders" replace />} />
                 <Route path="inventory-v2/testing-transactions" element={<TestingTransactionsV2 />} />
                 <Route path="inventory-v2/settings" element={<SettingsPage />} />
+                <Route path="users" element={<UsersManagement />} />
+                <Route path="management" element={<ManagementDashboard />} />
                 <Route path="inventory-v2/balances" element={<InventoryBalanceV2 />} />
               </Route>
               <Route path="*" element={<Navigate to="/login" replace />} />

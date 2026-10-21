@@ -27,6 +27,11 @@ const userSchema = new mongoose.Schema({
     ref: "Role",
     required: true
   },
+  // Companies this user may access. The super admin (role "admin") can access every company regardless.
+  companies: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Company"
+  }],
   status: {
     type: String,
     enum: ["active", "inactive"],
